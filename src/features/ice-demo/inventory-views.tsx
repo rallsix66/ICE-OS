@@ -1,15 +1,11 @@
 import { useState } from 'react';
-import { ArrowRight, ArrowUpRight, AlertTriangle, Layers, Package, Ship, Warehouse, Globe2, CircleCheck, Clock3 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { ReferenceHome, type ReferenceHomeProps } from './reference-home';
 import { MARKETS, MAPPING_LABELS } from './fixtures';
-import { calculateValuation, canManageMappings, confirmedSnapshots, filterProducts, getProductMetrics, getOverviewInventory, isSnapshotAttributable, latestSnapshots, remainingInTransit, shipmentValuation } from './model';
-import type { DemoData, DemoFilters, DemoProduct, DemoRole, DemoView, MappingStatus, Market, Valuation } from './types';
-import { Coverage, EmptyState, MappingPill, money, number, Pill, ProductFilters, ProductName, SectionHeading, TextLink, marketName } from './widgets';
+import { calculateValuation, canManageMappings, confirmedSnapshots, filterProducts, getProductMetrics, isSnapshotAttributable, latestSnapshots } from './model';
+import type { DemoData, DemoFilters, DemoProduct, DemoRole, MappingStatus } from './types';
+import { EmptyState, MappingPill, money, number, Pill, ProductFilters, ProductName, SectionHeading, marketName } from './widgets';
 import styles from './demo.module.css';
-
-function ValueCard({ label, value, icon, showAmounts, onClick, hasData = true }: { hasData?: boolean; label: string; value: Valuation; icon: 'domestic' | 'transit' | 'overseas'; showAmounts: boolean; onClick: () => void }) {
-  const Icon = icon === 'domestic' ? Warehouse : icon === 'transit' ? Ship : Globe2;
-  return <button type="button" className={styles.valueCard} onClick={onClick} disabled={!hasData}><div className={styles.valueCardTop}><span>{label}{showAmounts ? '估算货值' : '来源记录数量'}</span><Icon size={19} /></div><strong className={styles.amount}>{!hasData ? '暂无有效记录' : showAmounts ? money(value.knownValue) : number(value.totalQuantity)}</strong><p>{showAmounts ? '人民币 · 已估值小计' : '按商品基本销售单元计数'}</p>{showAmounts ? <Coverage value={value} /> : <span className={styles.coverage}>未归集 {number(value.unmappedQuantity)}<span>缺失、陈旧和映射状态需单独核对</span></span>}<ArrowUpRight className={styles.cardArrow} size={16} /></button>;
-}
 
 function ProductSignals({ data, product }: { data: DemoData; product: DemoProduct }) {
   const rows = confirmedSnapshots(data, product.id);
@@ -20,48 +16,9 @@ function ProductSignals({ data, product }: { data: DemoData; product: DemoProduc
   return <Pill tone="green">资料可追溯</Pill>;
 }
 
-export function OverviewView({ data, showAmounts, onBrowse, onNavigate, onOpenProduct }: { data: DemoData; showAmounts: boolean; onBrowse: (market?: Market | 'all', exception?: DemoFilters['exception']) => void; onNavigate: (view: DemoView) => void; onOpenProduct: (id: string) => void }) {
-  const raw = latestSnapshots(data);
-  const stock = getOverviewInventory(data);
-  const domestic = calculateValuation(raw.filter((row) => row.market === 'CN'), data.products, data.mappings);
-  const overseas = calculateValuation(raw.filter((row) => row.market !== 'CN'), data.products, data.mappings);
-  const transit = shipmentValuation(data);
-  const lowProducts = filterProducts(data, { query: '', market: 'all', exception: 'low' });
-  const mappingCount = raw.filter((row) => !isSnapshotAttributable(row, data.mappings)).length;
-  const staleCount = raw.filter((row) => row.freshness === 'stale').length;
-  const activeTickets = data.shipments.filter((row) => remainingInTransit(row.quantity, row.receivedQuantity) > 0).length;
-  const distributions = MARKETS.filter((market) => market.id !== 'CN').map((market) => ({ ...market, value: calculateValuation(raw.filter((row) => row.market === market.id), data.products, data.mappings) }));
-  const chartTotal = distributions.reduce((sum, row) => sum + (showAmounts ? row.value.knownValue : row.value.totalQuantity), 0);
-
-  return <>
-    <div className={styles.overviewIntro}><span><span className={styles.liveDot} />四源独立观察，商品身份统一追溯</span><span>来源时间并未全部对齐 <Pill tone="amber">跨阶段合计待核对</Pill></span></div>
-    <div className={styles.valueGrid}><ValueCard hasData={raw.some((row) => row.market === 'CN')} label="国内" value={domestic} icon="domestic" showAmounts={showAmounts} onClick={() => onBrowse('CN')} /><ValueCard hasData={data.shipments.length > 0} label="在途" value={transit} icon="transit" showAmounts={showAmounts} onClick={() => onNavigate('logistics')} /><ValueCard hasData={raw.some((row) => row.market !== 'CN')} label="海外" value={overseas} icon="overseas" showAmounts={showAmounts} onClick={() => onBrowse()} /><div className={styles.valueExplanation}><div className={styles.explanationIcon}><Layers size={20} /></div><strong>看清分项，不猜总量</strong><p>飞书到货不会增加海外库存；BigSeller 新快照才改变来源数量。</p><button type="button" onClick={() => onNavigate('logistics')}>体验流转场景 <ArrowRight size={15} /></button></div></div>
-    <div className={styles.summaryStrip}>
-      <button type="button" disabled={stock.domestic === null} onClick={() => onBrowse('CN')}><span>国内实物库存</span><strong>{number(stock.domestic)}<small>销售单元</small></strong><span>聚水潭最近有效快照</span></button>
-      <button type="button" onClick={() => onBrowse()}><span>海外实物库存</span><strong>{number(stock.overseas)}<small>销售单元</small></strong><span>含 {staleCount} 条陈旧来源记录</span></button>
-      <button type="button" onClick={() => onBrowse('all', 'low')}><span>海外可售库存</span><strong>{number(stock.overseasAvailable)}<small>销售单元</small></strong><span>{lowProducts.length} 款商品可售量较低</span></button>
-      <button type="button" onClick={() => onNavigate('logistics')}><span>飞书剩余在途</span><strong>{number(stock.transit)}<small>销售单元</small></strong><span>{activeTickets} 票未完成货票 · 不加到海外库存</span></button>
-    </div>
-    <div className={styles.overviewColumns}>
-      <section className={styles.panel}><SectionHeading title={showAmounts ? '海外市场货值分布' : '海外市场数量分布'} eyebrow="MARKET DISTRIBUTION" action={<span className={styles.subtle}>{showAmounts ? '仅已估值海外实物 · 不含在途' : '原始实物记录 · 不含在途'}</span>} /><div className={styles.stackedBar} aria-label="市场占比">{distributions.map((market) => <span key={market.id} style={{ width: `${chartTotal === 0 ? 0 : (showAmounts ? market.value.knownValue : market.value.totalQuantity) / chartTotal * 100}%`, background: market.color }} />)}</div><div className={styles.marketRows}>{distributions.map((market) => { const amount = showAmounts ? market.value.knownValue : market.value.totalQuantity; return <button type="button" key={market.id} className={styles.marketRow} onClick={() => onBrowse(market.id)}><span className={styles.countryCode} style={{ color: market.color }}>{market.id}</span><span className={styles.marketLabel}><strong>{market.name}</strong><small>{showAmounts ? `估值覆盖 ${Math.round((market.value.coverage ?? 0) * 100)}%` : `未归集 ${number(market.value.unmappedQuantity)}`}{market.id === 'ID' ? ' · 来源陈旧' : ''}</small></span><div className={styles.marketTrack}><span style={{ width: `${chartTotal === 0 ? 0 : amount / chartTotal * 100}%`, background: market.color }} /></div><span className={styles.marketAmount}>{showAmounts ? money(amount) : number(amount)}<small>{chartTotal === 0 ? '—' : `${Math.round(amount / chartTotal * 100)}%`}</small></span><ArrowUpRight size={14} /></button>; })}</div></section>
-      <section className={styles.panel}><SectionHeading title="今天需要关注" eyebrow="ATTENTION CENTER" action={<span className={styles.attentionDot} />} /><div className={styles.attentionList}><button type="button" onClick={() => onNavigate('products')}><span className={`${styles.attentionIcon} ${styles.amber}`}><Package size={17} /></span><span><strong>商品身份待复核</strong><small>原始数量保留，未进入商品归集</small></span><b>{mappingCount}</b><ChevronArrow /></button><button type="button" onClick={() => onNavigate('snapshots')}><span className={`${styles.attentionIcon} ${styles.amber}`}><Clock3 size={17} /></span><span><strong>印尼快照陈旧</strong><small>新批次失败，沿用10月10日成功值</small></span><b>{staleCount}</b><ChevronArrow /></button>{showAmounts && <button type="button" onClick={() => onBrowse('all', 'cost')}><span className={`${styles.attentionIcon} ${styles.blue}`}><Layers size={17} /></span><span><strong>成本资料待补充</strong><small>不把缺失成本当作零成本</small></span><b>{data.products.filter((row) => row.unitCost === null).length}</b><ChevronArrow /></button>}<button type="button" onClick={() => onNavigate('logistics')}><span className={`${styles.attentionIcon} ${styles.blue}`}><Ship size={17} /></span><span><strong>运单等待绑定</strong><small>来源账号缺失，未自动认领</small></span><b>{data.shipments.filter((row) => row.binding === 'pending').length}</b><ChevronArrow /></button></div><div className={styles.attentionNote}><CircleCheck size={15} /><span>异常有依据，修正有记录。</span><TextLink onClick={() => onNavigate('logs')}>查看日志</TextLink></div></section>
-    </div>
-    <section className={styles.panel}><SectionHeading title={`商品库存概览 · ${data.products.length} 款`} eyebrow="INVENTORY AT A GLANCE" action={<TextLink onClick={() => onBrowse()}>全部商品库存</TextLink>} />
-      <div className={styles.tableScroll}><table className={styles.table}><thead><tr><th>商品 / 货号 / 69编码</th><th>国内实物</th><th>海外实物 / 可售</th><th>飞书在途</th>{showAmounts && <th>库存已估值</th>}<th>来源核对</th></tr></thead>
-      <tbody>{data.products.map((product) => { const metrics = getProductMetrics(data, product.id); return <tr key={product.id}>
-        <td><ProductName product={product} onOpen={onOpenProduct} /><small className={styles.cellSub}>69 · {product.barcode}</small></td>
-        <td>{number(metrics.domestic)}<small className={styles.cellSub}>{product.unit}</small></td>
-        <td>{number(metrics.overseas)} {product.unit}<small className={styles.cellSub}>可售 {number(metrics.overseasAvailable)} {product.unit}</small></td>
-        <td>{number(metrics.transit)} {product.unit}</td>
-        {showAmounts && <td>{product.unitCost === null ? <Pill tone="amber">成本待补充</Pill> : metrics.domestic === null && metrics.overseas === null ? '—' : metrics.valuation.unknownRows > 0 ? '部分数量待核对' : money(metrics.valuation.knownValue)}</td>}
-        <td><button type="button" className={styles.smallButton} onClick={() => onOpenProduct(product.id)}>查看库存来源</button></td>
-      </tr>; })}</tbody></table></div>
-      <p className={styles.tableFootnote}>数量以各商品基本销售单位观察，— 不等于零。已估值仅含可归集的国内/海外实物，不含在途；三阶段不直接相加。</p>
-    </section>
-  </>;
+export function OverviewView(props: ReferenceHomeProps) {
+  return <ReferenceHome {...props} />;
 }
-
-function ChevronArrow() { return <ArrowUpRight size={14} className={styles.faint} />; }
 
 interface ProductListProps { data: DemoData; showAmounts: boolean; filters: DemoFilters; onFilters: (filters: DemoFilters) => void; onReset: () => void; onOpenProduct: (id: string) => void }
 

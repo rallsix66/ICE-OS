@@ -9,6 +9,30 @@ import type { ShipmentFilters } from './types';
 
 const ALL: ShipmentFilters = { market: 'all', status: 'all', query: '' };
 
+describe('homepage visual hierarchy correction', () => {
+  function renderHome(showAmounts: boolean) {
+    return renderToStaticMarkup(createElement(OverviewView, { data: createDemoData(), showAmounts, onBrowse: () => {}, onNavigate: () => {}, onOpenProduct: () => {} }));
+  }
+  it('copies the reference structure: metrics, hero, stages, allocation and tabbed inventory', () => {
+    const html = renderHome(true);
+    const positions = ['经营指标', '货值重点观察', '库存流转三阶段', '市场金额占比', '商品库存概览'].map((label) => html.indexOf(label));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(html).not.toContain('看清分项，不猜总量');
+    expect(html).not.toContain('最近操作');
+    expect(html).toContain('data-reference-home="ice_inventory_demo_v4"');
+    expect(html).toContain('海外库存已知货值');
+    expect(html).toContain('近期货物流转');
+    expect(html).toContain('预计到货');
+  });
+  it('keeps all homepage monetary values hidden in the no-amount view', () => {
+    const html = renderHome(false);
+    expect(html).not.toMatch(/[¥￥]/);
+    expect(html).toContain('库存与物流概况');
+    expect(html).not.toContain('库存已知货值</th>');
+  });
+});
+
 describe('market-first logistics', () => {
   it('keeps carrier signature separate from the Feishu state and stock', () => {
     const data = createDemoData(); const shipment = data.shipments[0];
