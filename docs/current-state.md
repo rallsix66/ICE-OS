@@ -1,5 +1,21 @@
 # Current Project State
 
+## ICE-V4-PLANNING-DEMO：本地交付完成，待产品评审（2026-10-13）
+
+用户已授权本次由 Codex 实施：现有系统分析、ICE v4 产品/架构/模型/数据流设计、规则增量更新、六视图隔离 Demo、本地验证，以及独立分支提交/推送。不是生产改造授权。
+
+- 基线：`44d0b13`，远端 `origin/master` 在开始时同SHA；本次分支 `codex/ice-v4-planning`。
+- 真实现状：[current-analysis.md](current-analysis.md)。新设计入口：[product-plan-v4.md](product-plan-v4.md)、[architecture-v2.md](architecture-v2.md)、[database-design-v2.md](database-design-v2.md)、[data-flow-v2.md](data-flow-v2.md)。
+- 状态：分析、五份设计文档、ADR、规则入口和六视图隔离 Demo 已完成。新增81/81测试、全仓lint零警告、Next构建及其TypeScript检查通过；桌面/390px浏览器及本地正式构建预览通过。默认全量4093/4094，仍有改动前已复现的00051换行契约失败；直接全仓tsc还有未修改历史测试的类型诊断，不能称全部质量门全绿。详见 [本次验收记录](reports/2026-10-13-ice-v4-validation.md)。
+- Demo：`npm run dev` 后访问 `/demo/ice-v4`；全部虚构数据，三角色仅展示模拟，不是真实RLS验收。Git交付使用独立分支，远端SHA以Git核对和最终交接为准，不宣称已合并/CI通过/上线。
+- 保护：保留 Product→ProductVariant、现役业务/认证/RLS、Supabase与52个历史 SQL Migration。不连接外部账号、不迁移、不写Staging/Production、不执行OPT-6 Batch 4、不合并master/主动生产部署。
+- 未决：真实公司货号资料、69编码规则、聚水潭与飞书字段/授权、物流账号键、成本口径、三角色金额权限。仅虚构Demo可先行，不得据此接入真实数据。
+- 原有未提交 `docs/reports/2026-07-18-内网部署可行性评估报告.md` 保留，不纳入本次提交。
+
+单次范围见 [current-task.md](tasks/current-task.md)。以下全部为旧系统历史记录，不是本次实施授权或当前远端验证。
+
+## Historical closeout: 00052 / OPT-6
+
 The corrected 00052 Staging SELECT-only revalidation returned one row with all history, full statements[] payload, public.product policy, and active-sync hard-stop gates passing. Version/name digests matched at 2d6174dce487614c3280456fff9169d0; full-payload digests matched at 8ec295c38bc90f769dc35ca5fd64a500; in_progress_sync_runs=0. No write, Migration, or apply packet ran during that Staging read-only stage. The designated independent reviewer returned PASS for this read-only stage at head a2e319eeb587474b71e66888bdbccbc27f38813c, CI 30266046505, and Vercel 7Py8GVBM1NhfendWozqvRwvLCT2G. Production 00052 apply/postcheck completed once and passed; final evidence review then returned PASS at HEAD e92b8720dbc2be29dc371e5de61c6e70d88beeec. PR #11 is merged as f8f467f7fc649dd37d584864e2c79505fd53719e, master CI 30330308092 passed both jobs, and Vercel production deployment 6EDexdjVENq4CDJgPW7RdSwztT3h completed successfully. Current gate: wait for the user's next instruction; no further Production write, old Migration replay, or Batch 4 is allowed.
 
 > Current gate (2026-07-22 Batch 3): Batch 2 Staging/Production `00051`
@@ -60,11 +76,11 @@ The corrected 00052 Staging SELECT-only revalidation returned one row with all h
 
 > 文档导航：[文档树](README.md) · [当前任务包](tasks/current-task.md) · [项目概览](project-overview.md) · [架构](architecture.md) · [数据库设计](database-design.md)
 
-## Current Phase
+## Historical Phase（v4 之前）
 
 **Stage 1–4 已完成、合并并归档，当前进入系统优化与工程治理。** P0 生产 API 链路、P1 预测式补货（Migration 00041–00044）、P7 全球库存作战室（00045–00046）与首页决策看板（00047）均已完成。OPT-4 最终质量门为 **3932/3932（91 files）**、PostgreSQL 并发 **44/44**、Migration/RPC/RLS contract **14/14**、lint **0 errors / 31 warnings**、Next.js build/TypeScript PASS；PR #7 最终 head 的 GitHub Actions 与 Vercel Preview 全绿。Production 与 Staging 均为 48/48 远端 version 对齐，OPT-4 已获指定会话 FINAL PASS。当前按既定路线进入 OPT-5 数据库最小权限收口。
 
-## Current Task
+## Historical Task（v4 之前）
 
 **OPT-5-DATABASE-LEAST-PRIVILEGE-HARDENING — FINAL PASS / MERGED** — 00049 只固定 5 个 search_path、收紧函数 EXECUTE 与 `provider_token_cache` 直接表权限；两环境均为 `00001–00049`，全部 catalog、ACL/RLS、回滚探针、token 数据保持和 Advisor 后检通过。PR #8 已合并；OPT-6 当前状态以顶部事实和 [当前任务包](tasks/current-task.md) 为准。
 

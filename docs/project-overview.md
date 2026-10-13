@@ -1,5 +1,7 @@
 # DIS 项目概览
 
+> 旧版项目概览。ICE v4 产品目标见 [product-plan-v4.md](product-plan-v4.md)；真实现状见 [current-analysis.md](current-analysis.md)。下文国内库存和入仓加库存属于旧设计，不能作为当前实现依据：00026之后正常到仓只更新货票，不增加BigSeller库存。
+
 > 文档导航：[文档树](README.md) · [当前状态](current-state.md) · [架构](architecture.md) · [路线图](mvp-roadmap.md)
 
 ## 项目目标

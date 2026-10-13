@@ -1,8 +1,36 @@
 # Current Task Packet
 
+## Task ID: ICE-V4-PLANNING-DEMO
+
+### Status: LOCAL VERIFIED WITH BASELINE GAPS / 待产品评审（2026-10-13）
+
+五份文档、ADR、AGENTS入口、六视图Demo和81项新测试已完成。Next构建/内置TypeScript及lint通过，桌面/390px交互已复验；默认全量4093/4094的唯一失败改动前已存在，直接全仓tsc仍报告旧测试类型问题。完整证据和文件列表见 [验收报告](../reports/2026-10-13-ice-v4-validation.md)。不将这些结果写成生产或新权限模型已验收；代码冻结后仅做本任务Git交付。
+
+本次用户明确选择由 Codex 执行附件中的 ICE v4 方案验证任务。允许分析、设计文档、AGENTS增量更新、隔离Demo、本地验证、独立Git分支提交与推送；不扩大到真实数据接入。
+
+### 交付范围
+
+1. `docs/current-analysis.md`：真实代码、复用/调整/拟退役项与证据。
+2. `docs/product-plan-v4.md`、`architecture-v2.md`、`database-design-v2.md`、`data-flow-v2.md`及架构决策。
+3. 更新AGENTS和状态/导航入口，保留历史与既有角色约定，不读取或修改CLAUDE专属文件。
+4. `/demo/ice-v4`：经营总览、商品库存、ICE商品库、物流详情、库存快照、操作日志。全部虚构fixture；可搜索、筛选、详情、演示时间序列和日志。
+5. 新功能单元/隔离契约、默认非数据库测试、lint、build、浏览器可行验证、diff检查，记录新旧失败。
+6. 只提交本Task文件，提交标题 `feat: ICE inventory architecture v4 planning`，推送 `codex/ice-v4-planning`，不合并master、不主动部署。
+
+### 验收与停止条件
+
+- 保留Product→ProductVariant；货号是人工业务身份，SKU/69编码不替代技术主键。
+- 飞书到货不改变BigSeller快照；新快照才改变海外数量；证据不足不乱加库存/在途，缺成本不填0。
+- 演示切换不是真实RLS验收；业务链路、数据库、SDK和生产配置不变。
+- 六视图有明确演示标记、空/无匹配状态、可返回的详情、响应式和键盘操作；测试数据无真实资料。
+- 保留既有未提交内网部署报告；旧Migration/SQL packet测试失败不绕过、不顺手修。
+- 达到文档+Demo+验证+Git推送即停。新增源授权、真实schema/权限/成本或生产发布需要下一任务明确授权。
+
+## Historical task packets（closed，仅供证据追溯）
+
 The corrected 00052 Staging SELECT-only revalidation ran once after its fresh implementation review PASS; all history/version-name/full-payload, product-policy, and active-sync gates passed, with no write or Migration. The designated independent reviewer returned PASS at head a2e319eeb587474b71e66888bdbccbc27f38813c, CI 30266046505, and Vercel 7Py8GVBM1NhfendWozqvRwvLCT2G. The Production 00052 SELECT-only preflight then ran exactly once with every gate true; the designated independent reviewer returned PASS at head 7f83f01c847d685e865d2c4c7c4d8012267ed085, CI 30276563343, and Vercel 4QSHNyh9PDfbnpWMrMeiadV2YBts. Production 00052 apply/postcheck completed once and passed; final evidence review returned PASS at HEAD e92b8720dbc2be29dc371e5de61c6e70d88beeec. PR #11 merged as f8f467f7fc649dd37d584864e2c79505fd53719e, master CI 30330308092 and Vercel production deployment 6EDexdjVENq4CDJgPW7RdSwztT3h passed. Current gate: wait for the user's next instruction; no further Production write, old Migration replay, or Batch 4 is allowed.
 
-## Task ID: ARCH-IN-TRANSIT-REPOSITORY-BOUNDARY
+## Historical Task ID: ARCH-IN-TRANSIT-REPOSITORY-BOUNDARY
 
 ### Status: DONE / 验收 PASS（2026-07-29，返工完成）
 

@@ -2,6 +2,19 @@
 
 本文档是 DIS 项目资料的统一入口。规则描述“必须遵守什么”，docs 描述“项目是什么、现在怎样、准备怎么做”。
 
+## ICE v4 方案验证入口
+
+当前任务以 [current-state.md](current-state.md) 与 [current-task.md](tasks/current-task.md) 为准。下面的新文档描述设计与隔离Demo，不代表生产已改造：
+
+- [现状分析](current-analysis.md)：代码事实、Supabase依赖、库存口径、复用与风险。
+- [产品方案 v4](product-plan-v4.md)：六视图、商品身份、权限与业务边界。
+- [目标架构 v2](architecture-v2.md)：模块归属、隔离层、未来平台迁移与回退门。
+- [数据库设计 v2](database-design-v2.md)：增量目标模型、约束、版本、RLS/金额保护；无Migration执行。
+- [数据流 v2](data-flow-v2.md)：四源权威、正逆时间序列、去重/缺口/失败规则。
+- [架构决策](adr/ADR-ICE-001-identity-snapshot-boundary.md)；[本次验收与Demo访问](reports/2026-10-13-ice-v4-validation.md)。
+
+下列旧文档保留现役历史背景，已知过时项以现状分析和真实代码为准，不能据旧说明恢复“入仓加库存”行为。
+
 ## 文档关系图
 
 ```text

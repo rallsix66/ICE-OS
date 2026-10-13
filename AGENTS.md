@@ -6,6 +6,29 @@ This version has breaking changes. APIs, conventions, and file structure may dif
 
 # AGENTS.md
 
+## ICE v4 项目方向与实施边界
+
+项目目标：以 ICE 人工商品货号为业务身份，连接国内/海外库存、在途、物流和估算货值。不是完整 WMS 或财务结算系统，禁止推倒重写。
+
+- 先读 `docs/current-state.md`、`docs/tasks/current-task.md`；真实现状见 `docs/current-analysis.md`。
+- 目标方案：`docs/product-plan-v4.md` → `docs/architecture-v2.md` → `docs/database-design-v2.md` → `docs/data-flow-v2.md`。新文档是目标设计，不代表真实数据库已改造；旧架构文档仍解释现役基础。
+- 保留 `Product → ProductVariant → Inventory`、UUID 技术主键与人工货号，不生成替代业务商品编号。外部 SKU 按来源/账号/市场/仓库作用域映射，不能用 SKU 作全局主键。
+- 69编码作为字符串；映射保留未匹配、待确认、已确认、重新核对、停用状态与版本/操作日志；未确认不能自动归入商品。
+- BigSeller 决定海外数量，聚水潭决定国内数量，飞书决定货票业务状态，物流 API 只增强轨迹。到货/签收不得直接加海外库存，发货不得在来源快照外再扣国内库存。
+- 现役 `inventory.quantity` 是 BigSeller 可售量，不能原地改成实物总量。目标快照保留实物/可售/锁定口径和来源批次；失败/未知不转零，旧成功数据保留并标陈旧。
+- 来源异步时，缺乏收货/对账证据不得将库存与在途直接求去重合计。成本缺失不是0；金额必须在服务端查询、导出和日志上隔离，RLS行权限不等于金额列权限。
+- 新公共业务契约不得暴露 Supabase Session/PostgREST/Database Row；通过现有 Repository/`src/lib/` 边界逐模块迁移，不提前建设复杂框架。当前保留 Supabase、Auth、RLS；未来自有后端迁移需单独授权与备份/回退演练。
+- `/demo/ice-v4` 与 `src/features/ice-demo/` 只能使用虚构数据和本地交互，不导入真实 Actions/Repository/SDK/密钥，不扩大 Proxy matcher，不替换 Dashboard。Demo角色切换不是真实权限验收。
+- 数据模型、角色、外部接入和生产切换须单独任务、新 Migration 与独立验收；不得改00001–00052等已执行迁移。发现旧库存写入口应记录风险，不在方案验证阶段顺手修复。
+
+## 常用验证命令
+
+- `npm run dev`：本地开发；Demo 路径 `/demo/ice-v4`。
+- `npm run test`：默认非数据库/非live测试；Windows 可等价执行 `node node_modules/vitest/vitest.mjs run --exclude '**/concurrency.test.ts' --exclude '**/*.postgres.test.ts' --exclude '**/*.live.test.ts'`，避免 npm 的 cmd 单引号差异。
+- `npm run lint -- --max-warnings 0`、`npm run build`、`git diff --check`：验收，不自动修复无关内容。
+- PostgreSQL/live/抓取/同步测试不属于默认验收；涉及真实数据须另获环境授权。
+- 提交只暂存本 Task 文件，保留用户既有修改；推送独立分支不等于已合并、CI通过或生产发布。
+
 ## 身份与职责
 
 你是 DIS 国内外库存看板系统的独立工程审查员和长期维护成员。

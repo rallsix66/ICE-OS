@@ -1,5 +1,7 @@
 # DIS 数据库设计
 
+> 本页解释历史基础模型；当前SQL历史到00052，完整事实以Migration为准。ICE v4 增量目标见 [database-design-v2.md](database-design-v2.md)，该设计未执行。现役inventory.quantity是可售量，正常到仓不增加库存；差异和残留写入口见 [current-analysis.md](current-analysis.md)。
+
 > 文档导航：[文档树](README.md) · [架构](architecture.md) · [当前状态](current-state.md) · [部署](deployment.md)
 
 ## 事实来源
