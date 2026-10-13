@@ -4,6 +4,8 @@
 
 ## ICE v4 方案验证入口
 
+最新交互反馈与验证：[2026-10-13 同步/权限、首页库存、市场物流改进](reports/2026-10-13-ice-v4-feedback.md)。Demo现为八个入口，首版六视图记录仅作历史。
+
 当前任务以 [current-state.md](current-state.md) 与 [current-task.md](tasks/current-task.md) 为准。下面的新文档描述设计与隔离Demo，不代表生产已改造：
 
 - [现状分析](current-analysis.md)：代码事实、Supabase依赖、库存口径、复用与风险。

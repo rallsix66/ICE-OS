@@ -1,3 +1,52 @@
+.sourceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 20px 0; }
+.sourceCard { min-width: 0; padding: 23px; border: 1px solid #e6e8ec; border-radius: 12px; background: white; }
+.sourceCardTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #5266d7; margin-bottom: 16px; }
+.sourceCard h2 { font-size: 18px; margin: 0 0 7px; font-weight: 650; }
+.sourceCard > strong { font-size: 12px; color: #5d6879; }
+.sourceCard > p { margin: 10px 0 15px; font-size: 12px; color: #667184; line-height: 1.8; }
+.sourceCard .detailList { margin: 0 0 16px; }
+.buttonRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+.buttonRow > button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; }
+.settingsForm { --ice-indigo: #5266d7; --ice-text: #273244; --ice-muted: #79828f; padding: 20px; color: #273244; font-size: 13px; }
+.settingsForm fieldset { padding: 0 0 22px; border: 0; }
+.settingsForm legend { margin-bottom: 14px; font-weight: 650; }
+.settingsForm > p { margin: 16px 0; color: #657083; line-height: 1.8; font-size: 12px; }
+.checkboxGrid { display: flex; flex-wrap: wrap; gap: 14px 25px; }
+.checkLabel { display: flex; align-items: center; gap: 9px; cursor: pointer; min-height: 32px; }
+.checkLabel input { width: 16px; height: 16px; accent-color: #5266d7; }
+.fieldLabel { display: grid; gap: 10px; margin: 16px 0; }
+.fieldLabel select, .settingsSelect { min-height: 38px; padding: 7px 12px; border: 1px solid #dce1e8; border-radius: 6px; background: #fff; color: #273244; font: inherit; }
+.positiveText { font-size: 12px; color: #267451; }
+.sectionTabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #e0e4eb; }
+.sectionTabs > button { border-bottom: 3px solid transparent; padding: 12px 19px; color: #6b7686; }
+.sectionTabs > button[aria-pressed="true"] { color: #4057c0; border-bottom-color: #5266d7; font-weight: 650; }
+.marketTabs { display: flex; gap: 10px; overflow-x: auto; padding: 0 22px 18px; }
+.marketTabs > button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 10px; min-height: 42px; border: 1px solid #e0e4eb; border-radius: 7px; padding: 8px 15px; color: #5a687a; background: #fff; }
+.marketTabs > button[aria-pressed="true"] { color: #4057c0; background: #eef1ff; border-color: #aebbe9; }
+.marketTabs b { font-size: 12px; padding: 0 4px; }
+.marketSummary { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 23px; padding: 16px 22px; background: #f8f9fc; border-top: 1px solid #e6e8ec; font-size: 12px; }
+.marketSummary small { margin-left: auto; font-size: 11px; color: #7a8493; }
+.panelFilters { padding: 0 22px 8px; }
+.logisticsTable { min-width: 1100px; }
+.wrappedNote { max-width: 240px; white-space: normal; line-height: 1.7; }
+.flowDemo { margin: 20px 0; border: 1px dashed #c7cfde; border-radius: 9px; padding: 16px 22px; color: #5e6e85; background: #fafbfe; }
+.flowDemo summary { cursor: pointer; font-weight: 550; font-size: 12px; }
+.flowDemo > p { font-size: 12px; margin-top: 14px; line-height: 1.8; }
+.detailOnly { display: block; }
+.detailOnly .panel { margin: 0; }
+
+@media (max-width: 600px) {
+  .sourceGrid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sourceCard { padding: 18px; }
+  .settingsForm { padding: 16px; }
+  .checkboxGrid { gap: 10px 16px; }
+  .marketTabs { padding-right: 16px; padding-left: 16px; }
+  .marketSummary { padding: 14px 16px; gap: 10px 16px; }
+  .marketSummary small { margin-left: 0; width: 100%; }
+  .panelFilters { padding: 0 16px 8px; }
+  .flowDemo { padding: 14px 16px; }
+}
+
 .app {
   --ice-text: #273244;
   --ice-muted: #79828f;

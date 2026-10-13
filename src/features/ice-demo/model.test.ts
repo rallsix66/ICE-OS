@@ -239,11 +239,11 @@ describe('valuation coverage must expose missing cost and missing identity', () 
   it('in-transit valuation retains the unpriced shipment instead of silently dropping its coverage gap', () => {
     const data = createDemoData();
     expect(shipmentValuation(data)).toMatchObject({
-      knownValue: 5690, totalQuantity: 420, valuedQuantity: 220, missingCostQuantity: 200,
+      knownValue: 11020, totalQuantity: 550, valuedQuantity: 350, missingCostQuantity: 200,
     });
-    expect(shipmentValuation(data).coverage).toBeCloseTo(220 / 420);
+    expect(shipmentValuation(data).coverage).toBeCloseTo(350 / 550);
     expect(shipmentValuation(getScenarioData(data, 'snapshot'))).toMatchObject({
-      knownValue: 3840, totalQuantity: 320, valuedQuantity: 120, missingCostQuantity: 200,
+      knownValue: 9170, totalQuantity: 450, valuedQuantity: 250, missingCostQuantity: 200,
     });
   });
 });

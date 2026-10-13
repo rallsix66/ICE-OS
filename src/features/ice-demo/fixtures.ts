@@ -92,6 +92,18 @@ const logs: DemoLog[] = [
   { id: 'log-6', at: '2026-10-12T15:00:00+08:00', actor: '系统 · 演示', action: '物流等待绑定', source: '喜运达', market: 'VN', productCode: 'ICE-1002', barcode: '6901234000022', externalSku: 'VN-DEMO-02', shipment: 'DEMO-VN-1015', batchId: 'XYD-DEMO-1012', detail: '缺少来源账号，不能按运单号自动绑定货票。', session: false },
 ];
 
+function demoTracking(id: string): { at: string; text: string }[] {
+  const events: Record<string, { at: string; text: string }[]> = {
+    'shipment-th': [{ at: '2026-10-11 09:20', text: '已发运' }, { at: '2026-10-12 14:30', text: '清关完成' }, { at: '2026-10-13 12:10', text: '承运商已签收' }],
+    'shipment-ph': [{ at: '2026-10-11 09:00', text: '抵达目的港' }, { at: '2026-10-13 11:00', text: '清关处理中' }],
+    'shipment-th-partial': [{ at: '2026-10-12 14:00', text: '清关完成' }, { at: '2026-10-13 10:30', text: '首批派送完成，其余待派送' }],
+    'shipment-th-done': [{ at: '2026-10-08 09:00', text: '派送中' }, { at: '2026-10-09 10:00', text: '承运商已签收' }],
+    'shipment-my': [{ at: '2026-10-12 08:00', text: '已发运' }],
+    'shipment-id-done': [{ at: '2026-10-10 08:00', text: '承运商已签收' }],
+  };
+  return events[id] ?? [];
+}
+
 /** Entire dataset is invented. No production names, identifiers, or credentials. */
 export function createDemoData(): DemoData {
   return {
@@ -99,9 +111,13 @@ export function createDemoData(): DemoData {
     mappings: [...mappings, ...extraMappings].map((entry) => ({ ...entry })),
     snapshots: [...snapshots, ...history].map((entry) => ({ ...entry })),
     shipments: [
-      { id: 'shipment-th', number: 'DEMO-TH-1013', productId: 'p1', market: 'TH', warehouse: warehouse('TH'), quantity: 100, receivedQuantity: 0, feishuStatus: '运输中', waybill: 'DEMO-XYD-TH-001', account: 'XYD-DEMO-A', binding: 'confirmed', eta: '2026-10-13', note: '虚构100件货；收货状态与库存快照分开观察。' },
-      { id: 'shipment-ph', number: 'DEMO-PH-1018', productId: 'p3', market: 'PH', warehouse: warehouse('PH'), quantity: 200, receivedQuantity: 0, feishuStatus: '清关中', waybill: 'DEMO-XYD-PH-002', account: 'XYD-DEMO-A', binding: 'confirmed', eta: '2026-10-18', note: '单位成本待补充，在途数量可见，货值不填0。' },
-      { id: 'shipment-vn', number: 'DEMO-VN-1015', productId: 'p2', market: 'VN', warehouse: warehouse('VN'), quantity: 120, receivedQuantity: 0, feishuStatus: '运输中', waybill: 'DEMO-XYD-VN-003', account: '', binding: 'pending', eta: '2026-10-15', note: '物流账号缺失；飞书在途事实保留，API记录待绑定。' },
+      { id: 'shipment-th', trackingEvents: demoTracking('shipment-th'), number: 'DEMO-TH-1013', productId: 'p1', market: 'TH', warehouse: warehouse('TH'), quantity: 100, receivedQuantity: 0, feishuStatus: '运输中', waybill: 'DEMO-XYD-TH-001', account: 'XYD-DEMO-A', binding: 'confirmed', eta: '2026-10-13', note: '虚构100件货；收货状态与库存快照分开观察。' },
+      { id: 'shipment-ph', trackingEvents: demoTracking('shipment-ph'), number: 'DEMO-PH-1018', productId: 'p3', market: 'PH', warehouse: warehouse('PH'), quantity: 200, receivedQuantity: 0, feishuStatus: '清关中', waybill: 'DEMO-XYD-PH-002', account: 'XYD-DEMO-A', binding: 'confirmed', eta: '2026-10-18', note: '单位成本待补充，在途数量可见，货值不填0。' },
+      { id: 'shipment-vn', trackingEvents: demoTracking('shipment-vn'), number: 'DEMO-VN-1015', productId: 'p2', market: 'VN', warehouse: warehouse('VN'), quantity: 120, receivedQuantity: 0, feishuStatus: '运输中', waybill: 'DEMO-XYD-VN-003', account: '', binding: 'pending', eta: '2026-10-15', note: '物流账号缺失；飞书在途事实保留，API记录待绑定。' },
+      { id: 'shipment-th-partial', trackingEvents: demoTracking('shipment-th-partial'), number: 'DEMO-TH-1016', productId: 'p2', market: 'TH', warehouse: warehouse('TH'), quantity: 60, receivedQuantity: 20, feishuStatus: '部分到货', waybill: 'DEMO-XYD-TH-004', account: 'XYD-DEMO-A', binding: 'confirmed', eta: '2026-10-16', note: '60瓶已到20瓶，剩余40瓶；飞书到货不累加BigSeller库存。' },
+      { id: 'shipment-th-done', trackingEvents: demoTracking('shipment-th-done'), number: 'DEMO-TH-1009', productId: 'p3', market: 'TH', warehouse: warehouse('TH'), quantity: 80, receivedQuantity: 80, feishuStatus: '已到货上架', waybill: 'DEMO-XYD-TH-005', account: 'XYD-DEMO-A', binding: 'confirmed', eta: '2026-10-09', note: '完成货票保留历史；本票不再计入运输在途。' },
+      { id: 'shipment-my', trackingEvents: demoTracking('shipment-my'), number: 'DEMO-MY-1025', productId: 'p6', market: 'MY', warehouse: warehouse('MY'), quantity: 90, receivedQuantity: 0, feishuStatus: '运输中', waybill: 'DEMO-XYD-MY-006', account: 'XYD-DEMO-A', binding: 'confirmed', eta: '2026-10-25', note: '演示远期到货，用于区分全部物流与未来7天到货。' },
+      { id: 'shipment-id-done', trackingEvents: demoTracking('shipment-id-done'), number: 'DEMO-ID-1010', productId: 'p2', market: 'ID', warehouse: warehouse('ID'), quantity: 50, receivedQuantity: 50, feishuStatus: '已到货上架', waybill: 'DEMO-XYD-ID-007', account: 'XYD-DEMO-A', binding: 'confirmed', eta: '2026-10-10', note: '在途已结束，库存仍按印尼最后成功快照显示。' },
     ],
     logs: logs.map((entry) => ({ ...entry })),
   };

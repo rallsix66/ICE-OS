@@ -1,5 +1,22 @@
 # Current Task Packet
 
+## Task ID: ICE-V4-DEMO-FEEDBACK-01
+
+### Status: LOCAL VERIFIED WITH BASELINE GAP（2026-10-13）
+
+本轮修改及浏览器验收完成。演示107/107；默认全量4119/4120（旧00051换行失败）；lint/Next build通过。完整证据见 [本轮报告](../reports/2026-10-13-ice-v4-feedback.md)。完成本任务独立分支提交/推送后停止，不进入真实同步或权限改造。
+
+延续用户已明确选择由Codex实施的Demo工作，按本轮反馈补齐数据同步/权限设置、首页库存展示、商品资料表和市场物流集中列表，完成后提交并推送原独立分支。参考用户提供的 ice_inventory_demo_v4.html 的页面结构，不执行/移植其脚本，不照搬最近操作或日志设计。
+
+- 范围：仅 src/features/ice-demo、必要文档与测试；权限和同步设置为可重置的本地演示，禁接真实账号、SDK、后台调度或修改RLS。
+- 首页新增真实由fixture派生的库存概览；商品摘要卡片改为资料表与映射分区。
+- 物流提供市场/状态/搜索组合筛选、集中货票表、详情弹窗；时序教学收起，不占主要列表。
+- 角色配置的市场、金额和映射操作能力须实际影响演示视角，空范围不回退为全量；不是生产安全控制。
+- 保留快照/货票权威边界和旧测试基线，不改Migration、现役业务、依赖或用户既有未提交报告。
+- 新测试、lint/build、桌面/手机浏览器验收后，只推送 codex/ice-v4-planning，不合并master或主动部署。
+
+## Previous delivery（历史，本轮在其上迭代）
+
 ## Task ID: ICE-V4-PLANNING-DEMO
 
 ### Status: LOCAL VERIFIED WITH BASELINE GAPS / 待产品评审（2026-10-13）

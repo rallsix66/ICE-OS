@@ -1,9 +1,31 @@
 export type Market = 'CN' | 'TH' | 'PH' | 'MY' | 'VN' | 'ID';
 export type DemoRole = 'admin' | 'manager' | 'operator';
-export type DemoView = 'overview' | 'inventory' | 'products' | 'logistics' | 'snapshots' | 'logs';
+export type DemoView = 'overview' | 'inventory' | 'products' | 'logistics' | 'snapshots' | 'logs' | 'sync' | 'permissions';
 export type MappingStatus = 'unmatched' | 'pending' | 'confirmed' | 'review' | 'disabled';
 export type ScenarioId = 'shipping' | 'arrived' | 'snapshot' | 'reverse';
 export type InventorySource = '聚水潭' | 'BigSeller';
+
+export interface DemoAccess {
+  markets: Market[];
+  viewAmounts: boolean;
+  manageMappings: boolean;
+}
+
+export type DemoPermissions = Record<DemoRole, DemoAccess>;
+export type ShipmentStatusFilter = 'all' | 'active' | 'soon' | 'pending' | 'completed';
+export interface ShipmentFilters {
+  market: Market | 'all';
+  status: ShipmentStatusFilter;
+  query: string;
+}
+
+export type DemoSourceId = 'bigseller' | 'jushuitan' | 'feishu' | 'golucky';
+export interface DemoSourceConfig {
+  id: DemoSourceId;
+  enabled: boolean;
+  cadence: 'manual' | 'hourly' | 'daily';
+  lastCheck: 'none' | 'passed' | 'failed';
+}
 
 export interface DemoProduct {
   id: string;
@@ -70,6 +92,7 @@ export interface DemoShipment {
   binding: 'confirmed' | 'pending';
   eta: string;
   note: string;
+  trackingEvents?: { at: string; text: string }[];
 }
 
 export interface DemoLog {

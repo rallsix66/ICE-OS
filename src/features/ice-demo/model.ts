@@ -1,5 +1,5 @@
 import { DEMO_NOW } from './fixtures';
-import type { DemoData, DemoFilters, DemoLog, DemoMapping, DemoProduct, DemoRole, DemoSnapshot, LogFilters, Market, ScenarioFacts, ScenarioId, Valuation } from './types';
+import type { DemoAccess, DemoData, DemoFilters, DemoLog, DemoMapping, DemoProduct, DemoRole, DemoSnapshot, LogFilters, Market, ScenarioFacts, ScenarioId, Valuation } from './types';
 
 export function getScenarioFacts(id: ScenarioId): ScenarioFacts {
   const base = {
@@ -79,6 +79,7 @@ export function getProductMetrics(data: DemoData, productId: string) {
   const sum = (selectedRows: DemoSnapshot[], field: 'current' | 'available'): number | null => selectedRows.length === 0 || selectedRows.some((row) => row[field] === null) ? null : selectedRows.reduce((total, row) => total + (row[field] ?? 0), 0);
   return {
     domestic: sum(rows.filter((row) => row.market === 'CN'), 'current'), overseas: sum(rows.filter((row) => row.market !== 'CN'), 'current'),
+    overseasAvailable: sum(rows.filter((row) => row.market !== 'CN'), 'available'),
     available: sum(rows, 'available'),
     transit: data.shipments.filter((row) => row.productId === productId).reduce((total, row) => total + remainingInTransit(row.quantity, row.receivedQuantity), 0),
     byMarket: Object.fromEntries((['CN', 'TH', 'PH', 'MY', 'VN', 'ID'] as const).map((market) => [market, sum(rows.filter((row) => row.market === market), 'current')])) as Record<Market, number | null>,
@@ -114,14 +115,28 @@ export function filterLogs(logs: DemoLog[], filters: LogFilters): DemoLog[] {
   }).sort((a, b) => b.at.localeCompare(a.at));
 }
 
-export function canViewAmounts(role: DemoRole): boolean { return role !== 'operator'; }
-export function canManageMappings(role: DemoRole): boolean { return role === 'admin'; }
+export function getOverviewInventory(data: DemoData) {
+  const rows = confirmedSnapshots(data);
+  const sum = (selected: DemoSnapshot[], field: 'current' | 'available') => selected.length === 0 || selected.some((row) => row[field] === null)
+    ? null : selected.reduce((total, row) => total + (row[field] ?? 0), 0);
+  const overseas = rows.filter((row) => row.market !== 'CN');
+  return {
+    domestic: sum(rows.filter((row) => row.market === 'CN'), 'current'),
+    overseas: sum(overseas, 'current'),
+    overseasAvailable: sum(overseas, 'available'),
+    transit: data.shipments.length ? data.shipments.reduce((total, row) => total + remainingInTransit(row.quantity, row.receivedQuantity), 0) : null,
+  };
+}
+
+export function canViewAmounts(role: DemoRole, access?: DemoAccess): boolean { return access?.viewAmounts ?? role !== 'operator'; }
+export function canManageMappings(role: DemoRole, access?: DemoAccess): boolean { return role === 'admin' && (access?.manageMappings ?? true); }
 
 /** Local demo authorization only. Never claim this is a server security boundary. */
-export function changeMapping(data: DemoData, mappingId: string, action: 'confirm' | 'review', role: DemoRole): { data: DemoData; error: string | null } {
-  if (!canManageMappings(role)) return { data, error: '此演示角色不能确认或重新核对映射，请切换管理员视角。' };
+export function changeMapping(data: DemoData, mappingId: string, action: 'confirm' | 'review', role: DemoRole, access?: DemoAccess): { data: DemoData; error: string | null } {
+  if (!canManageMappings(role, access)) return { data, error: '此演示角色不能确认或重新核对映射，请切换管理员视角。' };
   const mapping = data.mappings.find((row) => row.id === mappingId);
   if (!mapping) return { data, error: '映射记录不存在。' };
+  if (access && !access.markets.includes(mapping.market)) return { data, error: '该市场不在当前演示范围。' };
   if (mapping.status === 'disabled') return { data, error: '停用映射不能在此演示中重新启用。' };
   if (action === 'review' && mapping.status !== 'confirmed') return { data, error: '只有已确认映射可以标记重新核对。' };
   if (action === 'confirm' && mapping.status === 'confirmed') return { data, error: '此映射已经确认，无需重复操作。' };

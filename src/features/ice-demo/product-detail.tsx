@@ -20,14 +20,16 @@ interface ProductDetailProps {
   data: DemoData;
   productId: string;
   role: DemoRole;
+  showAmounts?: boolean;
+  mappingAllowed?: boolean;
   onClose: () => void;
   onMapping: (id: string, action: 'confirm' | 'review') => void;
 }
 
-export function ProductDetail({ data, productId, role, onClose, onMapping }: ProductDetailProps) {
+export function ProductDetail({ data, productId, role, showAmounts: amountOverride, mappingAllowed, onClose, onMapping }: ProductDetailProps) {
   const [view, setView] = useState<(typeof DETAIL_VIEWS)[number]['id']>('identity');
   const product = data.products.find((entry) => entry.id === productId);
-  const showAmounts = canViewAmounts(role);
+  const showAmounts = amountOverride ?? canViewAmounts(role);
   const mappings = data.mappings.filter((entry) => entry.productId === productId || entry.candidateProductId === productId);
   const mappingIds = new Set(mappings.map((entry) => entry.id));
   const snapshots = data.snapshots.filter((entry) => mappingIds.has(entry.mappingId))
@@ -83,7 +85,7 @@ export function ProductDetail({ data, productId, role, onClose, onMapping }: Pro
                 <td>{entry.source}<small className={styles.cellSub}>{entry.account}</small></td>
                 <td>{entry.externalSku}<small className={styles.cellSub}>{entry.variantId}</small></td>
                 <td><MappingPill status={entry.status} /><small className={styles.cellSub}>v{entry.version}</small></td>
-                <td>{entry.status === 'disabled' ? '已停用，保留历史' : canManageMappings(role)
+                <td>{entry.status === 'disabled' ? '已停用，保留历史' : (mappingAllowed ?? canManageMappings(role))
                   ? <button type="button" className={styles.smallButton} onClick={() => onMapping(entry.id, entry.status === 'confirmed' ? 'review' : 'confirm')}>{entry.status === 'confirmed' ? '重新核对' : '确认映射'}</button>
                   : <span className={styles.subtle}>当前演示视角只读</span>}</td>
               </tr>)}</tbody>
