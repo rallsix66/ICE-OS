@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     // Python caches (any level)
     "**/.pytest_cache/**",
     "**/__pycache__/**",
+    ".local/**",
+    // P0-02 acceptance tests run via vitest.config.p0-02.mts + scripts/p0-02/*
+    "tests/p0-02/**",
   ]),
 ]);
 

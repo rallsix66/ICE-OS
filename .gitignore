@@ -53,3 +53,9 @@ tools/bigseller-scraper/runtime/
 
 # Claude Code local pgdata
 .claude/pgdata-p5-sy5g/
+
+# P0-01 local isolated postgres runtime (binaries, pgdata, secrets, evidence)
+.local/p0-01/
+
+# P0-02 local isolated postgres runtime (binaries, pgdata, secrets, evidence)
+.local/p0-02/

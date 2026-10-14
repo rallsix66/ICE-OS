@@ -10,8 +10,10 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    exclude: ['tests/p0-02/**'],
     include: [
       'src/**/*.test.ts',
+      'tests/p0-01/**/*.test.ts',
       'supabase/migrations/00013_extend_user_variant_preference_favorited.test.ts',
       'supabase/migrations/00014_dynamic_alert_fields.test.ts',
     ],
