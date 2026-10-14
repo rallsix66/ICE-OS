@@ -1,0 +1,27 @@
+{
+  "capturedAt": "2026-10-14T03:23:28.430Z",
+  "knownFailure": "Only canonical body test at opt6-production-apply.test.ts:43:93; 1 failed / 5 passed",
+  "files": [
+    {
+      "rel": "supabase/migrations/00051_optimize_role_rls_policy_overlap.sql",
+      "sha256": "049fda0fac5a6c286de98855f3123c9ed64563c57ecddb85af475803e178f133",
+      "normalizedLfSha256": "e606aefbbaaa1464082d54a680221e11bc39ba5179968ee03df3859d7eae3505",
+      "crlfCount": 149,
+      "loneLfCount": 0
+    },
+    {
+      "rel": "docs/reports/sql/2026-07-21-opt6-00051-production-apply.sql",
+      "sha256": "a1f858b6483095a9d60f840032d7070acc65a6c0c4a29ca5fd8b1e80d60f2345",
+      "normalizedLfSha256": "c3a3e8e0d67e13a9af6e8369e97ce15a37d0b21517909025151d318e3a9ab1ba",
+      "crlfCount": 465,
+      "loneLfCount": 0
+    },
+    {
+      "rel": "src/features/database/opt6-production-apply.test.ts",
+      "sha256": "3bf48a02862febb39f89cb0f83db0cb7f155489bbcea80fda2e32461be18e7bd",
+      "normalizedLfSha256": "5a065bdfed4e46365bb64b8847abef1bdfabc4fe02b213fc367a8f2d85c357b0",
+      "crlfCount": 76,
+      "loneLfCount": 0
+    }
+  ]
+}
