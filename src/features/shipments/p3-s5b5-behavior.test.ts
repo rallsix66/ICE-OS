@@ -42,6 +42,10 @@ vi.mock('@/lib/supabase/server', () => ({
   ),
 }));
 
+vi.mock('@/lib/database/runtime', () => ({
+  isIndependentPlatformRuntime: () => false,
+}));
+
 vi.mock('@/lib/auth', () => ({
   requireActiveAuth: () => mockRequireActiveAuth(),
 }));
@@ -317,13 +321,10 @@ describe('P3-S5B5: listEligibleForBatchWarehousingAction', () => {
 
   it('Admin → 调用 repository.listEligibleForBatchWarehousing → 返回分页结果', async () => {
     mockRequireActiveAuth.mockResolvedValue(ADMIN_USER);
-    // Repository call order:
-    // 1. from('shipment') — main query chain (built first, executed second via .range())
-    // 2. from('profiles') — getUserRole (built second, executed first via .single())
-    // So pushFromResults: [shipment_result, profiles_result]
+    // getUserRole (profiles) 先于 shipment 查询
     pushFromResults(
-      { data: [], error: null },                                    // shipment query (count=0)
-      { data: { role: { name: 'admin' } } },                       // profiles → getUserRole
+      { data: { role: { name: 'admin' } } },
+      { data: [], error: null, count: 0 },
     );
 
     const result = await listEligibleForBatchWarehousingAction({ page: 1, pageSize: 20 });
@@ -387,11 +388,9 @@ describe('P3-S5B5: listEligibleForBatchWarehousingAction', () => {
 
   it('Repository 抛出 ShipmentError → ActionResult 带回中文错误', async () => {
     mockRequireActiveAuth.mockResolvedValue(ADMIN_USER);
-    // getUserRole succeeds (profiles), but shipment query fails
-    // from() order: shipment first, profiles second
     pushFromResults(
-      { data: null, error: { message: 'connection refused' } },     // shipment query fails
-      { data: { role: { name: 'admin' } } },                       // profiles → getUserRole OK
+      { data: { role: { name: 'admin' } } },
+      { data: null, error: { message: 'connection refused' } },
     );
 
     const result = await listEligibleForBatchWarehousingAction({});

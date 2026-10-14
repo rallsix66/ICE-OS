@@ -61,7 +61,8 @@ describe('P5-SY11G-D — 源码不再使用 is_archived 过滤', () => {
 describe('P5-SY11G-D — getByProductId 不过滤归档', () => {
   it('getByProductId 不接收 userId 参数', async () => {
     const { inventoryRepository } = await import('@/features/inventory/repository');
-    expect(inventoryRepository.getByProductId.length).toBe(1);
+    expect(inventoryRepository.getByProductId.length).toBe(2);
+    expect(inventoryRepository.getByProductId.name).toBe('getByProductId');
   });
 
   it('getByProductId 不查询 user_variant_preference', () => {

@@ -81,6 +81,10 @@ const {
   _mockRepoChangeStatus: vi.fn(),
 }));
 
+vi.mock('@/lib/database/runtime', () => ({
+  isIndependentPlatformRuntime: () => false,
+}));
+
 vi.mock('@/lib/auth', () => ({
   requireActiveAuth: () => mockRequireActiveAuth(),
 }));
@@ -428,11 +432,11 @@ describe('P3-S2A — shipmentRepository.list() 仓库隔离（真实 repo）', (
   };
 
   it('Operator 有已分配仓库 → 返回该仓库在途数据', async () => {
-    // from() order: 1) shipment (eager query builder), 2) profiles (getUserRole)
+    // from() order: 1) profiles (getUserRole), 2) shipment query
     mockGetAccessibleIds.mockResolvedValue(new Set([WAREHOUSE_A]));
     pushResults(
-      { data: [MOCK_ROW], count: 1 }, // 1) shipment query
-      { data: { role: { name: 'operator' } } }, // 2) getUserRole
+      { data: { role: { name: 'operator' } } },
+      { data: [MOCK_ROW], count: 1 },
     );
 
     const { shipmentRepository } = await import(
@@ -447,10 +451,7 @@ describe('P3-S2A — shipmentRepository.list() 仓库隔离（真实 repo）', (
 
   it('Operator 无分配仓库 → 直接返回空列表（提前返回不 await shipment）', async () => {
     mockGetAccessibleIds.mockResolvedValue(new Set<string>());
-    pushResults(
-      { data: null }, // 1) shipment (eager builder, never awaited)
-      { data: { role: { name: 'operator' } } }, // 2) getUserRole
-    );
+    pushResults({ data: { role: { name: 'operator' } } });
 
     const { shipmentRepository } = await import(
       '@/features/shipments/repository'
@@ -463,8 +464,8 @@ describe('P3-S2A — shipmentRepository.list() 仓库隔离（真实 repo）', (
 
   it('Admin → 无仓库过滤，返回所有数据', async () => {
     pushResults(
-      { data: [MOCK_ROW], count: 1 }, // 1) shipment query
-      { data: { role: { name: 'admin' } } }, // 2) getUserRole
+      { data: { role: { name: 'admin' } } },
+      { data: [MOCK_ROW], count: 1 },
     );
 
     const { shipmentRepository } = await import(
@@ -478,8 +479,8 @@ describe('P3-S2A — shipmentRepository.list() 仓库隔离（真实 repo）', (
 
   it('list 查询 DB error → ShipmentError', async () => {
     pushResults(
-      { data: null, error: { message: 'connection refused' } }, // 1) shipment error
-      { data: { role: { name: 'admin' } } }, // 2) getUserRole
+      { data: { role: { name: 'admin' } } },
+      { data: null, error: { message: 'connection refused' } },
     );
 
     const { shipmentRepository, ShipmentError } = await import(
@@ -497,13 +498,10 @@ describe('P3-S2A — shipmentRepository.list() 仓库隔离（真实 repo）', (
   });
 
   it('getUserRole DB error → ShipmentError（不静默降级为 unknown）', async () => {
-    pushResults(
-      { data: null }, // 1) shipment (eager builder, never awaited — error in step 2)
-      {
-        data: null,
-        error: { code: 'CONNECTION_REFUSED', message: 'db down' },
-      }, // 2) profiles error — not PGRST116
-    );
+    pushResults({
+      data: null,
+      error: { code: 'CONNECTION_REFUSED', message: 'db down' },
+    });
 
     const { shipmentRepository, ShipmentError } = await import(
       '@/features/shipments/repository'
@@ -521,11 +519,11 @@ describe('P3-S2A — shipmentRepository.list() 仓库隔离（真实 repo）', (
   it('getUserRole profile not found (PGRST116) → unknown（安全回退）', async () => {
     mockGetAccessibleIds.mockResolvedValue(new Set([WAREHOUSE_A]));
     pushResults(
-      { data: [MOCK_ROW], count: 1 }, // 1) shipment
       {
         data: null,
         error: { code: 'PGRST116', message: 'No rows' },
-      }, // 2) profiles not found → unknown
+      },
+      { data: [MOCK_ROW], count: 1 },
     );
 
     const { shipmentRepository } = await import(

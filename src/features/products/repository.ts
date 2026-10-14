@@ -6,6 +6,10 @@
 // - 目标不存在 → 返回 null
 // - 列表无数据 → 返回空数组
 // - 关联查询失败 → 抛出 ProductError(DB_ERROR)，不返回不完整数据
+import 'server-only';
+import { queryAppRows, type DbIdentity } from '@/lib/database/app-db';
+import { requireAppDbIdentity } from '@/lib/database/app-identity';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
 import { createClient } from '@/lib/supabase/server';
 import { unwrapJoin } from '@/lib/supabase/helpers';
 import type {
@@ -25,6 +29,106 @@ const PAGE_SIZE = 20;
 const PRODUCT_SEARCH_FETCH_LIMIT = 200;
 const VARIANT_SEARCH_FETCH_LIMIT = 500;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const PRODUCT_SELECT_SQL = `id::text AS id, code, name, safety_stock, category, unit, is_active, created_at, updated_at`;
+
+type ProductSqlRow = {
+  id: string;
+  code: string;
+  name: string;
+  safety_stock: number | string;
+  category: string | null;
+  unit: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type VariantBindingSourceRow = {
+  id: string;
+  sku: string;
+  country: string;
+  name: string;
+  match_status: string;
+  last_sync_at: string | null;
+  product_id: string | null;
+};
+
+function mapProductRow(row: ProductSqlRow): ProductRow {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    safety_stock: Number(row.safety_stock),
+    category: row.category,
+    unit: row.unit,
+    is_active: row.is_active,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+/** Duplicate product code: error.code === '23505' → ProductError('产品编码已存在', 'DUPLICATE_CODE') */
+function throwIfDuplicateProductCode(error: unknown): void {
+  if (
+    typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (error as { code: string }).code === '23505'
+  ) {
+    throw new ProductError('产品编码已存在', 'DUPLICATE_CODE');
+  }
+}
+
+async function resolveProductDbIdentity(identityOverride?: DbIdentity): Promise<DbIdentity> {
+  return identityOverride ?? (await requireAppDbIdentity());
+}
+
+function buildSkuBindingsForProducts(
+  productIds: string[],
+  variants: VariantBindingSourceRow[],
+): {
+  countMap: Map<string, number>;
+  bindingsMap: Map<string, ProductSkuBindingSummary>;
+} {
+  const countMap = new Map<string, number>();
+  const bindingsMap = new Map<string, ProductSkuBindingSummary>();
+  for (const pid of productIds) {
+    countMap.set(pid, 0);
+    bindingsMap.set(pid, { domestic: [], overseas: {} });
+  }
+
+  for (const v of variants) {
+    const pid = v.product_id;
+    if (!pid) continue;
+
+    countMap.set(pid, (countMap.get(pid) ?? 0) + 1);
+
+    const brief: ProductVariantBindingBrief = {
+      id: v.id,
+      sku: v.sku,
+      country: v.country,
+      name: v.name,
+      matchStatus: v.match_status,
+      lastSyncAt: v.last_sync_at,
+    };
+
+    const binding = bindingsMap.get(pid);
+    if (!binding) continue;
+
+    if (v.country === 'CN') {
+      binding.domestic.push(brief);
+    } else {
+      const groups = binding.overseas;
+      if (!groups[v.country]) {
+        groups[v.country] = [];
+      }
+      groups[v.country].push(brief);
+    }
+  }
+
+  return { countMap, bindingsMap };
+}
 
 // ---- 自定义错误 ----
 
@@ -96,8 +200,78 @@ function tokenize(input: string): string[] {
 export const productRepository = {
   /** 分页列表（含关联 SKU 计数） */
   async list(filters: ProductFilters = {}): Promise<PaginatedResult<ProductItem>> {
-    const supabase = await createClient();
     const { search, isActive, page = 1, pageSize = PAGE_SIZE } = filters;
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = await resolveProductDbIdentity();
+      const params: unknown[] = [];
+      const where: string[] = ['1=1'];
+      if (search) {
+        params.push(`%${search}%`);
+        const p = params.length;
+        where.push(`(code ILIKE $${p} OR name ILIKE $${p})`);
+      }
+      if (isActive !== undefined) {
+        params.push(isActive);
+        where.push(`is_active = $${params.length}`);
+      }
+      const whereSql = where.join(' AND ');
+
+      const countRows = await queryAppRows<{ count: string }>(
+        identity,
+        `SELECT COUNT(*)::text AS count FROM public.product WHERE ${whereSql}`,
+        params,
+      );
+      const total = Number(countRows[0]?.count ?? 0);
+      const offset = (page - 1) * pageSize;
+      const listParams = [...params, pageSize, offset];
+      const products = await queryAppRows<ProductSqlRow>(
+        identity,
+        `SELECT ${PRODUCT_SELECT_SQL}
+         FROM public.product
+         WHERE ${whereSql}
+         ORDER BY created_at DESC
+         LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+        listParams,
+      );
+
+      if (products.length === 0) {
+        return { data: [], total, page, pageSize };
+      }
+
+      const productIds = products.map((p) => p.id);
+      let variants: VariantBindingSourceRow[];
+      try {
+        variants = await queryAppRows<VariantBindingSourceRow>(
+          identity,
+          `SELECT id::text AS id, sku, country, name, match_status, last_sync_at, product_id::text AS product_id
+           FROM public.product_variant
+           WHERE product_id = ANY($1::uuid[])
+           ORDER BY country`,
+          [productIds],
+        );
+      } catch {
+        throw new ProductError('查询产品 SKU 绑定失败', 'DB_ERROR');
+      }
+
+      const { countMap, bindingsMap } = buildSkuBindingsForProducts(productIds, variants);
+
+      return {
+        data: products.map((p) => {
+          const row = mapProductRow(p);
+          return {
+            ...row,
+            skuCount: countMap.get(p.id) ?? 0,
+            bindings: bindingsMap.get(p.id),
+          };
+        }),
+        total,
+        page,
+        pageSize,
+      };
+    }
+
+    const supabase = await createClient();
 
     let query = supabase.from('product').select('*', { count: 'exact' });
 
@@ -134,42 +308,10 @@ export const productRepository = {
       throw new ProductError('查询产品 SKU 绑定失败', 'DB_ERROR');
     }
 
-    // 构建 skuCount + bindings 映射
-    const countMap = new Map<string, number>();
-    const bindingsMap = new Map<string, ProductSkuBindingSummary>();
-    for (const pid of productIds) {
-      countMap.set(pid, 0);
-      bindingsMap.set(pid, { domestic: [], overseas: {} });
-    }
-
-    for (const v of variants ?? []) {
-      const pid = v.product_id;
-      if (!pid) continue;
-
-      countMap.set(pid, (countMap.get(pid) ?? 0) + 1);
-
-      const brief: ProductVariantBindingBrief = {
-        id: v.id,
-        sku: v.sku,
-        country: v.country,
-        name: v.name,
-        matchStatus: v.match_status,
-        lastSyncAt: v.last_sync_at,
-      };
-
-      const binding = bindingsMap.get(pid);
-      if (!binding) continue;
-
-      if (v.country === 'CN') {
-        binding.domestic.push(brief);
-      } else {
-        const groups = binding.overseas;
-        if (!groups[v.country]) {
-          groups[v.country] = [];
-        }
-        groups[v.country].push(brief);
-      }
-    }
+    const { countMap, bindingsMap } = buildSkuBindingsForProducts(
+      productIds,
+      (variants ?? []) as VariantBindingSourceRow[],
+    );
 
     return {
       data: products.map((p) => ({
@@ -208,6 +350,145 @@ export const productRepository = {
     const tokens = tokenize(query);
     if (tokens.length === 0) {
       return [];
+    }
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = await resolveProductDbIdentity();
+      const rankMap = new Map<string, number>();
+
+      const variantParams: string[] = [];
+      const variantConds: string[] = [];
+      for (const token of tokens) {
+        variantParams.push(`%${escapeLike(token)}%`);
+        variantConds.push(`sku ILIKE $${variantParams.length}`);
+      }
+
+      if (variantConds.length > 0) {
+        let variantRows: Array<{ product_id: string | null; sku: string }>;
+        try {
+          variantRows = await queryAppRows<{ product_id: string | null; sku: string }>(
+            identity,
+            `SELECT product_id::text AS product_id, sku
+             FROM public.product_variant
+             WHERE product_id IS NOT NULL AND (${variantConds.join(' OR ')})
+             LIMIT ${VARIANT_SEARCH_FETCH_LIMIT}`,
+            variantParams,
+          );
+        } catch {
+          throw new ProductError('搜索产品失败', 'DB_ERROR');
+        }
+
+        for (const v of variantRows) {
+          if (!v.product_id) continue;
+          let variantRank = -1;
+          for (const token of tokens) {
+            const t = token.toLowerCase();
+            if (v.sku?.toLowerCase().includes(t)) variantRank = Math.max(variantRank, 1);
+          }
+          const existing = rankMap.get(v.product_id) ?? -1;
+          rankMap.set(v.product_id, Math.max(existing, variantRank));
+        }
+      }
+
+      const productParams: string[] = [];
+      const productConds: string[] = [];
+      for (const token of tokens) {
+        productParams.push(`%${escapeLike(token)}%`);
+        const p = productParams.length;
+        productConds.push(`(code ILIKE $${p} OR name ILIKE $${p})`);
+      }
+
+      const variantProductIds = Array.from(rankMap.keys());
+      const productsById = new Map<string, ProductRow>();
+
+      let directProducts: ProductSqlRow[];
+      try {
+        directProducts = await queryAppRows<ProductSqlRow>(
+          identity,
+          `SELECT ${PRODUCT_SELECT_SQL}
+           FROM public.product
+           WHERE is_active = true AND (${productConds.join(' OR ')})
+           ORDER BY created_at DESC
+           LIMIT ${PRODUCT_SEARCH_FETCH_LIMIT}`,
+          productParams,
+        );
+      } catch {
+        throw new ProductError('搜索产品失败', 'DB_ERROR');
+      }
+
+      for (const product of directProducts) {
+        productsById.set(product.id, mapProductRow(product));
+      }
+
+      if (variantProductIds.length > 0) {
+        let variantProducts: ProductSqlRow[];
+        try {
+          variantProducts = await queryAppRows<ProductSqlRow>(
+            identity,
+            `SELECT ${PRODUCT_SELECT_SQL}
+             FROM public.product
+             WHERE is_active = true AND id = ANY($1::uuid[])`,
+            [variantProductIds],
+          );
+        } catch {
+          throw new ProductError('搜索产品失败', 'DB_ERROR');
+        }
+
+        for (const product of variantProducts) {
+          productsById.set(product.id, mapProductRow(product));
+        }
+      }
+
+      const products = Array.from(productsById.values());
+      if (products.length === 0) {
+        return [];
+      }
+
+      for (const p of products) {
+        let rank = rankMap.get(p.id) ?? -1;
+        for (const token of tokens) {
+          const t = token.toLowerCase();
+          if (p.code?.toLowerCase() === t) {
+            rank = Math.max(rank, 4);
+          } else if (p.code?.toLowerCase().includes(t)) {
+            rank = Math.max(rank, 3);
+          }
+          if (p.name?.toLowerCase().includes(t)) {
+            rank = Math.max(rank, 2);
+          }
+        }
+        rankMap.set(p.id, rank);
+      }
+
+      products.sort((a, b) => {
+        const rankDiff = (rankMap.get(b.id) ?? -1) - (rankMap.get(a.id) ?? -1);
+        if (rankDiff !== 0) return rankDiff;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      const ranked = products.slice(0, pageSize);
+      const productIds = ranked.map((p) => p.id);
+
+      let countRows: Array<{ product_id: string }>;
+      try {
+        countRows = await queryAppRows<{ product_id: string }>(
+          identity,
+          `SELECT product_id::text AS product_id
+           FROM public.product_variant
+           WHERE product_id = ANY($1::uuid[])`,
+          [productIds],
+        );
+      } catch {
+        throw new ProductError('查询产品 SKU 计数失败', 'DB_ERROR');
+      }
+
+      const countMap = new Map<string, number>();
+      productIds.forEach((id) => countMap.set(id, 0));
+      countRows.forEach((v) => {
+        countMap.set(v.product_id, (countMap.get(v.product_id) ?? 0) + 1);
+      });
+
+      return ranked.map((p) => ({ ...p, skuCount: countMap.get(p.id) ?? 0 }));
     }
 
     const supabase = await createClient();
@@ -342,6 +623,17 @@ export const productRepository = {
 
   /** 根据 code 查询产品 */
   async getByCode(code: string): Promise<ProductRow | null> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await resolveProductDbIdentity();
+      const rows = await queryAppRows<ProductSqlRow>(
+        identity,
+        `SELECT ${PRODUCT_SELECT_SQL} FROM public.product WHERE code = $1 LIMIT 1`,
+        [code],
+      );
+      const row = rows[0];
+      return row ? mapProductRow(row) : null;
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('product')
@@ -358,6 +650,102 @@ export const productRepository = {
   /** 根据 ID 获取产品详情（含 SKU 列表 + 各仓库存） */
   async getById(id: string): Promise<ProductDetail | null> {
     if (!validateUUID(id)) return null;
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = await resolveProductDbIdentity();
+      const productRows = await queryAppRows<ProductSqlRow>(
+        identity,
+        `SELECT ${PRODUCT_SELECT_SQL} FROM public.product WHERE id = $1::uuid LIMIT 1`,
+        [id],
+      );
+      const productRow = productRows[0];
+      if (!productRow) return null;
+      const product = mapProductRow(productRow);
+
+      let variants: Array<{
+        id: string;
+        sku: string;
+        country: string;
+        name: string;
+        match_status: string;
+        last_sync_at: string | null;
+      }>;
+      let inventoryRows: Array<{
+        id: string;
+        quantity: number | string;
+        last_sync_at: string | null;
+        sku: string;
+        country: string;
+        warehouse_name: string | null;
+      }>;
+
+      try {
+        variants = await queryAppRows<{
+          id: string;
+          sku: string;
+          country: string;
+          name: string;
+          match_status: string;
+          last_sync_at: string | null;
+        }>(
+          identity,
+          `SELECT id::text AS id, sku, country, name, match_status, last_sync_at
+           FROM public.product_variant
+           WHERE product_id = $1::uuid
+           ORDER BY country`,
+          [id],
+        );
+      } catch {
+        throw new ProductError('查询产品关联 SKU 失败', 'DB_ERROR');
+      }
+
+      try {
+        inventoryRows = await queryAppRows<{
+          id: string;
+          quantity: number | string;
+          last_sync_at: string | null;
+          sku: string;
+          country: string;
+          warehouse_name: string | null;
+        }>(
+          identity,
+          `SELECT i.id::text AS id, i.quantity, i.last_sync_at,
+                  pv.sku, pv.country, w.name AS warehouse_name
+           FROM public.inventory i
+           INNER JOIN public.product_variant pv ON pv.id = i.variant_id
+           LEFT JOIN public.warehouse w ON w.id = i.warehouse_id
+           WHERE pv.product_id = $1::uuid`,
+          [id],
+        );
+      } catch {
+        throw new ProductError('查询产品库存失败', 'DB_ERROR');
+      }
+
+      const inventoryItems: InventoryBrief[] = inventoryRows
+        .filter((row) => row.warehouse_name)
+        .map((row) => ({
+          id: row.id,
+          sku: row.sku,
+          country: row.country,
+          warehouseName: row.warehouse_name as string,
+          quantity: Number(row.quantity) || 0,
+          safetyStock: product.safety_stock,
+          lastSyncAt: row.last_sync_at,
+        }));
+
+      return {
+        ...product,
+        variants: variants.map((v) => ({
+          id: v.id,
+          sku: v.sku,
+          country: v.country,
+          name: v.name,
+          matchStatus: v.match_status,
+          lastSyncAt: v.last_sync_at,
+        })),
+        inventory: inventoryItems,
+      };
+    }
 
     const supabase = await createClient();
 
@@ -420,6 +808,35 @@ export const productRepository = {
 
   /** 创建产品 */
   async create(data: ProductInsert): Promise<ProductItem> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await resolveProductDbIdentity();
+      try {
+        const rows = await queryAppRows<ProductSqlRow>(
+          identity,
+          `INSERT INTO public.product (code, name, safety_stock, category, unit, is_active)
+           VALUES ($1, $2, $3, $4, $5, COALESCE($6, true))
+           RETURNING ${PRODUCT_SELECT_SQL}`,
+          [
+            data.code,
+            data.name,
+            data.safety_stock ?? 0,
+            data.category ?? null,
+            data.unit ?? '件',
+            data.is_active,
+          ],
+        );
+        const product = rows[0];
+        if (!product) {
+          throw new ProductError('创建产品失败', 'DB_ERROR');
+        }
+        return { ...mapProductRow(product), skuCount: 0 };
+      } catch (error) {
+        throwIfDuplicateProductCode(error);
+        if (error instanceof ProductError) throw error;
+        throw new ProductError('创建产品失败', 'DB_ERROR');
+      }
+    }
+
     const supabase = await createClient();
     const { data: product, error } = await supabase
       .from('product')
@@ -444,6 +861,95 @@ export const productRepository = {
   async update(id: string, data: ProductUpdate): Promise<ProductItem | null> {
     if (!validateUUID(id)) {
       throw new ProductError('无效的产品 ID', 'INVALID_ID');
+    }
+    // PostgreSQL 唯一约束兜底：error.code === '23505' → '产品编码已存在'
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = await resolveProductDbIdentity();
+
+      if (data.code) {
+        const dupRows = await queryAppRows<{ id: string }>(
+          identity,
+          `SELECT id::text AS id FROM public.product WHERE code = $1 AND id <> $2::uuid LIMIT 1`,
+          [data.code, id],
+        );
+        if (dupRows[0]) {
+          throw new ProductError('产品编码已存在', 'DUPLICATE_CODE');
+        }
+      }
+
+      const sets: string[] = [];
+      const params: unknown[] = [id];
+      if (data.code !== undefined) {
+        params.push(data.code);
+        sets.push(`code = $${params.length}`);
+      }
+      if (data.name !== undefined) {
+        params.push(data.name);
+        sets.push(`name = $${params.length}`);
+      }
+      if (data.safety_stock !== undefined) {
+        params.push(data.safety_stock);
+        sets.push(`safety_stock = $${params.length}`);
+      }
+      if (data.category !== undefined) {
+        params.push(data.category);
+        sets.push(`category = $${params.length}`);
+      }
+      if (data.unit !== undefined) {
+        params.push(data.unit);
+        sets.push(`unit = $${params.length}`);
+      }
+      if (data.is_active !== undefined) {
+        params.push(data.is_active);
+        sets.push(`is_active = $${params.length}`);
+      }
+      if (sets.length === 0) {
+        const existing = await queryAppRows<ProductSqlRow>(
+          identity,
+          `SELECT ${PRODUCT_SELECT_SQL} FROM public.product WHERE id = $1::uuid LIMIT 1`,
+          [id],
+        );
+        const row = existing[0];
+        if (!row) return null;
+        const countRows = await queryAppRows<{ count: string }>(
+          identity,
+          `SELECT COUNT(*)::text AS count FROM public.product_variant WHERE product_id = $1::uuid`,
+          [id],
+        );
+        return { ...mapProductRow(row), skuCount: Number(countRows[0]?.count ?? 0) };
+      }
+
+      sets.push('updated_at = now()');
+
+      try {
+        const updated = await queryAppRows<ProductSqlRow>(
+          identity,
+          `UPDATE public.product SET ${sets.join(', ')}
+           WHERE id = $1::uuid
+           RETURNING ${PRODUCT_SELECT_SQL}`,
+          params,
+        );
+        const product = updated[0];
+        if (!product) return null;
+
+        const countRows = await queryAppRows<{ count: string }>(
+          identity,
+          `SELECT COUNT(*)::text AS count FROM public.product_variant WHERE product_id = $1::uuid`,
+          [id],
+        );
+        return { ...mapProductRow(product), skuCount: Number(countRows[0]?.count ?? 0) };
+      } catch (error) {
+        if (
+          typeof error === 'object'
+          && error !== null
+          && 'code' in error
+          && (error as { code: string }).code === '23505'
+        ) {
+          throw new ProductError('产品编码已存在', 'DUPLICATE_CODE');
+        }
+        throw new ProductError('更新产品失败', 'DB_ERROR');
+      }
     }
 
     const supabase = await createClient();
@@ -498,6 +1004,18 @@ export const productRepository = {
   async toggleActive(id: string, isActive: boolean): Promise<boolean> {
     if (!validateUUID(id)) {
       throw new ProductError('无效的产品 ID', 'INVALID_ID');
+    }
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = await resolveProductDbIdentity();
+      const rows = await queryAppRows<{ id: string }>(
+        identity,
+        `UPDATE public.product SET is_active = $2, updated_at = now()
+         WHERE id = $1::uuid
+         RETURNING id::text AS id`,
+        [id, isActive],
+      );
+      return rows.length > 0;
     }
 
     const supabase = await createClient();

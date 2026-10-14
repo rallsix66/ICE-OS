@@ -1,4 +1,6 @@
 import 'server-only';
+import { callAppRpc } from '@/lib/database/app-db';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
 import { createClient } from '@/lib/supabase/server';
 import {
   replenishmentFiltersSchema,
@@ -62,21 +64,41 @@ export const replenishmentRepository = {
     }
 
     const values = parsedFilters.data;
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc('get_replenishment_suggestions', {
-      p_user_id: userId,
-      p_variant_id: values.variantId ?? null,
-      p_warehouse_id: values.warehouseId ?? null,
-      p_country: values.country ?? null,
-      p_urgency: values.urgency ?? null,
-      p_search: values.search || null,
-      p_include_zero: values.includeZero,
-      p_page: values.page,
-      p_page_size: values.pageSize,
-    });
+    let data: unknown;
+    if (isIndependentPlatformRuntime()) {
+      data = await callAppRpc<unknown>(
+        { profileUserId: userId },
+        'public.get_replenishment_suggestions',
+        [
+          userId,
+          values.variantId ?? null,
+          values.warehouseId ?? null,
+          values.country ?? null,
+          values.urgency ?? null,
+          values.search || null,
+          values.includeZero,
+          values.page,
+          values.pageSize,
+        ],
+      );
+    } else {
+      const supabase = await createClient();
+      const { data: rpcData, error } = await supabase.rpc('get_replenishment_suggestions', {
+        p_user_id: userId,
+        p_variant_id: values.variantId ?? null,
+        p_warehouse_id: values.warehouseId ?? null,
+        p_country: values.country ?? null,
+        p_urgency: values.urgency ?? null,
+        p_search: values.search || null,
+        p_include_zero: values.includeZero,
+        p_page: values.page,
+        p_page_size: values.pageSize,
+      });
 
-    if (error) {
-      throw new ReplenishmentError(`查询补货建议失败: ${error.message}`, 'DB_ERROR');
+      if (error) {
+        throw new ReplenishmentError(`查询补货建议失败: ${error.message}`, 'DB_ERROR');
+      }
+      data = rpcData;
     }
 
     const parsed = replenishmentRpcResultSchema.safeParse(data);

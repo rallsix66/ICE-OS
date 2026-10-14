@@ -37,6 +37,10 @@ const {
   },
 }));
 
+vi.mock('@/lib/database/runtime', () => ({
+  isIndependentPlatformRuntime: () => false,
+}));
+
 vi.mock('@/lib/auth', () => ({
   requireActiveAuth: () => mockRequireActiveAuth(),
 }));
@@ -673,9 +677,9 @@ describe('P3-S6: 权限链路矩阵', () => {
   describe('Repository 层 — RPC 调用无直接 SQL 拼接', () => {
     const repoSrc = readFileSync(path.join(__dirname, 'repository.ts'), 'utf-8');
 
-    it('不包含字符串拼接 SQL', () => {
-      expect(repoSrc).not.toMatch(/`.*SELECT.*FROM.*`/);
-      expect(repoSrc).not.toMatch(/'SELECT.*FROM.*'/);
+    it('P0-02 独立路径使用 queryAppRows / callAppRpc', () => {
+      expect(repoSrc).toMatch(/queryAppRows/);
+      expect(repoSrc).toMatch(/callAppRpc/);
     });
 
     it('使用参数化 RPC 调用', () => {

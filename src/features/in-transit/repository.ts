@@ -1,9 +1,11 @@
 // 外部物流模块数据访问层
 // P0: 新增 golucky (喜运达) provider 支持
 //
-// 所有查询方法接受可选的 SupabaseClient 参数：
-//   - 不传 → 使用用户会话客户端（createClient，含 RLS）
-//   - 传入 service_role 客户端 → 绕过 RLS（仅 cron / 服务端同步任务）
+// Supabase 路径：可选 db 为 service_role 客户端（cron）；否则 createClient + RLS。
+// P0-02：会话走 app runner + RLS；cron 同步传入 P002_SYNC_RUNNER + sync runner。
+import { callAppRpc, queryAppRows, querySyncRows } from '@/lib/database/app-db';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
+import { getP002ProfileUserId } from '@/lib/independent-platform/p0-02-session';
 import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
@@ -38,13 +40,46 @@ function handlePgError(error: PostgrestError | null, message: string): void {
 
 type DbClient = SupabaseClient<Database>;
 
+/** Cron / 服务端同步在 P0-02 下使用 sync runner（非 Supabase service_role）。 */
+export const P002_SYNC_RUNNER = Symbol.for('ice.p0-02.sync-runner');
+export type ExternalTrackingDbHandle = DbClient | typeof P002_SYNC_RUNNER;
+
+function isSyncHandle(db?: ExternalTrackingDbHandle): boolean {
+  return db === P002_SYNC_RUNNER;
+}
+
+async function requireAppIdentity() {
+  const profileUserId = await getP002ProfileUserId();
+  if (!profileUserId) {
+    throw new ExternalTrackingError('未登录或会话无效', 'FORBIDDEN');
+  }
+  return { profileUserId };
+}
+
 export const externalTrackingRepository = {
   /** P0: 按 provider 查询 active 外部物流记录 */
   async getExternalRefsByProvider(
     provider: string,
-    db?: DbClient,
+    db?: ExternalTrackingDbHandle,
   ): Promise<ShipmentExternalRefRow[]> {
-    const supabase = db ?? await createClient();
+    if (isSyncHandle(db)) {
+      return querySyncRows<ShipmentExternalRefRow>(
+        `SELECT * FROM public.shipment_external_ref
+         WHERE provider = $1 AND sync_status = 'active'`,
+        [provider],
+        { mode: 'golucky' },
+      );
+    }
+    if (isIndependentPlatformRuntime() && !db) {
+      const identity = await requireAppIdentity();
+      return queryAppRows<ShipmentExternalRefRow>(
+        identity,
+        `SELECT * FROM public.shipment_external_ref
+         WHERE provider = $1 AND sync_status = 'active'`,
+        [provider],
+      );
+    }
+    const supabase = (db as DbClient | undefined) ?? (await createClient());
     const { data, error } = await supabase
       .from('shipment_external_ref')
       .select('*')
@@ -67,13 +102,45 @@ export const externalTrackingRepository = {
       occurredAt: string;
       rawPayload: Record<string, unknown>;
     }>,
-    db?: DbClient,
+    db?: ExternalTrackingDbHandle,
   ): Promise<{ inserted: number; skipped: number }> {
     if (events.length === 0) {
       return { inserted: 0, skipped: 0 };
     }
 
-    const supabase = db ?? await createClient();
+    if (isSyncHandle(db)) {
+      let inserted = 0;
+      let skipped = 0;
+      for (const event of events) {
+        const rows = await querySyncRows<{ id: string }>(
+          `INSERT INTO public.tracking_event_external (
+             external_ref_id, provider, external_event_id, external_category,
+             status, description, occurred_at, raw_payload
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8::jsonb)
+           ON CONFLICT (external_ref_id, external_event_id) DO NOTHING
+           RETURNING id`,
+          [
+            externalRefId,
+            provider,
+            event.externalEventId,
+            event.externalCategory,
+            event.status,
+            event.description,
+            event.occurredAt,
+            JSON.stringify(event.rawPayload),
+          ],
+          { mode: 'golucky' },
+        );
+        if (rows.length > 0) {
+          inserted++;
+        } else {
+          skipped++;
+        }
+      }
+      return { inserted, skipped };
+    }
+
+    const supabase = (db as DbClient | undefined) ?? (await createClient());
     let inserted = 0;
     let skipped = 0;
 
@@ -98,7 +165,6 @@ export const externalTrackingRepository = {
         );
 
       if (error) {
-        // 唯一约束冲突 → 已存在，跳过
         if (error.code === '23505') {
           skipped++;
           continue;
@@ -118,15 +184,35 @@ export const externalTrackingRepository = {
     syncStatus: 'active' | 'stale' | 'error',
     lastSyncedAt?: string,
     rawPayload?: Record<string, unknown>,
-    db?: DbClient,
+    db?: ExternalTrackingDbHandle,
   ): Promise<void> {
-    const supabase = db ?? await createClient();
+    const syncedAt = lastSyncedAt ?? new Date().toISOString();
+
+    if (isSyncHandle(db)) {
+      await querySyncRows(
+        `UPDATE public.shipment_external_ref
+         SET sync_status = $2,
+             last_synced_at = $3::timestamptz,
+             raw_payload = CASE WHEN $4::jsonb IS NULL THEN raw_payload ELSE $4::jsonb END
+         WHERE id = $1`,
+        [
+          refId,
+          syncStatus,
+          syncedAt,
+          rawPayload ? JSON.stringify(rawPayload) : null,
+        ],
+        { mode: 'golucky' },
+      );
+      return;
+    }
+
+    const supabase = (db as DbClient | undefined) ?? (await createClient());
 
     const { error } = await supabase
       .from('shipment_external_ref')
       .update({
         sync_status: syncStatus,
-        last_synced_at: lastSyncedAt ?? new Date().toISOString(),
+        last_synced_at: syncedAt,
         ...(rawPayload ? { raw_payload: rawPayload } : {}),
       })
       .eq('id', refId);
@@ -138,6 +224,30 @@ export const externalTrackingRepository = {
   async getExternalTrackingByShipment(
     shipmentId: string,
   ): Promise<ExternalRefWithTracking[]> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppIdentity();
+      const refs = await queryAppRows<ShipmentExternalRefRow>(
+        identity,
+        `SELECT * FROM public.shipment_external_ref WHERE shipment_id = $1`,
+        [shipmentId],
+      );
+      if (refs.length === 0) {
+        return [];
+      }
+      const result: ExternalRefWithTracking[] = [];
+      for (const ref of refs) {
+        const events = await queryAppRows<TrackingEventExternalRow>(
+          identity,
+          `SELECT * FROM public.tracking_event_external
+           WHERE external_ref_id = $1
+           ORDER BY occurred_at ASC`,
+          [ref.id],
+        );
+        result.push({ ...ref, events });
+      }
+      return result;
+    }
+
     const supabase = await createClient();
 
     const { data: refs, error: refError } = await supabase
@@ -175,6 +285,25 @@ export const externalTrackingRepository = {
   async listUnboundExternalRefs(
     provider?: string,
   ): Promise<ShipmentExternalRefRow[]> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppIdentity();
+      if (provider) {
+        return queryAppRows<ShipmentExternalRefRow>(
+          identity,
+          `SELECT * FROM public.shipment_external_ref
+           WHERE shipment_id IS NULL AND provider = $1
+           ORDER BY created_at DESC`,
+          [provider],
+        );
+      }
+      return queryAppRows<ShipmentExternalRefRow>(
+        identity,
+        `SELECT * FROM public.shipment_external_ref
+         WHERE shipment_id IS NULL
+         ORDER BY created_at DESC`,
+      );
+    }
+
     const supabase = await createClient();
 
     let query = supabase
@@ -196,6 +325,62 @@ export const externalTrackingRepository = {
   async listShipmentBindingCandidates(
     refId: string,
   ): Promise<ShipmentBindingCandidate[]> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppIdentity();
+      const refs = await queryAppRows<{
+        id: string;
+        provider: string;
+        country: string;
+        warehouse_id: string | null;
+        shipment_id: string | null;
+      }>(
+        identity,
+        `SELECT id, provider, country, warehouse_id, shipment_id
+         FROM public.shipment_external_ref
+         WHERE id = $1 AND provider = 'golucky'
+         LIMIT 1`,
+        [refId],
+      );
+      const ref = refs[0];
+      if (!ref) {
+        throw new ExternalTrackingError('喜运达外部物流记录不存在或无权访问', 'NOT_FOUND');
+      }
+      if (ref.shipment_id) {
+        throw new ExternalTrackingError('该外部物流记录已绑定 Shipment', 'VALIDATION');
+      }
+      if (!ref.warehouse_id) {
+        return [];
+      }
+      const shipments = await queryAppRows<{
+        id: string;
+        shipment_no: string;
+        purchase_order_no: string | null;
+        country: string;
+        warehouse_id: string | null;
+        status: string;
+        estimated_arrival: string | null;
+        created_at: string;
+      }>(
+        identity,
+        `SELECT id, shipment_no, purchase_order_no, country, warehouse_id, status, estimated_arrival, created_at
+         FROM public.shipment
+         WHERE warehouse_id = $1 AND country = $2
+         ORDER BY created_at DESC
+         LIMIT 100`,
+        [ref.warehouse_id, ref.country],
+      );
+      return shipments.map((shipment) => ({
+        id: shipment.id,
+        shipmentNo: shipment.shipment_no,
+        purchaseOrderNo: shipment.purchase_order_no,
+        country: shipment.country,
+        warehouseId: shipment.warehouse_id,
+        status: shipment.status,
+        estimatedArrival: shipment.estimated_arrival,
+        createdAt: shipment.created_at,
+      }));
+    }
+
     const supabase = await createClient();
 
     const { data: ref, error: refError } = await supabase
@@ -248,6 +433,25 @@ export const externalTrackingRepository = {
   async listFailedExternalRefs(
     provider?: string,
   ): Promise<ShipmentExternalRefRow[]> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppIdentity();
+      if (provider) {
+        return queryAppRows<ShipmentExternalRefRow>(
+          identity,
+          `SELECT * FROM public.shipment_external_ref
+           WHERE sync_status = 'error' AND provider = $1
+           ORDER BY last_synced_at DESC NULLS LAST`,
+          [provider],
+        );
+      }
+      return queryAppRows<ShipmentExternalRefRow>(
+        identity,
+        `SELECT * FROM public.shipment_external_ref
+         WHERE sync_status = 'error'
+         ORDER BY last_synced_at DESC NULLS LAST`,
+      );
+    }
+
     const supabase = await createClient();
 
     let query = supabase
@@ -267,6 +471,16 @@ export const externalTrackingRepository = {
 
   /** P0: 按 ID 获取单条外部物流记录 */
   async getExternalRefById(refId: string): Promise<ShipmentExternalRefRow | null> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppIdentity();
+      const rows = await queryAppRows<ShipmentExternalRefRow>(
+        identity,
+        `SELECT * FROM public.shipment_external_ref WHERE id = $1 LIMIT 1`,
+        [refId],
+      );
+      return rows[0] ?? null;
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('shipment_external_ref')
@@ -291,8 +505,6 @@ export const externalTrackingRepository = {
       externalOrderNo?: string;
     }>,
   ): Promise<GoluckyImportResult> {
-    const supabase = await createClient();
-
     const pItems = items.map((item) => ({
       waybill_no: item.waybillNo,
       warehouse_id: item.warehouseId,
@@ -300,12 +512,21 @@ export const externalTrackingRepository = {
       external_order_no: item.externalOrderNo ?? null,
     }));
 
-    const { data, error } = await supabase.rpc('import_golucky_refs', {
-      p_items: pItems,
-    });
-
-    if (error) {
-      throw new ExternalTrackingError(`导入失败: ${error.message}`, 'DB_ERROR');
+    let data: unknown;
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppIdentity();
+      data = await callAppRpc<unknown>(identity, 'public.import_golucky_refs', [
+        JSON.stringify(pItems),
+      ]);
+    } else {
+      const supabase = await createClient();
+      const { data: rpcData, error } = await supabase.rpc('import_golucky_refs', {
+        p_items: pItems,
+      });
+      if (error) {
+        throw new ExternalTrackingError(`导入失败: ${error.message}`, 'DB_ERROR');
+      }
+      data = rpcData;
     }
 
     const parsed = goluckyImportResultSchema.safeParse(data);
@@ -321,6 +542,12 @@ export const externalTrackingRepository = {
     refId: string,
     shipmentId: string,
   ): Promise<void> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppIdentity();
+      await callAppRpc(identity, 'public.bind_external_ref_to_shipment', [refId, shipmentId]);
+      return;
+    }
+
     const supabase = await createClient();
 
     const { error } = await supabase.rpc('bind_external_ref_to_shipment', {
@@ -335,6 +562,12 @@ export const externalTrackingRepository = {
 
   /** P0: 重激活外部物流记录同步 — 封装 RPC 调用 */
   async reactivateExternalRef(refId: string): Promise<void> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppIdentity();
+      await callAppRpc(identity, 'public.reactivate_external_ref', [refId]);
+      return;
+    }
+
     const supabase = await createClient();
 
     const { error } = await supabase.rpc('reactivate_external_ref', {

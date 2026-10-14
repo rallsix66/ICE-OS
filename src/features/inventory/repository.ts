@@ -8,6 +8,9 @@
 //           get_overseas_stats / get_in_transit_confirmed_aggregate），移除 JS 全量过滤分页和 N+1 查询。
 import { createClient } from '@/lib/supabase/server';
 import { unwrapJoin } from '@/lib/supabase/helpers';
+import { callAppRpc, queryAppRows } from '@/lib/database/app-db';
+import { requireAppDbIdentity } from '@/lib/database/app-identity';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
 import type {
   InventoryItem,
   InventoryFilters,
@@ -88,16 +91,7 @@ function mapOverseasRow(row: RawOverseasInventoryRow): InventoryItem {
 export const inventoryRepository = {
   /** 首页库存健康度：调用 00047 JSONB RPC，分类与权限均在数据库内完成。 */
   async getWarehouseHealthOverview(userId: string): Promise<WarehouseHealthOverview> {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc('get_warehouse_health_overview', {
-      p_user_id: userId,
-    });
-
-    if (error) {
-      throw new Error('库存健康度加载失败，请稍后重试');
-    }
-
-    const raw = data as {
+    let raw: {
       summary?: {
         distinct_variant_count?: number;
         total_position_count?: number;
@@ -121,6 +115,23 @@ export const inventoryRepository = {
         lead_time_days: number | null;
       }>;
     } | null;
+
+    if (isIndependentPlatformRuntime()) {
+      raw = await callAppRpc<typeof raw>(
+        { profileUserId: userId },
+        'public.get_warehouse_health_overview',
+        [userId],
+      );
+    } else {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc('get_warehouse_health_overview', {
+        p_user_id: userId,
+      });
+      if (error) {
+        throw new Error('库存健康度加载失败，请稍后重试');
+      }
+      raw = data as typeof raw;
+    }
 
     if (!raw?.summary || !Array.isArray(raw.warehouses)) {
       throw new Error('库存健康度返回结构校验失败');
@@ -158,6 +169,11 @@ export const inventoryRepository = {
 
   /** 分页列表（关联 product_variant + product + warehouse） */
   async list(filters: InventoryFilters = {}): Promise<PaginatedResult<InventoryItem>> {
+    if (isIndependentPlatformRuntime()) {
+      throw new Error(
+        'inventory.list 无现役调用方；独立平台请使用 getOverseasList / getOverseasStats',
+      );
+    }
     const supabase = await createClient();
     const { country, warehouseType, search, page = 1, pageSize = PAGE_SIZE } = filters;
 
@@ -238,29 +254,48 @@ export const inventoryRepository = {
    * 不再全量读取后在 JS 层过滤分页。
    */
   async getOverseasList(filters: InventoryFilters = {}): Promise<PaginatedResult<InventoryItem>> {
-    const supabase = await createClient();
     const { country, stockStatus, search, page = 1, pageSize = PAGE_SIZE, warehouseId, userId } = filters;
 
     if (!userId) {
       return { data: [], total: 0, page, pageSize };
     }
 
-    const { data: rpcResult, error } = await supabase.rpc('get_overseas_inventory', {
-      p_user_id: userId,
-      p_country: country ?? null,
-      p_warehouse_id: warehouseId ?? null,
-      p_search: search || null,
-      p_stock_status: stockStatus ?? null,
-      p_favorited_only: false,
-      p_page: page,
-      p_page_size: pageSize,
-    });
+    let rpcResult: { data: RawOverseasInventoryRow[]; total: number } | null;
+    if (isIndependentPlatformRuntime()) {
+      rpcResult = await callAppRpc<{ data: RawOverseasInventoryRow[]; total: number }>(
+        { profileUserId: userId },
+        'public.get_overseas_inventory',
+        [
+          userId,
+          country ?? null,
+          warehouseId ?? null,
+          search || null,
+          stockStatus ?? null,
+          false,
+          page,
+          pageSize,
+        ],
+      );
+    } else {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc('get_overseas_inventory', {
+        p_user_id: userId,
+        p_country: country ?? null,
+        p_warehouse_id: warehouseId ?? null,
+        p_search: search || null,
+        p_stock_status: stockStatus ?? null,
+        p_favorited_only: false,
+        p_page: page,
+        p_page_size: pageSize,
+      });
 
-    if (error) {
-      throw new Error(`海外库存查询失败: ${error.message}`);
+      if (error) {
+        throw new Error(`海外库存查询失败: ${error.message}`);
+      }
+      rpcResult = data as { data: RawOverseasInventoryRow[]; total: number } | null;
     }
 
-    const raw = rpcResult as { data: RawOverseasInventoryRow[]; total: number } | null;
+    const raw = rpcResult;
     if (!raw || !raw.data || raw.data.length === 0) {
       return { data: [], total: raw?.total ?? 0, page, pageSize };
     }
@@ -284,18 +319,24 @@ export const inventoryRepository = {
       return [];
     }
 
-    const supabase = await createClient();
-
-    const { data: rpcResult, error } = await supabase.rpc('get_low_stock', {
-      p_user_id: userId,
-      p_limit: limit,
-    });
-
-    if (error) {
-      throw new Error(`低库存查询失败: ${error.message}`);
+    let raw: { data: RawOverseasInventoryRow[] } | null;
+    if (isIndependentPlatformRuntime()) {
+      raw = await callAppRpc<{ data: RawOverseasInventoryRow[] }>(
+        { profileUserId: userId },
+        'public.get_low_stock',
+        [userId, limit],
+      );
+    } else {
+      const supabase = await createClient();
+      const { data: rpcResult, error } = await supabase.rpc('get_low_stock', {
+        p_user_id: userId,
+        p_limit: limit,
+      });
+      if (error) {
+        throw new Error(`低库存查询失败: ${error.message}`);
+      }
+      raw = rpcResult as { data: RawOverseasInventoryRow[] } | null;
     }
-
-    const raw = rpcResult as { data: RawOverseasInventoryRow[] } | null;
     if (!raw || !raw.data || raw.data.length === 0) {
       return [];
     }
@@ -304,7 +345,66 @@ export const inventoryRepository = {
   },
 
   /** 按产品 ID 获取各仓库存（不过滤归档，产品详情保留全部 Variant） */
-  async getByProductId(productId: string): Promise<InventoryItem[]> {
+  async getByProductId(
+    productId: string,
+    options?: { profileUserId?: string },
+  ): Promise<InventoryItem[]> {
+    if (isIndependentPlatformRuntime()) {
+      const profileUserId = options?.profileUserId;
+      if (!profileUserId) {
+        throw new Error('getByProductId 在独立平台需要 profileUserId');
+      }
+      const identity = { profileUserId };
+      const rows = await queryAppRows<{
+        id: string;
+        variant_id: string;
+        warehouse_id: string;
+        quantity: number;
+        last_sync_at: string | null;
+        sku: string;
+        country: string;
+        variant_name: string | null;
+        match_status: string;
+        product_name: string | null;
+        product_code: string | null;
+        warehouse_name: string;
+        warehouse_type: string;
+      }>(
+        identity,
+        `SELECT i.id::text, i.variant_id::text, i.warehouse_id::text, i.quantity, i.last_sync_at,
+                pv.sku, pv.country, pv.name AS variant_name, pv.match_status,
+                p.name AS product_name, p.code AS product_code,
+                w.name AS warehouse_name, w.type AS warehouse_type
+         FROM public.inventory i
+         JOIN public.product_variant pv ON pv.id = i.variant_id
+         JOIN public.product p ON p.id = pv.product_id
+         JOIN public.warehouse w ON w.id = i.warehouse_id
+         WHERE pv.product_id = $1::uuid
+         ORDER BY w.name, pv.sku`,
+        [productId],
+      );
+      return rows.map((row) => ({
+        id: row.id,
+        variantId: row.variant_id,
+        warehouseId: row.warehouse_id,
+        quantity: Number(row.quantity),
+        lastSyncAt: row.last_sync_at,
+        variantName: row.variant_name,
+        standardProductName: row.product_name,
+        standardProductCode: row.product_code,
+        productName: row.variant_name,
+        productCode: row.product_code,
+        sku: row.sku ?? '',
+        country: row.country ?? '',
+        warehouseName: row.warehouse_name ?? '',
+        warehouseType: row.warehouse_type ?? '',
+        safetyStock: 0,
+        matchStatus: row.match_status ?? 'unmatched',
+        isFavorited: false,
+        inTransitQuantity: 0,
+      }));
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase.from('inventory').select(
       `id, variant_id, warehouse_id, quantity, last_sync_at,
@@ -351,7 +451,26 @@ export const inventoryRepository = {
   },
 
   /** 更新库存数量（运营可操作） */
-  async updateQuantity(inventoryId: string, quantity: number): Promise<boolean> {
+  async updateQuantity(
+    inventoryId: string,
+    quantity: number,
+    options?: { profileUserId?: string },
+  ): Promise<boolean> {
+    if (isIndependentPlatformRuntime()) {
+      const profileUserId = options?.profileUserId;
+      if (!profileUserId) {
+        throw new Error('updateQuantity 在独立平台需要 profileUserId');
+      }
+      const updated = await queryAppRows<{ id: string }>(
+        { profileUserId },
+        `UPDATE public.inventory SET quantity = $2, updated_at = now()
+         WHERE id = $1::uuid
+         RETURNING id::text`,
+        [inventoryId, quantity],
+      );
+      return updated.length > 0;
+    }
+
     const supabase = await createClient();
     const { error } = await supabase
       .from('inventory')
@@ -375,8 +494,6 @@ export const inventoryRepository = {
     userId?: string,
     inTransitMap?: Map<string, number>,
   ): Promise<OverseasStats> {
-    const supabase = await createClient();
-
     if (!userId) {
       return {
         totalQuantity: 0,
@@ -388,14 +505,31 @@ export const inventoryRepository = {
       };
     }
 
-    const { data: rpcResult, error } = await supabase.rpc('get_overseas_stats', {
-      p_user_id: userId,
-      p_country: null,
-      p_warehouse_id: null,
-    });
+    let rpcResult: {
+      total_skus: number;
+      total_quantity: number;
+      low_stock_count: number;
+      last_sync_at: string | null;
+    } | null;
 
-    if (error) {
-      throw new Error(`海外库存统计查询失败: ${error.message}`);
+    if (isIndependentPlatformRuntime()) {
+      rpcResult = await callAppRpc(
+        { profileUserId: userId },
+        'public.get_overseas_stats',
+        [userId, null, null],
+      );
+    } else {
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc('get_overseas_stats', {
+        p_user_id: userId,
+        p_country: null,
+        p_warehouse_id: null,
+      });
+
+      if (error) {
+        throw new Error(`海外库存统计查询失败: ${error.message}`);
+      }
+      rpcResult = data as typeof rpcResult;
     }
 
     const raw = rpcResult as {
@@ -440,6 +574,17 @@ export const inventoryRepository = {
 
   /** 获取海外仓库列表（用于筛选下拉） */
   async getOverseasWarehouses(): Promise<WarehouseOption[]> {
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppDbIdentity();
+      const rows = await queryAppRows<{ id: string; name: string; country: string }>(
+        identity,
+        `SELECT id::text AS id, name, country FROM public.warehouse
+         WHERE type = 'overseas' AND is_active = true
+         ORDER BY country ASC`,
+      );
+      return rows;
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('warehouse')
@@ -477,8 +622,16 @@ export const inventoryRepository = {
     userId: string,
     warehouseIds?: string[],
   ): Promise<RawAggregateRow[]> {
-    const supabase = await createClient();
+    if (isIndependentPlatformRuntime()) {
+      const rows = await callAppRpc<RawAggregateRow[]>(
+        { profileUserId: userId },
+        'public.get_in_transit_confirmed_aggregate',
+        [userId, warehouseIds ?? null],
+      );
+      return rows ?? [];
+    }
 
+    const supabase = await createClient();
     const { data, error } = await supabase.rpc('get_in_transit_confirmed_aggregate', {
       p_user_id: userId,
       p_warehouse_ids: warehouseIds ?? null,

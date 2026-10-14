@@ -100,14 +100,16 @@ export async function updateInventoryQuantity(
   quantity: number
 ): Promise<ActionResult> {
   try {
-    await requireAuth();
+    const user = await requireAuth();
 
     const parsed = inventoryUpdateSchema.safeParse({ quantity });
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? '校验失败' };
     }
 
-    const ok = await inventoryRepository.updateQuantity(inventoryId, quantity);
+    const ok = await inventoryRepository.updateQuantity(inventoryId, quantity, {
+      profileUserId: user.id,
+    });
     if (!ok) {
       return { success: false, error: '更新库存失败' };
     }

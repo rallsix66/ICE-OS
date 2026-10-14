@@ -9,6 +9,9 @@
 // - 列表无数据 → 返回空数组
 // - 关联查询失败 → 抛出 VariantError(DB_ERROR)，不返回不完整数据
 import { cache } from 'react';
+import { callAppRpc, queryAppRows, type DbIdentity } from '@/lib/database/app-db';
+import { requireAppDbIdentity } from '@/lib/database/app-identity';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
 import { createClient } from '@/lib/supabase/server';
 import { unwrapJoin } from '@/lib/supabase/helpers';
 import type { VariantItem, VariantFilters } from './types';
@@ -35,6 +38,63 @@ function validateUUID(id: string): boolean {
   return UUID_RE.test(id);
 }
 
+function appIdentityForUserId(userId?: string): DbIdentity | null {
+  if (!userId || !validateUUID(userId)) return null;
+  return { profileUserId: userId };
+}
+
+function escapeIlike(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+type VariantSqlRow = {
+  id: string;
+  product_id: string | null;
+  sku: string;
+  country: string;
+  name: string;
+  match_status: string;
+  last_sync_at: string | null;
+  created_at: string;
+  updated_at: string;
+  product_name?: string | null;
+  product_code?: string | null;
+};
+
+const VARIANT_LIST_SELECT = `pv.id, pv.product_id, pv.sku, pv.country, pv.name, pv.match_status,
+  pv.last_sync_at, pv.created_at, pv.updated_at, p.name AS product_name, p.code AS product_code`;
+
+function mapVariantItemFromSqlRow(row: VariantSqlRow, archivedVariantIds: Set<string>): VariantItem {
+  return {
+    id: row.id,
+    product_id: row.product_id,
+    sku: row.sku,
+    country: row.country,
+    name: row.name,
+    match_status: row.match_status,
+    last_sync_at: row.last_sync_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    productName: row.product_name ?? null,
+    productCode: row.product_code ?? null,
+    isArchivedByUser: archivedVariantIds.has(row.id),
+  };
+}
+
+function mapBatchMatchRpcError(error: unknown): never {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('产品已停用')) {
+    throw new VariantError('产品已停用，无法匹配', 'PRODUCT_INACTIVE');
+  }
+  if (message.includes('产品不存在')) {
+    throw new VariantError('产品不存在', 'NOT_FOUND');
+  }
+  if (message.includes('SKU 不存在')) {
+    throw new VariantError('部分 SKU 不存在', 'NOT_FOUND');
+  }
+  throw new VariantError('批量匹配失败', 'DB_ERROR');
+}
+
 /** 将 Supabase join 结果映射为 VariantItem */
 function mapVariantItem(row: Record<string, unknown>, archivedVariantIds: Set<string>): VariantItem {
   const product = unwrapJoin<{ name: string; code: string }>(row.product);
@@ -52,6 +112,20 @@ function mapVariantItem(row: Record<string, unknown>, archivedVariantIds: Set<st
 const cachedGetUserArchivedVariantIds = cache(
   async (userId: string): Promise<string[]> => {
     if (!validateUUID(userId)) return [];
+
+    if (isIndependentPlatformRuntime()) {
+      try {
+        const rows = await queryAppRows<{ variant_id: string }>(
+          { profileUserId: userId },
+          `SELECT variant_id FROM public.user_variant_preference
+           WHERE user_id = $1 AND preference_type = 'archived'`,
+          [userId],
+        );
+        return rows.map((r) => r.variant_id);
+      } catch {
+        throw new VariantError('查询归档偏好失败', 'DB_ERROR');
+      }
+    }
 
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -87,7 +161,6 @@ export const variantRepository = {
    *  归档过滤在 DB 层完成（分页前），确保 total 和每页条数准确。
    *  'all' 时也加载 archivedVariantIds 用于 isArchivedByUser 标记。 */
   async list(filters: VariantFilters = {}): Promise<PaginatedResult<VariantItem>> {
-    const supabase = await createClient();
     const { country, matchStatus, productId, search, archiveStatus = 'active', page = 1, pageSize = PAGE_SIZE, userId } = filters;
 
     // 始终加载当前用户已归档 ID（all 也需要，用于 isArchivedByUser 标记）
@@ -100,6 +173,82 @@ export const variantRepository = {
     if (archiveStatus === 'archived' && archivedVariantIds.size === 0) {
       return { data: [], total: 0, page, pageSize };
     }
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = appIdentityForUserId(userId);
+      const conditions: string[] = ['TRUE'];
+      const params: unknown[] = [];
+      let paramIndex = 1;
+
+      if (country) {
+        conditions.push(`pv.country = $${paramIndex++}`);
+        params.push(country);
+      }
+      if (matchStatus) {
+        conditions.push(`pv.match_status = $${paramIndex++}`);
+        params.push(matchStatus);
+      }
+      if (productId) {
+        conditions.push(`pv.product_id = $${paramIndex++}`);
+        params.push(productId);
+      }
+      if (search) {
+        const pattern = `%${escapeIlike(search)}%`;
+        conditions.push(
+          `(pv.sku ILIKE $${paramIndex} ESCAPE E'\\\\' OR pv.name ILIKE $${paramIndex} ESCAPE E'\\\\')`,
+        );
+        params.push(pattern);
+        paramIndex += 1;
+      }
+      if (userId) {
+        const archivedArray = [...archivedVariantIds];
+        if (archiveStatus === 'active' && archivedArray.length > 0) {
+          conditions.push(`NOT (pv.id = ANY($${paramIndex++}::uuid[]))`);
+          params.push(archivedArray);
+        } else if (archiveStatus === 'archived') {
+          conditions.push(`pv.id = ANY($${paramIndex++}::uuid[])`);
+          params.push(archivedArray);
+        }
+      }
+
+      const whereClause = conditions.join(' AND ');
+      const from = (page - 1) * pageSize;
+
+      try {
+        const countRows = await queryAppRows<{ total: number }>(
+          identity,
+          `SELECT COUNT(*)::int AS total
+           FROM public.product_variant pv
+           WHERE ${whereClause}`,
+          params,
+        );
+        const total = countRows[0]?.total ?? 0;
+        if (total === 0) {
+          return { data: [], total: 0, page, pageSize };
+        }
+
+        const listParams = [...params, pageSize, from];
+        const limitParam = paramIndex;
+        const offsetParam = paramIndex + 1;
+        const dataRows = await queryAppRows<VariantSqlRow>(
+          identity,
+          `SELECT ${VARIANT_LIST_SELECT}
+           FROM public.product_variant pv
+           LEFT JOIN public.product p ON p.id = pv.product_id
+           WHERE ${whereClause}
+           ORDER BY pv.created_at DESC
+           LIMIT $${limitParam} OFFSET $${offsetParam}`,
+          listParams,
+        );
+
+        const items = dataRows.map((row) => mapVariantItemFromSqlRow(row, archivedVariantIds));
+        return { data: items, total, page, pageSize };
+      } catch {
+        throw new VariantError('查询 SKU 列表失败', 'DB_ERROR');
+      }
+    }
+
+    const supabase = await createClient();
 
     // 不再使用 is_archived 列；归档过滤基于 user_variant_preference 在 DB 层完成
     let query = supabase.from('product_variant').select('*, product:product_id (name, code)', {
@@ -156,13 +305,63 @@ export const variantRepository = {
     params: { userId?: string; page?: number; pageSize?: number } = {}
   ): Promise<PaginatedResult<VariantItem>> {
     const { userId, page = 1, pageSize = PAGE_SIZE } = params;
-    const supabase = await createClient();
 
     // 获取当前用户已归档 ID
     let archivedVariantIds = new Set<string>();
     if (userId) {
       archivedVariantIds = await this.getUserArchivedVariantIds(userId);
     }
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = appIdentityForUserId(userId);
+      const conditions: string[] = [`pv.match_status = ANY(ARRAY['unmatched', 'pending']::text[])`];
+      const paramsSql: unknown[] = [];
+      let paramIndex = 1;
+
+      if (userId) {
+        const archivedArray = [...archivedVariantIds];
+        if (archivedArray.length > 0) {
+          conditions.push(`NOT (pv.id = ANY($${paramIndex++}::uuid[]))`);
+          paramsSql.push(archivedArray);
+        }
+      }
+
+      const whereClause = conditions.join(' AND ');
+      const from = (page - 1) * pageSize;
+
+      try {
+        const countRows = await queryAppRows<{ total: number }>(
+          identity,
+          `SELECT COUNT(*)::int AS total FROM public.product_variant pv WHERE ${whereClause}`,
+          paramsSql,
+        );
+        const total = countRows[0]?.total ?? 0;
+        if (total === 0) {
+          return { data: [], total: 0, page, pageSize };
+        }
+
+        const listParams = [...paramsSql, pageSize, from];
+        const limitParam = paramIndex;
+        const offsetParam = paramIndex + 1;
+        const dataRows = await queryAppRows<VariantSqlRow>(
+          identity,
+          `SELECT ${VARIANT_LIST_SELECT}
+           FROM public.product_variant pv
+           LEFT JOIN public.product p ON p.id = pv.product_id
+           WHERE ${whereClause}
+           ORDER BY pv.last_sync_at DESC NULLS LAST
+           LIMIT $${limitParam} OFFSET $${offsetParam}`,
+          listParams,
+        );
+
+        const items = dataRows.map((row) => mapVariantItemFromSqlRow(row, archivedVariantIds));
+        return { data: items, total, page, pageSize };
+      } catch {
+        throw new VariantError('查询待处理 SKU 失败', 'DB_ERROR');
+      }
+    }
+
+    const supabase = await createClient();
 
     let query = supabase
       .from('product_variant')
@@ -206,6 +405,25 @@ export const variantRepository = {
       archivedVariantIds = await this.getUserArchivedVariantIds(userId);
     }
 
+    if (isIndependentPlatformRuntime()) {
+      try {
+        const rows = await queryAppRows<VariantSqlRow>(
+          appIdentityForUserId(userId),
+          `SELECT ${VARIANT_LIST_SELECT}
+           FROM public.product_variant pv
+           LEFT JOIN public.product p ON p.id = pv.product_id
+           WHERE pv.id = $1::uuid
+           LIMIT 1`,
+          [id],
+        );
+        const row = rows[0];
+        if (!row) return null;
+        return mapVariantItemFromSqlRow(row, archivedVariantIds);
+      } catch {
+        throw new VariantError('查询 SKU 详情失败', 'DB_ERROR');
+      }
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('product_variant')
@@ -238,6 +456,46 @@ export const variantRepository = {
     }
 
     const uniqueIds = [...new Set(variantIds)];
+    const identity = { profileUserId: userId };
+
+    if (isIndependentPlatformRuntime()) {
+      try {
+        const variants = await queryAppRows<{ id: string }>(
+          identity,
+          `SELECT id FROM public.product_variant WHERE id = ANY($1::uuid[])`,
+          [uniqueIds],
+        );
+        const foundIds = new Set(variants.map((v) => v.id));
+        for (const vid of uniqueIds) {
+          if (!foundIds.has(vid)) {
+            throw new VariantError('SKU 不存在', 'NOT_FOUND');
+          }
+        }
+
+        const existing = await queryAppRows<{ variant_id: string }>(
+          identity,
+          `SELECT variant_id FROM public.user_variant_preference
+           WHERE user_id = $1 AND preference_type = 'archived' AND variant_id = ANY($2::uuid[])`,
+          [userId, uniqueIds],
+        );
+        const alreadyArchived = new Set(existing.map((r) => r.variant_id));
+        const toArchive = uniqueIds.filter((vid) => !alreadyArchived.has(vid));
+        if (toArchive.length === 0) {
+          return { archived: 0 };
+        }
+
+        await queryAppRows(
+          identity,
+          `INSERT INTO public.user_variant_preference (user_id, variant_id, preference_type)
+           SELECT $1, unnest($2::uuid[]), 'archived'`,
+          [userId, toArchive],
+        );
+        return { archived: toArchive.length };
+      } catch (error) {
+        if (error instanceof VariantError) throw error;
+        throw new VariantError('归档 SKU 失败', 'DB_ERROR');
+      }
+    }
 
     const supabase = await createClient();
 
@@ -312,6 +570,45 @@ export const variantRepository = {
     }
 
     const uniqueIds = [...new Set(variantIds)];
+    const identity = { profileUserId: userId };
+
+    if (isIndependentPlatformRuntime()) {
+      try {
+        const variants = await queryAppRows<{ id: string }>(
+          identity,
+          `SELECT id FROM public.product_variant WHERE id = ANY($1::uuid[])`,
+          [uniqueIds],
+        );
+        const foundIds = new Set(variants.map((v) => v.id));
+        for (const vid of uniqueIds) {
+          if (!foundIds.has(vid)) {
+            throw new VariantError('SKU 不存在', 'NOT_FOUND');
+          }
+        }
+
+        const existing = await queryAppRows<{ variant_id: string }>(
+          identity,
+          `SELECT variant_id FROM public.user_variant_preference
+           WHERE user_id = $1 AND preference_type = 'archived' AND variant_id = ANY($2::uuid[])`,
+          [userId, uniqueIds],
+        );
+        const actuallyArchived = existing.map((r) => r.variant_id);
+        if (actuallyArchived.length === 0) {
+          return { restored: 0 };
+        }
+
+        await queryAppRows(
+          identity,
+          `DELETE FROM public.user_variant_preference
+           WHERE user_id = $1 AND preference_type = 'archived' AND variant_id = ANY($2::uuid[])`,
+          [userId, actuallyArchived],
+        );
+        return { restored: actuallyArchived.length };
+      } catch (error) {
+        if (error instanceof VariantError) throw error;
+        throw new VariantError('恢复 SKU 失败', 'DB_ERROR');
+      }
+    }
 
     const supabase = await createClient();
 
@@ -374,6 +671,49 @@ export const variantRepository = {
       throw new VariantError('无效的产品 ID', 'INVALID_ID');
     }
 
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppDbIdentity();
+      try {
+        const variantRows = await queryAppRows<{ id: string }>(
+          identity,
+          `SELECT id FROM public.product_variant WHERE id = $1::uuid LIMIT 1`,
+          [variantId],
+        );
+        if (variantRows.length === 0) {
+          throw new VariantError('SKU 不存在', 'NOT_FOUND');
+        }
+
+        const productRows = await queryAppRows<{ id: string; is_active: boolean }>(
+          identity,
+          `SELECT id, is_active FROM public.product WHERE id = $1::uuid LIMIT 1`,
+          [productId],
+        );
+        const product = productRows[0];
+        if (!product) {
+          throw new VariantError('产品不存在', 'NOT_FOUND');
+        }
+        if (!product.is_active) {
+          throw new VariantError('产品已停用，无法匹配', 'PRODUCT_INACTIVE');
+        }
+
+        const updated = await queryAppRows<{ id: string }>(
+          identity,
+          `UPDATE public.product_variant
+           SET product_id = $2, match_status = 'matched'
+           WHERE id = $1
+           RETURNING id`,
+          [variantId, productId],
+        );
+        if (updated.length === 0) {
+          throw new VariantError('SKU 不存在', 'NOT_FOUND');
+        }
+        return;
+      } catch (error) {
+        if (error instanceof VariantError) throw error;
+        throw new VariantError('匹配 SKU 失败', 'DB_ERROR');
+      }
+    }
+
     const supabase = await createClient();
 
     // 确认 Variant 存在
@@ -430,6 +770,36 @@ export const variantRepository = {
       throw new VariantError('无效的 SKU ID', 'INVALID_ID');
     }
 
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppDbIdentity();
+      try {
+        const variantRows = await queryAppRows<{ id: string }>(
+          identity,
+          `SELECT id FROM public.product_variant WHERE id = $1::uuid LIMIT 1`,
+          [variantId],
+        );
+        if (variantRows.length === 0) {
+          throw new VariantError('SKU 不存在', 'NOT_FOUND');
+        }
+
+        const updated = await queryAppRows<{ id: string }>(
+          identity,
+          `UPDATE public.product_variant
+           SET product_id = NULL, match_status = 'unmatched'
+           WHERE id = $1
+           RETURNING id`,
+          [variantId],
+        );
+        if (updated.length === 0) {
+          throw new VariantError('SKU 不存在', 'NOT_FOUND');
+        }
+        return;
+      } catch (error) {
+        if (error instanceof VariantError) throw error;
+        throw new VariantError('取消匹配失败', 'DB_ERROR');
+      }
+    }
+
     const supabase = await createClient();
 
     // 确认 Variant 存在
@@ -481,6 +851,33 @@ export const variantRepository = {
 
     // 2. 去重，避免重复 ID 导致更新数量与请求数量误判
     const uniqueIds = [...new Set(variantIds)];
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppDbIdentity();
+      try {
+        const variants = await queryAppRows<{ id: string }>(
+          identity,
+          `SELECT id FROM public.product_variant WHERE id = ANY($1::uuid[])`,
+          [uniqueIds],
+        );
+        const foundMap = new Map(variants.map((v) => [v.id, true]));
+        for (const vid of uniqueIds) {
+          if (!foundMap.has(vid)) {
+            throw new VariantError('部分 SKU 不存在', 'NOT_FOUND');
+          }
+        }
+
+        const matchedCount = await callAppRpc<number>(
+          identity,
+          'public.batch_match_variants',
+          [uniqueIds, productId],
+        );
+        return { matched: matchedCount ?? 0 };
+      } catch (error) {
+        if (error instanceof VariantError) throw error;
+        mapBatchMatchRpcError(error);
+      }
+    }
 
     // 3. 查询所有 Variant 的 id，验证存在性（归档偏好不再阻止匹配）
     const supabase = await createClient();

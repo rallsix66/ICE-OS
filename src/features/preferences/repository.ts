@@ -14,6 +14,8 @@
 // - 数据库查询/写入失败 → 抛出 PreferenceError，由 actions 层捕获并返回中文错误
 // - variant 不存在 → 返回 PreferenceResult error
 // - 用户无关注 → 返回空数组
+import { queryAppRows } from '@/lib/database/app-db';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
 import { createClient } from '@/lib/supabase/server';
 import { unwrapJoin } from '@/lib/supabase/helpers';
 import { warehouseAccessRepository } from '@/features/warehouse-access/repository';
@@ -32,6 +34,16 @@ export const preferencesRepository = {
   async getFavoritedVariantIds(userId: string): Promise<Set<string>> {
     if (!validateUUID(userId)) return new Set();
 
+    if (isIndependentPlatformRuntime()) {
+      const rows = await queryAppRows<{ variant_id: string }>(
+        { profileUserId: userId },
+        `SELECT variant_id FROM public.user_variant_preference
+         WHERE user_id = $1 AND preference_type = 'favorited'`,
+        [userId],
+      );
+      return new Set(rows.map((r) => r.variant_id));
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('user_variant_preference')
@@ -49,6 +61,17 @@ export const preferencesRepository = {
   /** 是否已关注 */
   async isFavorited(userId: string, variantId: string): Promise<boolean> {
     if (!validateUUID(userId) || !validateUUID(variantId)) return false;
+
+    if (isIndependentPlatformRuntime()) {
+      const rows = await queryAppRows<{ id: string }>(
+        { profileUserId: userId },
+        `SELECT id::text AS id FROM public.user_variant_preference
+         WHERE user_id = $1::uuid AND variant_id = $2::uuid AND preference_type = 'favorited'
+         LIMIT 1`,
+        [userId, variantId],
+      );
+      return rows.length > 0;
+    }
 
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -88,18 +111,39 @@ export const preferencesRepository = {
       return { success: false, error: new PreferenceError('ALREADY_FAVORITED', '已关注该 SKU') };
     }
 
-    // 3. INSERT
+    if (isIndependentPlatformRuntime()) {
+      try {
+        await queryAppRows(
+          { profileUserId: userId },
+          `INSERT INTO public.user_variant_preference (user_id, variant_id, preference_type)
+           VALUES ($1::uuid, $2::uuid, 'favorited')`,
+          [userId, variantId],
+        );
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code === '23505') {
+          return { success: false, error: new PreferenceError('ALREADY_FAVORITED', '已关注该 SKU') };
+        }
+        if (code === '42501') {
+          return { success: false, error: new PreferenceError('RLS_REJECTED', '无权操作该 SKU') };
+        }
+        return {
+          success: false,
+          error: new PreferenceError('DB_ERROR', `数据库错误: ${(error as Error).message}`),
+        };
+      }
+      return { success: true, data: { favorited: true } };
+    }
+
     const supabase = await createClient();
     const { error } = await supabase
       .from('user_variant_preference')
       .insert({ user_id: userId, variant_id: variantId, preference_type: 'favorited' });
 
     if (error) {
-      // 23505 = unique_violation（已被并发插入）
       if (error.code === '23505') {
         return { success: false, error: new PreferenceError('ALREADY_FAVORITED', '已关注该 SKU') };
       }
-      // 42501 = insufficient_privilege（RLS 拒绝）
       if (error.code === '42501') {
         return { success: false, error: new PreferenceError('RLS_REJECTED', '无权操作该 SKU') };
       }
@@ -122,6 +166,27 @@ export const preferencesRepository = {
     const already = await this.isFavorited(userId, variantId);
     if (!already) {
       return { success: false, error: new PreferenceError('NOT_FAVORITED', '未关注该 SKU') };
+    }
+
+    if (isIndependentPlatformRuntime()) {
+      try {
+        await queryAppRows(
+          { profileUserId: userId },
+          `DELETE FROM public.user_variant_preference
+           WHERE user_id = $1::uuid AND variant_id = $2::uuid AND preference_type = 'favorited'`,
+          [userId, variantId],
+        );
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code === '42501') {
+          return { success: false, error: new PreferenceError('RLS_REJECTED', '无权操作该 SKU') };
+        }
+        return {
+          success: false,
+          error: new PreferenceError('DB_ERROR', `数据库错误: ${(error as Error).message}`),
+        };
+      }
+      return { success: true, data: { favorited: false } };
     }
 
     const supabase = await createClient();
@@ -191,11 +256,119 @@ export const preferencesRepository = {
   async getFollowedVariantsBasic(userId: string): Promise<FollowedVariantBasic[]> {
     if (!validateUUID(userId)) return [];
 
-    const supabase = await createClient();
-
-    // 步骤 1：读取当前用户 favorited variant_id 集合
     const favoritedVariantIds = await this.getFavoritedVariantIds(userId);
     if (favoritedVariantIds.size === 0) return [];
+
+    if (isIndependentPlatformRuntime()) {
+      const ids = [...favoritedVariantIds];
+      const rows = await queryAppRows<{
+        id: string;
+        variant_id: string;
+        warehouse_id: string;
+        quantity: number;
+        daily_sales: number | null;
+        estimated_days: number | null;
+        last_sync_at: string | null;
+        v_id: string;
+        sku: string;
+        match_status: string;
+        country: string;
+        p_id: string | null;
+        product_name: string | null;
+        product_code: string | null;
+        safety_stock: number | null;
+        w_id: string;
+        warehouse_name: string;
+        wh_country: string;
+        warehouse_type: string;
+        lead_time_days: number | null;
+      }>(
+        { profileUserId: userId },
+        `SELECT i.id, i.variant_id, i.warehouse_id, i.quantity, i.daily_sales, i.estimated_days, i.last_sync_at,
+                v.id AS v_id, v.sku, v.match_status, v.country,
+                p.id AS p_id, p.name AS product_name, p.code AS product_code, p.safety_stock,
+                w.id AS w_id, w.name AS warehouse_name, w.country AS wh_country, w.type AS warehouse_type, w.lead_time_days
+         FROM public.inventory i
+         INNER JOIN public.product_variant v ON v.id = i.variant_id
+         LEFT JOIN public.product p ON p.id = v.product_id
+         INNER JOIN public.warehouse w ON w.id = i.warehouse_id
+         WHERE i.variant_id = ANY($1::uuid[]) AND w.type = 'overseas'
+         ORDER BY i.quantity ASC`,
+        [ids],
+      );
+      if (rows.length === 0) {
+        throw new PreferenceError(
+          'EMPTY_RESULT',
+          `已关注 ${favoritedVariantIds.size} 个 SKU 但未找到对应库存记录，请确认对应 variant 在 inventory 表中存在且 warehouse.type = 'overseas'`,
+        );
+      }
+      const accessibleWhIds = await warehouseAccessRepository.getAccessibleWarehouseIds(userId);
+      const ALERT_ORDER: Record<string, number> = { critical: 0, warning: 1, unknown: 2, normal: 2 };
+      const results: FollowedVariantBasic[] = [];
+      for (const row of rows) {
+        if (!accessibleWhIds.has(row.w_id)) continue;
+        const productName = row.product_name ?? row.sku ?? '未匹配产品';
+        const safetyStock = row.safety_stock ?? 0;
+        const qty = row.quantity ?? 0;
+        const estimatedDays = row.estimated_days;
+        const leadTimeDays = row.lead_time_days;
+        let alertLevel: FollowedVariantBasic['alertLevel'] = 'normal';
+        let alertReason: string | null = null;
+        const isCritical = estimatedDays != null && leadTimeDays != null && estimatedDays < leadTimeDays;
+        const isLowStock = row.p_id ? qty < safetyStock : false;
+        const isDataInsufficient = !row.p_id && (row.daily_sales == null || estimatedDays == null);
+        if (isCritical) {
+          alertLevel = 'critical';
+          alertReason = `可售天数(${estimatedDays})低于补货周期(${leadTimeDays}天)`;
+        } else if (isLowStock) {
+          alertLevel = 'warning';
+          alertReason = `低于安全线 ${safetyStock}`;
+        } else if (isDataInsufficient) {
+          alertLevel = 'unknown';
+          alertReason = '数据不足';
+        }
+        results.push({
+          variantId: row.v_id,
+          productName,
+          productCode: row.product_code ?? row.sku ?? '',
+          sku: row.sku,
+          matchStatus: row.match_status,
+          isUnmatched: !row.p_id,
+          country: row.country,
+          warehouseId: row.w_id,
+          warehouseName: row.warehouse_name,
+          quantity: qty,
+          safetyStock,
+          dailySales: row.daily_sales,
+          estimatedDays,
+          leadTimeDays,
+          alertLevel,
+          alertReason,
+          inTransitQuantity: 0,
+        });
+      }
+      if (results.length === 0) {
+        throw new PreferenceError(
+          'EMPTY_RESULT',
+          `已关注 ${favoritedVariantIds.size} 个 SKU 但处理后无有效结果，请确认 variant 数据完整性`,
+        );
+      }
+      results.sort((a, b) => {
+        const orderA = ALERT_ORDER[a.alertLevel];
+        const orderB = ALERT_ORDER[b.alertLevel];
+        if (orderA !== orderB) return orderA - orderB;
+        const edA = a.estimatedDays;
+        const edB = b.estimatedDays;
+        if (edA == null && edB == null) return a.quantity - b.quantity;
+        if (edA == null) return 1;
+        if (edB == null) return -1;
+        if (edA !== edB) return edA - edB;
+        return a.quantity - b.quantity;
+      });
+      return results;
+    }
+
+    const supabase = await createClient();
 
     // 步骤 2：从 inventory 正向查询这些 variant 的库存行（join variant/product/warehouse）
     // P5-SY12C: 新增 daily_sales, estimated_days, lead_time_days
@@ -334,6 +507,15 @@ export const preferencesRepository = {
   /** 校验 variantId 是否对应真实 ProductVariant */
   async _variantExists(variantId: string): Promise<boolean> {
     if (!validateUUID(variantId)) return false;
+
+    if (isIndependentPlatformRuntime()) {
+      const rows = await queryAppRows<{ id: string }>(
+        null,
+        `SELECT id::text AS id FROM public.product_variant WHERE id = $1::uuid LIMIT 1`,
+        [variantId],
+      );
+      return rows.length > 0;
+    }
 
     const supabase = await createClient();
     const { data, error } = await supabase

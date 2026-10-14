@@ -5,6 +5,9 @@
 // Admin 不受仓库分配限制（getUserRole() === 'admin' 时返回全部仓库）。
 // Operator 仅可访问 user_warehouses 中分配的仓库。
 import { cache } from 'react';
+import { callAppRpc, queryAppRows } from '@/lib/database/app-db';
+import { requireAppDbIdentity } from '@/lib/database/app-identity';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
 import { createClient } from '@/lib/supabase/server';
 import { unwrapJoin } from '@/lib/supabase/helpers';
 import type { WarehouseAccessRepository, OperatorItem, AssignableWarehouse } from './types';
@@ -22,16 +25,39 @@ const cachedGetAccessibleWarehouseIds = cache(
   async (userId: string): Promise<string[]> => {
     if (!validateUUID(userId)) return [];
 
+    if (isIndependentPlatformRuntime()) {
+      const identity = { profileUserId: userId };
+      const roleRows = await queryAppRows<{ name: string }>(
+        identity,
+        `SELECT r.name FROM public.profiles p
+         JOIN public.role r ON r.id = p.role_id
+         WHERE p.id = $1 LIMIT 1`,
+        [userId],
+      );
+      const roleName = roleRows[0]?.name;
+      if (roleName === 'admin') {
+        const wh = await queryAppRows<{ id: string }>(
+          identity,
+          `SELECT id FROM public.warehouse WHERE type = 'overseas' AND is_active = true`,
+        );
+        return wh.map((w) => w.id);
+      }
+      const assigned = await queryAppRows<{ warehouse_id: string }>(
+        identity,
+        `SELECT warehouse_id FROM public.user_warehouses WHERE user_id = $1`,
+        [userId],
+      );
+      return assigned.map((r) => r.warehouse_id);
+    }
+
     const supabase = await createClient();
 
-    // 先查角色
     const { data: profile } = await supabase
       .from('profiles')
       .select('role:role_id(name)')
       .eq('id', userId)
       .single();
 
-    // Admin → 返回所有 active overseas warehouse
     const roleName = (profile as unknown as { role: { name: string } } | null)?.role?.name;
     if (roleName === 'admin') {
       const { data: allWh } = await supabase
@@ -43,7 +69,6 @@ const cachedGetAccessibleWarehouseIds = cache(
       return (allWh ?? []).map((w) => w.id);
     }
 
-    // Operator → 返回 user_warehouses 中分配的
     const { data } = await supabase
       .from('user_warehouses')
       .select('warehouse_id')
@@ -77,9 +102,31 @@ export const warehouseAccessRepository: WarehouseAccessRepository = {
   async canAccessVariant(userId: string, variantId: string): Promise<boolean> {
     if (!validateUUID(userId) || !validateUUID(variantId)) return false;
 
-    const supabase = await createClient();
+    const identity = { profileUserId: userId };
+    if (isIndependentPlatformRuntime()) {
+      const roleRows = await queryAppRows<{ name: string }>(
+        identity,
+        `SELECT r.name FROM public.profiles p
+         JOIN public.role r ON r.id = p.role_id
+         WHERE p.id = $1 LIMIT 1`,
+        [userId],
+      );
+      if (roleRows[0]?.name === 'admin') return true;
 
-    // 先查角色
+      const accessibleIds = await this.getAccessibleWarehouseIds(userId);
+      if (accessibleIds.size === 0) return false;
+
+      const rows = await queryAppRows<{ id: string }>(
+        identity,
+        `SELECT id::text AS id FROM public.inventory
+         WHERE variant_id = $1::uuid AND warehouse_id = ANY($2::uuid[])
+         LIMIT 1`,
+        [variantId, [...accessibleIds]],
+      );
+      return rows.length > 0;
+    }
+
+    const supabase = await createClient();
     const { data: profile } = await supabase
       .from('profiles')
       .select('role:role_id(name)')
@@ -89,7 +136,6 @@ export const warehouseAccessRepository: WarehouseAccessRepository = {
     const roleName = (profile as unknown as { role: { name: string } } | null)?.role?.name;
     if (roleName === 'admin') return true;
 
-    // Operator: 检查 variant 在已分配仓库中是否有 inventory
     const accessibleIds = await this.getAccessibleWarehouseIds(userId);
     if (accessibleIds.size === 0) return false;
 
@@ -107,8 +153,34 @@ export const warehouseAccessRepository: WarehouseAccessRepository = {
 
   /** 获取所有活跃 operator 用户 */
   async listOperators(): Promise<OperatorItem[]> {
-    const supabase = await createClient();
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppDbIdentity();
+      const rows = await queryAppRows<{
+        id: string;
+        display_name: string;
+        is_active: boolean;
+        created_at: string;
+        role_name: string;
+      }>(
+        identity,
+        `SELECT p.id::text AS id, p.display_name, p.is_active, p.created_at, r.name AS role_name
+         FROM public.profiles p
+         JOIN public.role r ON r.id = p.role_id
+         WHERE p.is_active = true
+         ORDER BY p.created_at ASC`,
+      );
+      return rows
+        .filter((row) => row.role_name === 'operator')
+        .map((row) => ({
+          id: row.id,
+          email: '',
+          displayName: row.display_name,
+          isActive: row.is_active,
+          createdAt: row.created_at,
+        }));
+    }
 
+    const supabase = await createClient();
     const { data } = await supabase
       .from('profiles')
       .select('id, display_name, is_active, created_at, role:role_id (name)')
@@ -134,6 +206,16 @@ export const warehouseAccessRepository: WarehouseAccessRepository = {
   /** 获取某用户的已分配仓库 ID 集合 */
   async getUserWarehouseAssignments(userId: string): Promise<Set<string>> {
     if (!validateUUID(userId)) return new Set();
+
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppDbIdentity();
+      const rows = await queryAppRows<{ warehouse_id: string }>(
+        identity,
+        `SELECT warehouse_id::text AS warehouse_id FROM public.user_warehouses WHERE user_id = $1::uuid`,
+        [userId],
+      );
+      return new Set(rows.map((r) => r.warehouse_id));
+    }
 
     const supabase = await createClient();
     const { data } = await supabase
@@ -170,9 +252,54 @@ export const warehouseAccessRepository: WarehouseAccessRepository = {
       }
     }
 
-    const supabase = await createClient();
+    const dedupedIds = [...new Set(warehouseIds)];
 
-    // ── 1. 校验目标用户：存在、启用、且为 operator ─────────────
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppDbIdentity();
+      const targetRows = await queryAppRows<{
+        id: string;
+        is_active: boolean;
+        role_name: string | null;
+      }>(
+        identity,
+        `SELECT p.id::text AS id, p.is_active, r.name AS role_name
+         FROM public.profiles p
+         LEFT JOIN public.role r ON r.id = p.role_id
+         WHERE p.id = $1::uuid LIMIT 1`,
+        [userId],
+      );
+      const targetProfile = targetRows[0];
+      if (!targetProfile) {
+        return { success: false, error: '用户不存在' };
+      }
+      if (!targetProfile.is_active || targetProfile.role_name !== 'operator') {
+        return { success: false, error: '只能为启用的操作员分配仓库' };
+      }
+
+      if (dedupedIds.length > 0) {
+        const validWh = await queryAppRows<{ id: string }>(
+          identity,
+          `SELECT id::text AS id FROM public.warehouse
+           WHERE type = 'overseas' AND is_active = true AND id = ANY($1::uuid[])`,
+          [dedupedIds],
+        );
+        if (validWh.length !== dedupedIds.length) {
+          return { success: false, error: '只能分配启用的海外仓库' };
+        }
+      }
+
+      const rpcResult = await callAppRpc<{ success: boolean; error?: string } | null>(
+        identity,
+        'public.update_user_warehouses',
+        [userId, dedupedIds.length > 0 ? dedupedIds : null],
+      );
+      if (!rpcResult) {
+        return { success: false, error: '更新仓库分配失败，请稍后重试' };
+      }
+      return rpcResult;
+    }
+
+    const supabase = await createClient();
     const { data: targetProfile, error: targetErr } = await supabase
       .from('profiles')
       .select('id, is_active, role:role_id(name)')
@@ -192,10 +319,6 @@ export const warehouseAccessRepository: WarehouseAccessRepository = {
       return { success: false, error: '只能为启用的操作员分配仓库' };
     }
 
-    // ── 2. 去重 warehouseIds ────────────────────────────────────
-    const dedupedIds = [...new Set(warehouseIds)];
-
-    // ── 3. 非空时校验所有仓库：存在、启用、海外仓 ────────────────
     if (dedupedIds.length > 0) {
       const { data: validWh, error: whErr } = await supabase
         .from('warehouse')
@@ -213,7 +336,6 @@ export const warehouseAccessRepository: WarehouseAccessRepository = {
       }
     }
 
-    // ── 4. 通过 RPC 事务性写入（RPC 内部有 DB 层二次校验）─────
     const { data: rpcResult, error: rpcErr } = await supabase.rpc(
       'update_user_warehouses',
       {
@@ -236,8 +358,18 @@ export const warehouseAccessRepository: WarehouseAccessRepository = {
 
   /** 获取可分配的活跃海外仓库列表 */
   async getAssignableWarehouses(): Promise<AssignableWarehouse[]> {
-    const supabase = await createClient();
+    if (isIndependentPlatformRuntime()) {
+      const identity = await requireAppDbIdentity();
+      const rows = await queryAppRows<{ id: string; name: string; country: string }>(
+        identity,
+        `SELECT id::text AS id, name, country FROM public.warehouse
+         WHERE type = 'overseas' AND is_active = true
+         ORDER BY name ASC`,
+      );
+      return rows;
+    }
 
+    const supabase = await createClient();
     const { data } = await supabase
       .from('warehouse')
       .select('id, name, country')

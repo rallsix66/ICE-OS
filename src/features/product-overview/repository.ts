@@ -1,4 +1,6 @@
 import 'server-only';
+import { callAppRpc } from '@/lib/database/app-db';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
 import { createClient } from '@/lib/supabase/server';
 import {
   productOverviewParamsSchema,
@@ -96,18 +98,35 @@ export const productOverviewRepository: ProductOverviewRepository = {
     }
 
     const values = parsedParams.data;
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc('get_product_overview', {
-      p_user_id: userId,
-      p_page: values.page,
-      p_page_size: values.pageSize,
-      p_search: values.search || null,
-      p_stockout_urgency: values.stockoutUrgency ?? null,
-      p_country: values.country ?? null,
-    });
+    let data: unknown;
+    if (isIndependentPlatformRuntime()) {
+      data = await callAppRpc<unknown>(
+        { profileUserId: userId },
+        'public.get_product_overview',
+        [
+          userId,
+          values.page,
+          values.pageSize,
+          values.search || null,
+          values.stockoutUrgency ?? null,
+          values.country ?? null,
+        ],
+      );
+    } else {
+      const supabase = await createClient();
+      const { data: rpcData, error } = await supabase.rpc('get_product_overview', {
+        p_user_id: userId,
+        p_page: values.page,
+        p_page_size: values.pageSize,
+        p_search: values.search || null,
+        p_stockout_urgency: values.stockoutUrgency ?? null,
+        p_country: values.country ?? null,
+      });
 
-    if (error) {
-      throw new ProductOverviewError('查询全球库存总览失败，请稍后重试', 'DB_ERROR');
+      if (error) {
+        throw new ProductOverviewError('查询全球库存总览失败，请稍后重试', 'DB_ERROR');
+      }
+      data = rpcData;
     }
 
     const parsed = productOverviewRpcSchema.safeParse(data);
@@ -138,14 +157,24 @@ export const productOverviewRepository: ProductOverviewRepository = {
       );
     }
 
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc('get_war_room_variant_detail', {
-      p_user_id: userId,
-      p_variant_id: parsedInput.data.variantId,
-    });
+    let data: unknown;
+    if (isIndependentPlatformRuntime()) {
+      data = await callAppRpc<unknown>(
+        { profileUserId: userId },
+        'public.get_war_room_variant_detail',
+        [userId, parsedInput.data.variantId],
+      );
+    } else {
+      const supabase = await createClient();
+      const { data: rpcData, error } = await supabase.rpc('get_war_room_variant_detail', {
+        p_user_id: userId,
+        p_variant_id: parsedInput.data.variantId,
+      });
 
-    if (error) {
-      throw new ProductOverviewError('产品详情加载失败，请稍后重试', 'DB_ERROR');
+      if (error) {
+        throw new ProductOverviewError('产品详情加载失败，请稍后重试', 'DB_ERROR');
+      }
+      data = rpcData;
     }
 
     const parsed = productVariantDetailRpcSchema.safeParse(data);
