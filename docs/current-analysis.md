@@ -1,5 +1,7 @@
 # 现有系统分析：ICE v4 改造基线
 
+> 2026-10-13 方向更新：已批准脱离Supabase与历史底座，目标见 [architecture-v3.md](architecture-v3.md) 和 [历史模型](history-data-model-v1.md)。本轮在改名后的ICEOS目录核对 `0749343`：登录/认证封装、Repository、Python同步与`auth.users`/`auth.uid()`耦合仍在；没有执行替换。下文“保留Supabase”描述首版改造基线，不再代表后续平台目标。
+
 > 核实日期：2026-10-13。代码基线：`44d0b13cd2bc58a09bae46fc4594839d21996de1`。
 > 范围：本地代码、52 个 SQL Migration、配置与测试；未连接生产、Staging、BigSeller、飞书或聚水潭。历史发布记录不是本次运行态验证。
 

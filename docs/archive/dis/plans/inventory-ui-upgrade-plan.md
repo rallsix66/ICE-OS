@@ -1,3 +1,5 @@
+> 历史归档（2026-10-13）：原位置 `docs/design/dis-plans/inventory-ui-upgrade-plan.md`。保留用于旧实现与验收追溯，不作为当前任务或执行授权；现役入口见 [归档索引](../README.md)。
+
 # 库存看板系统 UI 升级方案（基于真实架构）
 
 > 产出角色：巴蒂（方案助理） ｜ 审查：Codex（架构师） ｜ 实现：Claude（主开发）

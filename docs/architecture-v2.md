@@ -1,5 +1,7 @@
 # ICE v4 目标架构（v2）
 
+> 2026-10-13 后续变更：平台目标已由 [architecture-v3.md](architecture-v3.md) 和 [ADR-ICE-002](adr/ADR-ICE-002-independent-postgres-history.md) 取代，正式方向是脱离 Supabase并增加[历史能力](history-data-model-v1.md)。本文保留首版设计背景，不再作为“继续用 Supabase 开发”的授权；运行代码尚未迁移。
+
 > 2026-10-13 · `approved`：方案验证范围与隔离边界；`proposal`：未来真实数据模型/平台迁移，需独立实施审批。现役实现依据 [current-analysis.md](current-analysis.md)，完成状态只看 [current-state.md](current-state.md)。
 
 ## 架构选择

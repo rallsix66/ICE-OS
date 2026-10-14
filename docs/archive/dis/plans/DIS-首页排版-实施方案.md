@@ -1,3 +1,5 @@
+> 历史归档（2026-10-13）：原位置 `docs/design/dis-plans/DIS-首页排版-实施方案.md`。保留用于旧实现与验收追溯，不作为当前任务或执行授权；现役入口见 [归档索引](../README.md)。
+
 # DIS · 首页决策看板重构 — 实施方案（v8 · 首页排版修订）
 
 > 状态：**v6 经 Codex 复审发现 4 个收口问题（健康度 RPC 未排 archived、旧在途数据源、Header 契约不彻底、章节编号错位），v7 已逐项修订；v8 继续修正 TypeScript null 契约、未来 7 日到港真实总数来源、abandoned 错误语义，待 Codex 最终确认（仅改方案，不实施、不建 Migration、不交 Claude 落盘）** ｜ 作者：巴蒂 ｜ 修订：2026-07-12（v4：Rall 确认单屏紧凑整页；v5：依 Codex 复审 17 类阻塞 + 2 类口径修正逐项取证修订；v6：依 Codex 终审 9 类收口固定为唯一实施契约，验收扩至 50 条；**v7：依 Codex 复审 4 个问题——① 健康度 RPC 补当前用户 archived Variant 过滤 / ② 首页在途数据源改用 P1 get_in_transit_detail（弃旧 getInTransitByVariant）/ ③ 共享 Header 契约彻底固定（删除临场修改入口）/ ④ 取证附录子章节编号 18.x→19.x 修正，验收扩至 56 条**；**v8：弃用 getInTransitDetail 调用的 null 实参（改无参调用，Repository 内映射 RPC null）/ 未来 7 日到港总数改用 getInTransitDetail 全量去重计数（不取 getUpcomingArrivals Top4 展示列表长度）/ 修正吸收语义（统一 bigseller_absorbed_at IS NOT NULL，删除不存在的 abandoned 字段误用），验收扩至 59 条**）

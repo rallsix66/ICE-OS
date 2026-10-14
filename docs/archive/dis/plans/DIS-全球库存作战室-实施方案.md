@@ -1,3 +1,5 @@
+> 历史归档（2026-10-13）：原位置 `docs/design/dis-plans/DIS-全球库存作战室-实施方案.md`。保留用于旧实现与验收追溯，不作为当前任务或执行授权；现役入口见 [归档索引](../README.md)。
+
 # DIS · 全球库存总览（P7-A 基础总览 + P7-B 作战室增强）· 实施方案（v8 · P7 合并整合）
 
 > 状态：**v7 经 Codex 最终复审，架构结论全部通过；仅 auth 返回对象形状 1 处事实错误，修正为 v8（`requireActiveAuth()` 直接返回 `CurrentActiveUser`，须先 `const user = await requireActiveAuth();` 再取 `user.id`）** ｜ 作者：巴蒂 ｜ 修订：2026-07-12（v2：Codex 审查 10 项；v3：Codex 终审 5 类问题；v4：Rall 终审合并为单一产品；v5：Codex 架构复审 10 类；v6：Codex 最终收口 8 类；v7：Codex 复审最终两项——Repository 接收服务端 userId（禁止客户端构造 p_user_id）/ P7 详情行动字段复用 P1 v8 get_replenishment_suggestions（禁 Migration F 重算行动公式）/ Migration E 依赖 C、F 依赖 C+D / 新增验收 #59–#61，全量 61 条；v8：仅修正 auth 返回对象形状——`const user = await requireActiveAuth(); user.id`，不改任何架构 / RPC / Migration / 公式 / 验收数量，验收保持 61 条）

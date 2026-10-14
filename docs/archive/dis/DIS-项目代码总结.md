@@ -1,3 +1,5 @@
+> 历史归档（2026-10-13）：原位置 `DIS-项目代码总结.md`。保留用于旧实现与验收追溯，不作为当前任务或执行授权；现役入口见 [归档索引](README.md)。
+
 # DIS 项目代码总结（基于实读代码与文档，2026-07-13）
 
 > 说明：本总结由只读审查得出，未修改 DIS 任何文件。信息来源 = 实际目录结构 + `CLAUDE.md` / `AGENTS.md` + `docs/` 四份核心文档（project-overview / architecture / current-state / database-design）+ 85 个测试文件分布 + 42 个 migration + `docs/design/dis-plans/` 下四份 v8 定稿实施方案与《实施总顺序方案》(v3)。**2026-07-13 已与 Codex 终审 v8 方案同步。**

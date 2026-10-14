@@ -1,5 +1,7 @@
 # ICE v4 数据库模型设计（v2）
 
+> 最新目标为 [独立 PostgreSQL 架构 v3](architecture-v3.md)。本篇商品/映射/快照/货票等基础模型继续沿用，历史粒度、维度修订、日统计和重算按 [history-data-model-v1.md](history-data-model-v1.md) 扩展；以下不是已执行 DDL。
+
 > 2026-10-13 · **设计草案，未创建或执行任何 Migration，未连接真实数据库。**
 > 本期仅验证文档与虚构 Demo；以下目标字段、约束、角色和表不代表已经上线。
 > 对齐 [产品方案](product-plan-v4.md)、[目标架构](architecture-v2.md)、[数据流](data-flow-v2.md) 与 [现状审计](current-analysis.md)。
@@ -145,10 +147,12 @@ Product ──< ProductCost ──< Valuation；领域事务 ──< OperationLo
 
 ### `product_cost` / `valuation`：金额独立受控
 
+2026-10-13 已确认本期不含运费；正式成本来源、含税与币种等仍待确认。[产品货值规则](product-plan-v4.md#货值口径已确认不含运费其余正式口径待确认) 为业务口径依据。不新增货票费用/运费分摊实体；既有 `basis`、来源与审批版本必须明确不含运费，混合到岸成本须先澄清，未澄清按无适用有效成本处理，不静默估扣。
+
 - Cost 字段：`product_id uuid NOT NULL FK`、`version bigint NOT NULL`、`unit_cost numeric(20,6) NOT NULL CHECK >= 0`、`currency text NOT NULL`、`unit text NOT NULL`、`basis text NOT NULL`（待批准标准成本口径）、`valid_from timestamptz NOT NULL`、`valid_to timestamptz NULL`、`source_ref text NOT NULL`、`approved_by uuid NOT NULL`、`approved_at timestamptz NOT NULL`。
 - 同 Product/单位/币种/口径版本唯一、有效区间不重叠；未知成本不创建0记录，真实零成本须显式确认。若成本随国家规格不同，再在独立任务增加Variant维度，不隐式复用。
 - Valuation 字段：`as_of timestamptz NOT NULL`、`snapshot_id uuid NULL FK`、`shipment_item_id uuid NULL FK`（恰好一个）、`cost_id uuid NULL FK`、`valued_quantity bigint NULL`、`report_currency text NOT NULL`、`fx_rate numeric(20,10) NULL CHECK > 0`、`fx_version text NULL`、`fx_effective_at timestamptz NULL`、`amount numeric(20,6) NULL`、`status text`（valued/missing_cost/missing_quantity/missing_mapping/missing_fx/reconciliation_pending）。
-- valued 要求明确物理/在途量、确认映射、有效成本与币种换算证据；同币种使用1并记同币种口径。其他状态 amount=NULL。汇总只输出已估值小计+覆盖率+缺口数量，不称完整资产总额。
+- valued 要求明确实物/有效未收货在途量、确认映射、适用的不含运费成本与币种换算证据；同币种使用1并记同币种口径。其他状态 amount=NULL。汇总只输出已估值小计+覆盖率+缺口数量，不称完整资产总额。
 - 索引 Cost `(product_id,valid_from DESC)`；Valuation `(as_of,status)` 及来源FK。写入者：Admin成本审批/估值服务；无金额权限不可读原表、金额汇总、金额排序或导出。Demo人民币数字不是正式成本授权。
 
 ## 8. 三角色、市场/仓库与金额隔离
@@ -179,7 +183,7 @@ Product ──< ProductCost ──< Valuation；领域事务 ──< OperationLo
 3. **写入门**：备份并暂停有关同步，退役旧累加RPC及手动库存改写授权，验证所有直接表/RPC路径；单点启用快照发布，禁止两套写入者并存。异常立即停止发布、保留证据。
 4. **权限与读切换门**：Staging验证Admin/Operator现役兼容及Manager新权限、金额拒绝、并发确认、重复/乱序/部分批次、零与未知、部分到货及两种事件先后；对照旧可售投影和新物理字段，逐页切读。
 5. **回退门**：代码、schema、业务数据、授权、配置和最后成功水位组成同一备份单元。写开放前可退读路径；开放后先停写、核对增量再补偿/恢复，不能只回代码、删除新表或丢弃已发布历史。
-6. **平台退出门**：Supabase继续保留。未来自有后端逐步替代Auth/SDK/RPC访问，PostgreSQL保留业务UUID和等价RLS；会话验证后以非superuser/非BYPASSRLS连接、事务内注入可信用户上下文，连接池必须隔离并清理上下文。
+6. **平台退出门（方向已变更）**：目标脱离 Supabase，旧服务仅在受控迁移兼容期保留；不再默认在其上扩建新功能。自有后端替代Auth/SDK/PostgREST与后台service-role路径，标准PostgreSQL保留业务UUID和等价RLS；运行账号非表owner/非superuser/非BYPASSRLS，可信身份使用事务局部上下文，连接池隔离与回滚均验收。具体迁移按架构v3单独批准执行。
 7. **认证等价门**：单独批准身份提供方、登录迁移、旧token撤销/重新登录策略；验证禁用、授权撤销、匿名/跨市场/金额行为。不得让客户端设置数据库身份，不用service-role通吃来绕RLS；不假设密码能直接迁移。
 
 生产写入、数据库回放、授权变更、供应商迁移均需新任务批准；本期没有这些执行证据。未决成本来源、来源完整性/删除语义、映射碰撞规则、收货证据、保留期和金额授权，只能在Demo中明确模拟，不能默认为已批准业务规则。

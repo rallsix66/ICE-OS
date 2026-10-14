@@ -1,5 +1,7 @@
 # ADR-ICE-001：商品身份、来源库存和方案隔离
 
+> 后续决定：[ADR-ICE-002](ADR-ICE-002-independent-postgres-history.md) 已取代“继续默认保留Supabase”的平台方向；商品身份、来源权威和隔离边界继续有效。本文件保留初始决定，不证明迁移已执行。
+
 - 日期：2026-10-13
 - 状态：方案验证边界 accepted；真实模型与平台迁移 pending implementation approval
 - 依据：用户 ICE v4 需求与本次明确实施授权；代码基线44d0b13。

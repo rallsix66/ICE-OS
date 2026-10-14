@@ -4,7 +4,7 @@ Batch 3 closeout update (2026-07-28): the corrected 00052 Staging SELECT-only re
 
 ## 文档定位
 
-本路线图把 `DIS-项目代码总结.md`（2026-07-13，42 个 Migration / 3524 个测试）中仍然有效的建议，按 2026-07-17 的真实代码、Migration、测试和线上 Supabase 状态重新校准。
+本路线图把 [DIS 项目代码总结](../archive/dis/DIS-项目代码总结.md)（2026-07-13，42 个 Migration / 3524 个测试）中仍然有效的建议，按 2026-07-17 的真实代码、Migration、测试和线上 Supabase 状态重新校准。
 
 事实来源优先级：
 
@@ -12,7 +12,7 @@ Batch 3 closeout update (2026-07-28): the corrected 00052 Staging SELECT-only re
 2. `supabase/migrations/`
 3. `docs/current-state.md`
 4. 本路线图
-5. `DIS-项目代码总结.md`（仅作为 2026-07-13 的历史审计快照）
+5. [DIS 项目代码总结](../archive/dis/DIS-项目代码总结.md)（仅作为 2026-07-13 的历史审计快照）
 
 ## 当前事实基线
 

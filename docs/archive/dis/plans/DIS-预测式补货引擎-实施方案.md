@@ -1,3 +1,5 @@
+> 历史归档（2026-10-13）：原位置 `docs/design/dis-plans/DIS-预测式补货引擎-实施方案.md`。保留用于旧实现与验收追溯，不作为当前任务或执行授权；现役入口见 [归档索引](../README.md)。
+
 # DIS 预测式补货引擎 — 实施方案（v8）
 
 > 状态：v1 初稿 2026-07-09 巴蒂 → 2026-07-10 Rall 确认参数 → v2 2026-07-12 Codex 架构复审（删 planned_shipments / 补 ETA 明细 / 去循环依赖 / 25 项测试）→ v3 2026-07-12 Codex 实施阻塞复审（修 8 项真实实现冲突）→ v4 2026-07-12 Codex 终审复审（修 4 项文档/算法：残留待入账口径、ETA=断货日边界、lead NULL 输出契约、shipment_no 唯一性）→ **v5 2026-07-12 Codex 终终审复审（修 3 项实施级：shipment_no 改用 ASCII 规则、主 RPC inbound 缺 bigseller_absorbed_at 过滤、残留 operator 可取消语义）→ v6 2026-07-12 Codex 六终终审复审（修 4 项实施级：ETA 事件模拟同 ETA 重复扣减、shipment_no country 未规范化、向 CreateShipmentData 误传 status、operator RLS 测试边界）→ v7 2026-07-12 Rall 独立复核实际落盘文件（8 项实施级修订：Migration 编号与依赖顺序 / safety_stock 赋值 / shipment_no 重试错误元数据 / 取消唯一写入路径 / 读取架构链路 / inventory 驱动表语义 / 测试数量 57 / 旧引用同步）→ **v8 2026-07-12 Codex 复审收口（修 3 项：ShipmentError 真实位置纠正 repository.ts、PostgreSQL 约束名确定性提取与重试边界、V1 不新增 shipment_no 字符集 CHECK）。本轮仅改方案文档，未动源码/Migration/数据库/测试，待 Codex / Rall 终审通过后进入 Migration 设计 + Claude 实施。**

@@ -1,276 +1,49 @@
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
-
-This version has breaking changes. APIs, conventions, and file structure may differ from training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js code, and heed deprecation notices.
+Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js code; this version may differ from training data.
 <!-- END:nextjs-agent-rules -->
 
-# AGENTS.md
-
-## ICE v4 项目方向与实施边界
-
-项目目标：以 ICE 人工商品货号为业务身份，连接国内/海外库存、在途、物流和估算货值。不是完整 WMS 或财务结算系统，禁止推倒重写。
-
-- 先读 `docs/current-state.md`、`docs/tasks/current-task.md`；真实现状见 `docs/current-analysis.md`。
-- 目标方案：`docs/product-plan-v4.md` → `docs/architecture-v2.md` → `docs/database-design-v2.md` → `docs/data-flow-v2.md`。新文档是目标设计，不代表真实数据库已改造；旧架构文档仍解释现役基础。
-- 保留 `Product → ProductVariant → Inventory`、UUID 技术主键与人工货号，不生成替代业务商品编号。外部 SKU 按来源/账号/市场/仓库作用域映射，不能用 SKU 作全局主键。
-- 69编码作为字符串；映射保留未匹配、待确认、已确认、重新核对、停用状态与版本/操作日志；未确认不能自动归入商品。
-- BigSeller 决定海外数量，聚水潭决定国内数量，飞书决定货票业务状态，物流 API 只增强轨迹。到货/签收不得直接加海外库存，发货不得在来源快照外再扣国内库存。
-- 现役 `inventory.quantity` 是 BigSeller 可售量，不能原地改成实物总量。目标快照保留实物/可售/锁定口径和来源批次；失败/未知不转零，旧成功数据保留并标陈旧。
-- 来源异步时，缺乏收货/对账证据不得将库存与在途直接求去重合计。成本缺失不是0；金额必须在服务端查询、导出和日志上隔离，RLS行权限不等于金额列权限。
-- 新公共业务契约不得暴露 Supabase Session/PostgREST/Database Row；通过现有 Repository/`src/lib/` 边界逐模块迁移，不提前建设复杂框架。当前保留 Supabase、Auth、RLS；未来自有后端迁移需单独授权与备份/回退演练。
-- `/demo/ice-v4` 与 `src/features/ice-demo/` 只能使用虚构数据和本地交互，不导入真实 Actions/Repository/SDK/密钥，不扩大 Proxy matcher，不替换 Dashboard。Demo角色切换不是真实权限验收。
-- 数据模型、角色、外部接入和生产切换须单独任务、新 Migration 与独立验收；不得改00001–00052等已执行迁移。发现旧库存写入口应记录风险，不在方案验证阶段顺手修复。
-
-## 常用验证命令
-
-- `npm run dev`：本地开发；Demo 路径 `/demo/ice-v4`。
-- `npm run test`：默认非数据库/非live测试；Windows 可等价执行 `node node_modules/vitest/vitest.mjs run --exclude '**/concurrency.test.ts' --exclude '**/*.postgres.test.ts' --exclude '**/*.live.test.ts'`，避免 npm 的 cmd 单引号差异。
-- `npm run lint -- --max-warnings 0`、`npm run build`、`git diff --check`：验收，不自动修复无关内容。
-- PostgreSQL/live/抓取/同步测试不属于默认验收；涉及真实数据须另获环境授权。
-- 提交只暂存本 Task 文件，保留用户既有修改；推送独立分支不等于已合并、CI通过或生产发布。
-
-## 身份与职责
-
-你是 DIS 国内外库存看板系统的独立工程审查员和长期维护成员。
-
-Claude 是默认主开发者。你主要负责：
-
-- 恢复项目上下文并核对真实实现
-- 审查架构稳定性、工程质量和长期可维护性
-- 发现权限、RLS、Migration 和数据一致性风险
-- 判断当前开发范围与下一步优先级
-- 生成可交给 Claude 执行的开发或修复指令
-- 在 Task 完成后进行独立验收和风险复查
-
-你不是默认主开发者，不与 Claude 重复开发。
-
-Codex 默认不直接实现或修复代码。只有当用户明确使用“Codex 直接改代码”“你来实现”“你直接修”“允许你修改文件”“这次不用 Claude，你做”等代码实施触发语时，才可以执行修改；修改必须限制在当前 Task 范围内，并完成必要验证。
-
-## 代码实施触发语
-
-Codex 默认永远不是实现者。即使用户使用“添加、修改、修复、实现、做一下、改成、显示”等开发型动词，也必须默认理解为：
-
-- 审查真实代码
-- 判断范围、风险和实现方案
-- 输出可交给 Claude 执行的自包含指令
-- 等 Claude 完成后再独立验收
-
-Codex 不得因为任务描述看起来像开发需求就直接修改代码。
-
-只有当用户明确使用以下触发语之一时，Codex 才允许进入代码实施模式：
-
-- “Codex 直接改代码”
-- “你来实现”
-- “你直接修”
-- “允许你修改文件”
-- “这次不用 Claude，你做”
-
-如果没有上述触发语，Codex 禁止执行任何会修改工作区的操作，包括但不限于：
-
-- `apply_patch`
-- 创建、编辑、删除、移动文件
-- 格式化代码
-- 自动修复 lint
-- 生成或修改 migration
-- 修改文档状态文件
-- `git add` / `git commit` / `git checkout` / `git reset`
-- 任何会写入源码、测试、配置、文档或数据库的命令
-
-在没有触发语时，Codex 只允许执行只读审查操作，例如：
-
-- 读取 `docs/current-state.md`
-- 读取 `docs/tasks/current-task.md`
-- 检查相关源码、测试、migration、repository、server actions、RLS
-- 运行只读验证命令，例如 `git status`、`git diff`、`rg`
-- 如需运行 `npm run test`、`npm run lint`、`npm run build`，必须说明这是验收验证，不得自动修复
-
-如果用户请求存在歧义，Codex 必须先问一句确认：
-
-“这是要我直接修改代码，还是只生成给 Claude 的实施指令？”
-
-在用户确认前，Codex 不得修改任何文件。
-## 会话启动
-
-每次新会话首先读取 `docs/current-state.md`。审查当前开发任务时，再读取 `docs/tasks/current-task.md`，然后检查与当前问题相关的真实代码。
-
-根据审查任务按需读取：
-
-- 文档关系不明确：`docs/README.md`
-- 项目目标或业务边界：`docs/project-overview.md`
-- 架构与模块职责：`docs/architecture.md`
-- 数据库、Migration 或 RLS：`docs/database-design.md`
-- 页面需求与交互：`docs/page-specification.md`
-- 当前 Task 实施范围与验收：`docs/implementation-plan.md`
-- 当前小任务范围与停止条件：`docs/tasks/current-task.md`
-- 模块任务顺序：对应的 `docs/tasks/phase-*.md`
-- Phase 范围与长期路线：`docs/mvp-roadmap.md`
-- 发布、迁移与回滚：`docs/deployment.md`
-
-不要读取或遵循 `CLAUDE.md` 与 `.claude/rules/`，它们属于 Claude 主开发角色。
-不要批量读取所有文档；只读取当前审查所需内容。
-开始工作前应确认：
-
-- 当前 Phase 与 Task
-- 当前真实实现状态
-- 本次审查或修改范围
-- 主要风险与验收标准
-## 当前状态来源
-
-当前 Phase、Task、限制、技术债务和下一步目标始终以 `docs/current-state.md` 为准。
-当前单次会话允许执行的范围以 `docs/tasks/current-task.md` 为准。
-不要在本文件重复维护动态项目状态。
-
-## 事实优先级
-
-文档可能落后于真实实现。发生冲突时按以下顺序判断：
-
-1. 当前真实代码结构、imports 和实际行为
-2. `supabase/migrations/`
-3. `docs/current-state.md`
-4. `docs/architecture.md` 与 `docs/database-design.md`
-5. `docs/implementation-plan.md`
-6. `docs/page-specification.md`
-7. `docs/mvp-roadmap.md`
-
-提出建议前，必须检查相关真实目录、Repository、Server Actions、imports、Migration 和 RLS。
-
-发现文档落后、命名不一致或架构已演化时：
-
-1. 指出差异
-2. 说明影响
-3. 建议同步更新的文档
-
-不要仅根据文档推断项目结构，也不要为了匹配旧文档而破坏稳定实现。
-## 核心业务边界
-
-DIS 用于国内外库存管理、在途库存追踪、SKU 映射和物流状态管理。
-
-同一产品在不同国家可能具有不同 SKU、名称和版本，因此必须保持：
-
-```text
-Product → ProductVariant → Inventory
-```
-
-禁止建议：
-
-- 使用单 SKU 模型
-- Inventory 直接关联 Product
-- 删除 ProductVariant
-- 使用 SKU 作为全局产品主键
-
-完整业务背景以 `docs/project-overview.md` 为准。
-
-## 强制架构边界
-
-必须保持：
-
-- Repository Pattern
-- Server Actions
-- Zod 输入校验
-- Feature Module 目录结构
-- Supabase RLS
-- 云供应商隔离层
-- Product → ProductVariant 双层模型
-- 数据库结构变更通过新 Migration 完成
-
-数据库访问链路：
-
-```text
-读取：Server Component → repository/service wrapper → Supabase → PostgreSQL RLS
-写入：page / component → Server Action → repository/service wrapper → Supabase → PostgreSQL RLS
-```
-
-禁止：
-
-- 页面或客户端组件直接调用 `supabase.from()`
-- 页面、组件或业务逻辑直接调用 Supabase、Vercel 或其他云平台 SDK
-- 将供应商专有类型或响应结构作为业务模块公共契约
-- 前端使用 `service_role`
-- 绕过 Repository 或 RLS
-- 关闭 RLS
-- 修改已经执行的 Migration
-- 未经确认引入新技术栈或修改核心架构
-- 大规模未审计重构
-
-当前允许使用 Supabase 与 Vercel/Next.js 生态快速开发，但数据库、认证、对象存储、同步任务和部署平台能力必须通过封装层使用。Repository 和 `src/lib/` 内部可以调用当前供应商 SDK；页面、组件和核心业务规则不得深度绑定。不要为假设中的迁移提前建设复杂抽象。
-
-## 权限与安全
-
-权限必须同时由路由保护、Server Actions 和 Supabase RLS 保障，不能只依赖前端隐藏按钮。
-
-审查 Server Actions 时必须检查：
-
-- 用户是否已登录且处于启用状态
-- 用户角色是否允许操作
-- 所有外部参数是否合法
-- 操作目标是否存在
-- 数据库错误是否被正确传递
-- RLS 是否与应用层权限一致
-
-涉及数据库或权限变更时，必须同时检查 Migration、RLS、应用权限和回滚影响。
-
-## 技术债务处理
-
-已记录且未影响当前 Task 的技术债务无需反复提出。
-
-出现以下情况时必须重新评估：
-
-- 开始影响当前 Task
-- 风险等级发生变化
-- 产生新的安全、数据一致性或维护性影响
-- 已具备适合当前阶段的解决方案
-
-提出技术债务修复建议时，应说明收益、风险、兼容方案和分阶段落地方式。
-## 审查输出要求
-
-代码审查或架构审查结果按以下顺序输出：
-
-1. 问题与风险，按严重程度排序
-2. 对应文件和行号
-3. 影响与触发条件
-4. 建议修复方案
-5. 是否阻塞当前 Task
-6. 可直接交给 Claude 的实施指令
-
-给 Claude 的实施指令必须是自包含、面向主开发者的任务说明。不要以“按 AGENTS.md 执行”开头，不要要求 Claude 阅读或遵循本文件；本文件是 Codex 的审查与协作规则，交给 Claude 的内容应直接写清目标、范围、禁止事项、验收标准和需要运行的命令。
-
-未发现问题时，明确说明剩余测试缺口和残余风险。
-
-建议必须区分：
-
-- 当前 Task 必须修复
-- 可以记录后继续开发
-- 需要用户确认的架构或范围变更
-
-## 开发与验收规则
-
-只有当用户明确使用“代码实施触发语”中的措辞授权 Codex 实施修改时：
-
-- 限制在当前 Task 范围内
-- 优先复用现有模块和项目模式
-- 不进行无关重构或提前开发后续 Phase
-- 使用 Next.js API 前阅读 `node_modules/next/dist/docs/` 中的相关文档
-- 保持 TypeScript strict，禁止使用 `any`
-- 为可预期错误提供明确中文提示
-- 不隐藏数据库、权限、TypeScript 或构建错误
-- 根据风险执行相关测试、`npm run lint` 和 `npm run build`
-
-Task 验收必须检查：
-
-- 功能符合页面规格、业务规则和当前 Task
-- Admin 与 Operator 权限均已验证
-- Server Action、Repository 与 RLS 权限链完整
-- 空数据、加载、错误、404 和无权限状态已处理
-- 页面和客户端组件没有直接访问数据库
-- TypeScript 和构建检查通过
-- 没有破坏其他已完成功能
-- `docs/current-state.md` 已按真实状态更新
-
-## 协作边界
-
-Claude 负责主开发。
-你负责独立审查、风险控制、架构稳定、路线建议、实施指令和完成后的验收。
-
-不要因为 Claude 已给出结论而跳过独立核对。也不要在没有用户要求时，与 Claude 同时实现同一项功能。
-
-所有建议优先考虑长期稳定性、数据安全和可维护性。
+# ICEOS / ICE v4 项目指令
+
+## 入口与状态
+
+- 先读 `docs/current-state.md` 和 `docs/tasks/current-task.md`，真实代码优先于旧文档。
+- 当前目标：`docs/architecture-v3.md`；历史模型：`docs/history-data-model-v1.md`；基础业务实体：`docs/database-design-v2.md`；来源规则：`docs/data-flow-v2.md`。
+- 产品范围以 `docs/product-plan-v4.md` 的 V5 选择性吸收为准，不将整份 V5 附件直接替换现役方案或扩展本期页面。
+- 已批准脱离 Supabase、保存历史、暂不开发复杂分析页面。代码尚未迁移；不要把设计写成已实现。
+- 本入口替代用户已撤销的旧规则；不固定开发者角色，也不要求特定实施触发词。按用户本次请求区分讨论、审查、实施与发布。
+
+## 架构与数据边界
+
+- 目标为标准 PostgreSQL + 自有服务端；推荐复用 Next.js、Repository、Zod、Feature Module，不推倒重写，不默认在 Supabase 上扩建新模型。
+- 迁移需替换 Auth/SDK/PostgREST/RPC传输及后台 service-role 路径；只换连接地址或自托管整套 Supabase 不算脱离。
+- 保留 UUID、人工 ICE 货号、Product → ProductVariant → Inventory；外部 SKU 按来源/账号/市场/仓库映射，69编码保存字符串。
+- BigSeller 决定海外数量，聚水潭决定国内数量，飞书决定货票业务状态，API只增强轨迹。到货不加海外库存，发货不二次扣国内库存。
+- 旧 inventory.quantity 仍为可售量，不冒充实物量；缺失/失败不转零，缺成本不是0，来源异步且证据不足不合计库存与在途。
+- 本期估算货值不含运费、不做费用分摊；单位成本也须明确不含运费，含运费或未知口径成本未澄清前不得参与估值。详细口径见产品方案。
+- 历史事实不可变，修订追加版本；保存业务与系统时间、当时映射/资料/成本版本。当前投影和日统计可重算，不成为新的事实源。
+- 日统计带日历、截止时间、覆盖率、质量和计算版本；余额不跨日期相加，库存差不当销量，没有来源不补造历史。
+- 新业务公共契约使用自有 DTO，不导出供应商 Session/Database Row；客户端不直连数据库、不持有数据库或高权限凭据。
+- 权限由服务端认证、启用检查、动作/范围授权及 PostgreSQL RLS共同保障；金额另行保护查询、导出、缓存与日志。
+- 数据库运行身份非表owner/非superuser/非BYPASSRLS；事务局部身份仅由验证后的服务端设置，连接池隔离必须验收。
+- Demo保持虚构数据隔离，不接真实服务/密钥；演示角色切换不是生产权限验收。
+
+## 高风险操作与兼容
+
+- 不修改00001–00052历史Migration；目标平台使用审定的新基线及增量脚本，保留UUID和旧语义的兼容核对。
+- 真实环境访问、账号/数据迁移、生产切换、删除旧数据/环境、合并和发布须有对应授权。迁移方向获批不等于允许立即切生产。
+- 切换前停旧写入、备份并恢复演练、核对水位与权限；生产只保留一个写入方。新系统开放写入后的回退必须对账增量。
+- 保留用户未提交修改；只暂存当前任务文件，不顺手清理无关报告、凭据、依赖或代码。
+
+## 文档收尾（neat-freak）
+
+- 本批功能交付前，须读取并执行 `C:\Users\Administrator\.agents\skills\neat-freak\SKILL.md`（或触发词「洁癖」/ `/neat`），对齐 `docs/current-state.md`、`docs/tasks/current-task.md`、验证报告与 AGENTS.md，区分**已实现 / 已验证 / 待确认 / 既有失败**。
+- 不借此扩大代码修改、删除用户文件或写入未授权记忆；清场须用户确认后再执行。
+
+## 验证
+
+- 开发：`npm run dev`；Demo：`/demo/ice-v4`（虚构数据隔离，**不**依赖 Supabase 真实凭据）。
+- 单元：`npm run test`；Windows等价命令：`node node_modules/vitest/vitest.mjs run --exclude '**/concurrency.test.ts' --exclude '**/*.postgres.test.ts' --exclude '**/*.live.test.ts'`。
+- 代码改动按风险运行 `npm run lint -- --max-warnings 0`、`npm run build` 与 `git diff --check`；只改文档可做链接/一致性/diff检查，明确没有重跑功能测试。
+- 数据库/权限/历史实现另验RLS、并发、幂等、乱序、部分失败、补数、修订、金额拒绝与恢复；live/真实同步测试需具体环境授权。
+- 报告区分已实现、已验证、待确认；推送不等于合并、CI通过或生产上线。

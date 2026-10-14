@@ -2,6 +2,8 @@
 
 以人工商品货号为身份，连接国内、海外和在途库存的经营管理系统。现有 DIS 业务系统继续保留；ICE v4 目前是设计与**虚构数据 Demo**，不是已接通的生产新系统。
 
+最新目标：脱离 Supabase，采用标准 PostgreSQL 与自有服务端，并从来源接入开始保存历史。参见 [架构 v3](docs/architecture-v3.md) 与 [历史模型](docs/history-data-model-v1.md)。暂不开发复杂分析页面；目标尚未替换现有运行代码。
+
 ## ICE v4 Demo
 
 使用仓库锁定的依赖（Node 24，见 `.nvmrc`）：
@@ -20,8 +22,9 @@ npm run dev
 ## 方案与证据
 
 - [现状分析](docs/current-analysis.md)：真实代码与复用边界。
-- [产品方案 v4](docs/product-plan-v4.md)、[架构 v2](docs/architecture-v2.md)、[数据库设计 v2](docs/database-design-v2.md)、[数据流 v2](docs/data-flow-v2.md)。
+- [产品方案（吸收 V5）](docs/product-plan-v4.md)、[架构 v3](docs/architecture-v3.md)、[数据库设计 v2](docs/database-design-v2.md)、[历史模型](docs/history-data-model-v1.md)、[数据流 v2](docs/data-flow-v2.md)。
 - [当前状态](docs/current-state.md)、[本次任务](docs/tasks/current-task.md)、[验证记录](docs/reports/2026-10-13-ice-v4-validation.md)。
+- [旧 DIS 方案与交付历史](docs/archive/dis/README.md)：旧方案和完整状态/任务记录，供追溯，不作为当前实施授权。
 - 全部资料入口：[docs/README.md](docs/README.md)。新数据库文档是设计，没有新增/执行Migration。
 
 ## 验证命令

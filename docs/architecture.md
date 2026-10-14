@@ -1,6 +1,6 @@
 # DIS 架构说明
 
-> 历史基础说明：ICE v4 目标边界见 [architecture-v2.md](architecture-v2.md)，当前代码差异见 [current-analysis.md](current-analysis.md)。本页旧模块清单与Operator范围不是完整现状；真实仓库授权以代码/RLS为准。新设计尚未替换现役后端。
+> 历史基础说明：ICE v4 新目标见 [architecture-v3.md](architecture-v3.md)（脱离 Supabase + 历史底座），首版为 [architecture-v2.md](architecture-v2.md)，当前代码差异见 [current-analysis.md](current-analysis.md)。本页旧模块清单与Operator范围不是完整现状；真实仓库授权以代码/RLS为准。新设计尚未替换现役后端。
 
 > 文档导航：[文档树](README.md) · [项目概览](project-overview.md) · [当前状态](current-state.md) · [数据库设计](database-design.md)
 

@@ -1,23 +1,27 @@
-# DIS 项目文档树
+# ICEOS 项目文档入口
 
-本文档是 DIS 项目资料的统一入口。规则描述“必须遵守什么”，docs 描述“项目是什么、现在怎样、准备怎么做”。
+本文档是 ICEOS（原 DIS）项目资料的统一入口。先从当前状态和目标方案进入；旧系统资料用于维护与追溯，不覆盖新方案或当前授权。
 
-## ICE v4 方案验证入口
+## ICE v4 当前设计入口
+
+2026-10-13 新方向：[独立PostgreSQL架构 v3](architecture-v3.md) + [历史数据模型](history-data-model-v1.md) + [ADR-ICE-002](adr/ADR-ICE-002-independent-postgres-history.md)。已确认脱离Supabase、预留历史分析基础，暂不开发复杂分析页；运行代码仍为旧平台，迁移未执行。
 
 最新交互反馈与验证：[2026-10-13 同步/权限、首页库存、市场物流改进](reports/2026-10-13-ice-v4-feedback.md)。Demo现为八个入口，首版六视图记录仅作历史。
 
 当前任务以 [current-state.md](current-state.md) 与 [current-task.md](tasks/current-task.md) 为准。下面的新文档描述设计与隔离Demo，不代表生产已改造：
 
 - [现状分析](current-analysis.md)：代码事实、Supabase依赖、库存口径、复用与风险。
-- [产品方案 v4](product-plan-v4.md)：六视图、商品身份、权限与业务边界。
-- [目标架构 v2](architecture-v2.md)：模块归属、隔离层、未来平台迁移与回退门。
+- [产品方案（v4 基础，吸收 V5）](product-plan-v4.md)：三种经营视角、现有八入口职责、不含运费估值、历史与后续分析边界。
+- [目标架构 v3](architecture-v3.md)：自主数据库/认证、服务边界、迁移与恢复；[v2](architecture-v2.md) 保留首版背景。
+- [历史数据模型](history-data-model-v1.md)：原始快照、业务/维度修订、日统计、晚到补数、权限与可追溯查询。
 - [数据库设计 v2](database-design-v2.md)：增量目标模型、约束、版本、RLS/金额保护；无Migration执行。
 - [数据流 v2](data-flow-v2.md)：四源权威、正逆时间序列、去重/缺口/失败规则。
 - [架构决策](adr/ADR-ICE-001-identity-snapshot-boundary.md)；[本次验收与Demo访问](reports/2026-10-13-ice-v4-validation.md)。
+- [旧 DIS 方案与交付历史](archive/dis/README.md)：根目录旧代码总结、6 份旧方案及清理前完整状态/任务记录。删除的仅是已确认无引用素材和可再生缓存，验收报告/SQL 仍在原位。
 
 下列旧文档保留现役历史背景，已知过时项以现状分析和真实代码为准，不能据旧说明恢复“入仓加库存”行为。
 
-## 文档关系图
+## 旧系统参考文档关系
 
 ```text
 project-overview.md
@@ -33,7 +37,7 @@ current-state.md
 
 `current-state.md` 是动态入口，其他文档分别维护稳定事实。任何 Task 都应从当前状态进入，再按影响范围读取相邻文档。
 
-## 阅读路径
+## 旧系统参考阅读路径
 
 ```text
 docs/README.md
@@ -53,7 +57,7 @@ docs/README.md
 └── deployment.md             环境、发布、Migration 与回滚流程
 ```
 
-## 按问题查找
+## 旧系统追溯索引（不是新方案实施入口）
 
 | 想了解的问题 | 阅读文件 |
 |---|---|
@@ -75,7 +79,7 @@ docs/README.md
 | 后续 Phase 如何安排 | `mvp-roadmap.md` |
 | 如何部署、迁移和回滚 | `deployment.md` |
 
-## 按任务组合阅读
+## 旧系统维护的组合阅读
 
 | 任务类型 | 必须组合阅读 |
 |---|---|
@@ -90,16 +94,16 @@ docs/README.md
 
 | 信息 | 主要维护文件 | 其他文档如何引用 |
 |---|---|---|
-| 项目目标与业务边界 | `project-overview.md` | 只引用，不重复完整描述 |
+| 当前产品目标与业务边界 | `product-plan-v4.md` | 已选择性吸收 V5；`project-overview.md` 仅作旧系统参考 |
 | 当前状态与技术债务 | `current-state.md` | 其他文档不维护当前进度 |
-| 架构与模块职责 | `architecture.md` | Rules 只保留必须遵守的约束 |
-| 数据库设计 | `database-design.md` + Migration | 页面和计划只描述使用方式 |
-| 页面需求 | `page-specification.md` | 实施计划引用其验收目标 |
+| 目标架构与模块职责 | `architecture-v3.md` | `architecture.md` 说明旧实现与目标入口；Rules 只放边界 |
+| 目标数据模型 | `database-design-v2.md` + `history-data-model-v1.md` | 已存在结构以实际 Migration/代码为准，设计不是已建表 |
+| ICE 页面需求 | `product-plan-v4.md` | `page-specification.md` 仅作旧系统页面参考 |
 | 历史详细实施规格 | `implementation-plan.md` | 不作为每次会话默认执行清单 |
 | AI 单次执行范围 | `tasks/current-task.md` | 每次只维护一个 ACTIVE Task Packet |
 | 系统优化审计基线与阶段顺序 | `tasks/system-optimization-roadmap-2026-07-17.md` | `current-task.md` 只引用当前优化子任务 |
 | 模块任务顺序 | `tasks/phase-*.md` | 只维护模块内任务依赖和状态 |
-| 长期 Phase 范围 | `mvp-roadmap.md` | 实施计划不重定义长期范围 |
+| 当前范围与后续方向 | `product-plan-v4.md` + `architecture-v3.md` | `mvp-roadmap.md` 只作旧 Phase 历史参考 |
 | 发布流程 | `deployment.md` | 其他文档只引用 |
 
 ## 维护规则
