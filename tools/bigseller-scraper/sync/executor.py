@@ -59,16 +59,66 @@ def _load_env() -> dict:
     return env
 
 
-_ENV = _load_env()
-_SUPABASE_URL = _ENV.get('NEXT_PUBLIC_SUPABASE_URL', '')
-_SERVICE_KEY = _ENV.get('SUPABASE_SERVICE_ROLE_KEY', '')
+_SUPABASE_URL: str | None = None
+_SERVICE_KEY: str | None = None
+_BASE: str | None = None
 
-if not _SUPABASE_URL:
-    raise RuntimeError('NEXT_PUBLIC_SUPABASE_URL 未在 .env.local 中配置')
-if not _SERVICE_KEY:
-    raise RuntimeError('SUPABASE_SERVICE_ROLE_KEY 未在 .env.local 中配置')
 
-_BASE = f'{_SUPABASE_URL}/rest/v1'
+def _audit_fetch_inventory(warehouse_id: str) -> list:
+    from .p0_02_connection_boundary import independent_p0_02_enabled
+
+    if independent_p0_02_enabled():
+        from .postgres_gateway import fetch_inventory_by_warehouse
+
+        return fetch_inventory_by_warehouse(warehouse_id)
+    return _get(
+        'inventory'
+        '?select=id,variant_id,warehouse_id,quantity'
+        f'&warehouse_id=eq.{warehouse_id}'
+    )
+
+
+def _audit_fetch_variants_by_country(country: str) -> list:
+    from .p0_02_connection_boundary import independent_p0_02_enabled
+
+    if independent_p0_02_enabled():
+        from .postgres_gateway import fetch_variants
+
+        return fetch_variants()
+
+    return _get(
+        'product_variant'
+        '?select=id,sku,country'
+        f'&country=eq.{country}'
+    )
+
+
+def _audit_fetch_warehouse(warehouse_id: str) -> list:
+    from .p0_02_connection_boundary import independent_p0_02_enabled
+
+    if independent_p0_02_enabled():
+        from .postgres_gateway import fetch_warehouse_by_id
+
+        return [fetch_warehouse_by_id(warehouse_id)]
+    return _get(f'warehouse?id=eq.{warehouse_id}')
+
+
+def _ensure_supabase_rest() -> tuple[str, str, str]:
+    """Legacy Supabase REST：仅在非 P0-02 独立运行时加载 .env.local。"""
+    global _SUPABASE_URL, _SERVICE_KEY, _BASE
+    if _BASE is not None and _SUPABASE_URL and _SERVICE_KEY:
+        return _SUPABASE_URL, _SERVICE_KEY, _BASE
+    env = _load_env()
+    url = env.get('NEXT_PUBLIC_SUPABASE_URL', '')
+    key = env.get('SUPABASE_SERVICE_ROLE_KEY', '')
+    if not url:
+        raise RuntimeError('NEXT_PUBLIC_SUPABASE_URL 未在 .env.local 中配置')
+    if not key:
+        raise RuntimeError('SUPABASE_SERVICE_ROLE_KEY 未在 .env.local 中配置')
+    _SUPABASE_URL = url
+    _SERVICE_KEY = key
+    _BASE = f'{url}/rest/v1'
+    return _SUPABASE_URL, _SERVICE_KEY, _BASE
 
 
 # =========================================================================
@@ -77,13 +127,14 @@ _BASE = f'{_SUPABASE_URL}/rest/v1'
 
 def _get(path: str, _retry: int = 2) -> list:
     """GET 请求 Supabase REST API，返回 list[dict]."""
-    url = f'{_BASE}/{path}'
+    supabase_url, service_key, base = _ensure_supabase_rest()
+    url = f'{base}/{path}'
     last_error = None
 
     for attempt in range(_retry + 1):
         req = urllib.request.Request(url)
-        req.add_header('apikey', _SERVICE_KEY)
-        req.add_header('Authorization', f'Bearer {_SERVICE_KEY}')
+        req.add_header('apikey', service_key)
+        req.add_header('Authorization', f'Bearer {service_key}')
         req.add_header('Accept', 'application/json')
 
         ctx = ssl.create_default_context()
@@ -113,14 +164,15 @@ def _get(path: str, _retry: int = 2) -> list:
 
 def _post(path: str, body: list, upsert: bool = False, _retry: int = 2) -> list:
     """POST 请求 Supabase REST API，返回创建的记录列表."""
-    url = f'{_BASE}/{path}'
+    _, service_key, base = _ensure_supabase_rest()
+    url = f'{base}/{path}'
     data = json.dumps(body).encode('utf-8')
     last_error = None
 
     for attempt in range(_retry + 1):
         req = urllib.request.Request(url, data=data, method='POST')
-        req.add_header('apikey', _SERVICE_KEY)
-        req.add_header('Authorization', f'Bearer {_SERVICE_KEY}')
+        req.add_header('apikey', service_key)
+        req.add_header('Authorization', f'Bearer {service_key}')
         req.add_header('Content-Type', 'application/json')
         if upsert:
             req.add_header('Prefer', 'resolution=merge-duplicates,return=representation')
@@ -155,14 +207,15 @@ def _post(path: str, body: list, upsert: bool = False, _retry: int = 2) -> list:
 
 def _patch(path: str, body: dict, _retry: int = 2) -> list:
     """PATCH 请求 Supabase REST API，返回更新的记录列表."""
-    url = f'{_BASE}/{path}'
+    _, service_key, base = _ensure_supabase_rest()
+    url = f'{base}/{path}'
     data = json.dumps(body).encode('utf-8')
     last_error = None
 
     for attempt in range(_retry + 1):
         req = urllib.request.Request(url, data=data, method='PATCH')
-        req.add_header('apikey', _SERVICE_KEY)
-        req.add_header('Authorization', f'Bearer {_SERVICE_KEY}')
+        req.add_header('apikey', service_key)
+        req.add_header('Authorization', f'Bearer {service_key}')
         req.add_header('Content-Type', 'application/json')
         req.add_header('Prefer', 'return=representation')
 
@@ -984,7 +1037,20 @@ def _call_sync_rpc(
         RuntimeError: RPC 业务错误（含 PostgreSQL 错误信息）
         RuntimeError: 网络超时（错误消息包含 network_timeout_unknown）
     """
-    url = f'{_SUPABASE_URL}/rest/v1/rpc/sync_warehouse_inventory'
+    from .p0_02_connection_boundary import independent_p0_02_enabled
+
+    if independent_p0_02_enabled():
+        from .postgres_rpc import call_sync_warehouse_inventory_rpc
+
+        return call_sync_warehouse_inventory_rpc(
+            warehouse_id,
+            p_variants,
+            p_inventory,
+            p_warehouse_name,
+        )
+
+    supabase_url, service_key, _base = _ensure_supabase_rest()
+    url = f'{supabase_url}/rest/v1/rpc/sync_warehouse_inventory'
     body = json.dumps({
         'p_warehouse_id': warehouse_id,
         'p_variants': p_variants,
@@ -993,8 +1059,8 @@ def _call_sync_rpc(
     }).encode('utf-8')
 
     req = urllib.request.Request(url, data=body, method='POST')
-    req.add_header('apikey', _SERVICE_KEY)
-    req.add_header('Authorization', f'Bearer {_SERVICE_KEY}')
+    req.add_header('apikey', service_key)
+    req.add_header('Authorization', f'Bearer {service_key}')
     req.add_header('Content-Type', 'application/json')
     req.add_header('Accept', 'application/json')
 
@@ -1077,7 +1143,22 @@ def _write_sync_log(
             f'new_variants_count 不能为负数: {new_variants_count}'
         )
 
-    url = f'{_BASE}/sync_log'
+    from .p0_02_connection_boundary import independent_p0_02_enabled
+
+    if independent_p0_02_enabled():
+        from .postgres_rpc import write_sync_log_postgres
+
+        return write_sync_log_postgres(
+            warehouse_id,
+            status,
+            new_variants_count,
+            error_message,
+            started_at,
+            finished_at,
+        )
+
+    _, service_key, base = _ensure_supabase_rest()
+    url = f'{base}/sync_log'
     body_data = {
         'warehouse_id': warehouse_id,
         'status': status,
@@ -1090,8 +1171,8 @@ def _write_sync_log(
 
     def _attempt_write():
         req = urllib.request.Request(url, data=data_bytes, method='POST')
-        req.add_header('apikey', _SERVICE_KEY)
-        req.add_header('Authorization', f'Bearer {_SERVICE_KEY}')
+        req.add_header('apikey', service_key)
+        req.add_header('Authorization', f'Bearer {service_key}')
         req.add_header('Content-Type', 'application/json')
         req.add_header('Prefer', 'return=representation')
         ctx = ssl.create_default_context()
@@ -1517,19 +1598,11 @@ def execute_plan_v2(
                     'warehouse_id': item.get('warehouse_id', warehouse_id),
                 })
 
-        verify_inventory = _get(
-            'inventory'
-            '?select=id,variant_id,warehouse_id,quantity'
-            f'&warehouse_id=eq.{warehouse_id}'
-        )
+        verify_inventory = _audit_fetch_inventory(warehouse_id)
         print(f'[execute_plan_v2] Phase G: Inventory 写后查询 {len(verify_inventory)} 条')
 
         time.sleep(0.3)
-        current_variants = _get(
-            'product_variant'
-            '?select=id,sku,country'
-            f'&country=eq.{WAREHOUSE_COUNTRY}'
-        )
+        current_variants = _audit_fetch_variants_by_country(WAREHOUSE_COUNTRY)
         current_variant_map = {v['sku']: v['id'] for v in current_variants}
 
         inv_diffs = verify_inventory_post_write(
@@ -1553,10 +1626,7 @@ def execute_plan_v2(
         # ==================================================================
         # 4. Phase I: Warehouse 最终状态审计
         # ==================================================================
-        wh_final_rows = _get(
-            f'warehouse?id=eq.{warehouse_id}'
-            '&select=id,name,country,type,is_active'
-        )
+        wh_final_rows = _audit_fetch_warehouse(warehouse_id)
         if not wh_final_rows:
             raise RuntimeError(_record_audit_failure(
                 f'无法查询 Warehouse id={warehouse_id}',

@@ -21,7 +21,9 @@
 
 import { NextRequest } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { GoluckyClient, SupabaseTokenCache } from '@/lib/providers/golucky';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
+import { GoluckyClient, PostgresTokenCache, SupabaseTokenCache } from '@/lib/providers/golucky';
+import { P002_SYNC_RUNNER } from '@/features/in-transit/repository';
 import { syncAllGoluckyRefs } from '@/features/in-transit/golucky-sync';
 
 const DEFAULT_CONCURRENCY = 5;
@@ -74,10 +76,9 @@ export async function GET(request: NextRequest) {
   }
 
   // ── 第四步：依赖注入 + 委托同步 ────────────────────────
-  const supabase = createServiceClient();
-
-  // 生产必须使用 SupabaseTokenCache（数据库租约缓存），禁止 InMemoryTokenCache
-  const tokenCache = new SupabaseTokenCache(supabase);
+  const tokenCache = isIndependentPlatformRuntime()
+    ? new PostgresTokenCache()
+    : new SupabaseTokenCache(await createServiceClient());
 
   const client = new GoluckyClient({
     baseUrl: baseUrl!,
@@ -87,7 +88,10 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    const result = await syncAllGoluckyRefs(client, DEFAULT_CONCURRENCY, supabase);
+    const dbHandle = isIndependentPlatformRuntime()
+      ? P002_SYNC_RUNNER
+      : await createServiceClient();
+    const result = await syncAllGoluckyRefs(client, DEFAULT_CONCURRENCY, dbHandle);
 
     return Response.json({
       total: result.total,

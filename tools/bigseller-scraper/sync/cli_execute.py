@@ -236,7 +236,7 @@ def main():
     # 3. 重新查询 Supabase + 重新生成计划 + 计划漂移比较
     # =========================================================================
     print('[步骤 3/4] 重新生成当前计划并比较漂移...')
-    from .supabase_gateway import (
+    from .db_read_gateway import (
         fetch_warehouse,
         fetch_variants,
         fetch_inventory_by_warehouse,

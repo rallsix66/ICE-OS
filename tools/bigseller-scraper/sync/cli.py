@@ -56,7 +56,7 @@ def main():
 
     # 3. 只读查询 Supabase
     print('3. 查询 Supabase（只读）...')
-    from .supabase_gateway import (
+    from .db_read_gateway import (
         fetch_warehouse,
         fetch_variants,
         fetch_inventory_by_warehouse,

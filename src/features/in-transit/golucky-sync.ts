@@ -13,10 +13,8 @@
 //   - 传入 service_role 客户端 → cron 同步（绕过 RLS，直接写库）
 //   - 不传 → 使用用户会话客户端（Server Action 调用，经过 RLS）
 
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
 import { GoluckyClient } from '@/lib/providers/golucky/client';
-import { externalTrackingRepository } from './repository';
+import { externalTrackingRepository, type ExternalTrackingDbHandle } from './repository';
 import type { GoluckySyncResult } from '@/lib/providers/golucky/types';
 
 const DEFAULT_CONCURRENCY = 5;
@@ -24,20 +22,18 @@ const DEFAULT_CONCURRENCY = 5;
 /** 终态轨迹节点 → 标记 stale，后续 cron 跳过 */
 const TERMINAL_CATEGORIES = new Set(['delivered', 'exception']);
 
-type DbClient = SupabaseClient<Database>;
-
 /**
  * 同步全部 active 喜运达外部物流记录。
  *
  * @param client — GoluckyClient 实例（已注入 TokenCache）
  * @param concurrency — 并发上限（默认 5）
- * @param db — 可选 SupabaseClient。cron 传入 service_role 客户端；页面/Server Action 不传使用用户会话
+ * @param db — Supabase service_role；或 P0-02 下 P002_SYNC_RUNNER（sync runner 写库）
  * @returns 逐单同步结果
  */
 export async function syncAllGoluckyRefs(
   client: GoluckyClient,
   concurrency: number = DEFAULT_CONCURRENCY,
-  db?: DbClient,
+  db?: ExternalTrackingDbHandle,
 ): Promise<{
   total: number;
   succeeded: number;
@@ -77,7 +73,7 @@ export async function syncSingleRef(
   client: GoluckyClient,
   refId: string,
   waybillNo: string | null,
-  db?: DbClient,
+  db?: ExternalTrackingDbHandle,
 ): Promise<GoluckySyncResult> {
   if (!waybillNo) {
     await externalTrackingRepository.updateExternalRefSync(refId, 'error', undefined, undefined, db);

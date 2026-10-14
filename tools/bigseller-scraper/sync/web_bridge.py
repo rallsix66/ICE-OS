@@ -115,7 +115,7 @@ def main():
         # ============================================================
         from sync.config import REPORT_OUTPUT_DIR
         from sync.plan_generator import generate_plan
-        from sync.supabase_gateway import (
+        from sync.db_read_gateway import (
             fetch_warehouse as fetch_wh,
             fetch_variants,
             fetch_inventory_by_warehouse,

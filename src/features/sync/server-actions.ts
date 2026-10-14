@@ -16,7 +16,12 @@ import { evaluateRules } from './rules-engine';
 import { getSyncRunsSchema, getSyncRunsPaginatedSchema, getSyncRunDetailSchema, getSyncLogDetailSchema } from './schema';
 import { revalidatePath } from 'next/cache';
 import { requireActiveAdmin, requireActiveAuth } from '@/lib/auth';
+import { callAppRpc, queryAppRows } from '@/lib/database/app-db';
+import { requireAppDbIdentity } from '@/lib/database/app-identity';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { PostgresSyncRepository } from './postgres-sync-repository';
+import { mapSyncWarehouseOverviewRows } from './map-sync-warehouse-overview';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -24,10 +29,14 @@ import type { SyncRunsResponse, SyncRunsPaginatedResponse, SyncRunDetailResponse
 
 // ─── Per-request dependency wiring ───────────────────────────────
 
-async function createSupabaseRepo() {
+async function createSyncRepository() {
+  if (isIndependentPlatformRuntime()) {
+    const identity = await requireAppDbIdentity();
+    return new PostgresSyncRepository(identity);
+  }
   return new SupabaseSyncRepository(
     await createClient(),
-    createServiceClient(),
+    await createServiceClient(),
   );
 }
 
@@ -38,7 +47,7 @@ async function createSupabaseRepo() {
  *  通过 WEBSYNC_REAL_WRITE_ENABLED feature gate 控制真实写入入口。
  *  P5-SY9E heartbeat/timeout 完成且 P5-SY9I 独立验收通过后才允许启用。 */
 async function wireRealActions(warehouses: WarehouseBridgeInfo[]) {
-  const repository = await createSupabaseRepo();
+  const repository = await createSyncRepository();
   const artifactProvider = new FileSystemArtifactProvider();
   const runner = new RealSyncRunner(warehouses);
   const inputArtifactSource = new WebInputArtifactSource(warehouses);
@@ -63,7 +72,7 @@ export async function getSyncRuns(
   limit?: number,
 ): Promise<SyncRunsResponse> {
   await requireActiveAuth();
-  const repository = await createSupabaseRepo();
+  const repository = await createSyncRepository();
   const parsed = getSyncRunsSchema.parse({ warehouseId, limit });
   return repository.getSyncRuns({
     warehouseId: parsed.warehouseId,
@@ -80,7 +89,7 @@ export async function getSyncRunsPaginated(
   pageSize?: number,
 ): Promise<SyncRunsPaginatedResponse> {
   await requireActiveAuth();
-  const repository = await createSupabaseRepo();
+  const repository = await createSyncRepository();
   const parsed = getSyncRunsPaginatedSchema.parse({ warehouseId, page, pageSize });
   return repository.getSyncRunsPaginated({
     warehouseId: parsed.warehouseId,
@@ -93,7 +102,7 @@ export async function getSyncRunDetail(
   runId: string,
 ): Promise<SyncRunDetailResponse> {
   await requireActiveAuth();
-  const repository = await createSupabaseRepo();
+  const repository = await createSyncRepository();
   const parsed = getSyncRunDetailSchema.parse({ runId });
   return repository.getSyncRunDetail(parsed.runId);
 }
@@ -137,18 +146,32 @@ const COUNTRY_OLDNAME_MAP: Record<string, string> = {
 async function getOverseasWarehouses(): Promise<
   Array<{ id: string; name: string; country: string; token: string }>
 > {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('warehouse')
-    .select('id, name, country')
-    .eq('type', 'overseas')
-    .eq('is_active', true)
-    .order('country');
+  let rows: Array<{ id: string; name: string; country: string }>;
+  if (isIndependentPlatformRuntime()) {
+    const identity = await requireAppDbIdentity();
+    rows = await queryAppRows<{ id: string; name: string; country: string }>(
+      identity,
+      `SELECT id::text AS id, name, country
+       FROM public.warehouse
+       WHERE type = 'overseas' AND is_active = true
+       ORDER BY country`,
+    );
+  } else {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('warehouse')
+      .select('id, name, country')
+      .eq('type', 'overseas')
+      .eq('is_active', true)
+      .order('country');
 
-  if (error) throw new Error(`获取海外仓列表失败: ${error.message}`);
-  if (!data || data.length === 0) throw new Error('未找到活跃海外仓');
+    if (error) throw new Error(`获取海外仓列表失败: ${error.message}`);
+    rows = data ?? [];
+  }
 
-  return data.map((w) => ({
+  if (rows.length === 0) throw new Error('未找到活跃海外仓');
+
+  return rows.map((w) => ({
     id: w.id,
     name: w.name,
     country: w.country,
@@ -169,8 +192,16 @@ export async function getOverseasWarehouseOptions(): Promise<
  *  Admin 返回全部活跃海外仓，Operator 仅返回已分配仓库。
  *  无外部输入，内部调用 get_sync_warehouse_overview RPC。 */
 export async function getSyncWarehouseOverview(): Promise<SyncWarehouseOverviewItem[]> {
-  await requireActiveAuth();
-  const repository = await createSupabaseRepo();
+  const user = await requireActiveAuth();
+  if (isIndependentPlatformRuntime()) {
+    const raw = await callAppRpc<unknown>(
+      { profileUserId: user.id },
+      'public.get_sync_warehouse_overview',
+      [],
+    );
+    return mapSyncWarehouseOverviewRows(raw);
+  }
+  const repository = await createSyncRepository();
   return repository.getSyncWarehouseOverview();
 }
 
@@ -404,7 +435,7 @@ export async function runScheduledAutoPreReview(
   const bridgeInfo = toWarehouseBridgeInfo(warehouses);
 
   // ── 系统 claim wiring（不经过 createSyncActions）─────────
-  const repository = await createSupabaseRepo();
+  const repository = await createSyncRepository();
   const artifactProvider = new FileSystemArtifactProvider();
   const runner = new RealSyncRunner(bridgeInfo);
   const inputArtifactSource = new WebInputArtifactSource(bridgeInfo);
@@ -846,7 +877,7 @@ export async function getOverseasWarehouseSyncStatus(): Promise<
   Record<string, WarehouseSyncStatus>
 > {
   const user = await requireActiveAuth();
-  const repository = await createSupabaseRepo();
+  const repository = await createSyncRepository();
   const runs = await repository.getSyncRuns({ limit: 100 });
 
   // P5-SY13A: 获取已分配仓库 ID，operator 仅看到已分配仓库的同步状态
@@ -900,7 +931,7 @@ export async function getSyncLogDetail(
   runId: string,
 ): Promise<SyncLogRecord | null> {
   const user = await requireActiveAuth();
-  const repository = await createSupabaseRepo();
+  const repository = await createSyncRepository();
   const parsed = getSyncLogDetailSchema.parse({ runId });
   const log = await repository.getSyncLog(parsed.runId);
   if (!log) return null;
