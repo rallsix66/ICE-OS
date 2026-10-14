@@ -2,6 +2,9 @@
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { unwrapJoin } from '@/lib/supabase/helpers';
+import { isIndependentPlatformRuntime } from '@/lib/database/runtime';
+import { withAppDb } from '@/lib/database/app-db';
+import { getP002AuthSessionUser, getP002ProfileUserId } from '@/lib/independent-platform/p0-02-session';
 
 export interface CurrentUser {
   id: string;
@@ -10,21 +13,75 @@ export interface CurrentUser {
   roleName: string;
 }
 
-// ─── Request-scope cached auth + profile helper ───────────────────
-// 使用 React cache() 确保同一请求内 getCurrentUser() 与
-// getCurrentActiveUser() 共享同一次 auth.getUser() + profiles 查询。
-
 interface CachedAuthProfile {
   authUser: { id: string; email?: string } | null;
-  /** Raw profile row (role is the nested Supabase join; callers use unwrapJoin). */
   profile: { display_name: string | null; is_active: boolean; role: unknown } | null;
-  /** Non-null only when the profiles query itself returned a real DB error. */
   profileError: string | null;
 }
 
+async function loadProfileForUser(profileUserId: string): Promise<{
+  profile: CachedAuthProfile['profile'];
+  profileError: string | null;
+}> {
+  return withAppDb({ profileUserId }, async (client) => {
+    const result = await client.query<{
+      display_name: string;
+      is_active: boolean;
+      role_name: string | null;
+    }>(
+      `SELECT p.display_name, p.is_active, r.name AS role_name
+       FROM profiles p
+       JOIN role r ON r.id = p.role_id
+       WHERE p.id = $1
+       LIMIT 1`,
+      [profileUserId],
+    );
+    if (result.rowCount === 0) {
+      return { profile: null, profileError: null };
+    }
+    const row = result.rows[0]!;
+    return {
+      profile: {
+        display_name: row.display_name,
+        is_active: row.is_active,
+        role: { name: row.role_name ?? 'operator' },
+      },
+      profileError: null,
+    };
+  });
+}
+
 const cachedGetAuthProfile = cache(async (): Promise<CachedAuthProfile> => {
+  if (isIndependentPlatformRuntime()) {
+    const sessionUser = await getP002AuthSessionUser();
+    if (!sessionUser) {
+      return { authUser: null, profile: null, profileError: null };
+    }
+    const profileUserId = await getP002ProfileUserId();
+    if (!profileUserId) {
+      return { authUser: null, profile: null, profileError: null };
+    }
+    try {
+      const { profile, profileError } = await loadProfileForUser(profileUserId);
+      return {
+        authUser: { id: profileUserId, email: sessionUser.email },
+        profile,
+        profileError,
+      };
+    } catch {
+      return {
+        authUser: { id: profileUserId, email: sessionUser.email },
+        profile: null,
+        profileError: '数据库错误：无法获取用户资料',
+      };
+    }
+  }
+
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
   if (error || !user) {
     return { authUser: null, profile: null, profileError: null };
@@ -36,8 +93,6 @@ const cachedGetAuthProfile = cache(async (): Promise<CachedAuthProfile> => {
     .eq('id', user.id)
     .single();
 
-  // PGRST116 = row not found — profile may genuinely not exist yet (e.g. trigger
-  // hasn't created it). Treat as absent profile rather than a hard error.
   if (profileError && profileError.code !== 'PGRST116') {
     return {
       authUser: { id: user.id, email: user.email },
@@ -53,11 +108,6 @@ const cachedGetAuthProfile = cache(async (): Promise<CachedAuthProfile> => {
   };
 });
 
-/**
- * 获取当前登录用户及角色信息。
- * 用于 Server Component / Server Action 中。
- * 复用 cachedGetAuthProfile，与 getCurrentActiveUser() 共享请求级缓存。
- */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const { authUser, profile } = await cachedGetAuthProfile();
   if (!authUser) return null;
@@ -73,10 +123,6 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   };
 }
 
-/**
- * 确认当前用户是管理员，否则抛出。
- * 在 Server Action 中调用以保护管理类操作。
- */
 export async function requireAdmin(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) throw new Error('未登录');
@@ -84,27 +130,16 @@ export async function requireAdmin(): Promise<CurrentUser> {
   return user;
 }
 
-/**
- * 确认当前用户已登录，否则抛出。
- */
 export async function requireAuth(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) throw new Error('未登录');
   return user;
 }
 
-// ─── Active-user variants (P5-SY5B) ───────────────────────────────
-
 export interface CurrentActiveUser extends CurrentUser {
   isActive: true;
 }
 
-/**
- * 获取当前登录且启用的用户。
- * 相比 getCurrentUser()，额外校验 profiles.is_active。
- * 停用用户返回 null（与未登录用户不可区分，调用方按未登录处理）。
- * 复用 cachedGetAuthProfile，与 getCurrentUser() 共享请求级缓存。
- */
 export async function getCurrentActiveUser(): Promise<CurrentActiveUser | null> {
   const { authUser, profile, profileError } = await cachedGetAuthProfile();
   if (!authUser) return null;
@@ -125,18 +160,12 @@ export async function getCurrentActiveUser(): Promise<CurrentActiveUser | null> 
   };
 }
 
-/**
- * 确认当前用户已登录且启用，否则抛出。
- */
 export async function requireActiveAuth(): Promise<CurrentActiveUser> {
   const user = await getCurrentActiveUser();
   if (!user) throw new Error('未登录或账户已停用');
   return user;
 }
 
-/**
- * 确认当前用户是已启用的管理员，否则抛出。
- */
 export async function requireActiveAdmin(): Promise<CurrentActiveUser> {
   const user = await getCurrentActiveUser();
   if (!user) throw new Error('未登录或账户已停用');

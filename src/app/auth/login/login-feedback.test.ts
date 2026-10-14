@@ -17,7 +17,7 @@ describe('LoginPage 登录反馈', () => {
 
   it('定义登录超时常量和中文超时消息，避免无限等待', () => {
     expect(src).toMatch(/const LOGIN_TIMEOUT_MS = 15_000/);
-    expect(src).toMatch(/const LOGIN_TIMEOUT_MSG = '登录请求超时，请检查网络或 Supabase 配置后重试'/);
+    expect(src).toMatch(/const LOGIN_TIMEOUT_MSG = '登录请求超时，请检查网络或认证服务配置后重试'/);
   });
 
   it('signInWithPassword 使用超时保护包装', () => {
@@ -28,8 +28,8 @@ describe('LoginPage 登录反馈', () => {
   });
 
   it('超时和网络异常返回明确中文提示', () => {
-    expect(src).toContain('登录请求超时，请检查网络或 Supabase 配置后重试');
-    expect(src).toContain('登录请求失败，请检查网络或 Supabase 配置后重试');
+    expect(src).toContain('登录请求超时，请检查网络或认证服务配置后重试');
+    expect(src).toContain('登录请求失败，请检查网络或认证服务配置后重试');
   });
 
   it('异常失败路径恢复登录按钮状态', () => {
@@ -46,6 +46,6 @@ describe('LoginPage 登录反馈', () => {
     expect(src).toMatch(/isTimeout/);
     expect(src).toMatch(/LOGIN_TIMEOUT_MSG/);
     // 通用 fallback 消息必须存在
-    expect(src).toContain('登录请求失败，请检查网络或 Supabase 配置后重试');
+    expect(src).toContain('登录请求失败，请检查网络或认证服务配置后重试');
   });
 });

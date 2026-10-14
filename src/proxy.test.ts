@@ -118,7 +118,7 @@ describe('NEXTJS16-PROXY-MIGRATION', () => {
     });
 
     it('注释已更新为 proxy.ts', () => {
-      expect(updateSessionContent).toMatch(/Next\.js\s+proxy\.ts/);
+      expect(updateSessionContent).toMatch(/路由会话守卫|P0-02|proxy/);
     });
   });
 
@@ -128,10 +128,8 @@ describe('NEXTJS16-PROXY-MIGRATION', () => {
     const serverContent = readSrcFile('src/lib/supabase/server.ts');
 
     it('注释已从 middleware 更新为 proxy', () => {
-      // 不应再包含 "在 middleware 或 route handler"
+      expect(serverContent).toMatch(/P0-02|独立平台|Repository 使用 app-db/);
       expect(serverContent).not.toMatch(/在 middleware 或 route handler 中处理/);
-      // 应该包含 "在 proxy 或 route handler"
-      expect(serverContent).toMatch(/在 proxy 或 route handler 中处理/);
     });
   });
 

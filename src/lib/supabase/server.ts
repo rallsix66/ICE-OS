@@ -1,13 +1,21 @@
-// Supabase 服务端客户端 — 用于 Server Components / Server Actions / API Routes
+// 遗留 Supabase 服务端客户端 — P0-02 隔离运行时禁用（Repository 使用 app-db）
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/database';
 
-/**
- * Server Component / Server Action 中使用的 Supabase 客户端。
- * 通过 cookie 读取用户 session，自动携带认证信息。
- */
+import { loadP002Config } from '@/lib/independent-platform/p0-02-config';
+
+function rejectIndependentPlatformClient(): never {
+  throw new Error(
+    'P0-02 独立平台已启用：禁止 createClient/createServiceClient；请使用 Feature Repository 的参数化 SQL 实现',
+  );
+}
+
 export async function createClient() {
+  if (loadP002Config()) {
+    rejectIndependentPlatformClient();
+  }
+
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -21,24 +29,24 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options),
             );
           } catch {
-            // Server Component 中不能设置 cookie，在 proxy 或 route handler 中处理
+            // Server Component 中不能设置 cookie
           }
         },
       },
-    }
+    },
   );
 }
 
-/**
- * 使用 service_role key 的客户端 — 仅用于同步脚本等需要绕过 RLS 的后端场景。
- * 禁止在客户端代码或 Server Component 中使用。
- */
-export function createServiceClient() {
+export async function createServiceClient() {
   if (typeof window !== 'undefined') {
     throw new Error('createServiceClient 禁止在浏览器端调用');
+  }
+
+  if (loadP002Config()) {
+    rejectIndependentPlatformClient();
   }
 
   return createServerClient<Database>(
@@ -49,10 +57,8 @@ export function createServiceClient() {
         getAll() {
           return [];
         },
-        setAll() {
-          // service_role 客户端不需要 session
-        },
+        setAll() {},
       },
-    }
+    },
   );
 }

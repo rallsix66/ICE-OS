@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Package } from 'lucide-react';
 
 const LOGIN_TIMEOUT_MS = 15_000;
-const LOGIN_TIMEOUT_MSG = '登录请求超时，请检查网络或 Supabase 配置后重试';
+const LOGIN_TIMEOUT_MSG = '登录请求超时，请检查网络或认证服务配置后重试';
 
 function withLoginTimeout<T>(promise: Promise<T>): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
@@ -65,7 +65,7 @@ export default function LoginPage() {
       setError(
         isTimeout
           ? LOGIN_TIMEOUT_MSG
-          : '登录请求失败，请检查网络或 Supabase 配置后重试'
+          : '登录请求失败，请检查网络或认证服务配置后重试'
       );
       setLoading(false);
       return;
