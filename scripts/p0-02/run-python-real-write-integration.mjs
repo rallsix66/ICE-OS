@@ -43,6 +43,7 @@ const modules = [
   'sync.test_p0_02_web_bridge_commit_outcome',
   'sync.test_p0_02_publish_atomicity',
   'sync.test_p0_02_postgres_real_write_chain',
+  'sync.test_p0_02_fixture_recovery',
 ];
 let combinedOutput = '';
 let exitCode = 0;

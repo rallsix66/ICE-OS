@@ -176,29 +176,49 @@ class OwnedFixtureRegistry:
         finally:
             conn.close()
 
+    def _resolve_owned_variant(self, cur, sku: str, warehouse_id: str) -> tuple[str | None, str | None]:
+        cur.execute(
+            """
+            SELECT v.id::text
+            FROM public.product_variant v
+            JOIN public.inventory i ON i.variant_id = v.id
+            WHERE v.sku = %s AND i.warehouse_id = %s::uuid
+            LIMIT 1
+            """,
+            (sku, warehouse_id),
+        )
+        joined = cur.fetchone()
+        if joined is not None:
+            return joined[0], None
+        cur.execute(
+            'SELECT id::text FROM public.product_variant WHERE sku = %s LIMIT 1',
+            (sku,),
+        )
+        variant_only = cur.fetchone()
+        if variant_only is None:
+            return None, 'absent'
+        return variant_only[0], 'missing_inventory_link'
+
     def cleanup_owned_skus(self) -> list[str]:
         import psycopg
 
         errors: list[str] = []
+        pending = list(self.owned_skus)
+        removed_skus: list[tuple[str, str]] = []
+        removed_variants: list[str] = []
         conn = self._connect()
         try:
             with conn.cursor() as cur:
-                for sku, warehouse_id in list(self.owned_skus):
-                    cur.execute(
-                        """
-                        SELECT v.id::text
-                        FROM public.product_variant v
-                        JOIN public.inventory i ON i.variant_id = v.id
-                        WHERE v.sku = %s AND i.warehouse_id = %s::uuid
-                        LIMIT 1
-                        """,
-                        (sku, warehouse_id),
-                    )
-                    row = cur.fetchone()
-                    if row is None:
-                        self.owned_skus.remove((sku, warehouse_id))
+                for sku, warehouse_id in pending:
+                    variant_id, lookup_state = self._resolve_owned_variant(cur, sku, warehouse_id)
+                    if lookup_state == 'missing_inventory_link':
+                        errors.append(
+                            f'owned sku {sku}@{warehouse_id}: variant exists but inventory link missing',
+                        )
                         continue
-                    variant_id = row[0]
+                    if variant_id is None:
+                        removed_skus.append((sku, warehouse_id))
+                        continue
                     cur.execute(
                         'DELETE FROM public.inventory WHERE variant_id = %s::uuid',
                         (variant_id,),
@@ -207,16 +227,29 @@ class OwnedFixtureRegistry:
                         'DELETE FROM public.product_variant WHERE id = %s::uuid',
                         (variant_id,),
                     )
-                    if variant_id in self.variant_ids:
-                        self.variant_ids.remove(variant_id)
-                    self.owned_skus.remove((sku, warehouse_id))
+                    removed_skus.append((sku, warehouse_id))
+                    removed_variants.append(variant_id)
             conn.commit()
+            for key in removed_skus:
+                if key in self.owned_skus:
+                    self.owned_skus.remove(key)
+            for variant_id in removed_variants:
+                if variant_id in self.variant_ids:
+                    self.variant_ids.remove(variant_id)
         except Exception as exc:
             conn.rollback()
             errors.append(str(exc))
         finally:
             conn.close()
         return errors
+
+    def class_cleanup(self, *, verify_counts: bool = True) -> dict[str, Any]:
+        sku_errors = self.cleanup_owned_skus()
+        report = self.restore(verify_counts=verify_counts)
+        if sku_errors:
+            report.setdefault('errors', []).extend(sku_errors)
+            report['integrity_ok'] = False
+        return report
 
     def restore(self, *, verify_counts: bool = True) -> dict[str, Any]:
         import psycopg

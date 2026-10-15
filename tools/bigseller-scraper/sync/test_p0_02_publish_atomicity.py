@@ -319,14 +319,16 @@ class P002PublishAtomicityTests(unittest.TestCase):
                 'sync.p0_02_publish_verify.verify_publish_state',
                 side_effect=RuntimeError('verify unavailable'),
             ):
-                with self.assertRaises(RuntimeError) as ctx:
+                from sync.publish_errors import PublishCommitUnknownError
+
+                with self.assertRaises(PublishCommitUnknownError) as ctx:
                     execute_plan_v2(
                         self._plan(qty=13),
                         sync_log_enabled=True,
                         sync_run_id=self.sync_run_id,
                         triggered_by=self.admin_profile,
                     )
-        self.assertIn('未知', str(ctx.exception))
+        self.assertEqual(ctx.exception.rpc_result.get('commit_outcome'), 'unknown')
         failed_after = self._read_failed_logs()
         self.assertEqual(failed_before, failed_after)
 

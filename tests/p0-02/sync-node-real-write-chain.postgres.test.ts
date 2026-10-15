@@ -23,6 +23,7 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
   let prefixSentinelWarehouseId: string;
   let prefixSentinelInventoryId: string;
   let prefixSentinelVariantId: string;
+  let prefixSentinelSnapshot: unknown;
   let variantId: string;
   let inventoryId: string;
   let sku: string;
@@ -98,6 +99,29 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
          VALUES ($1::uuid, $2::uuid, $3::uuid, 2)`,
         [prefixSentinelInventoryId, prefixSentinelVariantId, prefixSentinelWarehouseId],
       );
+      const sentinelRow = await client.query(
+        `
+        SELECT w.id::text, w.name, w.country, w.is_active,
+               COALESCE(
+                 json_agg(
+                   json_build_object(
+                     'variant_id', v.id::text,
+                     'sku', v.sku,
+                     'quantity', i.quantity::int
+                   )
+                   ORDER BY v.sku
+                 ) FILTER (WHERE v.id IS NOT NULL),
+                 '[]'::json
+               ) AS inv
+        FROM public.warehouse w
+        LEFT JOIN public.inventory i ON i.warehouse_id = w.id
+        LEFT JOIN public.product_variant v ON v.id = i.variant_id
+        WHERE w.id = $1::uuid
+        GROUP BY w.id, w.name, w.country, w.is_active
+        `,
+        [prefixSentinelWarehouseId],
+      );
+      prefixSentinelSnapshot = sentinelRow.rows[0];
     } finally {
       client.release();
     }
@@ -125,6 +149,29 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
       await client.query('DELETE FROM public.sync_warehouse_lock WHERE warehouse_id = $1::uuid', [warehouseId]);
       await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [warehouseId]);
       await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [decoyWarehouseId]);
+      const sentinelAfter = await client.query(
+        `
+        SELECT w.id::text, w.name, w.country, w.is_active,
+               COALESCE(
+                 json_agg(
+                   json_build_object(
+                     'variant_id', v.id::text,
+                     'sku', v.sku,
+                     'quantity', i.quantity::int
+                   )
+                   ORDER BY v.sku
+                 ) FILTER (WHERE v.id IS NOT NULL),
+                 '[]'::json
+               ) AS inv
+        FROM public.warehouse w
+        LEFT JOIN public.inventory i ON i.warehouse_id = w.id
+        LEFT JOIN public.product_variant v ON v.id = i.variant_id
+        WHERE w.id = $1::uuid
+        GROUP BY w.id, w.name, w.country, w.is_active
+        `,
+        [prefixSentinelWarehouseId],
+      );
+      expect(sentinelAfter.rows[0]).toEqual(prefixSentinelSnapshot);
       await client.query('DELETE FROM public.inventory WHERE id = $1::uuid', [
         prefixSentinelInventoryId,
       ]);

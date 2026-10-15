@@ -14,6 +14,7 @@ if (!includeMatch) {
 const included = [...includeMatch[1].matchAll(/'([^']+\.test\.ts)'/g)].map((m) => m[1]);
 const required = [
   'tests/p0-02/sync-node-real-write-chain.postgres.test.ts',
+  'tests/p0-02/sync-publish-unknown.postgres.test.ts',
   'tests/p0-02/delivery-rework.postgres.test.ts',
 ];
 

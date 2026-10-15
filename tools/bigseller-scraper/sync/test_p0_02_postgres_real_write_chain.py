@@ -49,6 +49,7 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
         cfg.OLD_WAREHOUSE_NAME = 'P0-02 RW fixture wh'
 
         cls.registry = OwnedFixtureRegistry(_load_owner_dsn())
+        cls.addClassCleanup(cls._class_fixture_cleanup)
         cls.registry.capture_baseline()
 
         cls.wh = str(uuid.uuid4())
@@ -149,10 +150,16 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
         cls.registry.capture_sentinel_snapshot([cls.sentinel_wh])
 
     @classmethod
-    def tearDownClass(cls) -> None:
-        report = cls.registry.restore(verify_counts=True)
+    def _class_fixture_cleanup(cls) -> None:
+        if not hasattr(cls, 'registry') or cls.registry is None:
+            return
+        report = cls.registry.class_cleanup(verify_counts=True)
         if report.get('errors'):
-            raise AssertionError(f'fixture restore failed: {report}')
+            raise AssertionError(f'fixture cleanup failed: {report}')
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._class_fixture_cleanup()
 
     def _new_variant_plan(self, new_sku: str, *, qty: int) -> dict:
         sync_at = datetime.now(timezone.utc).isoformat()

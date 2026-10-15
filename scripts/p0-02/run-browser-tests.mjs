@@ -29,6 +29,7 @@ import {
 } from './isolated-workspace.mjs';
 import { unregisterManagedProcess } from './managed-processes.mjs';
 import { guardP001Entry } from './entry-guard.mjs';
+import { operatorCsvRowsetMatches } from './restore-schema-contract.mjs';
 
 const ADMIN_EMAIL = 'admin@p0-02.test';
 const ADMIN_PASSWORD = 'AdminPass123!';
@@ -116,6 +117,29 @@ function installPlaywrightRouteGuard(context, egressState) {
     egressState.blockedExternal.push({ url, phase: egressState.egressPhase });
     route.abort('blockedbyclient');
   });
+}
+
+function selfTestOperatorCsvComparator() {
+  const expected = [
+    { sku: 'SKU-A', warehouse_name: 'WH-1', quantity: 3 },
+    { sku: 'SKU-B', warehouse_name: 'WH-2', quantity: 5 },
+  ];
+  const ok = operatorCsvRowsetMatches(expected, {
+    rows: [
+      { SKU: 'SKU-A', 仓库: 'WH-1', 当前库存: '3' },
+      { SKU: 'SKU-B', 仓库: 'WH-2', 当前库存: '5' },
+    ],
+  });
+  const badWarehouse = operatorCsvRowsetMatches(expected, {
+    rows: [{ SKU: 'SKU-A', 仓库: 'FORBIDDEN', 当前库存: '3' }, { SKU: 'SKU-B', 仓库: 'WH-2', 当前库存: '5' }],
+  });
+  const badQty = operatorCsvRowsetMatches(expected, {
+    rows: [{ SKU: 'SKU-A', 仓库: 'WH-1', 当前库存: '999998' }, { SKU: 'SKU-B', 仓库: 'WH-2', 当前库存: '5' }],
+  });
+  const missing = operatorCsvRowsetMatches(expected, {
+    rows: [{ SKU: 'SKU-A', 仓库: 'WH-1', 当前库存: '3' }],
+  });
+  return ok && !badWarehouse && !badQty && !missing;
 }
 
 function parseCsv(content) {
@@ -393,6 +417,10 @@ async function main() {
   child.unref();
 
   const results = [];
+  results.push({
+    name: 'browser-csv-comparator-selftest',
+    pass: selfTestOperatorCsvComparator(),
+  });
   const networkLog = [];
   const egressState = {
     blockedExternal: [],
@@ -705,20 +733,24 @@ async function main() {
       /(单位成本|货值|金额|unit_cost|amount)/i.test(operatorCsv) ||
       operatorCsv.includes(AMOUNT_SENTINEL);
     const parsedOperatorCsv = parseCsv(operatorCsv);
-    const operatorCsvSkus = parsedOperatorCsv.rows.map((row) => row.SKU).filter(Boolean).sort();
-    const expectedOperatorSkus = operatorExpectedRows.map((row) => row.sku).sort();
-    const operatorRowsetOk =
-      operatorCsvSkus.length === expectedOperatorSkus.length &&
-      operatorCsvSkus.every((sku, index) => sku === expectedOperatorSkus[index]);
+    const operatorRowsetOk = operatorCsvRowsetMatches(operatorExpectedRows, parsedOperatorCsv);
+    const amountSentinelApplicable = Boolean(amountSentinel?.seeded);
+    const amountBoundaryOk = amountSentinelApplicable
+      ? !operatorCsvAmountLeak
+      : !operatorCsvAmountLeak &&
+        !/(单位成本|货值|unit_cost)/i.test(parsedOperatorCsv.headers.join(','));
     results.push({
       name: 'playwright-operator-csv-export-no-amount',
       pass:
         /overseas-inventory.*\.csv/i.test(operatorDownload.suggestedFilename()) &&
         operatorRowsetOk &&
-        !operatorCsvAmountLeak,
+        amountBoundaryOk,
       filename: operatorDownload.suggestedFilename(),
-      expectedOperatorSkus,
-      operatorCsvSkus,
+      operatorExpectedRows,
+      parsedRowCount: parsedOperatorCsv.rows.length,
+      amountSentinelApplicable,
+      amountSentinelSeeded: amountSentinelApplicable,
+      csvComparatorSelfTest: selfTestOperatorCsvComparator(),
     });
 
     egressState.egressPhase = 'self-test';

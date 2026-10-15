@@ -101,6 +101,25 @@ if (pythonNegative.status !== 0) {
   process.exit(pythonNegative.status ?? 1);
 }
 
+const pythonLegacy = spawnSync(
+  process.execPath,
+  [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-python-legacy-regression.mjs')],
+  withHiddenWindowsSpawnOptions({
+    cwd: REPO_ROOT,
+    env,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }),
+);
+fs.writeFileSync(
+  path.join(evidenceDir, 'python-legacy-regression.log'),
+  `${pythonLegacy.stdout ?? ''}${pythonLegacy.stderr ?? ''}`,
+);
+if (pythonLegacy.status !== 0) {
+  console.error('python legacy regression failed', { status: pythonLegacy.status });
+  process.exit(pythonLegacy.status ?? 1);
+}
+
 const boundary = spawnSync(
   process.execPath,
   [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-python-boundary-probes.mjs')],
