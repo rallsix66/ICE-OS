@@ -194,6 +194,40 @@ describe('P0-02 publish unknown persistence and claim guard', () => {
       }
       expect(evidenceFreeReconcileFailed).toBe(true);
 
+      let nullConclusionFailed = false;
+      try {
+        await callAppRpc(
+          { profileUserId: adminProfileId },
+          'public.reconcile_sync_run_publish_unknown',
+          [real.runId, null, null],
+        );
+      } catch {
+        nullConclusionFailed = true;
+      }
+      expect(nullConclusionFailed).toBe(true);
+
+      const unreconciled = await client.query<{ result_summary: Record<string, unknown> | null }>(
+        `SELECT result_summary FROM public.sync_run WHERE id = $1::uuid`,
+        [real.runId],
+      );
+      expect(unreconciled.rows[0]?.result_summary?.publishUnknownReconciled).not.toBe(true);
+
+      let stillBlocked = false;
+      try {
+        await repository.claimSyncRun({
+          runId: randomUUID(),
+          warehouseId,
+          mode: 'dry_run',
+          leaseDuration: 60,
+          triggeredBy: adminProfileId,
+          triggeredFrom: 'web',
+          inputArtifactHash: 'after-null-reconcile',
+        });
+      } catch {
+        stillBlocked = true;
+      }
+      expect(stillBlocked).toBe(true);
+
       await callAppRpc(
         { profileUserId: adminProfileId },
         'public.reconcile_sync_run_publish_unknown',
