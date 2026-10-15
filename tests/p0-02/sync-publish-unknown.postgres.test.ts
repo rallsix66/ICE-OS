@@ -124,7 +124,7 @@ describe('P0-02 publish unknown persistence and claim guard', () => {
     }
   });
 
-  it('persists unknown summary, blocks claim until reconciled', async () => {
+  it('persists unknown summary, blocks claim until evidence-based reconcile', async () => {
     const repository = new PostgresSyncRepository({ profileUserId: adminProfileId });
     const artifactProvider = new FileSystemArtifactProvider(artifactDir);
     const runner = new PublishUnknownProbeRunner();
@@ -182,10 +182,26 @@ describe('P0-02 publish unknown persistence and claim guard', () => {
       }
       expect(blocked).toBe(true);
 
+      let evidenceFreeReconcileFailed = false;
+      try {
+        await callAppRpc(
+          { profileUserId: adminProfileId },
+          'public.reconcile_sync_run_publish_unknown',
+          [real.runId, 'confirmed_committed', null],
+        );
+      } catch {
+        evidenceFreeReconcileFailed = true;
+      }
+      expect(evidenceFreeReconcileFailed).toBe(true);
+
       await callAppRpc(
         { profileUserId: adminProfileId },
         'public.reconcile_sync_run_publish_unknown',
-        [real.runId],
+        [
+          real.runId,
+          'confirmed_not_committed',
+          'operator verified no success sync_log and inventory unchanged for this run',
+        ],
       );
 
       const claimId = randomUUID();
@@ -199,6 +215,107 @@ describe('P0-02 publish unknown persistence and claim guard', () => {
         inputArtifactHash: 'after-reconcile',
       });
       expect(claimed).toBe(claimId);
+
+      await client.query(
+        `UPDATE public.sync_warehouse_lock SET locked_by = NULL, locked_at = NULL WHERE warehouse_id = $1::uuid`,
+        [warehouseId],
+      );
+      await client.query('DELETE FROM public.sync_run WHERE id = $1::uuid', [claimId]);
+    } finally {
+      client.release();
+    }
+  });
+
+  it('blocks claim after lease expiry without release on real_write in_progress', async () => {
+    const repository = new PostgresSyncRepository({ profileUserId: adminProfileId });
+    const staleRunId = randomUUID();
+    const dryRunId = randomUUID();
+    const client = await bootstrap.connect();
+    try {
+      await client.query(
+        `
+        INSERT INTO public.sync_run (
+          id, warehouse_id, mode, status, triggered_by, triggered_from,
+          started_at, heartbeat_at, created_at, finished_at,
+          exit_code, plan_drift_check, plan_drift_count, plan_drift_differences,
+          result_summary, input_artifact_hash, plan_artifact_hash
+        ) VALUES (
+          $1::uuid, $2::uuid, 'dry_run', 'completed', $3::uuid, 'web',
+          now() - interval '10 minutes', now() - interval '10 minutes', now() - interval '10 minutes',
+          now() - interval '5 minutes', 0, 'PASS', 0, '[]'::jsonb,
+          '{}'::jsonb, 'expired-unknown-input', 'expired-unknown-plan'
+        )
+        `,
+        [dryRunId, warehouseId, adminProfileId],
+      );
+      await client.query(
+        `
+        INSERT INTO public.sync_run (
+          id, warehouse_id, mode, status, triggered_by, triggered_from,
+          started_at, heartbeat_at, created_at, locked_by, lease_expires_at,
+          dry_run_run_id, input_artifact_hash, plan_artifact_hash
+        ) VALUES (
+          $1::uuid, $2::uuid, 'real_write', 'in_progress', $3::uuid, 'web',
+          now() - interval '2 hours', now() - interval '2 hours', now() - interval '2 hours',
+          $1::uuid, now() - interval '1 hour',
+          $4::uuid, 'expired-unknown-input', 'expired-unknown-plan'
+        )
+        `,
+        [staleRunId, warehouseId, adminProfileId, dryRunId],
+      );
+      await client.query(
+        `UPDATE public.sync_warehouse_lock SET locked_by = $1::uuid WHERE warehouse_id = $2::uuid`,
+        [staleRunId, warehouseId],
+      );
+
+      let blocked = false;
+      try {
+        await repository.claimSyncRun({
+          runId: randomUUID(),
+          warehouseId,
+          mode: 'dry_run',
+          leaseDuration: 60,
+          triggeredBy: adminProfileId,
+          triggeredFrom: 'web',
+          inputArtifactHash: 'after-expired-unknown',
+        });
+      } catch {
+        blocked = true;
+      }
+      expect(blocked).toBe(true);
+
+      const stale = await client.query<{ result_summary: Record<string, unknown> | null }>(
+        `SELECT result_summary FROM public.sync_run WHERE id = $1::uuid`,
+        [staleRunId],
+      );
+      expect(stale.rows[0]?.result_summary?.leaseExpiredWithoutFinalRelease).toBe(true);
+      expect(stale.rows[0]?.result_summary?.commitOutcome).toBe('unknown');
+
+      await callAppRpc(
+        { profileUserId: adminProfileId },
+        'public.reconcile_sync_run_publish_unknown',
+        [
+          staleRunId,
+          'confirmed_not_committed',
+          'lease expired without release; no publish success log for stale run',
+        ],
+      );
+
+      const claimId = randomUUID();
+      const claimed = await repository.claimSyncRun({
+        runId: claimId,
+        warehouseId,
+        mode: 'dry_run',
+        leaseDuration: 60,
+        triggeredBy: adminProfileId,
+        triggeredFrom: 'web',
+        inputArtifactHash: 'after-expired-reconcile',
+      });
+      expect(claimed).toBe(claimId);
+
+      await client.query('DELETE FROM public.sync_run WHERE id = $1::uuid', [claimId]);
+      await client.query('DELETE FROM public.sync_run WHERE id = $1::uuid', [staleRunId]);
+      await client.query('DELETE FROM public.sync_run WHERE id = $1::uuid', [dryRunId]);
     } finally {
       client.release();
     }

@@ -48,6 +48,11 @@ export class PostgresSyncRepository implements SyncRepository {
     inputArtifactHash?: string;
     planArtifactHash?: string;
   }): Promise<string | null> {
+    await callAppRpc(
+      this.identity,
+      'public.expire_stale_sync_runs_for_warehouse',
+      [params.warehouseId],
+    );
     const data = await callAppRpc<string | null>(
       this.identity,
       'public.claim_sync_run',

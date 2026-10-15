@@ -132,6 +132,7 @@ async function main() {
   psql(path.join(sqlDir, '011_seal_app_inventory_quantity.sql'), true);
   psql(path.join(sqlDir, '012_tracking_event_partial_warehoused.sql'), true);
   psql(path.join(sqlDir, '013_sync_publish_unknown_guard.sql'), true);
+  psql(path.join(sqlDir, '014_sync_publish_unknown_reconcile_evidence.sql'), true);
 
   psql(`REVOKE ice_p0_02_owner FROM ${instance.bootstrapUser};`);
 
