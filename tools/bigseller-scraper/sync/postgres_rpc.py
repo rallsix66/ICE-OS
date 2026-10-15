@@ -73,6 +73,9 @@ def write_sync_log_postgres(
     error_message: str | None,
     started_at: str,
     finished_at: str,
+    *,
+    sync_run_id: str | None = None,
+    triggered_by: str | None = None,
 ) -> dict[str, Any]:
     from .p0_02_connection_boundary import connect_validated_sync
 
@@ -89,11 +92,13 @@ def write_sync_log_postgres(
                 """
                 INSERT INTO public.sync_log (
                   warehouse_id, status, new_variants_count,
-                  error_message, started_at, finished_at
+                  error_message, started_at, finished_at,
+                  sync_run_id, triggered_by
                 ) VALUES (
-                  %s::uuid, %s, %s, %s, %s::timestamptz, %s::timestamptz
+                  %s::uuid, %s, %s, %s, %s::timestamptz, %s::timestamptz,
+                  %s::uuid, %s::uuid
                 )
-                RETURNING id::text, status, warehouse_id::text
+                RETURNING id::text, status, warehouse_id::text, sync_run_id::text
                 """,
                 (
                     warehouse_id,
@@ -102,6 +107,8 @@ def write_sync_log_postgres(
                     error_message,
                     started_at,
                     finished_at,
+                    sync_run_id,
+                    triggered_by,
                 ),
             )
             row = cur.fetchone()

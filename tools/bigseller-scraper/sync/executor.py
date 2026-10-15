@@ -105,6 +105,12 @@ def _audit_fetch_warehouse(warehouse_id: str) -> list:
 
 def _ensure_supabase_rest() -> tuple[str, str, str]:
     """Legacy Supabase REST：仅在非 P0-02 独立运行时加载 .env.local。"""
+    from .p0_02_connection_boundary import independent_p0_02_enabled
+
+    if independent_p0_02_enabled():
+        raise RuntimeError(
+            'P0-02 独立平台已禁用 Supabase REST；请使用 postgres_gateway / execute_plan_v2',
+        )
     global _SUPABASE_URL, _SERVICE_KEY, _BASE
     if _BASE is not None and _SUPABASE_URL and _SERVICE_KEY:
         return _SUPABASE_URL, _SERVICE_KEY, _BASE
@@ -314,6 +320,13 @@ def execute_plan(
             f'如需真实写入，请使用 {write_hint} 令牌。'
         )
 
+    from .p0_02_connection_boundary import independent_p0_02_enabled
+
+    if independent_p0_02_enabled() and not dry_run:
+        raise RuntimeError(
+            'P0-02 独立平台 legacy execute_plan 真实写入已封存；请使用 execute_plan_v2',
+        )
+
     # 1. 加载 Dry Run 报告
     report_path = Path(dry_run_report_path)
     if not report_path.exists():
@@ -393,10 +406,7 @@ def execute_plan(
     # =====================================================================
 
     # A1. 查询 Warehouse
-    wh_rows = _get(
-        f'warehouse?id=eq.{warehouse_id}'
-        '&select=id,name,country,type,is_active'
-    )
+    wh_rows = _audit_fetch_warehouse(warehouse_id)
     if not wh_rows:
         raise RuntimeError(f'未找到 warehouse id={warehouse_id}')
     wh_current = wh_rows[0]
@@ -404,11 +414,7 @@ def execute_plan(
     print(f'[A1] Warehouse: id={warehouse_id}, name="{wh_current.get("name")}"')
 
     # A2. 查询现有 overseas variants
-    existing_variants = _get(
-        'product_variant'
-        '?select=id,sku,country,name,product_id,match_status'
-        f'&country=eq.{WAREHOUSE_COUNTRY}'
-    )
+    existing_variants = _audit_fetch_variants_by_country(WAREHOUSE_COUNTRY)
     result['variants_before'] = len(existing_variants)
     existing_sku_map = {v['sku']: v for v in existing_variants}
     print(f'[A2] 现有 {WAREHOUSE_COUNTRY} variants: {len(existing_variants)} 条')
@@ -416,11 +422,7 @@ def execute_plan(
     time.sleep(0.3)
 
     # A3. 查询现有 Inventory
-    existing_inventory = _get(
-        'inventory'
-        '?select=id,variant_id,warehouse_id,quantity'
-        f'&warehouse_id=eq.{warehouse_id}'
-    )
+    existing_inventory = _audit_fetch_inventory(warehouse_id)
     result['inventory_before'] = len(existing_inventory)
     existing_inv_set = {inv['variant_id'] for inv in existing_inventory}
     print(f'[A3] 现有 Inventory (wh={warehouse_id[:8]}...): {len(existing_inventory)} 条')
@@ -603,22 +605,14 @@ def execute_plan(
     # Phase G: 写后逐项验证 — 任一差异 fail-fast，禁止进入 Phase H
     # =====================================================================
     time.sleep(0.5)
-    verify_inventory = _get(
-        'inventory'
-        '?select=id,variant_id,warehouse_id,quantity'
-        f'&warehouse_id=eq.{warehouse_id}'
-    )
+    verify_inventory = _audit_fetch_inventory(warehouse_id)
     result['inventory_total'] = len(verify_inventory)
     print(f'[Phase G] 写后验证: Inventory 共 {len(verify_inventory)} 条')
 
     if not dry_run:
         # 重新查询 variant 映射以获取最新 ID（确保 verify 时映射完整）
         time.sleep(0.3)
-        current_variants = _get(
-            'product_variant'
-            '?select=id,sku,country'
-            f'&country=eq.{WAREHOUSE_COUNTRY}'
-        )
+        current_variants = _audit_fetch_variants_by_country(WAREHOUSE_COUNTRY)
         current_variant_map = {v['sku']: v['id'] for v in current_variants}
 
         inv_diffs = verify_inventory_post_write(
@@ -673,10 +667,7 @@ def execute_plan(
     # =====================================================================
     # Phase I: Warehouse 最终状态验证
     # =====================================================================
-    wh_final_rows = _get(
-        f'warehouse?id=eq.{warehouse_id}'
-        '&select=id,name,country,type,is_active'
-    )
+    wh_final_rows = _audit_fetch_warehouse(warehouse_id)
     if not wh_final_rows:
         raise RuntimeError(
             f'Phase I 失败: 无法查询 Warehouse id={warehouse_id}（可能已被删除）'
@@ -1114,6 +1105,9 @@ def _write_sync_log(
     error_message: str | None,
     started_at: str,
     finished_at: str,
+    *,
+    sync_run_id: str | None = None,
+    triggered_by: str | None = None,
 ) -> dict:
     """写入 sync_log 记录。
 
@@ -1155,6 +1149,8 @@ def _write_sync_log(
             error_message,
             started_at,
             finished_at,
+            sync_run_id=sync_run_id,
+            triggered_by=triggered_by,
         )
 
     _, service_key, base = _ensure_supabase_rest()
@@ -1296,6 +1292,8 @@ def execute_plan_v2(
     sync_log_enabled: bool = True,
     last_sync_at: str | None = None,
     fallback_dir: str | None = None,
+    sync_run_id: str | None = None,
+    triggered_by: str | None = None,
 ) -> dict:
     """使用 sync_warehouse_inventory RPC 执行写入计划。
 
@@ -1343,6 +1341,11 @@ def execute_plan_v2(
     new_variants_plan = plan.get('new_variants', [])
     new_variants_count = len(new_variants_plan)
 
+    import os as _os
+
+    bound_sync_run_id = sync_run_id or _os.environ.get('P0_02_SYNC_RUN_ID')
+    bound_triggered_by = triggered_by or _os.environ.get('P0_02_SYNC_TRIGGERED_BY')
+
     result = {
         'started_at': datetime.now().astimezone().isoformat(timespec='seconds'),
         'finished_at': None,
@@ -1374,7 +1377,7 @@ def execute_plan_v2(
 
     try:
         rpc_result = _call_sync_rpc(wh_id, p_variants, p_inventory, p_wh_name)
-    except RuntimeError as e:
+    except Exception as e:
         rpc_error = e
         finished_at = datetime.now().astimezone().isoformat(timespec='seconds')
         result['finished_at'] = finished_at
@@ -1392,9 +1395,11 @@ def execute_plan_v2(
                     error_message=error_str[:2000],
                     started_at=started_at,
                     finished_at=finished_at,
+                    sync_run_id=bound_sync_run_id,
+                    triggered_by=bound_triggered_by,
                 )
                 result['sync_log_written'] = True
-            except RuntimeError as sl_err:
+            except Exception as sl_err:
                 try:
                     fb_path = _save_fallback_log(
                         {
@@ -1449,9 +1454,11 @@ def execute_plan_v2(
                     error_message=full_msg[:2000],
                     started_at=started_at,
                     finished_at=finished_at,
+                    sync_run_id=bound_sync_run_id,
+                    triggered_by=bound_triggered_by,
                 )
                 result['sync_log_written'] = True
-            except RuntimeError as sl_err:
+            except Exception as sl_err:
                 try:
                     fb_path = _save_fallback_log(
                         {
@@ -1557,6 +1564,8 @@ def execute_plan_v2(
                 error_message=full_msg[:2000],
                 started_at=started_at,
                 finished_at=now_iso,
+                sync_run_id=bound_sync_run_id,
+                triggered_by=bound_triggered_by,
             )
             result['sync_log_written'] = True
         except RuntimeError as sl_err:
@@ -1689,10 +1698,12 @@ def execute_plan_v2(
                 error_message=None,
                 started_at=started_at,
                 finished_at=finished_at,
+                sync_run_id=bound_sync_run_id,
+                triggered_by=bound_triggered_by,
             )
             result['sync_log_written'] = True
             print('[execute_plan_v2] sync_log success 已写入')
-        except RuntimeError as sl_err:
+        except Exception as sl_err:
             try:
                 fb_path = _save_fallback_log(
                     {

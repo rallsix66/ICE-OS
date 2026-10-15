@@ -54,6 +54,11 @@ def _get_env() -> dict:
     if _env_cache is not None:
         return _env_cache
 
+    if os.environ.get('P0_02_ENABLED', '').strip().lower() == 'true':
+        raise RuntimeError(
+            'P0-02 独立平台已封存 name_backfill（禁止读取 .env.local / Supabase REST）',
+        )
+
     project_root = Path(__file__).resolve().parents[3]
     env_path = project_root / '.env.local'
     if not env_path.exists():

@@ -232,6 +232,8 @@ def main():
             rpc_result = execute_plan_v2(
                 plan=plan,
                 sync_log_enabled=True,
+                sync_run_id=os.environ.get('P0_02_SYNC_RUN_ID'),
+                triggered_by=os.environ.get('P0_02_SYNC_TRIGGERED_BY'),
             )
 
             # P5-SY9K rework: summary 从 rpc_result["rpc_summary"] 读取，
