@@ -22,4 +22,6 @@
 
 opt6：**1 failed / 5 passed**（00051 换行，未改）。
 
-保护报告 SHA256：`9b42a3f9486bd0c377be77c051ff947aaed6b17bc567925f1c09344171a6db2c`
+## 文档清理（2026-10-15）
+
+已删除过时的 DIS 内网部署方案 `docs/reports/2026-07-18-内网部署可行性评估报告.md`（原 7/18 评估 + 7/29 未提交扩写；路线已被 [architecture-v3.md](./architecture-v3.md) 与 P0-02 独立 PostgreSQL 取代）。部署与运维约束仍以现行架构与任务包为准。
