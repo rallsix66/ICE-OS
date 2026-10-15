@@ -19,7 +19,7 @@
 
 ## 2026-10-13 方向更新：自主平台与历史底座
 
-用户已确认不继续以Supabase作为目标平台，改为标准PostgreSQL与自有服务端；并在v4业务基础上增加历史数据模型。详见 [架构v3](architecture-v3.md)、[历史模型](history-data-model-v1.md)。P0-01 已通过；P0-02 保留功能已在虚构实例上实现脱离 Supabase 并待独立审查 — 见 [current-state.md](current-state.md)。以下首版 Demo 交付边界仅作历史。
+用户已确认不继续以Supabase作为目标平台，改为标准PostgreSQL与自有服务端；并在v4业务基础上增加历史数据模型。详见 [架构v3](architecture-v3.md)、[历史模型](history-data-model-v1.md)。P0-01 与 P0-02 本地独立平台验收均已独立审查通过（**P0_01_PASS** / **P0_02_PASS**）— 见 [current-state.md](current-state.md)；生产启用与旧环境删除仍属后续。以下首版 Demo 交付边界仅作历史。
 
 - 保存每次有效库存观测、商品/映射/仓库/货票/成本版本，为未来库存、市场分布和经营趋势提供可追溯数据。
 - 定义按日/商品/市场/仓库的查询、统计版本、晚到补数与修订；暂不开发复杂趋势图、BI、预测、利润或周转页面。

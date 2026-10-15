@@ -1,31 +1,31 @@
 # Current Project State
 
-更新：2026-10-15（**P0-02 d082728 审查返工后，待独立审查**）。仓库 ICEOS。
+更新：2026-10-15（**P0_02_PASS** 文档登记）。仓库 ICEOS。
 
 ## P0-02 状态
 
 | 项 | 状态 |
 |---|---|
-| 本轮审查 | **CHANGES_REQUIRED** @ `d082728`（2026-10-15） |
-| 审查目录 | `.local/p0-02/run-20261014-r2/reviews/independent-p002-delivery-d082728-20261015-01/` |
-| 正式任务包 | [docs/tasks/p0-02/2026-10-15-delivery-rework-d082728.md](./tasks/p0-02/2026-10-15-delivery-rework-d082728.md) |
-| 任务状态 | **`P0_02_IMPLEMENTED_AWAITING_REVIEW`**（**非** PASS） |
+| 现役结论 | **`P0_02_PASS`**（独立审查 @ `9507d86`，2026-10-15） |
+| 正式 PASS 报告 | [verification-report-p0-02-pass-20261015.md](./p0-02/verification-report-p0-02-pass-20261015.md) |
+| 审查目录 | `.local/p0-02/run-20261014-r2/reviews/independent-p002-delivery-9507d86-20261015-01/` |
 | Canonical Run | `run-20261014-r2` |
-| 总验收 | `npm run check:p0-02` **已通过**（`check-2026-10-15T07-07-04-252Z`） |
-| Postgres | **18** vitest 文件 / **61** 项（**56** PG + **5** config） |
-| Browser A3 | **21** 项 Playwright |
-| 验证报告 | [verification-report-r2-20261015-d082728-rework.md](./p0-02/verification-report-r2-20261015-d082728-rework.md) |
+| 执行方总验收（历史） | `npm run check:p0-02` exit 0（`check-2026-10-15T07-07-04-252Z`） |
+| Postgres 规模 | **18** vitest 文件 / **61** 项（**56** PG + **5** config） |
+| Browser A3 | **21** 项 Playwright（check 子证据） |
+
+**历史（非现役）：** d082728 审查 **CHANGES_REQUIRED** → 返工交付 **IMPLEMENTED_AWAITING_REVIEW** → 9507d86 独立审查 **PASS**。实施报告：[verification-report-r2-20261015-d082728-rework.md](./p0-02/verification-report-r2-20261015-d082728-rework.md)。
 
 ## P0-01 状态（保留）
 
 **P0_01_PASS** · Run `run-20261013-r1`
 
-opt6：**1 failed / 5 passed**（00051 换行，未改）。
+opt6：**1 failed / 5 passed**（00051 换行，未改；全门禁已知固定豁免）。
 
 ## 阶段边界（2026-10-15 用户确认）
 
-- 本轮已完成：保留功能脱离 Supabase、虚构数据验收；**不**迁移旧 Supabase 业务数据/SKU 映射。
-- 后续启用（本轮不实施）：正式账号与权限重建、真实来源接入与用户重匹配、旧 Supabase 环境删除（前置：P0-02 独立审查通过且现役入口不再依赖旧 Supabase）。
+- **已完成：** 保留功能脱离 Supabase、本地虚构数据下的独立平台验收（**P0_02_PASS**）。
+- **本轮未做 / 后续：** 正式账号与权限重建、真实来源接入与用户重匹配、旧 Supabase 业务数据/SKU 映射迁移、生产启用、删除旧 Supabase 环境（须前置条件）。
 - 详见 [product-plan-v4.md](./product-plan-v4.md) 与 [architecture-v3.md](./architecture-v3.md) 的 P0-02 后续方案节。
 
 ## 文档清理（2026-10-15）

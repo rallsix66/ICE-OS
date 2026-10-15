@@ -32,7 +32,7 @@
 
 | ID | 含义 | 证据入口 | 状态 |
 | --- | --- | --- | --- |
-| A1 | 保留功能迁移及证据矩阵 | 本矩阵 + `check-2026-10-15T07-07-04-252Z` | **已验证**（待独立审查复核范围） |
+| A1 | 保留功能迁移及证据矩阵 | 本矩阵 + `check-2026-10-15T07-07-04-252Z` + [PASS 报告](./verification-report-p0-02-pass-20261015.md) | **已验证**（独立审查 PASS @ `9507d86`） |
 | A2 | 无 Supabase 运行依赖/回退 | `build-isolated` + boundary probes + `P0_02_FIXTURE_INPUT_PATH` bridge | **已验证** |
 | A3 | 真实浏览器交互 + 网络/落库 | Playwright **21** 项：关注 DB/DOM/恢复、搜索行集、CSV 仓库/SKU/数量、egress、比较器自检 | **已验证** |
 | A4 | 认证/权限/金额 | `test:p0-02:http` + 浏览器运营 inventory API 无 amount 字段 | **已验证** |
@@ -61,6 +61,6 @@
 | `P0_02_ENABLED=true` | `postgres_gateway` + `postgres_rpc`（RPC/sync_log）；**禁止** import 时加载 Supabase / `.env.local` |
 | 否则 | legacy `supabase_gateway` |
 
-## 停止条件
+## 整包状态
 
-→ **`P0_02_IMPLEMENTED_AWAITING_REVIEW`**（**非**自行 PASS）。
+→ **`P0_02_PASS`**（独立审查 `9507d86`，2026-10-15）。正式结论：[verification-report-p0-02-pass-20261015.md](./verification-report-p0-02-pass-20261015.md)。不代表生产上线或 Supabase 删除；A1–A9 原合同与上表证据映射保留。

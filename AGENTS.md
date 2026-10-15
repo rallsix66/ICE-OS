@@ -10,7 +10,7 @@ Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js
 - 先读 `docs/current-state.md` 和 `docs/tasks/current-task.md`，真实代码优先于旧文档。
 - 当前目标：`docs/architecture-v3.md`；历史模型：`docs/history-data-model-v1.md`；基础业务实体：`docs/database-design-v2.md`；来源规则：`docs/data-flow-v2.md`。
 - 产品范围以 `docs/product-plan-v4.md` 的 V5 选择性吸收为准，不将整份 V5 附件直接替换现役方案或扩展本期页面。
-- 已批准脱离 Supabase、保存历史、暂不开发复杂分析页面。P0-01 独立审查已通过；P0-02 保留功能脱离 Supabase 已在代码与门禁中实现，完整独立审查待完成；不要把设计写成全面生产迁移已完成。
+- 已批准脱离 Supabase、保存历史、暂不开发复杂分析页面。P0-01 与 P0-02 本地独立平台验收均已独立审查通过（**P0_01_PASS** / **P0_02_PASS**）；生产启用、真实来源与旧环境删除仍属后续，不要把设计写成全面生产迁移或 Supabase 已删除。
 - 本入口替代用户已撤销的旧规则；不固定开发者角色，也不要求特定实施触发词。按用户本次请求区分讨论、审查、实施与发布。
 
 ## 架构与数据边界

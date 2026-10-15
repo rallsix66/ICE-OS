@@ -58,5 +58,5 @@
 ## 区分
 
 - **已实现 / 已验证：** 上表与本轮修改文件及 check 子证据。
-- **待独立审查：** 整包 P0-02（执行方不自判 PASS）。
+- **后续：** 整包已于 2026-10-15 独立审查 **PASS** @ `9507d86`；正式登记见 [verification-report-p0-02-pass-20261015.md](./verification-report-p0-02-pass-20261015.md)。本文保留 **IMPLEMENTED_AWAITING_REVIEW** 当时证据含义。
 - **既有失败（豁免）：** opt6 `00051` 换行 1 failed / 5 passed。
