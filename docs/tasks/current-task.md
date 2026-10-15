@@ -1,12 +1,12 @@
 # Current Task Packet
 
-## P0-02 — a3041cb 审查返工后交付
+## P0-02 — 5054755 审查返工后交付
 
 状态：**`P0_02_IMPLEMENTED_AWAITING_REVIEW`**（**非** PASS；等待独立审查）
 
-- 本轮审查：**CHANGES_REQUIRED** @ `a3041cb`（2026-10-15）
-- 正式任务包：[p0-02/2026-10-15-delivery-rework-a3041cb.md](./p0-02/2026-10-15-delivery-rework-a3041cb.md)
-- 验证报告：[../p0-02/verification-report-r2-20261015-a3041cb.md](../p0-02/verification-report-r2-20261015-a3041cb.md)
+- 本轮审查：**CHANGES_REQUIRED** @ `5054755`（2026-10-15）
+- 正式任务包：[p0-02/2026-10-15-delivery-rework-5054755.md](./p0-02/2026-10-15-delivery-rework-5054755.md)
+- 验证报告：[../p0-02/verification-report-r2-20261015-5054755-rework.md](../p0-02/verification-report-r2-20261015-5054755-rework.md)
 
 Canonical Run：`run-20261014-r2`
 
