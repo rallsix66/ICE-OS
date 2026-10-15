@@ -139,16 +139,32 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
     process.env.P0_02_FIXTURE_INPUT_PATH = fixtureInputPath;
   });
 
+  async function cleanupNodeChainFixtures(client: Awaited<ReturnType<Pool['connect']>>) {
+    await client.query('DELETE FROM public.sync_log WHERE warehouse_id = $1::uuid', [warehouseId]);
+    await client.query('DELETE FROM public.sync_run WHERE warehouse_id = $1::uuid', [warehouseId]);
+    await client.query('DELETE FROM public.inventory WHERE warehouse_id = $1::uuid', [warehouseId]);
+    await client.query('DELETE FROM public.product_variant WHERE id = $1::uuid', [variantId]);
+    await client.query('DELETE FROM public.sync_warehouse_lock WHERE warehouse_id = $1::uuid', [
+      warehouseId,
+    ]);
+    await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [warehouseId]);
+    await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [decoyWarehouseId]);
+    await client.query('DELETE FROM public.inventory WHERE id = $1::uuid', [
+      prefixSentinelInventoryId,
+    ]);
+    await client.query('DELETE FROM public.product_variant WHERE id = $1::uuid', [
+      prefixSentinelVariantId,
+    ]);
+    await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [
+      prefixSentinelWarehouseId,
+    ]);
+  }
+
   afterAll(async () => {
+    let sentinelAssertionError: unknown;
+    let cleanupError: unknown;
     const client = await bootstrap.connect();
     try {
-      await client.query('DELETE FROM public.sync_log WHERE warehouse_id = $1::uuid', [warehouseId]);
-      await client.query('DELETE FROM public.sync_run WHERE warehouse_id = $1::uuid', [warehouseId]);
-      await client.query('DELETE FROM public.inventory WHERE warehouse_id = $1::uuid', [warehouseId]);
-      await client.query('DELETE FROM public.product_variant WHERE id = $1::uuid', [variantId]);
-      await client.query('DELETE FROM public.sync_warehouse_lock WHERE warehouse_id = $1::uuid', [warehouseId]);
-      await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [warehouseId]);
-      await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [decoyWarehouseId]);
       const sentinelAfter = await client.query(
         `
         SELECT w.id::text, w.name, w.country, w.is_active,
@@ -171,16 +187,16 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
         `,
         [prefixSentinelWarehouseId],
       );
-      expect(sentinelAfter.rows[0]).toEqual(prefixSentinelSnapshot);
-      await client.query('DELETE FROM public.inventory WHERE id = $1::uuid', [
-        prefixSentinelInventoryId,
-      ]);
-      await client.query('DELETE FROM public.product_variant WHERE id = $1::uuid', [
-        prefixSentinelVariantId,
-      ]);
-      await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [
-        prefixSentinelWarehouseId,
-      ]);
+      try {
+        expect(sentinelAfter.rows[0]).toEqual(prefixSentinelSnapshot);
+      } catch (error) {
+        sentinelAssertionError = error;
+      }
+      try {
+        await cleanupNodeChainFixtures(client);
+      } catch (error) {
+        cleanupError = error;
+      }
     } finally {
       client.release();
       await bootstrap.end();
@@ -190,6 +206,12 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
       fs.rmSync(artifactDir, { recursive: true, force: true });
     }
     delete process.env.P0_02_FIXTURE_INPUT_PATH;
+    if (cleanupError) {
+      throw cleanupError;
+    }
+    if (sentinelAssertionError) {
+      throw sentinelAssertionError;
+    }
   });
 
   it('runs dry_run then real_write through SyncService and RealSyncRunner', async () => {

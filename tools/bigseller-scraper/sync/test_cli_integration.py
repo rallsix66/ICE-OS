@@ -1144,7 +1144,7 @@ def test_th_full_chain_country_assertions():
         return []
 
     def capture_sync_log(warehouse_id, status, new_variants_count,
-                         error_message, started_at, finished_at):
+                         error_message, started_at, finished_at, **kwargs):
         sync_log_captured.append({
             'warehouse_id': warehouse_id,
             'status': status,
@@ -1366,7 +1366,7 @@ def test_my_full_chain_country_assertions():
         return []
 
     def capture_sync_log(warehouse_id, status, new_variants_count,
-                         error_message, started_at, finished_at):
+                         error_message, started_at, finished_at, **kwargs):
         sync_log_captured.append({
             'warehouse_id': warehouse_id,
             'status': status,
@@ -1821,7 +1821,7 @@ def test_p5_sy8f_my_full_chain_country_assertions():
         return []
 
     def capture_sync_log(warehouse_id, status, new_variants_count,
-                         error_message, started_at, finished_at):
+                         error_message, started_at, finished_at, **kwargs):
         sync_log_captured.append({
             'warehouse_id': warehouse_id,
             'status': status,
@@ -2255,7 +2255,7 @@ def test_id_full_chain_country_assertions():
         return []
 
     def capture_sync_log(warehouse_id, status, new_variants_count,
-                         error_message, started_at, finished_at):
+                         error_message, started_at, finished_at, **kwargs):
         sync_log_captured.append({
             'warehouse_id': warehouse_id,
             'status': status,
@@ -2490,7 +2490,7 @@ def test_p5_sy8h_id_full_chain_country_assertions():
         return []
 
     def capture_sync_log(warehouse_id, status, new_variants_count,
-                         error_message, started_at, finished_at):
+                         error_message, started_at, finished_at, **kwargs):
         sync_log_captured.append({
             'warehouse_id': warehouse_id,
             'status': status,

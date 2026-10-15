@@ -5,6 +5,7 @@
 使用 service_role key（仅 CLI 同步脚本场景，不经由 RLS）。
 """
 import json
+import os
 import urllib.request
 import urllib.error
 import ssl
@@ -13,8 +14,21 @@ from pathlib import Path
 from .config import WAREHOUSE_COUNTRY, WAREHOUSE_TYPE
 
 
+def _legacy_test_isolated_env() -> dict | None:
+    if os.environ.get('SYNC_LEGACY_TEST_ISOLATED') == '1':
+        return {
+            'NEXT_PUBLIC_SUPABASE_URL': 'https://legacy-test.invalid',
+            'SUPABASE_SERVICE_ROLE_KEY': 'legacy-test-fictional-key-not-real',
+        }
+    return None
+
+
 def _load_env() -> dict:
-    """从项目根 .env.local 读取 Supabase 连接信息。"""
+    """从项目根 .env.local 读取 Supabase 连接信息（legacy 隔离测试使用虚构配置）。"""
+    isolated = _legacy_test_isolated_env()
+    if isolated is not None:
+        return isolated
+
     project_root = Path(__file__).resolve().parents[3]
     env_path = project_root / '.env.local'
     if not env_path.exists():

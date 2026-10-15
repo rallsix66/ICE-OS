@@ -20,29 +20,39 @@ const evidenceDir = newEvidenceSessionDir(runId, 'python-legacy-regression');
 const scraperRoot = path.join(REPO_ROOT, 'tools', 'bigseller-scraper');
 const instance = loadInstance(runId);
 const envJson = ensureEnvContract(instance, path.join(runRoot(runId), 'env.p0-02.json'));
-// Legacy __main__ suites target Supabase/mock paths; P0-02 PG paths are covered by dedicated modules.
-const env = buildP001ProcessEnv({ P0_02_ENABLED: 'false' }, envJson);
+const env = buildP001ProcessEnv({}, envJson);
 
 const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+const runner = path.join(scraperRoot, 'sync', 'run_legacy_test_module.py');
+
 const scripts = [
   { file: 'sync/test_executor.py', note: 'executor isolated regression (__main__)', required: true },
   { file: 'sync/test_name_backfill.py', note: 'name backfill isolated regression (__main__)', required: true },
   {
     file: 'sync/test_cli_integration.py',
-    note: 'cli integration (__main__); fixture-country scenarios are informational under p0-02 env',
-    required: false,
+    note: 'cli integration (__main__) under legacy isolation',
+    required: true,
   },
 ];
 
-let combinedOutput = '';
-let exitCode = 0;
-const scriptResults = [];
-function envForLegacyScript(scriptFile) {
+function legacyEnv(scriptFile) {
   const base = {
     ...env,
     PYTHONPATH: scraperRoot,
+    SYNC_LEGACY_TEST_ISOLATED: '1',
     P0_02_ENABLED: 'false',
   };
+  for (const key of Object.keys(base)) {
+    if (key.startsWith('P0_02') && key !== 'P0_02_RUN_ID') {
+      delete base[key];
+    }
+  }
+  delete base.DATABASE_URL;
+  delete base.PGHOST;
+  delete base.PGPORT;
+  delete base.PGUSER;
+  delete base.PGPASSWORD;
+  delete base.PGDATABASE;
   if (scriptFile.includes('cli')) {
     delete base.BS_WAREHOUSE_COUNTRY;
     delete base.BS_TARGET_WAREHOUSE_NAME;
@@ -52,34 +62,49 @@ function envForLegacyScript(scriptFile) {
   return base;
 }
 
+let combinedOutput = '';
+let exitCode = 0;
+const scriptResults = [];
+
 for (const script of scripts) {
   const abs = path.join(scraperRoot, script.file);
   if (!fs.existsSync(abs)) {
-    combinedOutput += `\n=== ${script.file} ===\nSKIP missing\n`;
+    combinedOutput += `\n=== ${script.file} ===\nMISSING required script\n`;
+    scriptResults.push({ file: script.file, required: script.required, status: 'missing' });
+    if (script.required) {
+      exitCode = 1;
+    }
     continue;
   }
   const result = spawnSync(
     pythonCmd,
-    [abs],
+    [runner, abs],
     withHiddenWindowsSpawnOptions({
       cwd: scraperRoot,
-      env: envForLegacyScript(script.file),
+      env: legacyEnv(script.file),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
     }),
   );
-  combinedOutput += `\n=== ${script.file} (${script.note}) ===\n${result.stdout ?? ''}${result.stderr ?? ''}`;
+  const out = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  combinedOutput += `\n=== ${script.file} (${script.note}) ===\n${out}`;
+  const passMatches = (out.match(/\bPASS:/g) ?? []).length;
+  const failMatches = (out.match(/\bFAIL:/g) ?? []).length;
+  const status = result.status ?? 1;
   scriptResults.push({
     file: script.file,
     required: script.required,
-    status: result.status ?? 1,
+    status,
+    passCount: passMatches,
+    failCount: failMatches,
   });
-  if (result.status !== 0 && script.required) {
-    exitCode = result.status ?? 1;
+  if (script.required && (status !== 0 || passMatches === 0 || failMatches > 0)) {
+    exitCode = status !== 0 ? status : 1;
     break;
   }
 }
+
 fs.writeFileSync(path.join(evidenceDir, 'legacy.log'), combinedOutput);
 fs.writeFileSync(
   path.join(evidenceDir, 'result.json'),

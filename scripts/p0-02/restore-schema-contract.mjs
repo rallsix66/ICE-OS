@@ -219,10 +219,16 @@ function normalizeContractSection(section, value) {
   return value
     .map((row) => ({
       proname: row.proname,
+      identity_args: row.identity_args ?? '',
+      definition_hash: row.definition_hash ?? '',
       owner: row.owner,
       security_definer: row.security_definer,
     }))
-    .sort((a, b) => `${a.proname}:${a.owner}`.localeCompare(`${b.proname}:${b.owner}`));
+    .sort((a, b) =>
+      `${a.proname}:${a.identity_args}:${a.owner}`.localeCompare(
+        `${b.proname}:${b.identity_args}:${b.owner}`,
+      ),
+    );
 }
 
 export function compareRestoreContracts(source, restored) {
