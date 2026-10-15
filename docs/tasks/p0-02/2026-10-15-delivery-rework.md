@@ -4,11 +4,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 上一轮审查结论 | **CHANGES_REQUIRED** |
-| 审查基线 SHA | `620fac4d5188055fd0c9bf865937901efd8b3a6f` |
+| 现役审查结论 | **CHANGES_REQUIRED** @ `d4f7804` |
+| 首轮审查基线 | `620fac4d5188055fd0c9bf865937901efd8b3a6f` |
 | 分支 | `codex/ice-v4-planning` |
 | Canonical Run | `run-20261014-r2` |
-| 审查证据（本地，不入 Git） | `.local/p0-02/run-20261014-r2/reviews/independent-p002-delivery-620fac4-20261014-01/` |
+| 审查证据（本地） | `.local/.../independent-p002-delivery-d4f7804-20261015-01/`（首轮：`...620fac4-20261014-01/`） |
 | 原完整授权包 | `.local/p0-02/run-20261014-r2/reviews/independent-delivery-commit-plan-20261014-01/next-instruction-commit-push-complete-p0-02.md` |
 
 六组初始提交已推送，**不**重新拆组、不撤回、不重写已推送历史。返工完成后追加本地提交并普通推送。
