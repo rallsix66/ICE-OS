@@ -68,7 +68,8 @@ DECLARE
     'import_golucky_refs(jsonb)',
     'bind_external_ref_to_shipment(uuid,uuid)',
     'reactivate_external_ref(uuid)',
-    'batch_match_variants(uuid[],uuid)'
+    'batch_match_variants(uuid[],uuid)',
+    'partial_warehouse_shipment(uuid,jsonb,text)'
   ];
   sync_required text[] := ARRAY[
     'claim_sync_run_system(uuid,text,uuid,integer,uuid,text,text)',

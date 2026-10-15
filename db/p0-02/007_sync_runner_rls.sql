@@ -124,10 +124,33 @@ CREATE POLICY sync_warehouse_select_product_variant ON public.product_variant
     )
   );
 
+DROP POLICY IF EXISTS sync_warehouse_insert_product_variant ON public.product_variant;
+CREATE POLICY sync_warehouse_insert_product_variant ON public.product_variant
+  FOR INSERT
+  WITH CHECK (
+    p0_02_meta.is_sync_runner()
+    AND p0_02_meta.sync_mode() = 'warehouse'
+    AND EXISTS (
+      SELECT 1
+      FROM public.warehouse w
+      WHERE w.id = p0_02_meta.sync_warehouse_id()
+        AND w.country = product_variant.country
+    )
+  );
+
 DROP POLICY IF EXISTS sync_warehouse_select_inventory ON public.inventory;
 CREATE POLICY sync_warehouse_select_inventory ON public.inventory
   FOR SELECT
   USING (
+    p0_02_meta.is_sync_runner()
+    AND p0_02_meta.sync_mode() = 'warehouse'
+    AND warehouse_id = p0_02_meta.sync_warehouse_id()
+  );
+
+DROP POLICY IF EXISTS sync_warehouse_insert_inventory ON public.inventory;
+CREATE POLICY sync_warehouse_insert_inventory ON public.inventory
+  FOR INSERT
+  WITH CHECK (
     p0_02_meta.is_sync_runner()
     AND p0_02_meta.sync_mode() = 'warehouse'
     AND warehouse_id = p0_02_meta.sync_warehouse_id()
