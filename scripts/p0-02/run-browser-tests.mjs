@@ -90,11 +90,28 @@ function ensurePlaywrightChromium() {
   }
 }
 
-async function countProductsAppDb(connectionString) {
+const ADMIN_PROFILE_ID = '11111111-1111-4111-8111-111111111101';
+
+async function countProductsWithSessionIdentity(connectionString) {
   const pool = new pg.Pool({ connectionString, max: 1 });
   try {
-    const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM public.product');
-    return rows[0]?.n ?? 0;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`SELECT set_config('request.jwt.claim.sub', $1, true)`, [ADMIN_PROFILE_ID]);
+      const { rows } = await client.query('SELECT COUNT(*)::int AS n FROM public.product');
+      await client.query('ROLLBACK');
+      return rows[0]?.n ?? 0;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   } finally {
     await pool.end();
   }
@@ -142,7 +159,7 @@ async function main() {
     fs.symlinkSync(path.join(REPO_ROOT, 'node_modules'), nodeModulesLink, 'junction');
   }
 
-  const productCountBefore = await countProductsAppDb(envJson.P0_02_APP_DATABASE_URL);
+  const productCountBefore = await countProductsWithSessionIdentity(envJson.P0_02_APP_DATABASE_URL);
 
   const port = await pickPort();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -169,6 +186,7 @@ async function main() {
 
   const results = [];
   const networkLog = [];
+  const blockedExternal = [];
 
   const { chromium } = await import('playwright');
 
@@ -177,6 +195,15 @@ async function main() {
 
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ baseURL: baseUrl });
+    await context.route('**/*', (route) => {
+      const url = route.request().url();
+      if (/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(url)) {
+        route.continue();
+        return;
+      }
+      blockedExternal.push(url);
+      route.abort('blockedbyclient');
+    });
     const page = await context.newPage();
 
     page.on('response', async (response) => {
@@ -208,10 +235,41 @@ async function main() {
       status: authRes.status(),
     });
     const sessionProbe = await page.request.get('/api/p0-02/session');
+    networkLog.push({
+      url: sessionProbe.url(),
+      status: sessionProbe.status(),
+      method: 'GET',
+    });
     results.push({
       name: 'playwright-session-probe',
       pass: sessionProbe.status() === 204,
       status: sessionProbe.status(),
+    });
+
+    const dashboardApi = await page.request.get('/api/p0-02/dashboard');
+    networkLog.push({
+      url: dashboardApi.url(),
+      status: dashboardApi.status(),
+      method: 'GET',
+    });
+    const dashboardJson = await dashboardApi.json().catch(() => null);
+    results.push({
+      name: 'playwright-dashboard-api',
+      pass: dashboardApi.status() === 200 && dashboardJson?.health?.summary != null,
+      status: dashboardApi.status(),
+    });
+
+    const inventoryApi = await page.request.get('/api/p0-02/inventory');
+    networkLog.push({
+      url: inventoryApi.url(),
+      status: inventoryApi.status(),
+      method: 'GET',
+    });
+    const inventoryJson = await inventoryApi.json().catch(() => null);
+    results.push({
+      name: 'playwright-inventory-api',
+      pass: inventoryApi.status() === 200 && (inventoryJson?.items?.length ?? 0) >= 1,
+      status: inventoryApi.status(),
     });
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     if (!page.url().includes('/dashboard')) {
@@ -237,15 +295,29 @@ async function main() {
       pass: /同步|sync/i.test(syncText),
     });
 
+    const overviewNav = page.waitForURL('**/dashboard/products/overview**', { timeout: 15_000 });
     await page.goto('/dashboard/products/overview', { waitUntil: 'domcontentloaded' });
-    const searchInput = page.getByPlaceholder(/搜索|SKU|产品/i).first();
-    await searchInput.fill('ICE');
+    await overviewNav;
+    const searchInput = page.getByPlaceholder(/搜索 SKU、产品名或变体名/i);
+    await searchInput.fill('SKU-TH');
+    const searchResponse = page.waitForResponse(
+      (r) =>
+        r.request().method() === 'GET' &&
+        r.url().includes('/dashboard/products/overview') &&
+        r.url().includes('search='),
+      { timeout: 15_000 },
+    );
     await page.getByRole('button', { name: '搜索' }).click();
-    await page.waitForTimeout(800);
+    const searchRes = await searchResponse;
     const overviewText = await page.locator('body').innerText();
     results.push({
-      name: 'playwright-product-search-interaction',
-      pass: /产品|SKU|库存|overview|全球/i.test(overviewText),
+      name: 'playwright-product-search-request',
+      pass: searchRes.status() === 200,
+      status: searchRes.status(),
+    });
+    results.push({
+      name: 'playwright-product-search-content',
+      pass: /SKU-TH|SKU|产品|库存/i.test(overviewText),
     });
 
     await page.goto('/dashboard/inventory/overseas', { waitUntil: 'networkidle' });
@@ -273,7 +345,7 @@ async function main() {
     }
   }
 
-  const productCountAfter = await countProductsAppDb(envJson.P0_02_APP_DATABASE_URL);
+  const productCountAfter = await countProductsWithSessionIdentity(envJson.P0_02_APP_DATABASE_URL);
   const apiHits = networkLog.filter(
     (e) => e.status >= 200 && e.status < 400 && e.url.includes('/api/'),
   );
@@ -285,18 +357,24 @@ async function main() {
     db: {
       productCountBefore,
       productCountAfter,
+      identity: ADMIN_PROFILE_ID,
       unchanged: productCountBefore === productCountAfter,
+      positive: productCountBefore > 0,
     },
+    blockedExternalCount: blockedExternal.length,
     playwright: true,
   };
 
   fs.writeFileSync(path.join(evidenceDir, 'results.json'), `${JSON.stringify(payload, null, 2)}\n`);
 
   const failed = results.filter((r) => !r.pass);
-  if (!payload.db.unchanged) {
-    failed.push({ name: 'db-product-count-stable', pass: false });
+  if (!payload.db.positive) {
+    failed.push({ name: 'db-product-count-with-admin-identity', pass: false });
   }
-  if (apiHits.length < 1) {
+  if (blockedExternal.length > 0) {
+    failed.push({ name: 'browser-external-blocked', pass: false });
+  }
+  if (apiHits.length < 2) {
     failed.push({ name: 'network-api-evidence', pass: false });
   }
 

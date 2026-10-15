@@ -101,4 +101,23 @@ if (pythonNegative.status !== 0) {
   process.exit(pythonNegative.status ?? 1);
 }
 
+const boundary = spawnSync(
+  process.execPath,
+  [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-python-boundary-probes.mjs')],
+  withHiddenWindowsSpawnOptions({
+    cwd: REPO_ROOT,
+    env,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }),
+);
+fs.writeFileSync(
+  path.join(evidenceDir, 'python-boundary-probes.log'),
+  `${boundary.stdout ?? ''}${boundary.stderr ?? ''}`,
+);
+if (boundary.status !== 0) {
+  console.error('python boundary probes failed', { status: boundary.status });
+  process.exit(boundary.status ?? 1);
+}
+
 console.log(`sync tests passed (evidence: ${evidenceDir})`);
