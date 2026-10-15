@@ -100,4 +100,22 @@ git diff --check
 
 **总验收（返工后）：** `check-2026-10-15T01-24-49-983Z` exit 0；Postgres **43/43**；Playwright **11** 项。
 
+**d4f7804 返工提交（已推送）：** `9ac3b8b` · `56162d3` · `af28645` · `dbaf953` · 远端 HEAD `dbaf953`
+
+**总验收：** `check-2026-10-15T02-03-22-319Z` · Postgres **45/45** · Browser **14**
+
 **交付状态：** `P0_02_IMPLEMENTED_AWAITING_REVIEW` — 待新一轮独立审查。
+
+## 原 A1–A9 合同（完整，不可缩略）
+
+- **A1** 保留功能逐项：入口 → 链 → Repository/SQL/RPC → 权限表 → 测试 → 证据；区分已实现/已验证/封存。
+- **A2** 无 Supabase 凭据与回退；Node/浏览器/Python 阻断下可运行；boundary probes 纳入回归。
+- **A3** 真实浏览器登录、业务交互、**写入与导出**、DOM/网络/DB 对照；禁止 sleep/标题/200 代替业务证明。
+- **A4** 匿名/篡改/撤权/跨范围/金额拒绝（响应、导出、缓存、日志）；并发保护保留。
+- **A5** UUID/ICE 货号、来源权威、到货不加海外库存、发货不二次扣国内、缺失不变零、货值不含运费。
+- **A6** 运行角色非 owner/BYPASSRLS；事务内身份；直写拒绝与 sync 正例。
+- **A7** 虚构来源 → plan → Node claim → bridge → real_write → 数据/run/log；失败不半成品、不误报成功；非双次 unchanged 计划。
+- **A8** 必要历史/审计/修订幂等、实例 init/重复/重启、fixture 负例与虚构备份恢复（非仅 fixture 负例）。
+- **A9** TS/Python/并发/ lint/build/diff/opt6；`check:p0-02` 绑定当前源码证据；opt6 00051 唯一例外。
+
+审查指令全文（脱敏副本）：`.local/.../independent-p002-delivery-d4f7804-20261015-01/next-instruction.md`
