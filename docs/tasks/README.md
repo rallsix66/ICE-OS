@@ -8,6 +8,7 @@
 mvp-roadmap.md          长期 Phase 与依赖
 tasks/phase-*.md        每个业务模块的任务顺序
 tasks/current-task.md   当前唯一允许执行的 Task Packet
+tasks/p0-02/2026-10-15-delivery-rework.md  P0-02 审查返工正式包（现役）
 tasks/system-optimization-roadmap-2026-07-17.md  当前工程治理路线与安全边界
 current-state.md        当前真实状态与当前 Task ID
 ```

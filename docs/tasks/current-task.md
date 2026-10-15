@@ -1,16 +1,18 @@
 # Current Task Packet
 
-## P0-02 — 现有功能完整脱离 Supabase
+## P0-02 — 审查返工后再次交付
 
 状态：**`P0_02_IMPLEMENTED_AWAITING_REVIEW`**（**非** PASS；等待独立审查）
 
-审查返工（2026-10-14）已关闭：**P002-R6**、**P002-WH**、**A3 Playwright**、**A7 real_write 链**（见交付包与 `check-2026-10-14T09-56-06-671Z`）。
-
-用户授权：六组逻辑 **commit + 推送** `origin/codex/ice-v4-planning`；合并/部署/真实数据/清场仍禁止。
+- 上一轮审查：**CHANGES_REQUIRED** @ `620fac4d5188055fd0c9bf865937901efd8b3a6f`
+- 正式任务包：[p0-02/2026-10-15-delivery-rework.md](./p0-02/2026-10-15-delivery-rework.md)
+- 验证报告：[../p0-02/verification-report-r2-20261015.md](../p0-02/verification-report-r2-20261015.md)
 
 Canonical Run：`run-20261014-r2`
 
-交付摘要：`.local/p0-02/run-20261014-r2/P0_02_IMPLEMENTED_AWAITING_REVIEW.md`
+本地交付摘要：`.local/p0-02/run-20261014-r2/P0_02_IMPLEMENTED_AWAITING_REVIEW.md`
+
+用户授权：返工修复 **commit + 推送** `origin/codex/ice-v4-planning`；合并/部署/真实数据/清场仍禁止。
 
 ---
 

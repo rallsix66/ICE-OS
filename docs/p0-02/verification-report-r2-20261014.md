@@ -1,5 +1,7 @@
 # P0-02 run-20261014-r2 验证报告（实施交付）
 
+> **已由返工后报告取代：** [verification-report-r2-20261015.md](./verification-report-r2-20261015.md)（审查 CHANGES_REQUIRED @ `620fac4` 之后）。
+
 日期：2026-10-14 · Run：`run-20261014-r2` · 分支：`codex/ice-v4-planning`
 
 ## 总入口
