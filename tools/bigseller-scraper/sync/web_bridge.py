@@ -49,6 +49,7 @@ def main():
     os.environ['BS_OLD_WAREHOUSE_NAME'] = args.old_name
     os.environ['BS_WAREHOUSE_COUNTRY'] = args.country
     os.environ['BS_NEW_VARIANT_COUNTRY'] = args.country
+    os.environ['P0_02_TARGET_WAREHOUSE_ID'] = args.warehouse_id
     os.environ['BS_REPORT_OUTPUT_DIR'] = 'runtime'
     os.environ['BS_HEADLESS'] = '1'  # 网页端调用使用 headless 模式，依赖持久化 profile 认证
 

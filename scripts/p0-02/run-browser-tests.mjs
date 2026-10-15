@@ -115,6 +115,28 @@ async function withAppIdentity(connectionString, profileId, fn) {
   }
 }
 
+async function mutateAppIdentity(connectionString, profileId, fn) {
+  const pool = new pg.Pool({ connectionString, max: 1 });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT set_config('request.jwt.claim.sub', $1, true)`, [profileId]);
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // ignore
+    }
+    throw error;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
 async function readFavoriteState(connectionString, userId, variantId) {
   return withAppIdentity(connectionString, userId, async (client) => {
     const { rows } = await client.query(
@@ -127,18 +149,61 @@ async function readFavoriteState(connectionString, userId, variantId) {
   });
 }
 
-async function listSearchSkus(connectionString, profileId, term) {
+async function readFavoriteRow(connectionString, userId, variantId) {
+  return withAppIdentity(connectionString, userId, async (client) => {
+    const { rows } = await client.query(
+      `SELECT id::text, user_id::text, variant_id::text, preference_type,
+              created_at::text
+       FROM public.user_variant_preference
+       WHERE user_id = $1::uuid AND variant_id = $2::uuid AND preference_type = 'favorited'
+       LIMIT 1`,
+      [userId, variantId],
+    );
+    return rows[0] ?? null;
+  });
+}
+
+async function restoreFavoriteRow(connectionString, userId, variantId, snapshot) {
+  return mutateAppIdentity(connectionString, userId, async (client) => {
+    await client.query(
+      `DELETE FROM public.user_variant_preference
+       WHERE user_id = $1::uuid AND variant_id = $2::uuid AND preference_type = 'favorited'`,
+      [userId, variantId],
+    );
+    if (snapshot) {
+      await client.query(
+        `INSERT INTO public.user_variant_preference
+           (id, user_id, variant_id, preference_type, created_at)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 'favorited', $4::timestamptz)`,
+        [snapshot.id, snapshot.user_id, snapshot.variant_id, snapshot.created_at],
+      );
+    }
+  });
+}
+
+async function listOverviewSearchSkus(connectionString, profileId, term) {
   return withAppIdentity(connectionString, profileId, async (client) => {
     const { rows } = await client.query(
-      `SELECT v.sku
-       FROM public.product_variant v
-       JOIN public.inventory i ON i.variant_id = v.id
-       WHERE v.sku ILIKE $1
-       ORDER BY v.sku`,
-      [`%${term}%`],
+      `SELECT public.get_product_overview($1::uuid, 1, 100, $2, NULL, NULL) AS payload`,
+      [profileId, term],
     );
-    return rows.map((r) => r.sku);
+    const payload = rows[0]?.payload ?? {};
+    const items = payload.rows ?? payload.items ?? [];
+    return items.map((row) => row.sku).filter(Boolean).sort();
   });
+}
+
+async function extractOverviewRowSkus(page) {
+  const labels = await page.locator('tbody tr[aria-label*="全球库存详情"]').all();
+  const skus = [];
+  for (const row of labels) {
+    const label = await row.getAttribute('aria-label');
+    const match = label?.match(/查看\s+(\S+)\s+全球库存详情/);
+    if (match?.[1]) {
+      skus.push(match[1]);
+    }
+  }
+  return skus.sort();
 }
 
 async function countProductsWithSessionIdentity(connectionString) {
@@ -356,7 +421,11 @@ async function main() {
     const overviewNav = page.waitForURL('**/dashboard/products/overview**', { timeout: 15_000 });
     await page.goto('/dashboard/products/overview', { waitUntil: 'domcontentloaded' });
     await overviewNav;
-    const expectedSkus = await listSearchSkus(envJson.P0_02_APP_DATABASE_URL, ADMIN_PROFILE_ID, SEARCH_TERM);
+    const expectedSkus = await listOverviewSearchSkus(
+      envJson.P0_02_APP_DATABASE_URL,
+      ADMIN_PROFILE_ID,
+      SEARCH_TERM,
+    );
     const searchInput = page.getByPlaceholder(/搜索 SKU、产品名或变体名/i);
     await searchInput.fill(SEARCH_TERM);
     const searchResponse = page.waitForResponse(
@@ -368,12 +437,12 @@ async function main() {
     );
     await page.getByRole('button', { name: '搜索' }).click();
     const searchRes = await searchResponse;
-    const overviewText = await page.locator('tbody').innerText().catch(() => '');
-    const uiSkus = expectedSkus.filter((sku) => overviewText.includes(sku));
+    await page.locator('tbody tr[aria-label*="全球库存详情"]').first().waitFor({ timeout: 15_000 }).catch(() => {});
+    const uiSkus = await extractOverviewRowSkus(page);
     const searchOk =
       searchRes.status() === 200 &&
       expectedSkus.length > 0 &&
-      uiSkus.length === expectedSkus.length;
+      JSON.stringify(uiSkus) === JSON.stringify(expectedSkus);
     results.push({
       name: 'playwright-product-search-request',
       pass: searchRes.status() === 200,
@@ -404,45 +473,61 @@ async function main() {
     });
     let favoriteRestoreOk = false;
     if (favoriteExists) {
-      const favoriteBefore = await readFavoriteState(
+      const favoriteSnapshotBefore = await readFavoriteRow(
         envJson.P0_02_APP_DATABASE_URL,
         ADMIN_PROFILE_ID,
         TARGET_VARIANT_ID,
       );
-      await favoriteBtn.click();
-      await page.waitForTimeout(800);
-      const favoriteAfter = await readFavoriteState(
-        envJson.P0_02_APP_DATABASE_URL,
-        ADMIN_PROFILE_ID,
-        TARGET_VARIANT_ID,
-      );
-      const domTitle = await favoriteBtn.getAttribute('title');
-      const toggled = favoriteAfter !== favoriteBefore;
-      await favoriteBtn.click();
-      await page.waitForTimeout(800);
-      const favoriteRestored = await readFavoriteState(
-        envJson.P0_02_APP_DATABASE_URL,
-        ADMIN_PROFILE_ID,
-        TARGET_VARIANT_ID,
-      );
-      favoriteRestoreOk = favoriteRestored === favoriteBefore;
-      results.push({
-        name: 'playwright-overseas-favorite-toggle-db',
-        pass: toggled && (domTitle === '关注' || domTitle === '取消关注'),
-        before: favoriteBefore,
-        after: favoriteAfter,
-        restored: favoriteRestored,
-      });
-      results.push({
-        name: 'playwright-overseas-favorite-restore',
-        pass: favoriteRestoreOk,
-      });
-      evidenceDetails.favorite = {
-        before: favoriteBefore,
-        after: favoriteAfter,
-        restored: favoriteRestored,
-        domTitle,
-      };
+      try {
+        const favoriteBefore = favoriteSnapshotBefore !== null;
+        const toggleResponse = page.waitForResponse(
+          (r) => r.request().method() === 'POST' && r.url().includes('/dashboard/inventory/overseas'),
+          { timeout: 15_000 },
+        );
+        await favoriteBtn.click();
+        const toggleRes = await toggleResponse;
+        await page.locator('button[title="关注"], button[title="取消关注"]').first().waitFor({
+          timeout: 10_000,
+        });
+        const favoriteAfter = await readFavoriteState(
+          envJson.P0_02_APP_DATABASE_URL,
+          ADMIN_PROFILE_ID,
+          TARGET_VARIANT_ID,
+        );
+        const domTitle = await favoriteBtn.getAttribute('title');
+        const toggled = favoriteAfter !== favoriteBefore;
+        results.push({
+          name: 'playwright-overseas-favorite-toggle-db',
+          pass:
+            toggleRes.status() < 400 &&
+            toggled &&
+            (domTitle === '关注' || domTitle === '取消关注'),
+          before: favoriteBefore,
+          after: favoriteAfter,
+        });
+      } finally {
+        await restoreFavoriteRow(
+          envJson.P0_02_APP_DATABASE_URL,
+          ADMIN_PROFILE_ID,
+          TARGET_VARIANT_ID,
+          favoriteSnapshotBefore,
+        );
+        const favoriteRowAfterRestore = await readFavoriteRow(
+          envJson.P0_02_APP_DATABASE_URL,
+          ADMIN_PROFILE_ID,
+          TARGET_VARIANT_ID,
+        );
+        favoriteRestoreOk =
+          JSON.stringify(favoriteRowAfterRestore) === JSON.stringify(favoriteSnapshotBefore);
+        results.push({
+          name: 'playwright-overseas-favorite-restore',
+          pass: favoriteRestoreOk,
+        });
+        evidenceDetails.favorite = {
+          before: favoriteSnapshotBefore,
+          afterRestore: favoriteRowAfterRestore,
+        };
+      }
     }
 
     const exportBtn = page.getByRole('button', { name: /导出/i });
@@ -491,6 +576,41 @@ async function main() {
       status: operatorInv.status,
     });
 
+    const operatorContext = await browser.newContext();
+    if (operatorCookie) {
+      const cookiePairs = operatorCookie.split('; ').filter(Boolean);
+      await operatorContext.addCookies(
+        cookiePairs.map((pair) => {
+          const eq = pair.indexOf('=');
+          return {
+            name: pair.slice(0, eq),
+            value: pair.slice(eq + 1),
+            url: baseUrl,
+          };
+        }),
+      );
+    }
+    const operatorPage = await operatorContext.newPage();
+    await operatorPage.goto(`${baseUrl}/dashboard/inventory/overseas`, {
+      waitUntil: 'domcontentloaded',
+    });
+    const operatorExportBtn = operatorPage.getByRole('button', { name: /导出/i });
+    const operatorDownloadPromise = operatorPage.waitForEvent('download', { timeout: 20_000 });
+    await operatorExportBtn.click();
+    const operatorDownload = await operatorDownloadPromise;
+    const operatorCsvPath = await operatorDownload.path();
+    const operatorCsv = operatorCsvPath ? fs.readFileSync(operatorCsvPath, 'utf8') : '';
+    const operatorCsvAmountLeak = /(单位成本|货值|金额|unit_cost|amount)/i.test(operatorCsv);
+    results.push({
+      name: 'playwright-operator-csv-export-no-amount',
+      pass:
+        /overseas-inventory.*\.csv/i.test(operatorDownload.suggestedFilename()) &&
+        operatorCsv.length > 0 &&
+        !operatorCsvAmountLeak,
+      filename: operatorDownload.suggestedFilename(),
+    });
+    await operatorContext.close();
+
     egressPhase = 'self-test';
     let selfTestBlocked = false;
     let selfTestErrorCode = null;
@@ -513,6 +633,7 @@ async function main() {
       violations: businessEgressViolations.slice(0, 10),
     });
 
+    const overviewText = await page.locator('body').innerText().catch(() => '');
     const htmlLeak = /SUPABASE_SERVICE_ROLE|createBrowserClient/i.test(overviewText + overseasText);
     results.push({
       name: 'no-supabase-leak-in-rendered-ui',

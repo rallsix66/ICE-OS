@@ -26,6 +26,17 @@ fs.writeFileSync(path.join(evidenceDir, 'fixture-integrity-before.json'), `${JSO
 
 const env = buildP001ProcessEnv({ P0_02_POOL_MAX: '1' }, envJson);
 
+const discovery = spawnSync(
+  process.execPath,
+  [path.join(REPO_ROOT, 'scripts', 'p0-02', 'validate-postgres-test-discovery.mjs')],
+  { cwd: REPO_ROOT, encoding: 'utf8' },
+);
+if (discovery.status !== 0) {
+  console.error(discovery.stderr || discovery.stdout);
+  process.exit(discovery.status ?? 1);
+}
+fs.writeFileSync(path.join(evidenceDir, 'postgres-test-discovery.json'), `${discovery.stdout}\n`);
+
 const vitestBin = path.join(REPO_ROOT, 'node_modules', 'vitest', 'vitest.mjs');
 const vitestBaseArgs = ['run', '--config', 'vitest.config.p0-02.mts'];
 const vitestPhases = [

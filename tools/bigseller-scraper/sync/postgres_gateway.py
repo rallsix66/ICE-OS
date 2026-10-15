@@ -1,6 +1,7 @@
 """P0-02 只读 PostgreSQL 网关 — sync runner 连接，替代 Supabase REST 读路径。"""
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from typing import Any, Iterator
 
@@ -62,7 +63,31 @@ def _query(sql: str, params: tuple[Any, ...] = (), *, mode: str, warehouse_id: s
             return rows_to_gateway_dtos([dict(row) for row in rows])
 
 
+def target_warehouse_id_from_env() -> str | None:
+    wh = os.environ.get('P0_02_TARGET_WAREHOUSE_ID', '').strip()
+    return wh or None
+
+
+def _validate_target_warehouse(row: dict) -> dict:
+    if row.get('country') != WAREHOUSE_COUNTRY:
+        raise RuntimeError(
+            f'目标仓库 country={row.get("country")} 与 BS_WAREHOUSE_COUNTRY={WAREHOUSE_COUNTRY} 不一致',
+        )
+    if row.get('type') != WAREHOUSE_TYPE:
+        raise RuntimeError(
+            f'目标仓库 type={row.get("type")} 与预期 {WAREHOUSE_TYPE} 不一致',
+        )
+    if row.get('is_active') is not True:
+        raise RuntimeError(f'目标仓库 {row.get("id")} 未激活 (is_active=false)')
+    return row_to_gateway_dto(row)
+
+
 def fetch_warehouse() -> dict:
+    target_id = target_warehouse_id_from_env()
+    if target_id:
+        wh = fetch_warehouse_by_id(target_id)
+        return _validate_target_warehouse(wh)
+
     rows = _query(
         """
         SELECT id, name, country, type, is_active
@@ -84,7 +109,7 @@ def fetch_warehouse() -> dict:
     if len(active) > 1:
         names = [r.get('name', '?') for r in active]
         raise RuntimeError(
-            f'预期 1 个活跃 {WAREHOUSE_COUNTRY} overseas 仓库，实际 {len(active)} 个: {names}',
+            f'同国家存在多个活跃仓库且未设置 P0_02_TARGET_WAREHOUSE_ID: {names}',
         )
     return row_to_gateway_dto(active[0])
 

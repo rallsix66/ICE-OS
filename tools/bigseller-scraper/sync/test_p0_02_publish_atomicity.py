@@ -269,6 +269,37 @@ class P002PublishAtomicityTests(unittest.TestCase):
         self.assertEqual(qty, 12)
         self.assertGreaterEqual(success_logs, 1)
 
+    def test_commit_ack_lost_verified_committed_not_rolled_back(self) -> None:
+        import psycopg
+        from sync.executor import execute_plan_v2
+
+        os.environ['P0_02_SYNC_RUN_ID'] = self.sync_run_id
+        os.environ['P0_02_SYNC_TRIGGERED_BY'] = self.admin_profile
+        real_commit = psycopg.Connection.commit
+        state = {'fired': False}
+
+        def flaky_commit(conn_self):
+            real_commit(conn_self)
+            if not state['fired']:
+                state['fired'] = True
+                raise RuntimeError('CONTROLLED_COMMIT_ACK_LOST')
+
+        with patch.object(psycopg.Connection, 'commit', flaky_commit):
+            result = execute_plan_v2(
+                self._plan(qty=17),
+                sync_log_enabled=True,
+                sync_run_id=self.sync_run_id,
+                triggered_by=self.admin_profile,
+            )
+        self.assertTrue(result.get('publish_committed'))
+        self.assertIn(
+            result.get('commit_outcome'),
+            ('committed_ack_lost', 'committed'),
+        )
+        qty, _, success_logs = self._read_quantity_and_logs()
+        self.assertEqual(qty, 17)
+        self.assertGreaterEqual(success_logs, 1)
+
 
 if __name__ == '__main__':
     unittest.main()

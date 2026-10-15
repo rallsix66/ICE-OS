@@ -19,6 +19,7 @@ const CONFIRM_TOKEN = 'P5-SY8D-TH';
 describe('P0-02 Node claim → bridge → real_write chain', () => {
   let bootstrap: Pool;
   let warehouseId: string;
+  let decoyWarehouseId: string;
   let variantId: string;
   let inventoryId: string;
   let sku: string;
@@ -45,6 +46,12 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
     const client = await bootstrap.connect();
     try {
       await client.query(
+        `DELETE FROM public.inventory WHERE warehouse_id IN (
+           SELECT id FROM public.warehouse WHERE name LIKE 'P0-02 node chain decoy%'
+         )`,
+      );
+      await client.query(`DELETE FROM public.warehouse WHERE name LIKE 'P0-02 node chain decoy%'`);
+      await client.query(
         `INSERT INTO public.warehouse (id, name, country, type, is_active)
          VALUES ($1::uuid, $2, 'TH', 'overseas', true)`,
         [warehouseId, 'P0-02 node chain wh'],
@@ -63,6 +70,14 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
         `INSERT INTO public.sync_warehouse_lock (warehouse_id) VALUES ($1::uuid)
          ON CONFLICT (warehouse_id) DO NOTHING`,
         [warehouseId],
+      );
+      // 同国家第二活跃仓：bridge 必须按目标 UUID 而非“唯一 TH 仓”解析
+      decoyWarehouseId = randomUUID();
+      await client.query(
+        `INSERT INTO public.warehouse (id, name, country, type, is_active)
+         VALUES ($1::uuid, $2, 'TH', 'overseas', true)
+         ON CONFLICT (id) DO NOTHING`,
+        [decoyWarehouseId, `P0-02 node chain decoy ${decoyWarehouseId.slice(0, 8)}`],
       );
     } finally {
       client.release();
@@ -90,6 +105,7 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
       await client.query('DELETE FROM public.product_variant WHERE id = $1::uuid', [variantId]);
       await client.query('DELETE FROM public.sync_warehouse_lock WHERE warehouse_id = $1::uuid', [warehouseId]);
       await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [warehouseId]);
+      await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [decoyWarehouseId]);
     } finally {
       client.release();
       await bootstrap.end();

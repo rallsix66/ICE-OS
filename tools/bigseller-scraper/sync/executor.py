@@ -1370,6 +1370,7 @@ def execute_plan_v2(
         'sync_log_fallback_path': None,
         'sync_log_enabled': sync_log_enabled,
         'publish_committed': False,
+        'commit_outcome': None,
         'errors': [],
     }
 
@@ -1402,6 +1403,75 @@ def execute_plan_v2(
         finally:
             publish_conn.close()
             publish_conn = None
+
+    def _expected_publish_quantity() -> int | None:
+        for bucket in ('inventory_updates', 'inventory_inserts'):
+            for item in plan.get(bucket) or []:
+                if item.get('warehouse_id') == warehouse_id and item.get('sku') == plan.get('_primary_sku'):
+                    return int(item.get('new_quantity', item.get('quantity', 0)))
+        updates = plan.get('inventory_updates') or []
+        if len(updates) == 1:
+            return int(updates[0].get('new_quantity', updates[0].get('quantity', 0)))
+        return None
+
+    def _commit_publish_with_verification() -> None:
+        nonlocal publish_conn
+        if publish_conn is None:
+            return
+        from .p0_02_publish_verify import verify_publish_state
+
+        expected_qty = _expected_publish_quantity()
+        primary_sku = None
+        updates = plan.get('inventory_updates') or []
+        if len(updates) == 1:
+            primary_sku = updates[0].get('sku')
+
+        commit_exc: Exception | None = None
+        try:
+            publish_conn.commit()
+            result['commit_outcome'] = 'committed'
+            result['publish_committed'] = True
+        except Exception as exc:
+            commit_exc = exc
+            try:
+                publish_conn.close()
+            except Exception:
+                pass
+            publish_conn = None
+            evidence = verify_publish_state(
+                warehouse_id=warehouse_id,
+                sync_run_id=bound_sync_run_id,
+                inventory_id=None,
+                expected_quantity=expected_qty,
+                sku=primary_sku,
+            )
+            if evidence.get('committed_evidence'):
+                result['commit_outcome'] = 'committed_ack_lost'
+                result['publish_committed'] = True
+                result['errors'].append(
+                    f'发布事务已在数据库提交，但 commit 回执丢失: {commit_exc}',
+                )
+                print(
+                    '[execute_plan_v2] commit 回执丢失；只读核对确认库存与 success sync_log 已提交',
+                    file=sys.stderr,
+                )
+                return
+            if evidence.get('inventory_quantity') is not None and expected_qty is not None:
+                if evidence['inventory_quantity'] != expected_qty:
+                    result['commit_outcome'] = 'rolled_back'
+                    result['publish_committed'] = False
+                    raise RuntimeError(
+                        f'发布 commit 失败且只读核对确认未提交: {commit_exc}',
+                    ) from commit_exc
+            result['commit_outcome'] = 'unknown'
+            result['publish_committed'] = False
+            raise RuntimeError(
+                f'发布 commit 结果未知，已中止且未写入冲突完成记录: {commit_exc}',
+            ) from commit_exc
+        finally:
+            if publish_conn is not None:
+                publish_conn.close()
+                publish_conn = None
 
     try:
         from .p0_02_connection_boundary import independent_p0_02_enabled
@@ -1770,16 +1840,20 @@ def execute_plan_v2(
                     triggered_by=bound_triggered_by,
                     conn=publish_conn,
                 )
-            _finalize_publish_conn(commit=True)
-            result['publish_committed'] = True
+            _commit_publish_with_verification()
             if sync_log_enabled:
                 result['sync_log_written'] = True
                 print('[execute_plan_v2] sync_log success 已与发布同事务提交')
         except Exception as sl_err:
-            _finalize_publish_conn(commit=False)
-            result['publish_committed'] = False
-            result['sync_log_written'] = False
-            fail_msg = f'发布事务提交失败（库存与 success sync_log 已回滚）: {sl_err}'
+            committed = result.get('commit_outcome') in ('committed', 'committed_ack_lost')
+            if result.get('commit_outcome') == 'unknown':
+                result['sync_log_written'] = False
+                raise
+            if not committed:
+                _finalize_publish_conn(commit=False)
+                result['publish_committed'] = False
+                result['sync_log_written'] = False
+            fail_msg = f'发布事务提交前失败（库存与 success sync_log 已回滚）: {sl_err}'
             result['errors'].append(fail_msg)
             print(fail_msg, file=sys.stderr)
             if sync_log_enabled:

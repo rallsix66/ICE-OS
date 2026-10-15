@@ -48,7 +48,12 @@ describe('P0-02 sync runner effective authorization', () => {
     const client = await bootstrap.connect();
     try {
       const wh = await client.query<{ id: string }>(
-        `SELECT id::text FROM public.warehouse WHERE country = 'TH' AND type = 'overseas' LIMIT 1`,
+        `SELECT w.id::text
+         FROM public.warehouse w
+         JOIN public.inventory i ON i.warehouse_id = w.id
+         WHERE w.country = 'TH' AND w.type = 'overseas' AND w.is_active = true
+         ORDER BY w.name
+         LIMIT 1`,
       );
       thWarehouseId = wh.rows[0]?.id ?? '';
       const otherWh = await client.query<{ id: string }>(

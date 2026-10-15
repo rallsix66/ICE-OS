@@ -152,17 +152,6 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
                     (self.wh, self.variant),
                 )
                 cur.execute(
-                    """
-                    DELETE FROM public.product_variant
-                    WHERE id IN (
-                      SELECT v.id FROM public.product_variant v
-                      LEFT JOIN public.inventory i ON i.variant_id = v.id AND i.warehouse_id = %s::uuid
-                      WHERE i.id IS NULL AND v.sku LIKE 'RW-NEW-%%'
-                    )
-                    """,
-                    (self.wh,),
-                )
-                cur.execute(
                     'UPDATE public.inventory SET quantity = 5 WHERE id = %s::uuid',
                     (self.inventory_id,),
                 )
@@ -277,9 +266,7 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
     def test_new_sku_insert_via_sync(self) -> None:
         from sync.executor import execute_plan_v2
 
-        new_variant = str(uuid.uuid4())
-        new_sku = f'RW-NEW-{new_variant[:8]}'
-        self.registry.register_variant(new_variant)
+        new_sku = f'RW-NEW-{uuid.uuid4().hex[:8]}'
 
         sync_at = datetime.now(timezone.utc).isoformat()
         plan = {
@@ -321,6 +308,19 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
         try:
             with conn.cursor() as cur:
                 cur.execute(
+                    """
+                    SELECT v.id::text
+                    FROM public.inventory i
+                    JOIN public.product_variant v ON v.id = i.variant_id
+                    WHERE v.sku = %s AND i.warehouse_id = %s::uuid
+                    """,
+                    (new_sku, self.wh),
+                )
+                row = cur.fetchone()
+                self.assertIsNotNone(row)
+                created_variant_id = row[0]
+                self.registry.register_variant(created_variant_id)
+                cur.execute(
                     'SELECT COUNT(*)::int FROM public.inventory i '
                     'JOIN public.product_variant v ON v.id = i.variant_id '
                     'WHERE v.sku = %s AND i.warehouse_id = %s::uuid',
@@ -333,9 +333,7 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
     def test_post_publish_assertion_failure_still_restores_new_variant(self) -> None:
         from sync.executor import execute_plan_v2
 
-        new_variant = str(uuid.uuid4())
-        new_sku = f'RW-NEW-{new_variant[:8]}'
-        self.registry.register_variant(new_variant)
+        new_sku = f'RW-NEW-{uuid.uuid4().hex[:8]}'
         sync_at = datetime.now(timezone.utc).isoformat()
         plan = {
             'warehouse_rename_required': {
@@ -365,10 +363,50 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
                 },
             ],
         }
-        result = execute_plan_v2(plan, sync_log_enabled=True)
-        self.assertTrue(result.get('publish_committed'))
-        with self.assertRaises(AssertionError):
-            raise AssertionError('controlled post-publish assertion failure')
+        created_variant_id: str | None = None
+        try:
+            result = execute_plan_v2(plan, sync_log_enabled=True)
+            self.assertTrue(result.get('publish_committed'))
+            import psycopg
+
+            conn = psycopg.connect(_load_owner_dsn())
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT v.id::text
+                        FROM public.product_variant v
+                        WHERE v.sku = %s
+                        """,
+                        (new_sku,),
+                    )
+                    row = cur.fetchone()
+                    self.assertIsNotNone(row)
+                    created_variant_id = row[0]
+                    self.registry.register_variant(created_variant_id)
+            finally:
+                conn.close()
+            with self.assertRaises(AssertionError):
+                raise AssertionError('controlled post-publish assertion failure')
+        finally:
+            if created_variant_id and created_variant_id in self.registry.variant_ids:
+                import psycopg
+
+                conn = psycopg.connect(_load_owner_dsn())
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            'DELETE FROM public.inventory WHERE variant_id = %s::uuid',
+                            (created_variant_id,),
+                        )
+                        cur.execute(
+                            'DELETE FROM public.product_variant WHERE id = %s::uuid',
+                            (created_variant_id,),
+                        )
+                    conn.commit()
+                    self.registry.variant_ids.remove(created_variant_id)
+                finally:
+                    conn.close()
 
 
 if __name__ == '__main__':

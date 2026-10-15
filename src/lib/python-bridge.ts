@@ -98,6 +98,7 @@ export async function callPythonBridge(
   if (params.triggeredByProfileId) {
     childEnv.P0_02_SYNC_TRIGGERED_BY = params.triggeredByProfileId;
   }
+  childEnv.P0_02_TARGET_WAREHOUSE_ID = params.warehouseId;
 
   return new Promise<PythonBridgeResult>((resolve, reject) => {
     const proc = spawn('python', args, {

@@ -25,6 +25,7 @@ export default defineConfig({
       'tests/p0-02/rpc-dependency.postgres.test.ts',
       'tests/p0-02/warehouse-replenishment-numeric.postgres.test.ts',
       'tests/p0-02/delivery-rework.postgres.test.ts',
+      'tests/p0-02/sync-node-real-write-chain.postgres.test.ts',
     ],
     fileParallelism: false,
     alias: {
