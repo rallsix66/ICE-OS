@@ -17,7 +17,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   public.profiles,
   public.product,
   public.product_variant,
-  public.inventory,
   public.warehouse,
   public.shipment,
   public.shipment_item,
@@ -30,6 +29,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   public.sync_run,
   public.sync_log
 TO ice_p0_02_app_runner;
+
+GRANT SELECT ON public.inventory TO ice_p0_02_app_runner;
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ice_p0_02_app_runner;
 

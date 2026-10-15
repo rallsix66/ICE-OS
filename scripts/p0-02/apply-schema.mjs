@@ -129,6 +129,8 @@ async function main() {
   psql(path.join(sqlDir, '007_sync_runner_rls.sql'), true);
   psql(path.join(sqlDir, '008_runtime_grants_incremental.sql'), true);
   psql(path.join(sqlDir, '009_sync_reads_auth_rpc_deps.sql'), true);
+  psql(path.join(sqlDir, '011_seal_app_inventory_quantity.sql'), true);
+  psql(path.join(sqlDir, '012_tracking_event_partial_warehoused.sql'), true);
 
   psql(`REVOKE ice_p0_02_owner FROM ${instance.bootstrapUser};`);
 
