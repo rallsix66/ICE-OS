@@ -32,20 +32,22 @@
 
 | ID | 含义 | 证据入口 | 状态 |
 | --- | --- | --- | --- |
-| A1 | 保留功能迁移及证据矩阵 | 本矩阵 + `check-2026-10-15T02-32-41-460Z` | **已验证**（待独立审查复核范围） |
+| A1 | 保留功能迁移及证据矩阵 | 本矩阵 + `check-2026-10-15T04-43-54-505Z` | **已验证**（待独立审查复核范围） |
 | A2 | 无 Supabase 运行依赖/回退 | `build-isolated` + boundary probes + `P0_02_FIXTURE_INPUT_PATH` bridge | **已验证** |
-| A3 | 真实浏览器交互 + 网络/落库 | Playwright **18** 项：关注 DB/DOM/恢复、搜索行集、CSV 内容、egress | **已验证** |
+| A3 | 真实浏览器交互 + 网络/落库 | Playwright **21** 项：关注 DB/DOM/恢复、搜索行集、CSV 仓库/SKU/数量、egress、比较器自检 | **已验证** |
 | A4 | 认证/权限/金额 | `test:p0-02:http` + 浏览器运营 inventory API 无 amount 字段 | **已验证** |
 | A5 | 业务语义兼容 | vitest + delivery-rework + Python gateway | **已验证** |
-| A6 | PG 最小权限/RLS/池隔离 | postgres **46/46** + 011 重复 apply + 发布/审计原子性 | **已验证** |
-| A7 | 虚构来源→claim→bridge→real_write→sync_log | `sync-node-real-write-chain.postgres.test.ts` + Python atomicity/real_write | **已验证** |
+| A6 | PG 最小权限/RLS/池隔离 | postgres **47/47** + 011/013 增量 + restore 语义合同 | **已验证** |
+| A7 | 虚构来源→claim→bridge→real_write→sync_log；publish **unknown** 持久化 | `sync-node-real-write-chain` + `sync-publish-unknown` + Python atomicity/real_write | **已验证** |
 | A8 | 实例/fixture/负例/备份恢复 | fixture-restore-negative + **`run-backup-restore-drill.mjs`** + repeat-schema | **已验证** |
 | A9 | lint/build/diff/opt6/concurrency | `check:p0-02` + **`run-p0-02-concurrency.mjs`** | **已验证**（opt6 已知 1 fail / 5 pass） |
 
 ### 子测试挂接（摘要）
 
 - **A2**：`run-python-gateway-negative.mjs` / `run-python-gateway-integration.mjs`
-- **A3**：`run-browser-tests.mjs` → `browser-2026-10-15T02-31-59-987Z`
+- **A3**：`run-browser-tests.mjs` → `browser-2026-10-15T04-40-46-981Z`（21 项）
+- **A7 unknown**：`tests/p0-02/sync-publish-unknown.postgres.test.ts`；`db/p0-02/013_sync_publish_unknown_guard.sql`
+- **A9 legacy Python**：`run-python-legacy-regression.mjs`（`test_executor` / `test_name_backfill` 必过）
 - **DELIVERY**：`delivery-rework.postgres.test.ts`；`test_p0_02_publish_atomicity.py`；`run-repeat-schema-apply.mjs`
 - **A7**：`sync-node-real-write-chain.postgres.test.ts`；`run-python-real-write-integration.mjs`
 - **A8/A9**：`run-backup-restore-drill.mjs`；`run-p0-02-concurrency.mjs`
