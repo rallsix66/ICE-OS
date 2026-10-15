@@ -1,7 +1,7 @@
 # ICE v4 目标架构 v3：独立 PostgreSQL 与历史数据能力
 
 > 2026-10-13。用户已批准的目标：脱离 Supabase，增加历史模型，不开发复杂分析页面。
-> 状态：架构目标；P0-01 与 P0-02 均在虚构实例上完成本地独立平台验收（**P0_01_PASS** / **P0_02_PASS**，Run `run-20261014-r2`）— 详见 [current-state.md](current-state.md)。生产切换与旧环境删除仍属后续，不在 PASS 登记本轮。
+> 状态：架构目标；P0-01 **P0_01_PASS**（Run `run-20261013-r1`）、P0-02 **P0_02_PASS**（Run `run-20261014-r2`），均在虚构实例上完成本地独立平台验收 — 详见 [current-state.md](current-state.md)。生产切换与旧环境删除仍属后续，不在 PASS 登记本轮。
 > 本文取代 [v2](architecture-v2.md) 的平台目标；业务实体沿用 [数据库 v2](database-design-v2.md)，历史扩展以 [历史模型](history-data-model-v1.md) 为准。动态状态只看 [current-state.md](current-state.md)。
 
 ## 1. 范围与决定
