@@ -1,20 +1,20 @@
 # Current Project State
 
-更新：2026-10-15（**P0-02 a928545 审查返工后，待独立审查**）。仓库 ICEOS。
+更新：2026-10-15（**P0-02 e8bfd08 审查返工后，待独立审查**）。仓库 ICEOS。
 
 ## P0-02 状态
 
 | 项 | 状态 |
 |---|---|
-| 本轮审查 | **CHANGES_REQUIRED** @ `a928545`（2026-10-15） |
-| 审查目录 | `.local/p0-02/run-20261014-r2/reviews/independent-p002-delivery-a928545-20261015-01/` |
-| 正式任务包 | [docs/tasks/p0-02/2026-10-15-delivery-rework-a928545.md](./tasks/p0-02/2026-10-15-delivery-rework-a928545.md) |
+| 本轮审查 | **CHANGES_REQUIRED** @ `e8bfd08`（2026-10-15） |
+| 审查目录 | `.local/p0-02/run-20261014-r2/reviews/independent-p002-delivery-e8bfd08-20261015-01/` |
+| 正式任务包 | [docs/tasks/p0-02/2026-10-15-delivery-rework-e8bfd08.md](./tasks/p0-02/2026-10-15-delivery-rework-e8bfd08.md) |
 | 任务状态 | **`P0_02_IMPLEMENTED_AWAITING_REVIEW`**（**非** PASS） |
 | Canonical Run | `run-20261014-r2` |
-| 总验收 | `npm run check:p0-02` **已通过**（`check-2026-10-15T04-43-54-505Z`） |
-| Postgres | **14** 文件 / **47** vitest + **5** config |
+| 总验收 | `npm run check:p0-02` **已通过**（`check-2026-10-15T06-04-49-136Z`） |
+| Postgres | **15** 文件 / **48** vitest + **5** config |
 | Browser A3 | **21** 项 Playwright（含 CSV 比较器自检） |
-| 验证报告 | [verification-report-r2-20261015-a928545-rework.md](./p0-02/verification-report-r2-20261015-a928545-rework.md) |
+| 验证报告 | [verification-report-r2-20261015-e8bfd08-rework.md](./p0-02/verification-report-r2-20261015-e8bfd08-rework.md) |
 
 ## P0-01 状态（保留）
 
