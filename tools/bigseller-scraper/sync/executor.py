@@ -1356,6 +1356,7 @@ def execute_plan_v2(
         'sync_log_written': False,
         'sync_log_fallback_path': None,
         'sync_log_enabled': sync_log_enabled,
+        'publish_committed': False,
         'errors': [],
     }
 
@@ -1374,10 +1375,43 @@ def execute_plan_v2(
     # =====================================================================
     started_at = result['started_at']
     rpc_error = None
+    publish_conn = None
+
+    def _finalize_publish_conn(*, commit: bool) -> None:
+        nonlocal publish_conn
+        if publish_conn is None:
+            return
+        try:
+            if commit:
+                publish_conn.commit()
+            else:
+                publish_conn.rollback()
+        finally:
+            publish_conn.close()
+            publish_conn = None
 
     try:
-        rpc_result = _call_sync_rpc(wh_id, p_variants, p_inventory, p_wh_name)
+        from .p0_02_connection_boundary import independent_p0_02_enabled
+
+        if independent_p0_02_enabled():
+            from .postgres_rpc import (
+                call_sync_warehouse_inventory_rpc,
+                open_sync_publish_connection,
+            )
+
+            publish_conn = open_sync_publish_connection()
+            rpc_result = call_sync_warehouse_inventory_rpc(
+                wh_id,
+                p_variants,
+                p_inventory,
+                p_wh_name,
+                conn=publish_conn,
+                auto_commit=False,
+            )
+        else:
+            rpc_result = _call_sync_rpc(wh_id, p_variants, p_inventory, p_wh_name)
     except Exception as e:
+        _finalize_publish_conn(commit=False)
         rpc_error = e
         finished_at = datetime.now().astimezone().isoformat(timespec='seconds')
         result['finished_at'] = finished_at
@@ -1436,6 +1470,7 @@ def execute_plan_v2(
         """RPC 摘要校验失败：记录 sync_log.failed + 抛出 RuntimeError。
         RPC 已执行但返回不可信，数据库状态未知，必须只读核对。
         """
+        _finalize_publish_conn(commit=False)
         full_msg = (
             f'RPC 返回摘要校验失败（RPC 已执行，提交状态未知）: {reason}'
         )
@@ -1548,6 +1583,7 @@ def execute_plan_v2(
             full_msg — 调用方必须用此返回值构造 RuntimeError，
             确保主错误始终为审计失败信息，sync_log fallback 仅为附加信息。
         """
+        _finalize_publish_conn(commit=False)
         full_msg = f'post-commit audit failed ({phase_label}): {error_msg}'
         result['errors'].append(full_msg)
 
@@ -1607,11 +1643,28 @@ def execute_plan_v2(
                     'warehouse_id': item.get('warehouse_id', warehouse_id),
                 })
 
-        verify_inventory = _audit_fetch_inventory(warehouse_id)
+        if publish_conn is not None:
+            from .postgres_gateway import (
+                fetch_inventory_by_warehouse_conn,
+                fetch_variants_conn,
+            )
+
+            verify_inventory = fetch_inventory_by_warehouse_conn(
+                publish_conn, warehouse_id
+            )
+        else:
+            verify_inventory = _audit_fetch_inventory(warehouse_id)
         print(f'[execute_plan_v2] Phase G: Inventory 写后查询 {len(verify_inventory)} 条')
 
         time.sleep(0.3)
-        current_variants = _audit_fetch_variants_by_country(WAREHOUSE_COUNTRY)
+        if publish_conn is not None:
+            from .postgres_gateway import fetch_variants_conn
+
+            current_variants = fetch_variants_conn(
+                publish_conn, warehouse_id=warehouse_id
+            )
+        else:
+            current_variants = _audit_fetch_variants_by_country(WAREHOUSE_COUNTRY)
         current_variant_map = {v['sku']: v['id'] for v in current_variants}
 
         inv_diffs = verify_inventory_post_write(
@@ -1635,14 +1688,18 @@ def execute_plan_v2(
         # ==================================================================
         # 4. Phase I: Warehouse 最终状态审计
         # ==================================================================
-        wh_final_rows = _audit_fetch_warehouse(warehouse_id)
-        if not wh_final_rows:
-            raise RuntimeError(_record_audit_failure(
-                f'无法查询 Warehouse id={warehouse_id}',
-                'Phase I',
-            ))
+        if publish_conn is not None:
+            from .postgres_gateway import fetch_warehouse_by_id_conn
 
-        wh_final = wh_final_rows[0]
+            wh_final = fetch_warehouse_by_id_conn(publish_conn, warehouse_id)
+        else:
+            wh_final_rows = _audit_fetch_warehouse(warehouse_id)
+            if not wh_final_rows:
+                raise RuntimeError(_record_audit_failure(
+                    f'无法查询 Warehouse id={warehouse_id}',
+                    'Phase I',
+                ))
+            wh_final = wh_final_rows[0]
 
         wh_expected = {
             'id': warehouse_id,
@@ -1682,9 +1739,11 @@ def execute_plan_v2(
             'post-commit audit',
         )) from e
 
-    # Phase G/I 审计全部通过后设置 finished_at
+    # Phase G/I 审计全部通过后提交发布事务（P0-02）并设置 finished_at
+    _finalize_publish_conn(commit=True)
     finished_at = datetime.now().astimezone().isoformat(timespec='seconds')
     result['finished_at'] = finished_at
+    result['publish_committed'] = True
 
     # =====================================================================
     # 5. 记录 sync_log success

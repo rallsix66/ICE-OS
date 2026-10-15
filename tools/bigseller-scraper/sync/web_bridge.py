@@ -247,10 +247,32 @@ def main():
                 'inventory_unchanged': rpc_summary.get('inventory_unchanged', 0),
                 'warehouse_renamed': rpc_summary.get('warehouse_renamed', False),
             }
+            result['sync_log_written'] = bool(rpc_result.get('sync_log_written'))
+            result['publish_committed'] = bool(rpc_result.get('publish_committed'))
+            bridge_errors = list(rpc_result.get('errors') or [])
+            if bridge_errors:
+                result['errors'].extend(bridge_errors)
             print(f'[web_bridge] RPC 写入完成: {json.dumps(result["summary"])}', file=sys.stderr)
 
-        result['success'] = True
-        result['exit_code'] = 0
+            publish_ok = (
+                rpc_result.get('phase_g_verified')
+                and rpc_result.get('phase_i_verified')
+                and rpc_result.get('publish_committed')
+            )
+            log_ok = not rpc_result.get('sync_log_enabled') or rpc_result.get('sync_log_written')
+            if publish_ok and log_ok and not bridge_errors:
+                result['success'] = True
+                result['exit_code'] = 0
+            else:
+                result['success'] = False
+                result['exit_code'] = 1
+                if not log_ok:
+                    result['errors'].append('sync_log 未成功写入')
+                if not publish_ok:
+                    result['errors'].append('发布未完成或审计未通过')
+        else:
+            result['success'] = True
+            result['exit_code'] = 0
 
     except Exception as e:
         result['success'] = False

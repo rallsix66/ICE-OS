@@ -109,7 +109,10 @@ export class RealSyncRunner implements SyncRunner {
         },
         syncLog: {
           status: bridgeResult.success ? 'success' : 'failed',
-          written: bridgeResult.success,
+          written:
+            typeof (bridgeResult as { sync_log_written?: boolean }).sync_log_written === 'boolean'
+              ? Boolean((bridgeResult as { sync_log_written?: boolean }).sync_log_written)
+              : bridgeResult.success,
         },
         planDriftCheck: bridgeResult.plan_drift_check ?? 'PASS',
         planDriftCount: bridgeResult.plan_drift_count,

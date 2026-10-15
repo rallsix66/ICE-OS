@@ -135,6 +135,69 @@ def fetch_inventory_by_warehouse(warehouse_id: str) -> list[dict]:
     )
 
 
+def fetch_inventory_by_warehouse_conn(conn, warehouse_id: str) -> list[dict]:
+    """同一 libpq 连接内只读 inventory（发布事务内审计）。"""
+    from .postgres_rpc import _apply_sync_scope
+
+    psycopg, dict_row = _import_psycopg()
+    conn.row_factory = dict_row
+    wh_text = _warehouse_id_text(warehouse_id)
+    with conn.cursor() as cur:
+        _apply_sync_scope(cur, wh_text)
+        cur.execute(
+            """
+            SELECT id, variant_id, warehouse_id, quantity
+            FROM public.inventory
+            WHERE warehouse_id = %s::uuid
+            """,
+            (wh_text,),
+        )
+        rows = cur.fetchall()
+        return rows_to_gateway_dtos([dict(row) for row in rows])
+
+
+def fetch_variants_conn(conn, *, warehouse_id: str) -> list[dict]:
+    from .postgres_rpc import _apply_sync_scope
+
+    psycopg, dict_row = _import_psycopg()
+    conn.row_factory = dict_row
+    wh_text = _warehouse_id_text(warehouse_id)
+    with conn.cursor() as cur:
+        _apply_sync_scope(cur, wh_text)
+        cur.execute(
+            """
+            SELECT id, sku, country, name, product_id, match_status
+            FROM public.product_variant
+            WHERE country = %s
+            """,
+            (WAREHOUSE_COUNTRY,),
+        )
+        rows = cur.fetchall()
+        return rows_to_gateway_dtos([dict(row) for row in rows])
+
+
+def fetch_warehouse_by_id_conn(conn, warehouse_id: str) -> dict:
+    from .postgres_rpc import _apply_sync_scope
+
+    psycopg, dict_row = _import_psycopg()
+    conn.row_factory = dict_row
+    wh_text = _warehouse_id_text(warehouse_id)
+    with conn.cursor() as cur:
+        _apply_sync_scope(cur, wh_text)
+        cur.execute(
+            """
+            SELECT id, name, country, type, is_active
+            FROM public.warehouse
+            WHERE id = %s::uuid
+            """,
+            (wh_text,),
+        )
+        rows = cur.fetchall()
+    if not rows:
+        raise RuntimeError(f'未找到 warehouse_id={warehouse_id}')
+    return row_to_gateway_dto(dict(rows[0]))
+
+
 def assert_independent_gateway_ready() -> None:
     """Import-time guard when P0-02 is enabled (no Supabase fallback)."""
     if independent_p0_02_enabled():

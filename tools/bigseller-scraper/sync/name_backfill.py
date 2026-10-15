@@ -51,13 +51,15 @@ _env_cache: dict | None = None
 def _get_env() -> dict:
     """Lazy-load .env.local。首次调用时读取并缓存，后续复用缓存。"""
     global _env_cache
-    if _env_cache is not None:
-        return _env_cache
+    from .p0_02_connection_boundary import independent_p0_02_enabled
 
-    if os.environ.get('P0_02_ENABLED', '').strip().lower() == 'true':
+    if independent_p0_02_enabled():
         raise RuntimeError(
             'P0-02 独立平台已封存 name_backfill（禁止读取 .env.local / Supabase REST）',
         )
+
+    if _env_cache is not None:
+        return _env_cache
 
     project_root = Path(__file__).resolve().parents[3]
     env_path = project_root / '.env.local'

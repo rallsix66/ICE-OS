@@ -15,23 +15,54 @@ def _import_psycopg():
     return psycopg
 
 
+def _apply_sync_scope(cur, warehouse_id: str) -> None:
+    cur.execute("SELECT set_config('p0_02.sync.mode', 'warehouse', true)")
+    cur.execute(
+        "SELECT set_config('p0_02.sync.warehouse_id', %s, true)",
+        (warehouse_id,),
+    )
+
+
+def _decode_rpc_payload(row) -> dict:
+    if row is None:
+        return {}
+    payload = row[0] if not isinstance(row, dict) else row[list(row.keys())[0]]
+    if isinstance(payload, dict):
+        return payload
+    if isinstance(payload, str):
+        return json.loads(payload)
+    return {}
+
+
+def open_sync_publish_connection():
+    """P0-02 发布用连接：调用方在审计通过后 commit，否则 rollback。"""
+    from .p0_02_connection_boundary import connect_validated_sync
+
+    psycopg = _import_psycopg()
+    conn = connect_validated_sync(import_psycopg=psycopg)
+    conn.rollback()
+    return conn
+
+
 def call_sync_warehouse_inventory_rpc(
     warehouse_id: str,
     p_variants: list,
     p_inventory: list,
     p_warehouse_name: str,
+    *,
+    conn=None,
+    auto_commit: bool = True,
 ) -> dict:
     from .p0_02_connection_boundary import connect_validated_sync
 
-    psycopg = _import_psycopg()
-    conn = connect_validated_sync(import_psycopg=psycopg)
+    own_conn = conn is None
+    if own_conn:
+        psycopg = _import_psycopg()
+        conn = connect_validated_sync(import_psycopg=psycopg)
+        conn.rollback()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT set_config('p0_02.sync.mode', 'warehouse', true)")
-            cur.execute(
-                "SELECT set_config('p0_02.sync.warehouse_id', %s, true)",
-                (warehouse_id,),
-            )
+            _apply_sync_scope(cur, warehouse_id)
             cur.execute(
                 """
                 SELECT public.sync_warehouse_inventory(
@@ -49,21 +80,16 @@ def call_sync_warehouse_inventory_rpc(
                 ),
             )
             row = cur.fetchone()
-            if row is None:
-                conn.commit()
-                return {}
-            payload = row[0] if not isinstance(row, dict) else row[list(row.keys())[0]]
+            payload = _decode_rpc_payload(row)
+        if auto_commit:
             conn.commit()
-            if isinstance(payload, dict):
-                return payload
-            if isinstance(payload, str):
-                return json.loads(payload)
-            return {}
+        return payload
     except Exception:
         conn.rollback()
         raise
     finally:
-        conn.close()
+        if own_conn:
+            conn.close()
 
 
 def write_sync_log_postgres(
