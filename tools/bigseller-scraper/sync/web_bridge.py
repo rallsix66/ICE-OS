@@ -313,10 +313,16 @@ def main():
             result['exit_code'] = 0
 
     except Exception as e:
-        result['success'] = False
-        result['exit_code'] = 1
-        result['errors'].append(f'{type(e).__name__}: {e}')
-        traceback.print_exc(file=sys.stderr)
+        from sync.publish_errors import PublishCommitUnknownError
+
+        if isinstance(e, PublishCommitUnknownError):
+            evaluate_real_write_bridge_outcome(result, e.rpc_result)
+            result['errors'].append(f'{type(e).__name__}: {e}')
+        else:
+            result['success'] = False
+            result['exit_code'] = 1
+            result['errors'].append(f'{type(e).__name__}: {e}')
+            traceback.print_exc(file=sys.stderr)
 
     result['finished_at'] = datetime.now(timezone.utc).isoformat()
     _write_result(result)

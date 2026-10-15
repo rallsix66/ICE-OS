@@ -608,13 +608,26 @@ async function executeRealWrite(
   }
 
   // f. exitCode !== 0
+  const publishUnknown =
+    result.exitCode === 2 && result.commitOutcome === 'unknown';
   try {
     await repo.releaseSyncRun({
       runId,
       status: 'failed',
-      exitCode: result.exitCode,
+      exitCode: result.exitCode === 2 ? 2 : 1,
       errorMessage: result.errors?.[0] ?? 'Runner 返回非零退出码',
+      resultSummary: publishUnknown ? buildResultSummary(result) : undefined,
     });
+    if (publishUnknown) {
+      return makeIndeterminate(
+        runId,
+        result,
+        result.errors?.[0] ?? '发布 commit 结果未知',
+        true,
+        true,
+        '发布结果未知：artifact 保留，需核对后再 claim',
+      );
+    }
     // release 成功 — input 保留由 7 天 GC 清理
     return { runId, status: 'failed', runnerResult: result, error: result.errors?.[0] };
   } catch (err) {

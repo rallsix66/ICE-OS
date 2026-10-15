@@ -27,7 +27,9 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+from .publish_errors import PublishCommitUnknownError
 
 from .config import (
     TARGET_WAREHOUSE_NAME,
@@ -1299,6 +1301,20 @@ def _save_fallback_log(sync_log_data: dict, output_dir: str) -> str:
     return filepath
 
 
+def _publish_rpc_snapshot(result: dict[str, Any]) -> dict[str, Any]:
+    """Minimal executor receipt for bridge when publish outcome is unknown."""
+    return {
+        'rpc_summary': result.get('rpc_summary') or {},
+        'phase_g_verified': bool(result.get('phase_g_verified')),
+        'phase_i_verified': bool(result.get('phase_i_verified')),
+        'sync_log_written': bool(result.get('sync_log_written')),
+        'sync_log_enabled': bool(result.get('sync_log_enabled', True)),
+        'publish_committed': bool(result.get('publish_committed')),
+        'commit_outcome': result.get('commit_outcome') or 'unknown',
+        'errors': list(result.get('errors') or []),
+    }
+
+
 def execute_plan_v2(
     plan: dict,
     *,
@@ -1452,8 +1468,9 @@ def execute_plan_v2(
                 result['errors'].append(
                     f'发布 commit 回执丢失且只读核对不可用: {commit_exc}; verify={verify_exc}',
                 )
-                raise RuntimeError(
+                raise PublishCommitUnknownError(
                     f'发布 commit 结果未知（核对不可用）: {commit_exc}',
+                    rpc_result=_publish_rpc_snapshot(result),
                 ) from commit_exc
             if evidence.get('committed_evidence'):
                 result['commit_outcome'] = 'committed_ack_lost'
@@ -1480,8 +1497,9 @@ def execute_plan_v2(
             result['errors'].append(
                 f'发布 commit 结果未知（证据不足: {reason}）: {commit_exc}',
             )
-            raise RuntimeError(
+            raise PublishCommitUnknownError(
                 f'发布 commit 结果未知，已中止且未写入冲突完成记录: {commit_exc}',
+                rpc_result=_publish_rpc_snapshot(result),
             ) from commit_exc
         finally:
             if publish_conn is not None:
