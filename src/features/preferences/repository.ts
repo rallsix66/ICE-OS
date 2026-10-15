@@ -100,7 +100,7 @@ export const preferencesRepository = {
     }
 
     // 1. 验证 Variant 存在
-    const variantExists = await this._variantExists(variantId);
+    const variantExists = await this._variantExists(variantId, userId);
     if (!variantExists) {
       return { success: false, error: new PreferenceError('VARIANT_NOT_FOUND', '该 SKU 不存在') };
     }
@@ -217,7 +217,7 @@ export const preferencesRepository = {
     }
 
     // 1. 验证 Variant 存在
-    const variantExists = await this._variantExists(variantId);
+    const variantExists = await this._variantExists(variantId, userId);
     if (!variantExists) {
       return { success: false, error: new PreferenceError('VARIANT_NOT_FOUND', '该 SKU 不存在') };
     }
@@ -505,12 +505,13 @@ export const preferencesRepository = {
   // ─── 内部工具 ──────────────────────────────────────────────────────
 
   /** 校验 variantId 是否对应真实 ProductVariant */
-  async _variantExists(variantId: string): Promise<boolean> {
+  async _variantExists(variantId: string, profileUserId: string): Promise<boolean> {
     if (!validateUUID(variantId)) return false;
 
     if (isIndependentPlatformRuntime()) {
+      if (!validateUUID(profileUserId)) return false;
       const rows = await queryAppRows<{ id: string }>(
-        null,
+        { profileUserId },
         `SELECT id::text AS id FROM public.product_variant WHERE id = $1::uuid LIMIT 1`,
         [variantId],
       );

@@ -85,6 +85,8 @@ export class RealSyncRunner implements SyncRunner {
           token,
           mode: params.mode,
           priorDryRunPath,
+          syncRunId: params.runId,
+          triggeredByProfileId: params.triggeredBy,
         },
         params.signal,
         caps.maxTimeoutMs > 0 ? caps.maxTimeoutMs : undefined,

@@ -456,19 +456,11 @@ export const inventoryRepository = {
     quantity: number,
     options?: { profileUserId?: string },
   ): Promise<boolean> {
+    void options;
     if (isIndependentPlatformRuntime()) {
-      const profileUserId = options?.profileUserId;
-      if (!profileUserId) {
-        throw new Error('updateQuantity 在独立平台需要 profileUserId');
-      }
-      const updated = await queryAppRows<{ id: string }>(
-        { profileUserId },
-        `UPDATE public.inventory SET quantity = $2, updated_at = now()
-         WHERE id = $1::uuid
-         RETURNING id::text`,
-        [inventoryId, quantity],
+      throw new Error(
+        'inventory.updateQuantity 已在独立平台封存；数量仅经授权来源同步写入',
       );
-      return updated.length > 0;
     }
 
     const supabase = await createClient();

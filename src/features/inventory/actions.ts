@@ -99,6 +99,13 @@ export async function updateInventoryQuantity(
   inventoryId: string,
   quantity: number
 ): Promise<ActionResult> {
+  const { isIndependentPlatformRuntime } = await import('@/lib/database/runtime');
+  if (isIndependentPlatformRuntime()) {
+    return {
+      success: false,
+      error: '独立平台已封存人工改库存；数量由授权来源同步更新',
+    };
+  }
   try {
     const user = await requireAuth();
 

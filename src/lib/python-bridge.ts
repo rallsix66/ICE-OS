@@ -19,6 +19,10 @@ export interface PythonBridgeParams {
   mode: 'dry_run' | 'real_write';
   /** P5-SY9D: real_write 模式下的前一次 Dry Run 基线 JSON 文件路径（用于计划漂移比较） */
   priorDryRunPath?: string;
+  /** P0-02: Node claim 的运行 ID，写入 Python sync_log 关联 */
+  syncRunId?: string;
+  /** P0-02: 发起 sync 的 profile UUID */
+  triggeredByProfileId?: string;
 }
 
 export interface PythonBridgeResult {
@@ -84,11 +88,22 @@ export async function callPythonBridge(
     args.push('--prior-dry-run-path', params.priorDryRunPath);
   }
 
+  const childEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    PYTHONIOENCODING: 'utf-8',
+  };
+  if (params.syncRunId) {
+    childEnv.P0_02_SYNC_RUN_ID = params.syncRunId;
+  }
+  if (params.triggeredByProfileId) {
+    childEnv.P0_02_SYNC_TRIGGERED_BY = params.triggeredByProfileId;
+  }
+
   return new Promise<PythonBridgeResult>((resolve, reject) => {
     const proc = spawn('python', args, {
       cwd: PROJECT_ROOT,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: childEnv,
     });
 
     let stdout = '';
