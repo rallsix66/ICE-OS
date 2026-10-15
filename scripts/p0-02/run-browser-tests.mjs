@@ -91,6 +91,55 @@ function ensurePlaywrightChromium() {
 }
 
 const ADMIN_PROFILE_ID = '11111111-1111-4111-8111-111111111101';
+const OPERATOR_EMAIL = 'operator@p0-02.test';
+const OPERATOR_PASSWORD = 'OperatorPass123!';
+const TARGET_VARIANT_ID = '55555555-5555-4555-8555-555555555501';
+const TARGET_SKU = 'SKU-TH-001';
+const SEARCH_TERM = 'SKU-TH-001';
+
+async function withAppIdentity(connectionString, profileId, fn) {
+  const pool = new pg.Pool({ connectionString, max: 1 });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT set_config('request.jwt.claim.sub', $1, true)`, [profileId]);
+    return await fn(client);
+  } finally {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // ignore
+    }
+    client.release();
+    await pool.end();
+  }
+}
+
+async function readFavoriteState(connectionString, userId, variantId) {
+  return withAppIdentity(connectionString, userId, async (client) => {
+    const { rows } = await client.query(
+      `SELECT 1 FROM public.user_variant_preference
+       WHERE user_id = $1::uuid AND variant_id = $2::uuid AND preference_type = 'favorited'
+       LIMIT 1`,
+      [userId, variantId],
+    );
+    return rows.length > 0;
+  });
+}
+
+async function listSearchSkus(connectionString, profileId, term) {
+  return withAppIdentity(connectionString, profileId, async (client) => {
+    const { rows } = await client.query(
+      `SELECT v.sku
+       FROM public.product_variant v
+       JOIN public.inventory i ON i.variant_id = v.id
+       WHERE v.sku ILIKE $1
+       ORDER BY v.sku`,
+      [`%${term}%`],
+    );
+    return rows.map((r) => r.sku);
+  });
+}
 
 async function countProductsWithSessionIdentity(connectionString) {
   const pool = new pg.Pool({ connectionString, max: 1 });
@@ -187,6 +236,9 @@ async function main() {
   const results = [];
   const networkLog = [];
   const blockedExternal = [];
+  const businessEgressViolations = [];
+  let egressPhase = 'business';
+  const evidenceDetails = {};
 
   const { chromium } = await import('playwright');
 
@@ -201,7 +253,13 @@ async function main() {
         route.continue();
         return;
       }
-      blockedExternal.push(url);
+      if (/supabase\.co/i.test(url) && egressPhase === 'business') {
+        businessEgressViolations.push({ url, reason: 'supabase-attempt' });
+      }
+      if (egressPhase === 'business') {
+        businessEgressViolations.push({ url, reason: 'external-during-business' });
+      }
+      blockedExternal.push({ url, phase: egressPhase });
       route.abort('blockedbyclient');
     });
     const page = await context.newPage();
@@ -298,8 +356,9 @@ async function main() {
     const overviewNav = page.waitForURL('**/dashboard/products/overview**', { timeout: 15_000 });
     await page.goto('/dashboard/products/overview', { waitUntil: 'domcontentloaded' });
     await overviewNav;
+    const expectedSkus = await listSearchSkus(envJson.P0_02_APP_DATABASE_URL, ADMIN_PROFILE_ID, SEARCH_TERM);
     const searchInput = page.getByPlaceholder(/搜索 SKU、产品名或变体名/i);
-    await searchInput.fill('SKU-TH');
+    await searchInput.fill(SEARCH_TERM);
     const searchResponse = page.waitForResponse(
       (r) =>
         r.request().method() === 'GET' &&
@@ -309,16 +368,24 @@ async function main() {
     );
     await page.getByRole('button', { name: '搜索' }).click();
     const searchRes = await searchResponse;
-    const overviewText = await page.locator('body').innerText();
+    const overviewText = await page.locator('tbody').innerText().catch(() => '');
+    const uiSkus = expectedSkus.filter((sku) => overviewText.includes(sku));
+    const searchOk =
+      searchRes.status() === 200 &&
+      expectedSkus.length > 0 &&
+      uiSkus.length === expectedSkus.length;
     results.push({
       name: 'playwright-product-search-request',
       pass: searchRes.status() === 200,
       status: searchRes.status(),
     });
     results.push({
-      name: 'playwright-product-search-content',
-      pass: /SKU-TH|SKU|产品|库存/i.test(overviewText),
+      name: 'playwright-product-search-rowset',
+      pass: searchOk,
+      expected: expectedSkus,
+      matched: uiSkus,
     });
+    evidenceDetails.search = { expectedSkus, uiSkus, status: searchRes.status() };
 
     await page.goto('/dashboard/inventory/overseas', { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: /海外库存/i }).waitFor({ timeout: 15_000 });
@@ -328,43 +395,122 @@ async function main() {
       pass: /海外|库存|SKU/i.test(overseasText) && overseasText.includes('SKU-TH'),
     });
 
-    const favoriteBtn = page.locator('button[title="关注"], button[title="取消关注"]').first();
-    if (await favoriteBtn.count()) {
-      const favResponse = page.waitForResponse(
-        (r) => r.request().method() === 'POST' && /dashboard\/inventory\/overseas/.test(r.url()),
-        { timeout: 15_000 },
+    const targetRow = page.locator('tr', { hasText: TARGET_SKU });
+    const favoriteBtn = targetRow.locator('button[title="关注"], button[title="取消关注"]');
+    const favoriteExists = (await favoriteBtn.count()) === 1;
+    results.push({
+      name: 'playwright-overseas-favorite-button-present',
+      pass: favoriteExists,
+    });
+    let favoriteRestoreOk = false;
+    if (favoriteExists) {
+      const favoriteBefore = await readFavoriteState(
+        envJson.P0_02_APP_DATABASE_URL,
+        ADMIN_PROFILE_ID,
+        TARGET_VARIANT_ID,
       );
       await favoriteBtn.click();
-      const favRes = await favResponse;
-      networkLog.push({
-        url: favRes.url(),
-        status: favRes.status(),
-        method: 'POST',
+      await page.waitForTimeout(800);
+      const favoriteAfter = await readFavoriteState(
+        envJson.P0_02_APP_DATABASE_URL,
+        ADMIN_PROFILE_ID,
+        TARGET_VARIANT_ID,
+      );
+      const domTitle = await favoriteBtn.getAttribute('title');
+      const toggled = favoriteAfter !== favoriteBefore;
+      await favoriteBtn.click();
+      await page.waitForTimeout(800);
+      const favoriteRestored = await readFavoriteState(
+        envJson.P0_02_APP_DATABASE_URL,
+        ADMIN_PROFILE_ID,
+        TARGET_VARIANT_ID,
+      );
+      favoriteRestoreOk = favoriteRestored === favoriteBefore;
+      results.push({
+        name: 'playwright-overseas-favorite-toggle-db',
+        pass: toggled && (domTitle === '关注' || domTitle === '取消关注'),
+        before: favoriteBefore,
+        after: favoriteAfter,
+        restored: favoriteRestored,
       });
       results.push({
-        name: 'playwright-overseas-favorite-action',
-        pass: favRes.status() >= 200 && favRes.status() < 400,
-        status: favRes.status(),
+        name: 'playwright-overseas-favorite-restore',
+        pass: favoriteRestoreOk,
       });
+      evidenceDetails.favorite = {
+        before: favoriteBefore,
+        after: favoriteAfter,
+        restored: favoriteRestored,
+        domTitle,
+      };
     }
 
     const exportBtn = page.getByRole('button', { name: /导出/i });
-    const downloadPromise = page.waitForEvent('download', { timeout: 20_000 }).catch(() => null);
+    const downloadPromise = page.waitForEvent('download', { timeout: 20_000 });
     await exportBtn.click();
     const download = await downloadPromise;
+    const csvPath = await download.path();
+    const csvContent = csvPath ? fs.readFileSync(csvPath, 'utf8') : '';
+    const csvHasTargetSku = csvContent.includes(TARGET_SKU);
+    const csvHasAmountColumn = /(单位成本|货值|金额|unit_cost|amount)/i.test(csvContent);
     results.push({
-      name: 'playwright-overseas-csv-export',
-      pass: download != null && /overseas-inventory.*\.csv/i.test(download.suggestedFilename()),
-      filename: download?.suggestedFilename(),
+      name: 'playwright-overseas-csv-export-content',
+      pass:
+        /overseas-inventory.*\.csv/i.test(download.suggestedFilename()) &&
+        csvHasTargetSku &&
+        !csvHasAmountColumn,
+      filename: download.suggestedFilename(),
+      bytes: csvContent.length,
+    });
+    evidenceDetails.csv = {
+      filename: download.suggestedFilename(),
+      hasTargetSku: csvHasTargetSku,
+      hasAmountColumn: csvHasAmountColumn,
+      sample: csvContent.split('\n').slice(0, 5),
+    };
+
+    const operatorSignIn = await fetch(`${baseUrl}/api/auth/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: baseUrl,
+      },
+      body: JSON.stringify({ email: OPERATOR_EMAIL, password: OPERATOR_PASSWORD }),
+    });
+    const operatorSetCookie = operatorSignIn.headers.getSetCookie?.() ?? [];
+    const operatorCookie = operatorSetCookie.map((c) => c.split(';')[0]).join('; ');
+    const operatorInv = await fetch(`${baseUrl}/api/p0-02/inventory`, {
+      headers: { Cookie: operatorCookie },
+    });
+    const operatorInvJson = await operatorInv.json().catch(() => null);
+    const operatorJsonText = JSON.stringify(operatorInvJson ?? {});
+    const operatorAmountLeak = /(unit_cost|unitCost|amount|cost)/i.test(operatorJsonText);
+    results.push({
+      name: 'playwright-operator-inventory-no-amount-leak',
+      pass: operatorInv.status === 200 && !operatorAmountLeak,
+      status: operatorInv.status,
     });
 
-    const blockedProbe = page
-      .goto('http://example.com/', { waitUntil: 'commit', timeout: 5_000 })
-      .then(() => false)
-      .catch(() => true);
+    egressPhase = 'self-test';
+    let selfTestBlocked = false;
+    let selfTestErrorCode = null;
+    try {
+      await page.goto('http://example.com/', { waitUntil: 'commit', timeout: 5_000 });
+    } catch (error) {
+      selfTestBlocked = blockedExternal.some(
+        (entry) => entry.phase === 'self-test' && /example\.com/.test(entry.url),
+      );
+      selfTestErrorCode = error?.message ?? String(error);
+    }
     results.push({
       name: 'playwright-browser-egress-block-selftest',
-      pass: await blockedProbe,
+      pass: selfTestBlocked,
+      error: selfTestErrorCode,
+    });
+    results.push({
+      name: 'playwright-business-egress-clean',
+      pass: businessEgressViolations.length === 0,
+      violations: businessEgressViolations.slice(0, 10),
     });
 
     const htmlLeak = /SUPABASE_SERVICE_ROLE|createBrowserClient/i.test(overviewText + overseasText);
@@ -402,6 +548,8 @@ async function main() {
       positive: productCountBefore > 0,
     },
     blockedExternalCount: blockedExternal.length,
+    businessEgressViolations,
+    evidenceDetails,
     playwright: true,
   };
 
@@ -413,6 +561,15 @@ async function main() {
   }
   if (!results.some((r) => r.name === 'playwright-browser-egress-block-selftest' && r.pass)) {
     failed.push({ name: 'browser-external-block-selftest', pass: false });
+  }
+  if (!results.some((r) => r.name === 'playwright-business-egress-clean' && r.pass)) {
+    failed.push({ name: 'browser-business-egress-violation', pass: false });
+  }
+  if (!results.some((r) => r.name === 'playwright-overseas-favorite-button-present' && r.pass)) {
+    failed.push({ name: 'browser-favorite-button-required', pass: false });
+  }
+  if (!results.some((r) => r.name === 'playwright-overseas-favorite-restore' && r.pass)) {
+    failed.push({ name: 'browser-favorite-restore', pass: false });
   }
   if (apiHits.length < 2) {
     failed.push({ name: 'network-api-evidence', pass: false });

@@ -157,6 +157,27 @@ const steps = [
     env: p002TestEnv,
   },
   {
+    name: 'p0-02-repeat-schema-apply',
+    cmd: process.execPath,
+    args: [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-repeat-schema-apply.mjs')],
+    cwd: REPO_ROOT,
+    env: p002TestEnv,
+  },
+  {
+    name: 'p0-02-backup-restore-drill',
+    cmd: process.execPath,
+    args: [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-backup-restore-drill.mjs')],
+    cwd: REPO_ROOT,
+    env: p002TestEnv,
+  },
+  {
+    name: 'p0-02-concurrency',
+    cmd: process.execPath,
+    args: [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-p0-02-concurrency.mjs')],
+    cwd: REPO_ROOT,
+    env: p002TestEnv,
+  },
+  {
     name: 'p0-02-python-connection-boundary',
     cmd: process.platform === 'win32' ? 'python' : 'python3',
     args: [

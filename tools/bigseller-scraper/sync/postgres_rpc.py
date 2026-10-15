@@ -92,6 +92,81 @@ def call_sync_warehouse_inventory_rpc(
             conn.close()
 
 
+def _insert_sync_log_row(
+    cur,
+    warehouse_id: str,
+    status: str,
+    new_variants_count: int,
+    error_message: str | None,
+    started_at: str,
+    finished_at: str,
+    *,
+    sync_run_id: str | None = None,
+    triggered_by: str | None = None,
+) -> dict[str, Any]:
+    _apply_sync_scope(cur, warehouse_id)
+    cur.execute(
+        """
+        INSERT INTO public.sync_log (
+          warehouse_id, status, new_variants_count,
+          error_message, started_at, finished_at,
+          sync_run_id, triggered_by
+        ) VALUES (
+          %s::uuid, %s, %s, %s, %s::timestamptz, %s::timestamptz,
+          %s::uuid, %s::uuid
+        )
+        RETURNING id::text, status, warehouse_id::text, sync_run_id::text
+        """,
+        (
+            warehouse_id,
+            status,
+            new_variants_count,
+            error_message,
+            started_at,
+            finished_at,
+            sync_run_id,
+            triggered_by,
+        ),
+    )
+    row = cur.fetchone()
+    if row is None:
+        raise RuntimeError('sync_log INSERT 未返回行')
+    if isinstance(row, dict):
+        return {
+            'id': row['id'],
+            'status': row['status'],
+            'warehouse_id': row['warehouse_id'],
+        }
+    return {'id': row[0], 'status': row[1], 'warehouse_id': row[2]}
+
+
+def write_sync_log_postgres_conn(
+    conn,
+    warehouse_id: str,
+    status: str,
+    new_variants_count: int,
+    error_message: str | None,
+    started_at: str,
+    finished_at: str,
+    *,
+    sync_run_id: str | None = None,
+    triggered_by: str | None = None,
+) -> dict[str, Any]:
+    """在同一发布事务内写入 sync_log（由调用方 commit/rollback）。"""
+    with conn.cursor() as cur:
+        return _insert_sync_log_row(
+            cur,
+            warehouse_id,
+            status,
+            new_variants_count,
+            error_message,
+            started_at,
+            finished_at,
+            sync_run_id=sync_run_id,
+            triggered_by=triggered_by,
+        )
+
+
 def write_sync_log_postgres(
     warehouse_id: str,
     status: str,
@@ -109,45 +184,17 @@ def write_sync_log_postgres(
     conn = connect_validated_sync(import_psycopg=psycopg)
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT set_config('p0_02.sync.mode', 'warehouse', true)")
-            cur.execute(
-                "SELECT set_config('p0_02.sync.warehouse_id', %s, true)",
-                (warehouse_id,),
+            record = _insert_sync_log_row(
+                cur,
+                warehouse_id,
+                status,
+                new_variants_count,
+                error_message,
+                started_at,
+                finished_at,
+                sync_run_id=sync_run_id,
+                triggered_by=triggered_by,
             )
-            cur.execute(
-                """
-                INSERT INTO public.sync_log (
-                  warehouse_id, status, new_variants_count,
-                  error_message, started_at, finished_at,
-                  sync_run_id, triggered_by
-                ) VALUES (
-                  %s::uuid, %s, %s, %s, %s::timestamptz, %s::timestamptz,
-                  %s::uuid, %s::uuid
-                )
-                RETURNING id::text, status, warehouse_id::text, sync_run_id::text
-                """,
-                (
-                    warehouse_id,
-                    status,
-                    new_variants_count,
-                    error_message,
-                    started_at,
-                    finished_at,
-                    sync_run_id,
-                    triggered_by,
-                ),
-            )
-            row = cur.fetchone()
-            if row is None:
-                raise RuntimeError('sync_log INSERT 未返回行')
-            if isinstance(row, dict):
-                record = {
-                    'id': row['id'],
-                    'status': row['status'],
-                    'warehouse_id': row['warehouse_id'],
-                }
-            else:
-                record = {'id': row[0], 'status': row[1], 'warehouse_id': row[2]}
         conn.commit()
         return record
     except Exception:

@@ -82,33 +82,60 @@ def main():
         # ============================================================
         sys.path.insert(0, BASE_DIR)
 
-        from bigseller_scraper import scrape, save_json
+        from sync.p0_02_connection_boundary import independent_p0_02_enabled
 
-        print(f'[web_bridge] 开始抓取 BigSeller: {args.warehouse_name}', file=sys.stderr)
-        rows, metadata, invalid_sku_rows, combo_sku_rows = scrape()
-
-        if not rows:
-            result['errors'].append(
-                'BigSeller 抓取返回 0 行数据，可能是登录会话已过期或需要验证码。'
-                '请在库存同步页面点击「重新建立登录会话」按钮，系统会自动打开浏览器供您完成登录和验证码，'
-                '登录成功后网页端同步即可恢复正常。'
+        fixture_input_path = os.environ.get('P0_02_FIXTURE_INPUT_PATH', '').strip()
+        if fixture_input_path and independent_p0_02_enabled():
+            if not os.path.exists(fixture_input_path):
+                result['errors'].append(
+                    f'P0_02 fixture 输入不存在: {fixture_input_path}',
+                )
+                _write_result(result)
+                sys.exit(1)
+            with open(fixture_input_path, 'r', encoding='utf-8') as f:
+                normalized_data = json.load(f)
+            input_rows = normalized_data.get('rows') or normalized_data
+            metadata = normalized_data.get('metadata') or {}
+            invalid_sku_rows = normalized_data.get('invalid_sku_rows') or []
+            output_path = fixture_input_path
+            result['raw_row_count'] = metadata.get('raw_row_count', len(input_rows))
+            result['valid_sku_count'] = metadata.get('valid_sku_count', len(input_rows))
+            result['invalid_sku_count'] = metadata.get(
+                'invalid_sku_count',
+                len(invalid_sku_rows),
             )
-            _write_result(result)
-            sys.exit(1)
+            print(
+                f'[web_bridge] 使用 P0-02 fixture 输入: {len(input_rows)} 行',
+                file=sys.stderr,
+            )
+        else:
+            from bigseller_scraper import scrape, save_json
 
-        # 保存抓取 JSON（含规范化行: sku, product_name, available_quantity 等）
-        output_path = save_json(rows, metadata, invalid_sku_rows, combo_sku_rows)
-        print(f'[web_bridge] 抓取完成: {len(rows)} 行 → {output_path}', file=sys.stderr)
+            print(f'[web_bridge] 开始抓取 BigSeller: {args.warehouse_name}', file=sys.stderr)
+            rows, metadata, invalid_sku_rows, combo_sku_rows = scrape()
 
-        # 录入 scraper metadata 到结果摘要（供前端审核展示）
-        result['raw_row_count'] = (metadata or {}).get('raw_row_count', len(rows))
-        result['valid_sku_count'] = (metadata or {}).get('valid_sku_count', len(rows))
-        result['invalid_sku_count'] = (metadata or {}).get('invalid_sku_count', len(invalid_sku_rows) if invalid_sku_rows else 0)
+            if not rows:
+                result['errors'].append(
+                    'BigSeller 抓取返回 0 行数据，可能是登录会话已过期或需要验证码。'
+                    '请在库存同步页面点击「重新建立登录会话」按钮，系统会自动打开浏览器供您完成登录和验证码，'
+                    '登录成功后网页端同步即可恢复正常。'
+                )
+                _write_result(result)
+                sys.exit(1)
 
-        # 从保存的 JSON 读取规范化行（generate_plan 需要 sku/product_name/available_quantity 字段）
-        with open(output_path, 'r', encoding='utf-8') as f:
-            normalized_data = json.load(f)
-        input_rows = normalized_data['rows']
+            output_path = save_json(rows, metadata, invalid_sku_rows, combo_sku_rows)
+            print(f'[web_bridge] 抓取完成: {len(rows)} 行 → {output_path}', file=sys.stderr)
+
+            result['raw_row_count'] = (metadata or {}).get('raw_row_count', len(rows))
+            result['valid_sku_count'] = (metadata or {}).get('valid_sku_count', len(rows))
+            result['invalid_sku_count'] = (metadata or {}).get(
+                'invalid_sku_count',
+                len(invalid_sku_rows) if invalid_sku_rows else 0,
+            )
+
+            with open(output_path, 'r', encoding='utf-8') as f:
+                normalized_data = json.load(f)
+            input_rows = normalized_data['rows']
 
         # ============================================================
         # Phase 2: Dry Run 基线

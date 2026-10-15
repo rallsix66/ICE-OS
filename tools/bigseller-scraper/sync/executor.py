@@ -1108,6 +1108,7 @@ def _write_sync_log(
     *,
     sync_run_id: str | None = None,
     triggered_by: str | None = None,
+    conn=None,
 ) -> dict:
     """写入 sync_log 记录。
 
@@ -1140,8 +1141,20 @@ def _write_sync_log(
     from .p0_02_connection_boundary import independent_p0_02_enabled
 
     if independent_p0_02_enabled():
-        from .postgres_rpc import write_sync_log_postgres
+        from .postgres_rpc import write_sync_log_postgres, write_sync_log_postgres_conn
 
+        if conn is not None:
+            return write_sync_log_postgres_conn(
+                conn,
+                warehouse_id,
+                status,
+                new_variants_count,
+                error_message,
+                started_at,
+                finished_at,
+                sync_run_id=sync_run_id,
+                triggered_by=triggered_by,
+            )
         return write_sync_log_postgres(
             warehouse_id,
             status,
@@ -1739,52 +1752,93 @@ def execute_plan_v2(
             'post-commit audit',
         )) from e
 
-    # Phase G/I 审计全部通过后提交发布事务（P0-02）并设置 finished_at
-    _finalize_publish_conn(commit=True)
+    # Phase G/I 通过后：必要 success sync_log 与库存发布同一事务提交（P0-02）
     finished_at = datetime.now().astimezone().isoformat(timespec='seconds')
     result['finished_at'] = finished_at
-    result['publish_committed'] = True
 
-    # =====================================================================
-    # 5. 记录 sync_log success
-    # =====================================================================
-    if sync_log_enabled:
+    if publish_conn is not None:
         try:
-            _write_sync_log(
-                warehouse_id=warehouse_id,
-                status='success',
-                new_variants_count=rpc_result.get('variants_created', 0),
-                error_message=None,
-                started_at=started_at,
-                finished_at=finished_at,
-                sync_run_id=bound_sync_run_id,
-                triggered_by=bound_triggered_by,
-            )
-            result['sync_log_written'] = True
-            print('[execute_plan_v2] sync_log success 已写入')
+            if sync_log_enabled:
+                _write_sync_log(
+                    warehouse_id=warehouse_id,
+                    status='success',
+                    new_variants_count=rpc_result.get('variants_created', 0),
+                    error_message=None,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    sync_run_id=bound_sync_run_id,
+                    triggered_by=bound_triggered_by,
+                    conn=publish_conn,
+                )
+            _finalize_publish_conn(commit=True)
+            result['publish_committed'] = True
+            if sync_log_enabled:
+                result['sync_log_written'] = True
+                print('[execute_plan_v2] sync_log success 已与发布同事务提交')
         except Exception as sl_err:
+            _finalize_publish_conn(commit=False)
+            result['publish_committed'] = False
+            result['sync_log_written'] = False
+            fail_msg = f'发布事务提交失败（库存与 success sync_log 已回滚）: {sl_err}'
+            result['errors'].append(fail_msg)
+            print(fail_msg, file=sys.stderr)
+            if sync_log_enabled:
+                try:
+                    _write_sync_log(
+                        warehouse_id=warehouse_id,
+                        status='failed',
+                        new_variants_count=new_variants_count,
+                        error_message=fail_msg[:2000],
+                        started_at=started_at,
+                        finished_at=finished_at,
+                        sync_run_id=bound_sync_run_id,
+                        triggered_by=bound_triggered_by,
+                    )
+                except Exception as log_err:
+                    result['errors'].append(
+                        f'回滚后 failed sync_log 写入失败: {log_err}',
+                    )
+            raise RuntimeError(fail_msg) from sl_err
+    else:
+        _finalize_publish_conn(commit=True)
+        result['publish_committed'] = True
+        if sync_log_enabled:
             try:
-                fb_path = _save_fallback_log(
-                    {
-                        'warehouse_id': warehouse_id,
-                        'status': 'success',
-                        'new_variants_count': rpc_result.get('variants_created', 0),
-                        'error_message': None,
-                        'started_at': started_at,
-                        'finished_at': finished_at,
-                    },
-                    fallback_dir,
+                _write_sync_log(
+                    warehouse_id=warehouse_id,
+                    status='success',
+                    new_variants_count=rpc_result.get('variants_created', 0),
+                    error_message=None,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    sync_run_id=bound_sync_run_id,
+                    triggered_by=bound_triggered_by,
                 )
-                result['sync_log_fallback_path'] = fb_path
-                result['errors'].append(
-                    f'sync_log 写入失败（RPC 已成功）: {sl_err}（已保存 fallback: {fb_path}）'
-                )
-                print(f'[execute_plan_v2] sync_log 写入失败，已保存 fallback: {fb_path}')
-            except Exception as fb_err:
-                msg = (f'sync_log 写入失败且 fallback 保存失败（RPC 已成功） — '
-                       f'sync_log 错误: {sl_err}；fallback 错误: {fb_err}')
-                result['errors'].append(msg)
-                print(msg, file=sys.stderr)
+                result['sync_log_written'] = True
+                print('[execute_plan_v2] sync_log success 已写入')
+            except Exception as sl_err:
+                try:
+                    fb_path = _save_fallback_log(
+                        {
+                            'warehouse_id': warehouse_id,
+                            'status': 'success',
+                            'new_variants_count': rpc_result.get('variants_created', 0),
+                            'error_message': None,
+                            'started_at': started_at,
+                            'finished_at': finished_at,
+                        },
+                        fallback_dir,
+                    )
+                    result['sync_log_fallback_path'] = fb_path
+                    result['errors'].append(
+                        f'sync_log 写入失败（RPC 已成功）: {sl_err}（已保存 fallback: {fb_path}）'
+                    )
+                    print(f'[execute_plan_v2] sync_log 写入失败，已保存 fallback: {fb_path}')
+                except Exception as fb_err:
+                    msg = (f'sync_log 写入失败且 fallback 保存失败（RPC 已成功） — '
+                           f'sync_log 错误: {sl_err}；fallback 错误: {fb_err}')
+                    result['errors'].append(msg)
+                    print(msg, file=sys.stderr)
 
     print('[execute_plan_v2] 完成')
     return result

@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sync.p0_02_test_fixture import OwnedFixtureRegistry
+
 
 def _load_owner_dsn() -> str:
     run_id = os.environ.get('P0_02_RUN_ID', 'run-20261014-r2')
@@ -20,11 +22,13 @@ def _load_owner_dsn() -> str:
 
 
 class P002PostgresRealWriteChainTests(unittest.TestCase):
+    registry: OwnedFixtureRegistry
     wh: str
     variant: str
     inventory_id: str
     sku: str
     sync_run_id: str
+    dry_run_id: str
     admin_profile: str
 
     @classmethod
@@ -42,6 +46,9 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
         cfg.TARGET_WAREHOUSE_NAME = 'P0-02 RW fixture wh'
         cfg.OLD_WAREHOUSE_NAME = 'P0-02 RW fixture wh'
 
+        cls.registry = OwnedFixtureRegistry(_load_owner_dsn())
+        cls.registry.capture_baseline()
+
         cls.wh = str(uuid.uuid4())
         cls.variant = str(uuid.uuid4())
         cls.inventory_id = str(uuid.uuid4())
@@ -49,6 +56,12 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
         cls.sync_run_id = str(uuid.uuid4())
         cls.dry_run_id = str(uuid.uuid4())
         cls.admin_profile = '11111111-1111-4111-8111-111111111101'
+
+        cls.registry.register_warehouse(cls.wh)
+        cls.registry.register_variant(cls.variant)
+        cls.registry.register_inventory(cls.inventory_id)
+        cls.registry.register_sync_run(cls.sync_run_id)
+        cls.registry.register_sync_run(cls.dry_run_id)
 
         import psycopg
 
@@ -109,26 +122,81 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
+        report = cls.registry.restore(verify_counts=False)
+        if report.get('errors'):
+            raise AssertionError(f'fixture restore failed: {report}')
+
+    def setUp(self) -> None:
+        os.environ['BS_WAREHOUSE_COUNTRY'] = 'TH'
+        os.environ['BS_TARGET_WAREHOUSE_NAME'] = 'P0-02 RW fixture wh'
+        os.environ['BS_OLD_WAREHOUSE_NAME'] = 'P0-02 RW fixture wh'
+        os.environ['BS_NEW_VARIANT_COUNTRY'] = 'TH'
+        os.environ['P0_02_SYNC_RUN_ID'] = self.sync_run_id
+        os.environ['P0_02_SYNC_TRIGGERED_BY'] = self.admin_profile
+        import sync.config as cfg
+
+        cfg.WAREHOUSE_COUNTRY = 'TH'
+        cfg.TARGET_WAREHOUSE_NAME = 'P0-02 RW fixture wh'
+        cfg.OLD_WAREHOUSE_NAME = 'P0-02 RW fixture wh'
+
         import psycopg
 
         conn = psycopg.connect(_load_owner_dsn())
         try:
             with conn.cursor() as cur:
                 cur.execute(
+                    """
+                    DELETE FROM public.inventory
+                    WHERE warehouse_id = %s::uuid AND variant_id <> %s::uuid
+                    """,
+                    (self.wh, self.variant),
+                )
+                cur.execute(
+                    """
+                    DELETE FROM public.product_variant
+                    WHERE id IN (
+                      SELECT v.id FROM public.product_variant v
+                      LEFT JOIN public.inventory i ON i.variant_id = v.id AND i.warehouse_id = %s::uuid
+                      WHERE i.id IS NULL AND v.sku LIKE 'RW-NEW-%%'
+                    )
+                    """,
+                    (self.wh,),
+                )
+                cur.execute(
+                    'UPDATE public.inventory SET quantity = 5 WHERE id = %s::uuid',
+                    (self.inventory_id,),
+                )
+                cur.execute(
                     'DELETE FROM public.sync_log WHERE warehouse_id = %s::uuid',
-                    (cls.wh,),
+                    (self.wh,),
                 )
-                cur.execute('DELETE FROM public.inventory WHERE warehouse_id = %s::uuid', (cls.wh,))
-                cur.execute(
-                    'DELETE FROM public.product_variant WHERE id = %s::uuid',
-                    (cls.variant,),
-                )
-                cur.execute(
-                    'DELETE FROM public.sync_run WHERE id IN (%s::uuid, %s::uuid)',
-                    (cls.sync_run_id, cls.dry_run_id),
-                )
-                cur.execute('DELETE FROM public.sync_warehouse_lock WHERE warehouse_id = %s::uuid', (cls.wh,))
-                cur.execute('DELETE FROM public.warehouse WHERE id = %s::uuid', (cls.wh,))
+            conn.commit()
+        finally:
+            conn.close()
+
+    def tearDown(self) -> None:
+        dynamic = [
+            vid
+            for vid in self.registry.variant_ids
+            if vid not in (self.variant,)
+        ]
+        if not dynamic:
+            return
+        import psycopg
+
+        conn = psycopg.connect(_load_owner_dsn())
+        try:
+            with conn.cursor() as cur:
+                for variant_id in dynamic:
+                    cur.execute(
+                        'DELETE FROM public.inventory WHERE variant_id = %s::uuid',
+                        (variant_id,),
+                    )
+                    cur.execute(
+                        'DELETE FROM public.product_variant WHERE id = %s::uuid',
+                        (variant_id,),
+                    )
+                    self.registry.variant_ids.remove(variant_id)
             conn.commit()
         finally:
             conn.close()
@@ -211,6 +279,8 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
 
         new_variant = str(uuid.uuid4())
         new_sku = f'RW-NEW-{new_variant[:8]}'
+        self.registry.register_variant(new_variant)
+
         sync_at = datetime.now(timezone.utc).isoformat()
         plan = {
             'warehouse_rename_required': {
@@ -257,15 +327,48 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
                     (new_sku, self.wh),
                 )
                 self.assertEqual(cur.fetchone()[0], 1)
-                cur.execute(
-                    'DELETE FROM public.inventory WHERE variant_id IN '
-                    '(SELECT id FROM public.product_variant WHERE sku = %s)',
-                    (new_sku,),
-                )
-                cur.execute('DELETE FROM public.product_variant WHERE sku = %s', (new_sku,))
-            conn.commit()
         finally:
             conn.close()
+
+    def test_post_publish_assertion_failure_still_restores_new_variant(self) -> None:
+        from sync.executor import execute_plan_v2
+
+        new_variant = str(uuid.uuid4())
+        new_sku = f'RW-NEW-{new_variant[:8]}'
+        self.registry.register_variant(new_variant)
+        sync_at = datetime.now(timezone.utc).isoformat()
+        plan = {
+            'warehouse_rename_required': {
+                'warehouse_id': self.wh,
+                'action': 'none',
+                'target_name': 'P0-02 RW fixture wh',
+            },
+            'new_variants': [{'sku': new_sku, 'country': 'TH', 'name': 'Fault path variant'}],
+            'inventory_updates': [],
+            'inventory_inserts': [
+                {
+                    'sku': new_sku,
+                    'country': 'TH',
+                    'new_quantity': 2,
+                    'warehouse_id': self.wh,
+                    'last_sync_at': sync_at,
+                },
+            ],
+            'inventory_after_variant_create': [],
+            'inventory_unchanged': [
+                {
+                    'sku': self.sku,
+                    'warehouse_id': self.wh,
+                    'quantity': 5,
+                    'new_quantity': 5,
+                    'last_sync_at': sync_at,
+                },
+            ],
+        }
+        result = execute_plan_v2(plan, sync_log_enabled=True)
+        self.assertTrue(result.get('publish_committed'))
+        with self.assertRaises(AssertionError):
+            raise AssertionError('controlled post-publish assertion failure')
 
 
 if __name__ == '__main__':

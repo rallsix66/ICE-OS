@@ -38,25 +38,36 @@ const pythonEnv = {
   P0_02_ENABLED: 'true',
 };
 
-const result = spawnSync(
-  pythonCmd,
-  ['-m', 'unittest', 'sync.test_p0_02_postgres_real_write_chain'],
-  withHiddenWindowsSpawnOptions({
-    cwd: scraperRoot,
-    env: pythonEnv,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: process.platform === 'win32',
-  }),
-);
+const modules = [
+  'sync.test_p0_02_publish_atomicity',
+  'sync.test_p0_02_postgres_real_write_chain',
+];
+let combinedOutput = '';
+let exitCode = 0;
+for (const moduleName of modules) {
+  const result = spawnSync(
+    pythonCmd,
+    ['-m', 'unittest', moduleName],
+    withHiddenWindowsSpawnOptions({
+      cwd: scraperRoot,
+      env: pythonEnv,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    }),
+  );
+  combinedOutput += `\n=== ${moduleName} ===\n${result.stdout ?? ''}${result.stderr ?? ''}`;
+  if (result.status !== 0) {
+    exitCode = result.status ?? 1;
+    break;
+  }
+}
+fs.writeFileSync(path.join(evidenceDir, 'unittest.log'), combinedOutput);
 
-const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-fs.writeFileSync(path.join(evidenceDir, 'unittest.log'), output);
-
-if (result.status !== 0) {
-  console.error('python real_write integration failed', { status: result.status });
-  console.error(output);
-  process.exit(result.status ?? 1);
+if (exitCode !== 0) {
+  console.error('python real_write integration failed', { status: exitCode });
+  console.error(combinedOutput);
+  process.exit(exitCode);
 }
 
 console.log(`python real_write integration passed (evidence: ${evidenceDir})`);
