@@ -1,20 +1,20 @@
 # Current Project State
 
-更新：2026-10-15（**P0-02 d4f7804 审查返工后，待独立审查**）。仓库 ICEOS。
+更新：2026-10-15（**P0-02 2289acf 审查返工后，待独立审查**）。仓库 ICEOS。
 
 ## P0-02 状态
 
 | 项 | 状态 |
 |---|---|
-| 上一轮审查 | **CHANGES_REQUIRED** @ `d4f7804`（2026-10-15） |
-| 审查摘要 | [docs/p0-02/independent-review-summary-d4f7804-20261015.md](./p0-02/independent-review-summary-d4f7804-20261015.md) |
-| 正式任务包 | [docs/tasks/p0-02/2026-10-15-delivery-rework.md](./tasks/p0-02/2026-10-15-delivery-rework.md) |
+| 本轮审查 | **CHANGES_REQUIRED** @ `2289acf`（2026-10-15） |
+| 审查摘要 | [docs/p0-02/independent-review-summary-2289acf-20261015.md](./p0-02/independent-review-summary-2289acf-20261015.md) |
+| 正式任务包 | [docs/tasks/p0-02/2026-10-15-delivery-rework-2289acf.md](./tasks/p0-02/2026-10-15-delivery-rework-2289acf.md) |
 | 任务状态 | **`P0_02_IMPLEMENTED_AWAITING_REVIEW`**（**非** PASS） |
 | Canonical Run | `run-20261014-r2` |
-| 总验收 | `npm run check:p0-02` **已通过**（`check-2026-10-15T02-03-22-319Z`） |
-| Postgres | **45/45** |
-| Browser A3 | **14** 项 Playwright |
-| 验证报告 | [verification-report-r2-20261015-r2.md](./p0-02/verification-report-r2-20261015-r2.md) |
+| 总验收 | `npm run check:p0-02` **已通过**（`check-2026-10-15T02-32-41-460Z`） |
+| Postgres | **46/46** vitest（含 Node→bridge 整链） |
+| Browser A3 | **18** 项 Playwright |
+| 验证报告 | [verification-report-r2-20261015-r3.md](./p0-02/verification-report-r2-20261015-r3.md) |
 
 ## P0-01 状态（保留）
 

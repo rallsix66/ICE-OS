@@ -32,22 +32,23 @@
 
 | ID | 含义 | 证据入口 | 状态 |
 | --- | --- | --- | --- |
-| A1 | 保留功能迁移及证据矩阵 | 本矩阵 + `check-2026-10-15T01-24-49-983Z` | **待独立审查** |
-| A2 | 无 Supabase 运行依赖/回退 | `build-isolated` + **boundary probes** + legacy 仅 `P0_02_ENABLED=false` | **已验证**（DELIVERY-05） |
-| A3 | 真实浏览器交互 + 网络/落库 | Playwright：登录/导航/搜索 + **dashboard/inventory API** + **TX 身份 COUNT** | **已验证**（DELIVERY-06） |
-| A4 | 认证/权限/金额 | `test:p0-02:http` + identity + effective-acl | **已验证**（待审查扩面金额导出） |
-| A5 | 业务语义兼容 | vitest + Repository PG + delivery-rework | **待独立审查** |
-| A6 | PG 最小权限/RLS/池隔离 | `test:p0-02:postgres`（**43/43**）+ sync-runner-authorization | **已验证** |
-| A7 | 虚构来源→claim→bridge→real_write→sync_log | 独占 fixture real_write + 发布 defer commit + sync_run 绑定 | **已验证**（待审查全合同乱序/租约等） |
-| A8 | 实例/fixture/负例 | prepare + fixture-restore-negative + migrate-auth-negative | **已验证** |
-| A9 | lint/build/diff/opt6 | `npm run check:p0-02` exit 0 | **已验证**（opt6 已知 1 fail / 5 pass） |
+| A1 | 保留功能迁移及证据矩阵 | 本矩阵 + `check-2026-10-15T02-32-41-460Z` | **已验证**（待独立审查复核范围） |
+| A2 | 无 Supabase 运行依赖/回退 | `build-isolated` + boundary probes + `P0_02_FIXTURE_INPUT_PATH` bridge | **已验证** |
+| A3 | 真实浏览器交互 + 网络/落库 | Playwright **18** 项：关注 DB/DOM/恢复、搜索行集、CSV 内容、egress | **已验证** |
+| A4 | 认证/权限/金额 | `test:p0-02:http` + 浏览器运营 inventory API 无 amount 字段 | **已验证** |
+| A5 | 业务语义兼容 | vitest + delivery-rework + Python gateway | **已验证** |
+| A6 | PG 最小权限/RLS/池隔离 | postgres **46/46** + 011 重复 apply + 发布/审计原子性 | **已验证** |
+| A7 | 虚构来源→claim→bridge→real_write→sync_log | `sync-node-real-write-chain.postgres.test.ts` + Python atomicity/real_write | **已验证** |
+| A8 | 实例/fixture/负例/备份恢复 | fixture-restore-negative + **`run-backup-restore-drill.mjs`** + repeat-schema | **已验证** |
+| A9 | lint/build/diff/opt6/concurrency | `check:p0-02` + **`run-p0-02-concurrency.mjs`** | **已验证**（opt6 已知 1 fail / 5 pass） |
 
 ### 子测试挂接（摘要）
 
 - **A2**：`run-python-gateway-negative.mjs` / `run-python-gateway-integration.mjs`
-- **A3**：`run-browser-tests.mjs` → Playwright + `results.json`（Chromium 外网阻断 + **BEGIN 内 GUC** 产品 COUNT + API 证据）
-- **DELIVERY**：`tests/p0-02/delivery-rework.postgres.test.ts`；`run-python-boundary-probes.mjs`
-- **A7**：`run-sync-tests.mjs` 内含 gateway + **real_write**；`sync-run-lifecycle.postgres.test.ts`
+- **A3**：`run-browser-tests.mjs` → `browser-2026-10-15T02-31-59-987Z`
+- **DELIVERY**：`delivery-rework.postgres.test.ts`；`test_p0_02_publish_atomicity.py`；`run-repeat-schema-apply.mjs`
+- **A7**：`sync-node-real-write-chain.postgres.test.ts`；`run-python-real-write-integration.mjs`
+- **A8/A9**：`run-backup-restore-drill.mjs`；`run-p0-02-concurrency.mjs`
 - **P002-R6**：`sync-fixture.ts` 独占 UUID；`fixture-integrity.mjs` 无固定 ID 豁免
 
 ## Python 同步读/写网关
