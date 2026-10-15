@@ -209,6 +209,23 @@ class P002PublishAtomicityTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def _read_failed_logs(self) -> int:
+        import psycopg
+
+        conn = psycopg.connect(_load_owner_dsn())
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)::int FROM public.sync_log
+                    WHERE warehouse_id = %s::uuid AND status = 'failed'
+                    """,
+                    (self.wh,),
+                )
+                return int(cur.fetchone()[0])
+        finally:
+            conn.close()
+
     def test_success_publish_quantity_log_and_run_aligned(self) -> None:
         from sync.executor import execute_plan_v2
 
@@ -258,6 +275,21 @@ class P002PublishAtomicityTests(unittest.TestCase):
         from sync.executor import execute_plan_v2
 
         os.environ['P0_02_SYNC_RUN_ID'] = self.sync_run_id
+        with patch(
+            'sync.postgres_rpc._insert_sync_log_row',
+            side_effect=RuntimeError('injected sync_log failure before retry'),
+        ):
+            with self.assertRaises(RuntimeError):
+                execute_plan_v2(
+                    self._plan(qty=12),
+                    sync_log_enabled=True,
+                    sync_run_id=self.sync_run_id,
+                    triggered_by=self.admin_profile,
+                )
+        qty, _, success_logs = self._read_quantity_and_logs()
+        self.assertEqual(qty, 5)
+        self.assertEqual(success_logs, 0)
+
         result = execute_plan_v2(
             self._plan(qty=12),
             sync_log_enabled=True,
@@ -268,6 +300,35 @@ class P002PublishAtomicityTests(unittest.TestCase):
         qty, _, success_logs = self._read_quantity_and_logs()
         self.assertEqual(qty, 12)
         self.assertGreaterEqual(success_logs, 1)
+
+    def test_commit_verify_unavailable_stays_unknown(self) -> None:
+        import psycopg
+        from sync.executor import execute_plan_v2
+
+        os.environ['P0_02_SYNC_RUN_ID'] = self.sync_run_id
+        os.environ['P0_02_SYNC_TRIGGERED_BY'] = self.admin_profile
+        real_commit = psycopg.Connection.commit
+        failed_before = self._read_failed_logs()
+
+        def flaky_commit(conn_self):
+            real_commit(conn_self)
+            raise RuntimeError('CONTROLLED_COMMIT_ACK_LOST')
+
+        with patch.object(psycopg.Connection, 'commit', flaky_commit):
+            with patch(
+                'sync.p0_02_publish_verify.verify_publish_state',
+                side_effect=RuntimeError('verify unavailable'),
+            ):
+                with self.assertRaises(RuntimeError) as ctx:
+                    execute_plan_v2(
+                        self._plan(qty=13),
+                        sync_log_enabled=True,
+                        sync_run_id=self.sync_run_id,
+                        triggered_by=self.admin_profile,
+                    )
+        self.assertIn('未知', str(ctx.exception))
+        failed_after = self._read_failed_logs()
+        self.assertEqual(failed_before, failed_after)
 
     def test_commit_ack_lost_verified_committed_not_rolled_back(self) -> None:
         import psycopg

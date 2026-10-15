@@ -39,6 +39,8 @@ const pythonEnv = {
 };
 
 const modules = [
+  'sync.test_p0_02_publish_verify',
+  'sync.test_p0_02_web_bridge_commit_outcome',
   'sync.test_p0_02_publish_atomicity',
   'sync.test_p0_02_postgres_real_write_chain',
 ];

@@ -91,11 +91,100 @@ function ensurePlaywrightChromium() {
 }
 
 const ADMIN_PROFILE_ID = '11111111-1111-4111-8111-111111111101';
+const OPERATOR_PROFILE_ID = '11111111-1111-4111-8111-111111111104';
 const OPERATOR_EMAIL = 'operator@p0-02.test';
 const OPERATOR_PASSWORD = 'OperatorPass123!';
 const TARGET_VARIANT_ID = '55555555-5555-4555-8555-555555555501';
 const TARGET_SKU = 'SKU-TH-001';
 const SEARCH_TERM = 'SKU-TH-001';
+const AMOUNT_SENTINEL = '884466.88-P0-02-AMOUNT-LEAK';
+const DOMESTIC_WAREHOUSE_ID = '33333333-3333-4333-8333-333333333301';
+
+function installPlaywrightRouteGuard(context, egressState) {
+  return context.route('**/*', (route) => {
+    const url = route.request().url();
+    if (/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(url)) {
+      route.continue();
+      return;
+    }
+    if (/supabase\.co/i.test(url) && egressState.egressPhase === 'business') {
+      egressState.businessEgressViolations.push({ url, reason: 'supabase-attempt' });
+    }
+    if (egressState.egressPhase === 'business') {
+      egressState.businessEgressViolations.push({ url, reason: 'external-during-business' });
+    }
+    egressState.blockedExternal.push({ url, phase: egressState.egressPhase });
+    route.abort('blockedbyclient');
+  });
+}
+
+function parseCsv(content) {
+  const lines = content.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) {
+    return { headers: [], rows: [] };
+  }
+  const headers = lines[0].split(',').map((h) => h.trim());
+  const rows = lines.slice(1).map((line) => {
+    const cols = line.split(',').map((c) => c.trim());
+    const row = {};
+    headers.forEach((header, index) => {
+      row[header] = cols[index] ?? '';
+    });
+    return row;
+  });
+  return { headers, rows };
+}
+
+async function listOperatorOverseasRows(connectionString, operatorId) {
+  return withAppIdentity(connectionString, operatorId, async (client) => {
+    const { rows } = await client.query(
+      `
+      SELECT v.sku, w.name AS warehouse_name, i.quantity::int AS quantity
+      FROM public.inventory i
+      JOIN public.product_variant v ON v.id = i.variant_id
+      JOIN public.warehouse w ON w.id = i.warehouse_id
+      JOIN public.user_warehouses uw
+        ON uw.warehouse_id = w.id AND uw.user_id = $1::uuid
+      WHERE w.type = 'overseas'
+      ORDER BY v.sku, w.name
+      `,
+      [operatorId],
+    );
+    return rows;
+  });
+}
+
+async function waitUntil(condition, { timeoutMs = 10_000, intervalMs = 200 } = {}) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (await condition()) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return false;
+}
+
+async function seedAmountSentinel(connectionString) {
+  return mutateAppIdentity(connectionString, ADMIN_PROFILE_ID, async (client) => {
+    const tableCheck = await client.query(
+      `SELECT to_regclass('p0_02_biz.inventory_unit_costs') IS NOT NULL AS present`,
+    );
+    if (!tableCheck.rows[0]?.present) {
+      return { seeded: false };
+    }
+    await client.query(
+      `
+      INSERT INTO p0_02_biz.inventory_unit_costs (variant_id, warehouse_id, unit_cost, currency)
+      VALUES ($1::uuid, $2::uuid, $3, 'CNY')
+      ON CONFLICT (variant_id, warehouse_id) DO UPDATE
+        SET unit_cost = EXCLUDED.unit_cost, currency = EXCLUDED.currency
+      `,
+      [TARGET_VARIANT_ID, DOMESTIC_WAREHOUSE_ID, AMOUNT_SENTINEL],
+    );
+    return { seeded: true };
+  });
+}
 
 async function withAppIdentity(connectionString, profileId, fn) {
   const pool = new pg.Pool({ connectionString, max: 1 });
@@ -274,6 +363,11 @@ async function main() {
   }
 
   const productCountBefore = await countProductsWithSessionIdentity(envJson.P0_02_APP_DATABASE_URL);
+  const amountSentinel = await seedAmountSentinel(envJson.P0_02_APP_DATABASE_URL);
+  const operatorExpectedRows = await listOperatorOverseasRows(
+    envJson.P0_02_APP_DATABASE_URL,
+    OPERATOR_PROFILE_ID,
+  );
 
   const port = await pickPort();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -300,9 +394,11 @@ async function main() {
 
   const results = [];
   const networkLog = [];
-  const blockedExternal = [];
-  const businessEgressViolations = [];
-  let egressPhase = 'business';
+  const egressState = {
+    blockedExternal: [],
+    businessEgressViolations: [],
+    egressPhase: 'business',
+  };
   const evidenceDetails = {};
 
   const { chromium } = await import('playwright');
@@ -312,21 +408,7 @@ async function main() {
 
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ baseURL: baseUrl });
-    await context.route('**/*', (route) => {
-      const url = route.request().url();
-      if (/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(url)) {
-        route.continue();
-        return;
-      }
-      if (/supabase\.co/i.test(url) && egressPhase === 'business') {
-        businessEgressViolations.push({ url, reason: 'supabase-attempt' });
-      }
-      if (egressPhase === 'business') {
-        businessEgressViolations.push({ url, reason: 'external-during-business' });
-      }
-      blockedExternal.push({ url, phase: egressPhase });
-      route.abort('blockedbyclient');
-    });
+    await installPlaywrightRouteGuard(context, egressState);
     const page = await context.newPage();
 
     page.on('response', async (response) => {
@@ -486,14 +568,24 @@ async function main() {
         );
         await favoriteBtn.click();
         const toggleRes = await toggleResponse;
-        await page.locator('button[title="关注"], button[title="取消关注"]').first().waitFor({
-          timeout: 10_000,
+        const dbUpdated = await waitUntil(async () => {
+          const state = await readFavoriteState(
+            envJson.P0_02_APP_DATABASE_URL,
+            ADMIN_PROFILE_ID,
+            TARGET_VARIANT_ID,
+          );
+          return state !== favoriteBefore;
         });
         const favoriteAfter = await readFavoriteState(
           envJson.P0_02_APP_DATABASE_URL,
           ADMIN_PROFILE_ID,
           TARGET_VARIANT_ID,
         );
+        const expectedDomTitle = favoriteAfter ? '取消关注' : '关注';
+        const domUpdated = await waitUntil(async () => {
+          const title = await favoriteBtn.getAttribute('title');
+          return title === expectedDomTitle;
+        });
         const domTitle = await favoriteBtn.getAttribute('title');
         const toggled = favoriteAfter !== favoriteBefore;
         results.push({
@@ -501,9 +593,12 @@ async function main() {
           pass:
             toggleRes.status() < 400 &&
             toggled &&
-            (domTitle === '关注' || domTitle === '取消关注'),
+            dbUpdated &&
+            domUpdated &&
+            domTitle === expectedDomTitle,
           before: favoriteBefore,
           after: favoriteAfter,
+          expectedDomTitle,
         });
       } finally {
         await restoreFavoriteRow(
@@ -538,12 +633,14 @@ async function main() {
     const csvContent = csvPath ? fs.readFileSync(csvPath, 'utf8') : '';
     const csvHasTargetSku = csvContent.includes(TARGET_SKU);
     const csvHasAmountColumn = /(单位成本|货值|金额|unit_cost|amount)/i.test(csvContent);
+    const csvHasAmountSentinel = csvContent.includes(AMOUNT_SENTINEL);
     results.push({
       name: 'playwright-overseas-csv-export-content',
       pass:
         /overseas-inventory.*\.csv/i.test(download.suggestedFilename()) &&
         csvHasTargetSku &&
-        !csvHasAmountColumn,
+        !csvHasAmountColumn &&
+        !csvHasAmountSentinel,
       filename: download.suggestedFilename(),
       bytes: csvContent.length,
     });
@@ -569,14 +666,18 @@ async function main() {
     });
     const operatorInvJson = await operatorInv.json().catch(() => null);
     const operatorJsonText = JSON.stringify(operatorInvJson ?? {});
-    const operatorAmountLeak = /(unit_cost|unitCost|amount|cost)/i.test(operatorJsonText);
+    const operatorAmountLeak =
+      /(unit_cost|unitCost|amount|cost)/i.test(operatorJsonText) ||
+      operatorJsonText.includes(AMOUNT_SENTINEL);
     results.push({
       name: 'playwright-operator-inventory-no-amount-leak',
       pass: operatorInv.status === 200 && !operatorAmountLeak,
       status: operatorInv.status,
+      amountSentinelSeeded: amountSentinel.seeded,
     });
 
-    const operatorContext = await browser.newContext();
+    const operatorContext = await browser.newContext({ baseURL: baseUrl });
+    await installPlaywrightRouteGuard(operatorContext, egressState);
     if (operatorCookie) {
       const cookiePairs = operatorCookie.split('; ').filter(Boolean);
       await operatorContext.addCookies(
@@ -600,24 +701,52 @@ async function main() {
     const operatorDownload = await operatorDownloadPromise;
     const operatorCsvPath = await operatorDownload.path();
     const operatorCsv = operatorCsvPath ? fs.readFileSync(operatorCsvPath, 'utf8') : '';
-    const operatorCsvAmountLeak = /(单位成本|货值|金额|unit_cost|amount)/i.test(operatorCsv);
+    const operatorCsvAmountLeak =
+      /(单位成本|货值|金额|unit_cost|amount)/i.test(operatorCsv) ||
+      operatorCsv.includes(AMOUNT_SENTINEL);
+    const parsedOperatorCsv = parseCsv(operatorCsv);
+    const operatorCsvSkus = parsedOperatorCsv.rows.map((row) => row.SKU).filter(Boolean).sort();
+    const expectedOperatorSkus = operatorExpectedRows.map((row) => row.sku).sort();
+    const operatorRowsetOk =
+      operatorCsvSkus.length === expectedOperatorSkus.length &&
+      operatorCsvSkus.every((sku, index) => sku === expectedOperatorSkus[index]);
     results.push({
       name: 'playwright-operator-csv-export-no-amount',
       pass:
         /overseas-inventory.*\.csv/i.test(operatorDownload.suggestedFilename()) &&
-        operatorCsv.length > 0 &&
+        operatorRowsetOk &&
         !operatorCsvAmountLeak,
       filename: operatorDownload.suggestedFilename(),
+      expectedOperatorSkus,
+      operatorCsvSkus,
+    });
+
+    egressState.egressPhase = 'self-test';
+    const operatorSelfTestPage = await operatorContext.newPage();
+    let operatorSelfTestBlocked = false;
+    try {
+      await operatorSelfTestPage.goto('http://example.com/', {
+        waitUntil: 'commit',
+        timeout: 5_000,
+      });
+    } catch {
+      operatorSelfTestBlocked = egressState.blockedExternal.some(
+        (entry) => entry.phase === 'self-test' && /example\.com/.test(entry.url),
+      );
+    }
+    results.push({
+      name: 'playwright-operator-egress-block-selftest',
+      pass: operatorSelfTestBlocked,
     });
     await operatorContext.close();
 
-    egressPhase = 'self-test';
+    egressState.egressPhase = 'self-test';
     let selfTestBlocked = false;
     let selfTestErrorCode = null;
     try {
       await page.goto('http://example.com/', { waitUntil: 'commit', timeout: 5_000 });
     } catch (error) {
-      selfTestBlocked = blockedExternal.some(
+      selfTestBlocked = egressState.blockedExternal.some(
         (entry) => entry.phase === 'self-test' && /example\.com/.test(entry.url),
       );
       selfTestErrorCode = error?.message ?? String(error);
@@ -629,8 +758,8 @@ async function main() {
     });
     results.push({
       name: 'playwright-business-egress-clean',
-      pass: businessEgressViolations.length === 0,
-      violations: businessEgressViolations.slice(0, 10),
+      pass: egressState.businessEgressViolations.length === 0,
+      violations: egressState.businessEgressViolations.slice(0, 10),
     });
 
     const overviewText = await page.locator('body').innerText().catch(() => '');
@@ -668,8 +797,8 @@ async function main() {
       unchanged: productCountBefore === productCountAfter,
       positive: productCountBefore > 0,
     },
-    blockedExternalCount: blockedExternal.length,
-    businessEgressViolations,
+    blockedExternalCount: egressState.blockedExternal.length,
+    businessEgressViolations: egressState.businessEgressViolations,
     evidenceDetails,
     playwright: true,
   };

@@ -110,6 +110,9 @@ export interface SyncExecuteResult {
     validSkuCount: number;
     invalidSkuCount: number;
   };
+  /** P0-02: Python executor 发布 commit 结果 */
+  commitOutcome?: 'committed' | 'committed_ack_lost' | 'rolled_back' | 'unknown' | null;
+  publishCommitted?: boolean;
 }
 
 // ─── SyncServiceInput — mode 判别联合 ─────────────────────────────

@@ -20,6 +20,9 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
   let bootstrap: Pool;
   let warehouseId: string;
   let decoyWarehouseId: string;
+  let prefixSentinelWarehouseId: string;
+  let prefixSentinelInventoryId: string;
+  let prefixSentinelVariantId: string;
   let variantId: string;
   let inventoryId: string;
   let sku: string;
@@ -45,12 +48,9 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
     bootstrap = bootstrapPoolFromInstance();
     const client = await bootstrap.connect();
     try {
-      await client.query(
-        `DELETE FROM public.inventory WHERE warehouse_id IN (
-           SELECT id FROM public.warehouse WHERE name LIKE 'P0-02 node chain decoy%'
-         )`,
-      );
-      await client.query(`DELETE FROM public.warehouse WHERE name LIKE 'P0-02 node chain decoy%'`);
+      prefixSentinelWarehouseId = randomUUID();
+      prefixSentinelVariantId = randomUUID();
+      prefixSentinelInventoryId = randomUUID();
       await client.query(
         `INSERT INTO public.warehouse (id, name, country, type, is_active)
          VALUES ($1::uuid, $2, 'TH', 'overseas', true)`,
@@ -79,6 +79,25 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
          ON CONFLICT (id) DO NOTHING`,
         [decoyWarehouseId, `P0-02 node chain decoy ${decoyWarehouseId.slice(0, 8)}`],
       );
+      await client.query(
+        `INSERT INTO public.warehouse (id, name, country, type, is_active)
+         VALUES ($1::uuid, $2, 'TH', 'overseas', true)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          prefixSentinelWarehouseId,
+          `P0-02 node chain decoy sentinel ${prefixSentinelWarehouseId.slice(0, 8)}`,
+        ],
+      );
+      await client.query(
+        `INSERT INTO public.product_variant (id, sku, country, name, match_status)
+         VALUES ($1::uuid, $2, 'TH', 'Prefix sentinel variant', 'unmatched')`,
+        [prefixSentinelVariantId, `NC-SENT-${prefixSentinelVariantId.slice(0, 8)}`],
+      );
+      await client.query(
+        `INSERT INTO public.inventory (id, variant_id, warehouse_id, quantity)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 2)`,
+        [prefixSentinelInventoryId, prefixSentinelVariantId, prefixSentinelWarehouseId],
+      );
     } finally {
       client.release();
     }
@@ -106,6 +125,15 @@ describe('P0-02 Node claim → bridge → real_write chain', () => {
       await client.query('DELETE FROM public.sync_warehouse_lock WHERE warehouse_id = $1::uuid', [warehouseId]);
       await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [warehouseId]);
       await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [decoyWarehouseId]);
+      await client.query('DELETE FROM public.inventory WHERE id = $1::uuid', [
+        prefixSentinelInventoryId,
+      ]);
+      await client.query('DELETE FROM public.product_variant WHERE id = $1::uuid', [
+        prefixSentinelVariantId,
+      ]);
+      await client.query('DELETE FROM public.warehouse WHERE id = $1::uuid', [
+        prefixSentinelWarehouseId,
+      ]);
     } finally {
       client.release();
       await bootstrap.end();

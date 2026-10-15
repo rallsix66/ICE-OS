@@ -92,11 +92,16 @@ export class RealSyncRunner implements SyncRunner {
         caps.maxTimeoutMs > 0 ? caps.maxTimeoutMs : undefined,
       );
 
-      const exitCode = bridgeResult.exit_code === 0 ? 0 as const : 1 as const;
+      const bridgeExit = bridgeResult.exit_code;
+      const exitCode: 0 | 1 | 2 =
+        bridgeExit === 0 ? 0 : bridgeExit === 2 ? 2 : 1;
+      const commitOutcome = bridgeResult.commit_outcome ?? null;
 
       return {
         success: bridgeResult.success,
         exitCode,
+        commitOutcome,
+        publishCommitted: bridgeResult.publish_committed,
         summary: {
           warehouseId: bridgeResult.warehouse_id,
           warehouseName: bridgeResult.warehouse_name,

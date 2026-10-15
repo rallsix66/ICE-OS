@@ -15,6 +15,8 @@ class OwnedFixtureRegistry:
     inventory_ids: list[str] = field(default_factory=list)
     sync_run_ids: list[str] = field(default_factory=list)
     preference_keys: list[tuple[str, str]] = field(default_factory=list)
+    owned_skus: list[tuple[str, str]] = field(default_factory=list)
+    _baseline_sentinels: dict[str, list[tuple]] | None = None
     _baseline_counts: dict[str, int] | None = None
 
     def _connect(self):
@@ -62,6 +64,159 @@ class OwnedFixtureRegistry:
         key = (user_id, variant_id)
         if key not in self.preference_keys:
             self.preference_keys.append(key)
+
+    def register_owned_sku(self, sku: str, warehouse_id: str) -> None:
+        key = (sku, warehouse_id)
+        if key not in self.owned_skus:
+            self.owned_skus.append(key)
+
+    def capture_sentinel_snapshot(self, warehouse_ids: list[str]) -> None:
+        import psycopg
+
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                sentinels: dict[str, list[tuple]] = {}
+                for wh in warehouse_ids:
+                    cur.execute(
+                        """
+                        SELECT w.id::text, w.name, w.country, w.is_active,
+                               COALESCE(
+                                 json_agg(
+                                   json_build_object(
+                                     'variant_id', v.id::text,
+                                     'sku', v.sku,
+                                     'quantity', i.quantity::int
+                                   )
+                                   ORDER BY v.sku
+                                 ) FILTER (WHERE v.id IS NOT NULL),
+                                 '[]'::json
+                               ) AS inv
+                        FROM public.warehouse w
+                        LEFT JOIN public.inventory i ON i.warehouse_id = w.id
+                        LEFT JOIN public.product_variant v ON v.id = i.variant_id
+                        WHERE w.id = %s::uuid
+                        GROUP BY w.id, w.name, w.country, w.is_active
+                        """,
+                        (wh,),
+                    )
+                    row = cur.fetchone()
+                    if row is not None:
+                        sentinels[wh] = [row]
+                self._baseline_sentinels = sentinels
+        finally:
+            conn.close()
+
+    def assert_sentinels_unchanged(self, warehouse_ids: list[str]) -> None:
+        if self._baseline_sentinels is None:
+            return
+        import psycopg
+
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                for wh in warehouse_ids:
+                    cur.execute(
+                        """
+                        SELECT w.id::text, w.name, w.country, w.is_active,
+                               COALESCE(
+                                 json_agg(
+                                   json_build_object(
+                                     'variant_id', v.id::text,
+                                     'sku', v.sku,
+                                     'quantity', i.quantity::int
+                                   )
+                                   ORDER BY v.sku
+                                 ) FILTER (WHERE v.id IS NOT NULL),
+                                 '[]'::json
+                               ) AS inv
+                        FROM public.warehouse w
+                        LEFT JOIN public.inventory i ON i.warehouse_id = w.id
+                        LEFT JOIN public.product_variant v ON v.id = i.variant_id
+                        WHERE w.id = %s::uuid
+                        GROUP BY w.id, w.name, w.country, w.is_active
+                        """,
+                        (wh,),
+                    )
+                    row = cur.fetchone()
+                    baseline = self._baseline_sentinels.get(wh)
+                    if baseline != [row]:
+                        raise AssertionError(
+                            f'sentinel warehouse changed: wh={wh} baseline={baseline} current={[row]}',
+                        )
+        finally:
+            conn.close()
+
+    def resolve_and_register_variant_by_sku(
+        self,
+        sku: str,
+        warehouse_id: str,
+    ) -> str | None:
+        import psycopg
+
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT v.id::text
+                    FROM public.product_variant v
+                    JOIN public.inventory i ON i.variant_id = v.id
+                    WHERE v.sku = %s AND i.warehouse_id = %s::uuid
+                    LIMIT 1
+                    """,
+                    (sku, warehouse_id),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    return None
+                variant_id = row[0]
+                self.register_variant(variant_id)
+                return variant_id
+        finally:
+            conn.close()
+
+    def cleanup_owned_skus(self) -> list[str]:
+        import psycopg
+
+        errors: list[str] = []
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                for sku, warehouse_id in list(self.owned_skus):
+                    cur.execute(
+                        """
+                        SELECT v.id::text
+                        FROM public.product_variant v
+                        JOIN public.inventory i ON i.variant_id = v.id
+                        WHERE v.sku = %s AND i.warehouse_id = %s::uuid
+                        LIMIT 1
+                        """,
+                        (sku, warehouse_id),
+                    )
+                    row = cur.fetchone()
+                    if row is None:
+                        self.owned_skus.remove((sku, warehouse_id))
+                        continue
+                    variant_id = row[0]
+                    cur.execute(
+                        'DELETE FROM public.inventory WHERE variant_id = %s::uuid',
+                        (variant_id,),
+                    )
+                    cur.execute(
+                        'DELETE FROM public.product_variant WHERE id = %s::uuid',
+                        (variant_id,),
+                    )
+                    if variant_id in self.variant_ids:
+                        self.variant_ids.remove(variant_id)
+                    self.owned_skus.remove((sku, warehouse_id))
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            errors.append(str(exc))
+        finally:
+            conn.close()
+        return errors
 
     def restore(self, *, verify_counts: bool = True) -> dict[str, Any]:
         import psycopg

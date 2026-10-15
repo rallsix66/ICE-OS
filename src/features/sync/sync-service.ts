@@ -25,15 +25,19 @@ import { validateJsonValue } from './validate-json-value';
  *  供 getWarehouseHistory 历史查询使用。 */
 function buildResultSummary(result: SyncExecuteResult): Record<string, unknown> {
   const base = result.summary as Record<string, unknown>;
-  if (result.scraperMeta) {
-    return {
-      ...base,
-      rawRowCount: result.scraperMeta.rawRowCount,
-      validSkuCount: result.scraperMeta.validSkuCount,
-      invalidSkuCount: result.scraperMeta.invalidSkuCount,
-    };
+  const enriched: Record<string, unknown> = { ...base };
+  if (result.commitOutcome !== undefined) {
+    enriched.commitOutcome = result.commitOutcome;
   }
-  return base;
+  if (result.publishCommitted !== undefined) {
+    enriched.publishCommitted = result.publishCommitted;
+  }
+  if (result.scraperMeta) {
+    enriched.rawRowCount = result.scraperMeta.rawRowCount;
+    enriched.validSkuCount = result.scraperMeta.validSkuCount;
+    enriched.invalidSkuCount = result.scraperMeta.invalidSkuCount;
+  }
+  return enriched;
 }
 
 export interface SyncServiceDeps {

@@ -54,6 +54,10 @@ export interface PythonBridgeResult {
   raw_row_count: number;
   valid_sku_count: number;
   invalid_sku_count: number;
+  /** P0-02: 发布事务 commit 结果（real_write） */
+  publish_committed?: boolean;
+  sync_log_written?: boolean;
+  commit_outcome?: 'committed' | 'committed_ack_lost' | 'rolled_back' | 'unknown' | null;
 }
 
 /** SIGKILL 前等待 SIGTERM 优雅退出的宽限期（毫秒） */

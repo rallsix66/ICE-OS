@@ -23,6 +23,7 @@ def verify_publish_state(
         'success_log_present': False,
         'success_log_sync_run_id': None,
         'committed_evidence': False,
+        'evidence_reason': None,
     }
     try:
         with conn.cursor() as cur:
@@ -81,10 +82,44 @@ def verify_publish_state(
     finally:
         conn.close()
 
-    inv_ok = (
-        expected_quantity is None
-        or outcome['inventory_matches_expected']
+    return finalize_committed_evidence(
+        outcome,
+        expected_quantity=expected_quantity,
+        sync_run_id=sync_run_id,
     )
-    log_ok = sync_run_id is None or outcome['success_log_present']
-    outcome['committed_evidence'] = inv_ok and log_ok
+
+
+def finalize_committed_evidence(
+    outcome: dict[str, Any],
+    *,
+    expected_quantity: int | None,
+    sync_run_id: str | None,
+) -> dict[str, Any]:
+    if expected_quantity is None or not sync_run_id:
+        outcome['evidence_reason'] = 'missing_expected_quantity_or_sync_run_id'
+        outcome['committed_evidence'] = False
+        return outcome
+
+    if outcome['inventory_quantity'] is None:
+        outcome['evidence_reason'] = 'inventory_row_missing'
+        outcome['committed_evidence'] = False
+        return outcome
+
+    if not outcome['inventory_matches_expected']:
+        outcome['evidence_reason'] = 'inventory_quantity_mismatch'
+        outcome['committed_evidence'] = False
+        return outcome
+
+    if not outcome['success_log_present']:
+        outcome['evidence_reason'] = 'success_log_missing'
+        outcome['committed_evidence'] = False
+        return outcome
+
+    if outcome['success_log_sync_run_id'] != sync_run_id:
+        outcome['evidence_reason'] = 'success_log_run_id_mismatch'
+        outcome['committed_evidence'] = False
+        return outcome
+
+    outcome['evidence_reason'] = 'ok'
+    outcome['committed_evidence'] = True
     return outcome

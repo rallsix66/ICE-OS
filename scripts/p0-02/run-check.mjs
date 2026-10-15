@@ -164,6 +164,20 @@ const steps = [
     env: p002TestEnv,
   },
   {
+    name: 'p0-02-aux-failure-negative',
+    cmd: process.execPath,
+    args: [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-aux-failure-negative.mjs')],
+    cwd: REPO_ROOT,
+    env: p002TestEnv,
+  },
+  {
+    name: 'p0-02-restore-contract-negative',
+    cmd: process.execPath,
+    args: [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-restore-contract-negative.mjs')],
+    cwd: REPO_ROOT,
+    env: p002TestEnv,
+  },
+  {
     name: 'p0-02-backup-restore-drill',
     cmd: process.execPath,
     args: [path.join(REPO_ROOT, 'scripts', 'p0-02', 'run-backup-restore-drill.mjs')],

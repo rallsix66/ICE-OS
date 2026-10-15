@@ -22,6 +22,8 @@ const instance = { ...loadInstance(runId), runId };
 const { dbName: concurrencyDb } = allocateAuxiliaryDatabase(runId, 'concurrency', instance);
 
 let cleanupFailed = false;
+let primaryError = null;
+
 try {
   const env = {
     ...process.env,
@@ -46,11 +48,12 @@ try {
   fs.writeFileSync(path.join(evidenceDir, 'vitest.log'), output);
 
   if (result.status !== 0) {
-    console.error(output);
-    process.exit(result.status ?? 1);
+    primaryError = new Error(output || 'concurrency vitest failed');
+  } else {
+    console.log(`p0-02 concurrency passed (evidence: ${evidenceDir})`);
   }
-
-  console.log(`p0-02 concurrency passed (evidence: ${evidenceDir})`);
+} catch (error) {
+  primaryError = error;
 } finally {
   try {
     dropAuxiliaryDatabase(runId, instance, concurrencyDb);
@@ -59,7 +62,12 @@ try {
     fs.writeFileSync(path.join(evidenceDir, 'cleanup-error.log'), `${String(error)}\n`);
     console.error(error);
   }
-  if (cleanupFailed) {
-    process.exit(2);
-  }
+}
+
+if (cleanupFailed) {
+  process.exit(2);
+}
+if (primaryError) {
+  console.error(primaryError);
+  process.exit(1);
 }

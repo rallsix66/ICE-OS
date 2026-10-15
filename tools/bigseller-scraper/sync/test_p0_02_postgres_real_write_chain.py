@@ -5,6 +5,7 @@ import json
 import os
 import unittest
 import uuid
+from unittest.mock import patch
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +25,7 @@ def _load_owner_dsn() -> str:
 class P002PostgresRealWriteChainTests(unittest.TestCase):
     registry: OwnedFixtureRegistry
     wh: str
+    sentinel_wh: str
     variant: str
     inventory_id: str
     sku: str
@@ -50,6 +52,7 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
         cls.registry.capture_baseline()
 
         cls.wh = str(uuid.uuid4())
+        cls.sentinel_wh = str(uuid.uuid4())
         cls.variant = str(uuid.uuid4())
         cls.inventory_id = str(uuid.uuid4())
         cls.sku = f'RW-{cls.variant[:8]}'
@@ -58,6 +61,7 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
         cls.admin_profile = '11111111-1111-4111-8111-111111111101'
 
         cls.registry.register_warehouse(cls.wh)
+        cls.registry.register_warehouse(cls.sentinel_wh)
         cls.registry.register_variant(cls.variant)
         cls.registry.register_inventory(cls.inventory_id)
         cls.registry.register_sync_run(cls.sync_run_id)
@@ -74,6 +78,29 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
                     VALUES (%s, %s, 'TH', 'overseas', true)
                     """,
                     (cls.wh, 'P0-02 RW fixture wh'),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO public.warehouse (id, name, country, type, is_active)
+                    VALUES (%s, %s, 'TH', 'overseas', true)
+                    """,
+                    (cls.sentinel_wh, f'P0-02 RW fixture decoy {cls.sentinel_wh[:8]}'),
+                )
+                sentinel_variant = str(uuid.uuid4())
+                cls.registry.register_variant(sentinel_variant)
+                cur.execute(
+                    """
+                    INSERT INTO public.product_variant (id, sku, country, name, match_status)
+                    VALUES (%s, %s, 'TH', 'RW sentinel variant', 'unmatched')
+                    """,
+                    (sentinel_variant, f'RW-SENT-{cls.sentinel_wh[:8]}'),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO public.inventory (id, variant_id, warehouse_id, quantity)
+                    VALUES (%s, %s, %s, 7)
+                    """,
+                    (str(uuid.uuid4()), sentinel_variant, cls.sentinel_wh),
                 )
                 cur.execute(
                     """
@@ -119,12 +146,45 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
             conn.commit()
         finally:
             conn.close()
+        cls.registry.capture_sentinel_snapshot([cls.sentinel_wh])
 
     @classmethod
     def tearDownClass(cls) -> None:
-        report = cls.registry.restore(verify_counts=False)
+        report = cls.registry.restore(verify_counts=True)
         if report.get('errors'):
             raise AssertionError(f'fixture restore failed: {report}')
+
+    def _new_variant_plan(self, new_sku: str, *, qty: int) -> dict:
+        sync_at = datetime.now(timezone.utc).isoformat()
+        self.registry.register_owned_sku(new_sku, self.wh)
+        return {
+            'warehouse_rename_required': {
+                'warehouse_id': self.wh,
+                'action': 'none',
+                'target_name': 'P0-02 RW fixture wh',
+            },
+            'new_variants': [{'sku': new_sku, 'country': 'TH', 'name': 'Inserted by RW test'}],
+            'inventory_updates': [],
+            'inventory_inserts': [
+                {
+                    'sku': new_sku,
+                    'country': 'TH',
+                    'new_quantity': qty,
+                    'warehouse_id': self.wh,
+                    'last_sync_at': sync_at,
+                },
+            ],
+            'inventory_after_variant_create': [],
+            'inventory_unchanged': [
+                {
+                    'sku': self.sku,
+                    'warehouse_id': self.wh,
+                    'quantity': 5,
+                    'new_quantity': 5,
+                    'last_sync_at': sync_at,
+                },
+            ],
+        }
 
     def setUp(self) -> None:
         os.environ['BS_WAREHOUSE_COUNTRY'] = 'TH'
@@ -164,31 +224,10 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
             conn.close()
 
     def tearDown(self) -> None:
-        dynamic = [
-            vid
-            for vid in self.registry.variant_ids
-            if vid not in (self.variant,)
-        ]
-        if not dynamic:
-            return
-        import psycopg
-
-        conn = psycopg.connect(_load_owner_dsn())
-        try:
-            with conn.cursor() as cur:
-                for variant_id in dynamic:
-                    cur.execute(
-                        'DELETE FROM public.inventory WHERE variant_id = %s::uuid',
-                        (variant_id,),
-                    )
-                    cur.execute(
-                        'DELETE FROM public.product_variant WHERE id = %s::uuid',
-                        (variant_id,),
-                    )
-                    self.registry.variant_ids.remove(variant_id)
-            conn.commit()
-        finally:
-            conn.close()
+        errors = self.registry.cleanup_owned_skus()
+        if errors:
+            raise AssertionError(f'owned sku cleanup failed: {errors}')
+        self.registry.assert_sentinels_unchanged([self.sentinel_wh])
 
     def _plan(self, *, qty: int, new_variants: list | None = None) -> dict:
         sync_at = datetime.now(timezone.utc).isoformat()
@@ -267,146 +306,48 @@ class P002PostgresRealWriteChainTests(unittest.TestCase):
         from sync.executor import execute_plan_v2
 
         new_sku = f'RW-NEW-{uuid.uuid4().hex[:8]}'
-
-        sync_at = datetime.now(timezone.utc).isoformat()
-        plan = {
-            'warehouse_rename_required': {
-                'warehouse_id': self.wh,
-                'action': 'none',
-                'target_name': 'P0-02 RW fixture wh',
-            },
-            'new_variants': [{'sku': new_sku, 'country': 'TH', 'name': 'Inserted by RW test'}],
-            'inventory_updates': [],
-            'inventory_inserts': [
-                {
-                    'sku': new_sku,
-                    'country': 'TH',
-                    'new_quantity': 3,
-                    'warehouse_id': self.wh,
-                    'last_sync_at': sync_at,
-                },
-            ],
-            'inventory_after_variant_create': [],
-            'inventory_unchanged': [
-                {
-                    'sku': self.sku,
-                    'warehouse_id': self.wh,
-                    'quantity': 5,
-                    'new_quantity': 5,
-                    'last_sync_at': sync_at,
-                },
-            ],
-        }
+        plan = self._new_variant_plan(new_sku, qty=3)
         result = execute_plan_v2(plan, sync_log_enabled=True)
         self.assertTrue(result.get('publish_committed'))
         summary = result.get('rpc_summary') or {}
         self.assertGreaterEqual(int(summary.get('variants_created', 0)), 1)
-
-        import psycopg
-
-        conn = psycopg.connect(_load_owner_dsn())
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT v.id::text
-                    FROM public.inventory i
-                    JOIN public.product_variant v ON v.id = i.variant_id
-                    WHERE v.sku = %s AND i.warehouse_id = %s::uuid
-                    """,
-                    (new_sku, self.wh),
-                )
-                row = cur.fetchone()
-                self.assertIsNotNone(row)
-                created_variant_id = row[0]
-                self.registry.register_variant(created_variant_id)
-                cur.execute(
-                    'SELECT COUNT(*)::int FROM public.inventory i '
-                    'JOIN public.product_variant v ON v.id = i.variant_id '
-                    'WHERE v.sku = %s AND i.warehouse_id = %s::uuid',
-                    (new_sku, self.wh),
-                )
-                self.assertEqual(cur.fetchone()[0], 1)
-        finally:
-            conn.close()
+        created_variant_id = self.registry.resolve_and_register_variant_by_sku(new_sku, self.wh)
+        self.assertIsNotNone(created_variant_id)
 
     def test_post_publish_assertion_failure_still_restores_new_variant(self) -> None:
         from sync.executor import execute_plan_v2
 
         new_sku = f'RW-NEW-{uuid.uuid4().hex[:8]}'
-        sync_at = datetime.now(timezone.utc).isoformat()
-        plan = {
-            'warehouse_rename_required': {
-                'warehouse_id': self.wh,
-                'action': 'none',
-                'target_name': 'P0-02 RW fixture wh',
-            },
-            'new_variants': [{'sku': new_sku, 'country': 'TH', 'name': 'Fault path variant'}],
-            'inventory_updates': [],
-            'inventory_inserts': [
-                {
-                    'sku': new_sku,
-                    'country': 'TH',
-                    'new_quantity': 2,
-                    'warehouse_id': self.wh,
-                    'last_sync_at': sync_at,
-                },
-            ],
-            'inventory_after_variant_create': [],
-            'inventory_unchanged': [
-                {
-                    'sku': self.sku,
-                    'warehouse_id': self.wh,
-                    'quantity': 5,
-                    'new_quantity': 5,
-                    'last_sync_at': sync_at,
-                },
-            ],
-        }
-        created_variant_id: str | None = None
+        plan = self._new_variant_plan(new_sku, qty=2)
         try:
             result = execute_plan_v2(plan, sync_log_enabled=True)
             self.assertTrue(result.get('publish_committed'))
-            import psycopg
-
-            conn = psycopg.connect(_load_owner_dsn())
-            try:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        SELECT v.id::text
-                        FROM public.product_variant v
-                        WHERE v.sku = %s
-                        """,
-                        (new_sku,),
-                    )
-                    row = cur.fetchone()
-                    self.assertIsNotNone(row)
-                    created_variant_id = row[0]
-                    self.registry.register_variant(created_variant_id)
-            finally:
-                conn.close()
             with self.assertRaises(AssertionError):
                 raise AssertionError('controlled post-publish assertion failure')
         finally:
-            if created_variant_id and created_variant_id in self.registry.variant_ids:
-                import psycopg
+            errors = self.registry.cleanup_owned_skus()
+            self.assertEqual(errors, [])
+            self.registry.assert_sentinels_unchanged([self.sentinel_wh])
 
-                conn = psycopg.connect(_load_owner_dsn())
-                try:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            'DELETE FROM public.inventory WHERE variant_id = %s::uuid',
-                            (created_variant_id,),
-                        )
-                        cur.execute(
-                            'DELETE FROM public.product_variant WHERE id = %s::uuid',
-                            (created_variant_id,),
-                        )
-                    conn.commit()
-                    self.registry.variant_ids.remove(created_variant_id)
-                finally:
-                    conn.close()
+    def test_uuid_read_failure_still_restores_new_variant(self) -> None:
+        from sync.executor import execute_plan_v2
+
+        new_sku = f'RW-NEW-{uuid.uuid4().hex[:8]}'
+        plan = self._new_variant_plan(new_sku, qty=4)
+        try:
+            result = execute_plan_v2(plan, sync_log_enabled=True)
+            self.assertTrue(result.get('publish_committed'))
+            with patch.object(
+                self.registry,
+                'resolve_and_register_variant_by_sku',
+                side_effect=RuntimeError('controlled uuid read failure'),
+            ):
+                with self.assertRaises(RuntimeError):
+                    self.registry.resolve_and_register_variant_by_sku(new_sku, self.wh)
+        finally:
+            errors = self.registry.cleanup_owned_skus()
+            self.assertEqual(errors, [])
+            self.registry.assert_sentinels_unchanged([self.sentinel_wh])
 
 
 if __name__ == '__main__':

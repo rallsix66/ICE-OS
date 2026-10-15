@@ -29,6 +29,48 @@ from datetime import datetime, timezone
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
+def evaluate_real_write_bridge_outcome(result: dict, rpc_result: dict) -> None:
+    """根据 executor 回执设置 bridge success/exit_code（含 commit_outcome）。"""
+    rpc_summary = rpc_result.get('rpc_summary', {}) or {}
+    result['summary'] = {
+        'variants_created': rpc_summary.get('variants_created', 0),
+        'variants_skipped': rpc_summary.get('variants_skipped', 0),
+        'inventory_inserted': rpc_summary.get('inventory_inserted', 0),
+        'inventory_updated': rpc_summary.get('inventory_updated', 0),
+        'inventory_unchanged': rpc_summary.get('inventory_unchanged', 0),
+        'warehouse_renamed': rpc_summary.get('warehouse_renamed', False),
+    }
+    result['sync_log_written'] = bool(rpc_result.get('sync_log_written'))
+    result['publish_committed'] = bool(rpc_result.get('publish_committed'))
+    commit_outcome = rpc_result.get('commit_outcome')
+    result['commit_outcome'] = commit_outcome
+    bridge_errors = list(rpc_result.get('errors') or [])
+    if bridge_errors:
+        result['errors'].extend(bridge_errors)
+
+    publish_ok = (
+        rpc_result.get('phase_g_verified')
+        and rpc_result.get('phase_i_verified')
+        and rpc_result.get('publish_committed')
+    )
+    log_ok = not rpc_result.get('sync_log_enabled') or rpc_result.get('sync_log_written')
+    if commit_outcome == 'unknown':
+        result['success'] = False
+        result['exit_code'] = 2
+        result['errors'].append('发布 commit 结果未知')
+    elif publish_ok and log_ok:
+        result['success'] = True
+        result['exit_code'] = 0
+    else:
+        result['success'] = False
+        result['exit_code'] = 1
+        if not log_ok:
+            result['errors'].append('sync_log 未成功写入')
+        if not publish_ok:
+            result['errors'].append('发布未完成或审计未通过')
+
+
 # ============================================================
 # CLI
 # ============================================================
@@ -264,40 +306,8 @@ def main():
                 triggered_by=os.environ.get('P0_02_SYNC_TRIGGERED_BY'),
             )
 
-            # P5-SY9K rework: summary 从 rpc_result["rpc_summary"] 读取，
-            # 而非直接从 rpc_result 读取（后者无 variants_created 等顶级键）
-            rpc_summary = rpc_result.get('rpc_summary', {}) or {}
-            result['summary'] = {
-                'variants_created': rpc_summary.get('variants_created', 0),
-                'variants_skipped': rpc_summary.get('variants_skipped', 0),
-                'inventory_inserted': rpc_summary.get('inventory_inserted', 0),
-                'inventory_updated': rpc_summary.get('inventory_updated', 0),
-                'inventory_unchanged': rpc_summary.get('inventory_unchanged', 0),
-                'warehouse_renamed': rpc_summary.get('warehouse_renamed', False),
-            }
-            result['sync_log_written'] = bool(rpc_result.get('sync_log_written'))
-            result['publish_committed'] = bool(rpc_result.get('publish_committed'))
-            bridge_errors = list(rpc_result.get('errors') or [])
-            if bridge_errors:
-                result['errors'].extend(bridge_errors)
+            evaluate_real_write_bridge_outcome(result, rpc_result)
             print(f'[web_bridge] RPC 写入完成: {json.dumps(result["summary"])}', file=sys.stderr)
-
-            publish_ok = (
-                rpc_result.get('phase_g_verified')
-                and rpc_result.get('phase_i_verified')
-                and rpc_result.get('publish_committed')
-            )
-            log_ok = not rpc_result.get('sync_log_enabled') or rpc_result.get('sync_log_written')
-            if publish_ok and log_ok and not bridge_errors:
-                result['success'] = True
-                result['exit_code'] = 0
-            else:
-                result['success'] = False
-                result['exit_code'] = 1
-                if not log_ok:
-                    result['errors'].append('sync_log 未成功写入')
-                if not publish_ok:
-                    result['errors'].append('发布未完成或审计未通过')
         else:
             result['success'] = True
             result['exit_code'] = 0
@@ -310,7 +320,7 @@ def main():
 
     result['finished_at'] = datetime.now(timezone.utc).isoformat()
     _write_result(result)
-    sys.exit(0 if result['success'] else 1)
+    sys.exit(int(result.get('exit_code', 0 if result['success'] else 1)))
 
 
 def _write_result(result):
