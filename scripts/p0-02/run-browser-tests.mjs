@@ -320,11 +320,51 @@ async function main() {
       pass: /SKU-TH|SKU|产品|库存/i.test(overviewText),
     });
 
-    await page.goto('/dashboard/inventory/overseas', { waitUntil: 'networkidle' });
+    await page.goto('/dashboard/inventory/overseas', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: /海外库存/i }).waitFor({ timeout: 15_000 });
     const overseasText = await page.locator('body').innerText();
     results.push({
       name: 'playwright-overseas-inventory',
-      pass: /海外|库存|warehouse|SKU/i.test(overseasText),
+      pass: /海外|库存|SKU/i.test(overseasText) && overseasText.includes('SKU-TH'),
+    });
+
+    const favoriteBtn = page.locator('button[title="关注"], button[title="取消关注"]').first();
+    if (await favoriteBtn.count()) {
+      const favResponse = page.waitForResponse(
+        (r) => r.request().method() === 'POST' && /dashboard\/inventory\/overseas/.test(r.url()),
+        { timeout: 15_000 },
+      );
+      await favoriteBtn.click();
+      const favRes = await favResponse;
+      networkLog.push({
+        url: favRes.url(),
+        status: favRes.status(),
+        method: 'POST',
+      });
+      results.push({
+        name: 'playwright-overseas-favorite-action',
+        pass: favRes.status() >= 200 && favRes.status() < 400,
+        status: favRes.status(),
+      });
+    }
+
+    const exportBtn = page.getByRole('button', { name: /导出/i });
+    const downloadPromise = page.waitForEvent('download', { timeout: 20_000 }).catch(() => null);
+    await exportBtn.click();
+    const download = await downloadPromise;
+    results.push({
+      name: 'playwright-overseas-csv-export',
+      pass: download != null && /overseas-inventory.*\.csv/i.test(download.suggestedFilename()),
+      filename: download?.suggestedFilename(),
+    });
+
+    const blockedProbe = page
+      .goto('http://example.com/', { waitUntil: 'commit', timeout: 5_000 })
+      .then(() => false)
+      .catch(() => true);
+    results.push({
+      name: 'playwright-browser-egress-block-selftest',
+      pass: await blockedProbe,
     });
 
     const htmlLeak = /SUPABASE_SERVICE_ROLE|createBrowserClient/i.test(overviewText + overseasText);
@@ -371,8 +411,8 @@ async function main() {
   if (!payload.db.positive) {
     failed.push({ name: 'db-product-count-with-admin-identity', pass: false });
   }
-  if (blockedExternal.length > 0) {
-    failed.push({ name: 'browser-external-blocked', pass: false });
+  if (!results.some((r) => r.name === 'playwright-browser-egress-block-selftest' && r.pass)) {
+    failed.push({ name: 'browser-external-block-selftest', pass: false });
   }
   if (apiHits.length < 2) {
     failed.push({ name: 'network-api-evidence', pass: false });

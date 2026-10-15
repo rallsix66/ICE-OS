@@ -4,9 +4,10 @@
 
 状态：**`P0_02_IMPLEMENTED_AWAITING_REVIEW`**（**非** PASS；等待独立审查）
 
-- 上一轮审查：**CHANGES_REQUIRED** @ `620fac4d5188055fd0c9bf865937901efd8b3a6f`
+- 上一轮审查：**CHANGES_REQUIRED** @ `d4f7804c5e3f1fa1648ee91b3ca993f59545600e`（2026-10-15 第二轮）
+- 首轮审查：**CHANGES_REQUIRED** @ `620fac4`
 - 正式任务包：[p0-02/2026-10-15-delivery-rework.md](./p0-02/2026-10-15-delivery-rework.md)
-- 验证报告：[../p0-02/verification-report-r2-20261015.md](../p0-02/verification-report-r2-20261015.md)
+- 验证报告：[../p0-02/verification-report-r2-20261015-r2.md](../p0-02/verification-report-r2-20261015-r2.md)
 
 Canonical Run：`run-20261014-r2`
 

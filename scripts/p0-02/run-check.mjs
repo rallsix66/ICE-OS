@@ -157,6 +157,21 @@ const steps = [
     env: p002TestEnv,
   },
   {
+    name: 'p0-02-python-connection-boundary',
+    cmd: process.platform === 'win32' ? 'python' : 'python3',
+    args: [
+      '-m',
+      'unittest',
+      'sync.test_p0_02_connection_boundary',
+    ],
+    cwd: path.join(REPO_ROOT, 'tools', 'bigseller-scraper'),
+    env: {
+      ...p002TestEnv,
+      PYTHONPATH: path.join(REPO_ROOT, 'tools', 'bigseller-scraper'),
+      P0_02_ENABLED: 'true',
+    },
+  },
+  {
     name: 'opt6-known-baseline',
     cmd: process.execPath,
     args: [

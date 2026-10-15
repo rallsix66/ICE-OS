@@ -23,6 +23,8 @@ const wh = randomUUID();
 const variant = randomUUID();
 const variantEmpty = randomUUID();
 const inventory = randomUUID();
+const shipment = randomUUID();
+const shipmentItem = randomUUID();
 const sku = `DEL-${variant.slice(0, 8)}`;
 const skuEmpty = `DEL-EMPTY-${variantEmpty.slice(0, 8)}`;
 const skuNew = `DEL-NEW-${randomUUID().slice(0, 8)}`;
@@ -79,6 +81,17 @@ beforeAll(async () => {
       [inventory, variant, wh],
     );
     await c.query(
+      `INSERT INTO public.shipment (
+         id, shipment_no, country, warehouse_id, status, created_by
+       ) VALUES ($1, $2, 'TH', $3, 'customs', $4)`,
+      [shipment, `DEL-SHP-${shipment.slice(0, 8)}`, wh, admin],
+    );
+    await c.query(
+      `INSERT INTO public.shipment_item (id, shipment_id, variant_id, quantity, warehoused_quantity)
+       VALUES ($1, $2, $3, 10, 0)`,
+      [shipmentItem, shipment, variant],
+    );
+    await c.query(
       `INSERT INTO public.user_warehouses (user_id, warehouse_id) VALUES ($1, $2)`,
       [operator, wh],
     );
@@ -101,6 +114,9 @@ afterAll(async () => {
         [[variant, variantEmpty]],
       );
       await c.query(`DELETE FROM public.user_warehouses WHERE warehouse_id = $1`, [wh]);
+      await c.query(`DELETE FROM public.tracking_event WHERE shipment_id = $1`, [shipment]);
+      await c.query(`DELETE FROM public.shipment_item WHERE shipment_id = $1`, [shipment]);
+      await c.query(`DELETE FROM public.shipment WHERE id = $1`, [shipment]);
       await c.query(`DELETE FROM public.inventory WHERE warehouse_id = $1`, [wh]);
       await c.query(`DELETE FROM public.product_variant WHERE id = ANY($1::uuid[])`, [
         [variant, variantEmpty],
@@ -141,6 +157,50 @@ it('DELIVERY-02: manual updateQuantity is sealed on independent platform', async
     await owner.query(`SELECT quantity FROM public.inventory WHERE id = $1`, [inventory])
   ).rows[0].quantity;
   expect(Number(persisted)).toBe(5);
+});
+
+it('DELIVERY-02: app runner cannot UPDATE inventory.quantity in database', async () => {
+  for (const profileId of [operator, admin]) {
+    const client = await app.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`SELECT set_config('request.jwt.claim.sub', $1, true)`, [profileId]);
+      await expect(
+        client.query(`UPDATE public.inventory SET quantity = 42 WHERE id = $1`, [inventory]),
+      ).rejects.toThrow();
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+  }
+  const qty = (
+    await owner.query(`SELECT quantity FROM public.inventory WHERE id = $1`, [inventory])
+  ).rows[0].quantity;
+  expect(Number(qty)).toBe(5);
+});
+
+it('DELIVERY-03: partial receipt succeeds and does not change inventory quantity', async () => {
+  const invBefore = (
+    await owner.query(`SELECT quantity FROM public.inventory WHERE id = $1`, [inventory])
+  ).rows[0].quantity;
+  const result = await shipmentRepository.partialWarehouse(
+    shipment,
+    [{ variantId: variant, quantity: 3 }],
+    'delivery rework partial',
+  );
+  expect(result.success).toBe(true);
+  expect(result.allWarehoused).toBe(false);
+  const event = (
+    await owner.query(
+      `SELECT status FROM public.tracking_event WHERE shipment_id = $1 ORDER BY occurred_at DESC LIMIT 1`,
+      [shipment],
+    )
+  ).rows[0];
+  expect(event.status).toBe('partial_warehoused');
+  const invAfter = (
+    await owner.query(`SELECT quantity FROM public.inventory WHERE id = $1`, [inventory])
+  ).rows[0].quantity;
+  expect(Number(invAfter)).toBe(Number(invBefore));
 });
 
 it('DELIVERY-03: app runner has partial_warehouse_shipment EXECUTE', async () => {
