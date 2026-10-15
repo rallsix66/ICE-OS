@@ -32,12 +32,12 @@
 
 | ID | 含义 | 证据入口 | 状态 |
 | --- | --- | --- | --- |
-| A1 | 保留功能迁移及证据矩阵 | 本矩阵 + `check-2026-10-15T06-43-00-219Z` | **已验证**（待独立审查复核范围） |
+| A1 | 保留功能迁移及证据矩阵 | 本矩阵 + `check-2026-10-15T07-07-04-252Z` | **已验证**（待独立审查复核范围） |
 | A2 | 无 Supabase 运行依赖/回退 | `build-isolated` + boundary probes + `P0_02_FIXTURE_INPUT_PATH` bridge | **已验证** |
 | A3 | 真实浏览器交互 + 网络/落库 | Playwright **21** 项：关注 DB/DOM/恢复、搜索行集、CSV 仓库/SKU/数量、egress、比较器自检 | **已验证** |
 | A4 | 认证/权限/金额 | `test:p0-02:http` + 浏览器运营 inventory API 无 amount 字段 | **已验证** |
 | A5 | 业务语义兼容 | vitest + delivery-rework + Python gateway | **已验证** |
-| A6 | PG 最小权限/RLS/池隔离 | postgres **53** PG 用例 + 011/013/014/015 增量 + restore 语义合同（含 functionMeta 签名/体哈希） | **已验证** |
+| A6 | PG 最小权限/RLS/池隔离 | postgres **56** PG 用例 + 011/013/014/015 增量 + restore 语义合同（含 functionMeta 签名/体哈希） | **已验证** |
 | A7 | 虚构来源→claim→bridge→real_write→sync_log；publish **unknown** 有证据核对 | `sync-node-real-write-chain` + `sync-publish-unknown` + **015** expiry 授权/锁序 + Python atomicity/real_write | **已验证** |
 | A8 | 实例/fixture/负例/备份恢复 | fixture-restore-negative + **`run-backup-restore-drill.mjs`** + repeat-schema | **已验证** |
 | A9 | lint/build/diff/opt6/concurrency | `check:p0-02` + **`run-p0-02-concurrency.mjs`** | **已验证**（opt6 已知 1 fail / 5 pass） |
@@ -45,9 +45,9 @@
 ### 子测试挂接（摘要）
 
 - **A2**：`run-python-gateway-negative.mjs` / `run-python-gateway-integration.mjs`
-- **A3**：`run-browser-tests.mjs` → `browser-2026-10-15T06-42-18-987Z`（21 项）
+- **A3**：`run-browser-tests.mjs` → `browser-2026-10-15T07-08-28-623Z`（21 项；check 子运行）
 - **A7 unknown**：`sync-publish-unknown` + `sync-expiry-authorization` + `sync-expiry-lock-concurrency`；`db/p0-02/015_sync_publish_unknown_hardening.sql`
-- **A9 legacy Python**：`run-python-legacy-regression.mjs`（148 项；导入前文件/网络隔离自检）
+- **A9 legacy Python**：`run-python-legacy-regression.mjs`（148 项；audit hook 边界 + 导入前自检）
 - **A9 PG discovery**：`sync-node-real-write-chain-cleanup.postgres.test.ts` 纳入 vitest include + required
 - **DELIVERY**：`delivery-rework.postgres.test.ts`；`test_p0_02_publish_atomicity.py`；`run-repeat-schema-apply.mjs`
 - **A7**：`sync-node-real-write-chain.postgres.test.ts`；`run-python-real-write-integration.mjs`

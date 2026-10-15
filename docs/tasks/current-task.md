@@ -1,12 +1,12 @@
 # Current Task Packet
 
-## P0-02 — 9fbaf42 审查返工后交付
+## P0-02 — d082728 审查返工后交付
 
 状态：**`P0_02_IMPLEMENTED_AWAITING_REVIEW`**（**非** PASS；等待独立审查）
 
-- 本轮审查：**CHANGES_REQUIRED** @ `9fbaf42`（2026-10-15）
-- 正式任务包：[p0-02/2026-10-15-delivery-rework-9fbaf42.md](./p0-02/2026-10-15-delivery-rework-9fbaf42.md)
-- 验证报告：[../p0-02/verification-report-r2-20261015-9fbaf42-rework.md](../p0-02/verification-report-r2-20261015-9fbaf42-rework.md)
+- 本轮审查：**CHANGES_REQUIRED** @ `d082728`（2026-10-15）
+- 正式任务包：[p0-02/2026-10-15-delivery-rework-d082728.md](./p0-02/2026-10-15-delivery-rework-d082728.md)
+- 验证报告：[../p0-02/verification-report-r2-20261015-d082728-rework.md](../p0-02/verification-report-r2-20261015-d082728-rework.md)
 
 Canonical Run：`run-20261014-r2`
 
