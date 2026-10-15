@@ -38,7 +38,7 @@
 | A4 | 认证/权限/金额 | `test:p0-02:http` + identity + effective-acl | **已验证**（待审查扩面金额导出） |
 | A5 | 业务语义兼容 | vitest + Repository PG + delivery-rework | **待独立审查** |
 | A6 | PG 最小权限/RLS/池隔离 | `test:p0-02:postgres`（**43/43**）+ sync-runner-authorization | **已验证** |
-| A7 | 虚构来源→claim→bridge→real_write→sync_log | gateway + real_write + lifecycle + sync_run 关联 | **已验证**（DELIVERY-04；待审查 E2E 深度） |
+| A7 | 虚构来源→claim→bridge→real_write→sync_log | 独占 fixture real_write + 发布 defer commit + sync_run 绑定 | **已验证**（待审查全合同乱序/租约等） |
 | A8 | 实例/fixture/负例 | prepare + fixture-restore-negative + migrate-auth-negative | **已验证** |
 | A9 | lint/build/diff/opt6 | `npm run check:p0-02` exit 0 | **已验证**（opt6 已知 1 fail / 5 pass） |
 
