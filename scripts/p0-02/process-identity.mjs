@@ -54,6 +54,27 @@ export function resolveProcessCommandLine(pid) {
   return '';
 }
 
+export function resolveProcessCreationTimeMs(pid) {
+  if (process.platform !== 'win32') {
+    return null;
+  }
+  const result = spawnSync(
+    'powershell',
+    [
+      '-NoProfile',
+      '-Command',
+      `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" -ErrorAction SilentlyContinue; if (-not $p) { exit 1 }; ([datetime]$p.CreationDate).ToUniversalTime().ToString('o')`,
+    ],
+    withHiddenWindowsSpawnOptions({ encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }),
+  );
+  const raw = (result.stdout ?? '').trim();
+  if (!raw || result.status !== 0) {
+    return null;
+  }
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
 function extractExecutableToken(commandLine) {
   const trimmed = (commandLine ?? '').trim();
   if (!trimmed) {

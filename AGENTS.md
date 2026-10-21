@@ -8,6 +8,7 @@ Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js
 ## 入口与状态
 
 - 先读 `docs/current-state.md` 和 `docs/tasks/current-task.md`，真实代码优先于旧文档。
+- 当前包：**本地真实商品预览**（`docs/catalog/local-preview-delivery-index.md`），启停状态 **R5 补修待第五轮独审**（对照 [.local/catalog/independent-local-preview-r5-20261021T080011Z-f432e41a/independent-review.md](.local/catalog/independent-local-preview-r5-20261021T080011Z-f432e41a/independent-review.md)）：重复 start 不杀进程、去掉 legacy 归属兜底；商品/估值/RLS/R3 已关闭项保持。**P0-03、商品首包、N1A/N1C 已验收积压可推送** `codex/ice-v4-planning`（见 [local-preview-git-manifest.md](docs/catalog/local-preview-git-manifest.md)）；预览启停 commit 单独标注待审。商品首包及 N1A/N1C 仍 **N1A_LOCAL_PASS / N1C_LOCAL_PASS**。现役预览 run `run-20261021T075139Z-821214d2` → http://127.0.0.1:3010/dashboard/catalog。不向封存实例补 DDL。
 - 当前目标：`docs/architecture-v3.md`；历史模型：`docs/history-data-model-v1.md`；基础业务实体：`docs/database-design-v2.md`；来源规则：`docs/data-flow-v2.md`。
 - 产品范围以 `docs/product-plan-v4.md` 的 V5 选择性吸收为准，不将整份 V5 附件直接替换现役方案或扩展本期页面。
 - 已批准脱离 Supabase、保存历史、暂不开发复杂分析页面。P0-01 与 P0-02 本地独立平台验收均已独立审查通过（**P0_01_PASS** / **P0_02_PASS**）；生产启用、真实来源与旧环境删除仍属后续，不要把设计写成全面生产迁移或 Supabase 已删除。
@@ -18,6 +19,7 @@ Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js
 - 目标为标准 PostgreSQL + 自有服务端；推荐复用 Next.js、Repository、Zod、Feature Module，不推倒重写，不默认在 Supabase 上扩建新模型。
 - 迁移需替换 Auth/SDK/PostgREST/RPC传输及后台 service-role 路径；只换连接地址或自托管整套 Supabase 不算脱离。
 - 保留 UUID、人工 ICE 货号、Product → ProductVariant → Inventory；外部 SKU 按来源/账号/市场/仓库映射，69编码保存字符串。
+- 商品身份规则唯一正文为 `docs/product-identity-standard-v1.md`；区分已批准规则、样表已验证事实与待实现机制，不将本批检查写成数据库约束或长期绑定已实现。
 - BigSeller 决定海外数量，聚水潭决定国内数量，飞书决定货票业务状态，API只增强轨迹。到货不加海外库存，发货不二次扣国内库存。
 - 旧 inventory.quantity 仍为可售量，不冒充实物量；缺失/失败不转零，缺成本不是0，来源异步且证据不足不合计库存与在途。
 - 本期估算货值不含运费、不做费用分摊；单位成本也须明确不含运费，含运费或未知口径成本未澄清前不得参与估值。详细口径见产品方案。
@@ -27,6 +29,7 @@ Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js
 - 权限由服务端认证、启用检查、动作/范围授权及 PostgreSQL RLS共同保障；金额另行保护查询、导出、缓存与日志。
 - 数据库运行身份非表owner/非superuser/非BYPASSRLS；事务局部身份仅由验证后的服务端设置，连接池隔离必须验收。
 - Demo保持虚构数据隔离，不接真实服务/密钥；演示角色切换不是生产权限验收。
+- P0-03 本批仅整理主库并保存样表人工核对；使用显式人工 CSV 和冻结哈希，仓别约束仅限本批。后续持续绑定、自动复用和使用方案未定；不得输出正式绑定资格或执行库存发布/同步。现役任务见 `docs/tasks/current-task.md`。
 
 ## 高风险操作与兼容
 
