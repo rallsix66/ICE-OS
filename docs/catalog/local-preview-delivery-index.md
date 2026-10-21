@@ -68,4 +68,4 @@
 
 ## 停止与边界
 
-**Git**：五 commit 已推送（manifest §4.1）；**package.json 在 acb4865**。§4.2 测试/文档增量待推送。不 merge/deploy。`.local` 短程原始 JSON 与凭据不入库。
+**Git**：六 commit 已推送至 **9a8acb2**（manifest §4.1–§4.2）；**package.json 在 acb4865**。不 merge/deploy。`.local` 短程原始 JSON 与凭据不入库。

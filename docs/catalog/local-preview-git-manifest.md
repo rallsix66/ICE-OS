@@ -324,16 +324,15 @@
 | **acb4865** | chore: gitignore + **package.json** + UI | `.gitignore`、`package.json`、`postgres-process.mjs`、login/sidebar |
 | **c3e1cb1** | fix(catalog-preview): R5 ownership impl | 启停/ownership/launcher/workspace、R5 探针（初版）、`process-identity.mjs`、delivery/manifest/治理文档 |
 
-推送后远端 HEAD 曾为 **c3e1cb1**；§4.2 增量推送后以 `git rev-parse origin/codex/ice-v4-planning` 为准。
+远端 HEAD：**9a8acb2**（与本地一致，2026-10-21 推送）。
 
-### 4.2 待推送（R5 交付收尾：测试门禁 + 文档）
+### 4.2 已推送 — **9a8acb2**（R5 交付收尾：测试门禁 + 文档）
 
 - `scripts/catalog/preview-control-flow-vm-probes.mjs`
-- `scripts/catalog/run-preview-start-control-flow-probe.mjs`（真实 VM start/stop 9 场景）
-- `scripts/catalog/run-preview-r5-short-verify.mjs`
-- `docs/catalog/local-preview-delivery-index.md`、`local-preview-git-manifest.md`（本文件）
-- `AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`
+- `scripts/catalog/run-preview-start-control-flow-probe.mjs`（spawn VM；start 4 + stop 5 场景，失败非零退出）
+- `scripts/catalog/run-preview-r5-short-verify.mjs`（本地短程编排，证据不入库）
+- 治理文档：`delivery-index`、本 manifest、`AGENTS.md`、`current-state.md`、`current-task.md`
 
 短程原始证据 **不入库**：`.local/catalog/run-20261021T075139Z-821214d2/evidence/r5-short-verify-2026-10-21T08-24-27-634Z-4ec9e4/`（索引 `r5-short-verify-index.json` 于 run 根）。
 
-不 merge、不 deploy；推送前 `git diff --check`。
+不 merge、不 deploy。
