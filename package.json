@@ -30,7 +30,21 @@
     "test:p0-02:fixture-restore-negative": "node scripts/p0-02/run-fixture-restore-negative.mjs",
     "test:p0-02:migrate-auth-negative": "node scripts/p0-02/run-migrate-auth-negative.mjs",
     "test:p0-02:sync": "node scripts/p0-02/run-sync-tests.mjs",
-    "test:p0-02:browser": "node scripts/p0-02/run-browser-tests.mjs"
+    "test:p0-02:browser": "node scripts/p0-02/run-browser-tests.mjs",
+    "p0-03:match": "node scripts/p0-03/run-match.mjs",
+    "check:p0-03": "node scripts/p0-03/run-check.mjs",
+    "catalog:prepare": "node scripts/catalog/prepare.mjs",
+    "check:catalog": "node scripts/catalog/run-check.mjs",
+    "catalog:postgres": "node scripts/catalog/run-postgres-tests.mjs",
+    "catalog:browser": "node scripts/catalog/run-browser-tests.mjs",
+    "catalog:prepare-local-preview": "node scripts/catalog/prepare-local-preview.mjs",
+    "catalog:start-local-preview": "node scripts/catalog/start-local-preview.mjs",
+    "catalog:stop-local-preview": "node scripts/catalog/stop-local-preview.mjs",
+    "catalog:status-local-preview": "node scripts/catalog/status-local-preview.mjs",
+    "catalog:start-postgres": "node scripts/catalog/start-catalog-postgres.mjs",
+    "catalog:stop-postgres": "node scripts/catalog/stop-catalog-postgres.mjs",
+    "catalog:list-postgres": "node scripts/catalog/list-catalog-postgres.mjs",
+    "catalog:self-verify-local-preview": "node scripts/catalog/run-local-preview-self-verify.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

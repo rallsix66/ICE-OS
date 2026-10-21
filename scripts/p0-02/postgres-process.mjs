@@ -52,7 +52,7 @@ export function removeStalePostmasterPid(dataDir) {
 export function startPostgresServer(config) {
   const { runRootDir, dataDir, port, logFile, runId } = config;
   const host = config.host ?? '127.0.0.1';
-  const postgresExe = pgExe('postgres', runId);
+  const postgresExe = config.postgresExe ?? pgExe('postgres', runId);
 
   removeStalePostmasterPid(dataDir);
 

@@ -215,6 +215,7 @@ export function SidebarNav({ roleName }: { roleName: string }) {
         {/* 管理区域 — 仅管理员 */}
         {isAdmin && (
           <div className="mt-0.5 space-y-0.5">
+            {renderItem({ href: '/dashboard/catalog', label: '商品资料', icon: List, phase: '0' })}
             {renderItem(USERS_ITEM)}
             {renderItem(WAREHOUSE_ASSIGN_ITEM)}
           </div>

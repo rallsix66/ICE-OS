@@ -57,7 +57,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/dashboard');
+      router.push(process.env.NEXT_PUBLIC_ICE_POST_LOGIN_PATH ?? '/dashboard');
       router.refresh();
     } catch (loginError) {
       // 只允许超时错误透出特定中文提示；其他网络/未知异常统一使用通用提示，防止泄露原始英文错误

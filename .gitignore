@@ -59,3 +59,17 @@ tools/bigseller-scraper/runtime/
 
 # P0-02 local isolated postgres runtime (binaries, pgdata, secrets, evidence)
 .local/p0-02/
+
+# P0-03 local sample workbooks, match evidence, review outcomes
+.local/p0-03/
+
+# Catalog isolated runs, local preview pgdata, secrets, and evidence
+.local/catalog/
+
+# Local discovery, desktop cleanup, and ad-hoc preview logs (keep on disk only)
+.local/product-library-discovery/
+.local/desktop-cleanup/
+.local/preview-*/
+
+# Local runtime noise
+debug.log
