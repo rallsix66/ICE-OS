@@ -1,12 +1,14 @@
 # Current Project State
 
-更新：2026-10-21（R5 功能关闭 + 交付收尾）。仓库 ICEOS。
+更新：2026-10-21（**LOCAL_PREVIEW_PASS** 文档登记）。仓库 ICEOS。
 
 ## 本地真实商品预览（当前）
 
-**R5 功能问题已独立关闭**；**交付收尾待复核** — 功能项见 [R5 closeout 独审](../.local/catalog/independent-local-preview-r5-closeout-20261021T081737Z-dab40b90/independent-review.md)。仓库已纳入真实 VM start/stop 控制流门禁（9 场景）与短程证据（归属 7 例、双 start、投影 restart 一致）。索引：[local-preview-delivery-index.md](./catalog/local-preview-delivery-index.md)；短程入口 `run-20261021T075139Z-821214d2/r5-short-verify-index.json`。预览 http://127.0.0.1:3010/dashboard/catalog。商品/估值/RLS/R3-2/3/4 **不重开**。
+**`LOCAL_PREVIEW_PASS`** — 本包独立验收完成（[最终独审](../.local/catalog/independent-local-preview-final-20261021T084549Z/independent-review.md)）。通过范围：本地真实商品及本批样表库存预览（126 资料、BS 530 展示、六仓、已确认口径货值、启停与测试证据）；**不代表**实时同步、生产启用或全库 ICEOS 已交付。索引：[local-preview-delivery-index.md](./catalog/local-preview-delivery-index.md)。
 
-**Git**：五 commit 已推送（manifest §4.1，`package.json` 在 **acb4865**）；§4.2 测试/文档增量待推送。`.local` 原始 JSON 不入库。
+**最终独审核验（2026-10-21）**：独立重跑 VM 控制流探针 9 场景 exit 0；独立重算短程 before/after 各 126 行投影 SHA 均为 `330125d4fdf1cddb00b2630822edfdcc87b6ac6cd3f21d9519e1abe2048de0fe`，时间顺序有效；只读 status/登录与进程归属通过（审查时点 PID 与短程记录可不同，见 delivery-index）。短程原始 JSON、历史全链自验与商品/估值/RLS 门禁结论为**原始日志核查或继承**，本轮未重跑 prepare、完整自验或业务回归。
+
+**Git**：catalog 积压与 closeout 测试已推送 `codex/ice-v4-planning`（manifest §4；`package.json` 在 **acb4865**）。`.local` 证据与凭据不入库；Git 无待提交变更不等于本地实例/缓存已清理（见 [工作区盘点](../.local/catalog/workspace-git-audit-20261021/workspace-git-audit.md)）。
 
 ## 来源身份N1A与持续新品N1C（保留）
 

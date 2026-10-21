@@ -8,7 +8,7 @@ Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js
 ## 入口与状态
 
 - 先读 `docs/current-state.md` 和 `docs/tasks/current-task.md`，真实代码优先于旧文档。
-- 当前包：**本地真实商品预览**（`docs/catalog/local-preview-delivery-index.md`）。**R5 功能问题已独立关闭**；**交付收尾（VM 门禁 + 短程证据 + 文档）待复核**（对照 [.local/catalog/independent-local-preview-r5-closeout-20261021T081737Z-dab40b90/independent-review.md](.local/catalog/independent-local-preview-r5-closeout-20261021T081737Z-dab40b90/independent-review.md)）。积压五 commit 已推送 `codex/ice-v4-planning`（`package.json` 在 **acb4865**）；短程证据见 run `run-20261021T075139Z-821214d2` 的 `r5-short-verify-index.json`。商品/估值/RLS 不重开；N1A/N1C 仍 **N1A_LOCAL_PASS / N1C_LOCAL_PASS**。预览 http://127.0.0.1:3010/dashboard/catalog。不向封存实例补 DDL。
+- 当前包：**本地真实商品预览** — **`LOCAL_PREVIEW_PASS`**（2026-10-21 最终独审；索引 [`local-preview-delivery-index.md`](docs/catalog/local-preview-delivery-index.md)，报告 [`.local/catalog/independent-local-preview-final-20261021T084549Z/independent-review.md`](.local/catalog/independent-local-preview-final-20261021T084549Z/independent-review.md)）。范围：126 主资料与本批 BS 样表库存的**本地**展示、六仓筛选、已确认口径估算货值及预览启停/测试证据；**不等于**实时同步、生产启用或整个 ICEOS 已完成。源码与 closeout 测试已推送 `codex/ice-v4-planning`（`package.json` 在 **acb4865**，见 [manifest](docs/catalog/local-preview-git-manifest.md) §4）。继承 P0/N1A/N1C 与 R3–R5 已关闭项，不重开。现役预览 run `run-20261021T075139Z-821214d2` → http://127.0.0.1:3010/dashboard/catalog。不向封存实例补 DDL。
 - 当前目标：`docs/architecture-v3.md`；历史模型：`docs/history-data-model-v1.md`；基础业务实体：`docs/database-design-v2.md`；来源规则：`docs/data-flow-v2.md`。
 - 产品范围以 `docs/product-plan-v4.md` 的 V5 选择性吸收为准，不将整份 V5 附件直接替换现役方案或扩展本期页面。
 - 已批准脱离 Supabase、保存历史、暂不开发复杂分析页面。P0-01 与 P0-02 本地独立平台验收均已独立审查通过（**P0_01_PASS** / **P0_02_PASS**）；生产启用、真实来源与旧环境删除仍属后续，不要把设计写成全面生产迁移或 Supabase 已删除。

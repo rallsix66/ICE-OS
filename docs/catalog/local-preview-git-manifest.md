@@ -1,12 +1,12 @@
 # 本地真实商品预览包 — Git 三份清单（R6 / F5）
 
-状态：**R5 功能问题已独立关闭**；**交付收尾（VM 门禁 + 短程证据 + 文档）待复核**。积压五 commit 已推送 `codex/ice-v4-planning`；§4.1 记录实际 SHA；§4.2 为本次测试/文档增量。
+状态：**`LOCAL_PREVIEW_PASS`**（2026-10-21 最终独审）。本包源码与 closeout 测试已推送 `codex/ice-v4-planning`；§1 为**已提交**路径清单；§4 为实际 commit 记录。
 
-盘点时点：2026-10-21（R5 closeout）。§1 为已入库路径索引；不再使用「拟提交/已暂存」旧说法。
+盘点时点：2026-10-21（最终 PASS 文档登记）。工作区 Git 事实见 [workspace-git-audit-20261021](../../.local/catalog/workspace-git-audit-20261021/workspace-git-audit.md)。
 
 ---
 
-## 1. 拟提交（源码 / SQL / 脚本 / 测试 / 配置 / 必要文档）
+## 1. 已提交文件清单（源码 / SQL / 脚本 / 测试 / 配置 / 必要文档）
 
 ### 1.1 横切与 P0-02 辅助（已分散在 §4.1 各 commit）
 
@@ -15,7 +15,7 @@
 - `scripts/p0-02/postgres-process.mjs` → **acb4865**
 - `scripts/p0-02/process-identity.mjs` → **c3e1cb1**
 - `src/app/auth/login/page.tsx`、`src/app/dashboard/_components/sidebar-nav.tsx` → **acb4865**
-- `AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`、delivery/manifest → **c3e1cb1** 与本次 §4.2 增量
+- `AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`、delivery/manifest → **c3e1cb1** 起多笔提交；**LOCAL_PREVIEW_PASS** 最终登记见 §4.3
 
 ### 1.2 商品首包 — SQL（`db/catalog/`）
 
@@ -308,7 +308,7 @@
 | `tools/bigseller-scraper/sync/__pycache__/config.cpython-313.pyc` | Python 字节码 |
 | `tools/bigseller-scraper/sync/__pycache__/plan_generator.cpython-313.pyc` | Python 字节码 |
 
-本地文件仍在磁盘；提交时随 `.gitignore` 更新一并纳入「清理跟踪」commit。
+本地文件仍在磁盘；已在 **d6cbeee** 自仓库索引移除。
 
 ---
 
@@ -324,15 +324,22 @@
 | **acb4865** | chore: gitignore + **package.json** + UI | `.gitignore`、`package.json`、`postgres-process.mjs`、login/sidebar |
 | **c3e1cb1** | fix(catalog-preview): R5 ownership impl | 启停/ownership/launcher/workspace、R5 探针（初版）、`process-identity.mjs`、delivery/manifest/治理文档 |
 
-远端 HEAD：以 `git rev-parse origin/codex/ice-v4-planning` 为准（closeout 功能主体 **9a8acb2**；其后仅文档 SHA 同步小提交）。
-
-### 4.2 已推送 — **9a8acb2**（R5 交付收尾：测试门禁 + 文档）
+### 4.2 已推送 — **9a8acb2**（R5 closeout：VM 门禁 + 短程编排）
 
 - `scripts/catalog/preview-control-flow-vm-probes.mjs`
 - `scripts/catalog/run-preview-start-control-flow-probe.mjs`（spawn VM；start 4 + stop 5 场景，失败非零退出）
 - `scripts/catalog/run-preview-r5-short-verify.mjs`（本地短程编排，证据不入库）
-- 治理文档：`delivery-index`、本 manifest、`AGENTS.md`、`current-state.md`、`current-task.md`
+- 治理文档（closeout 时点）：delivery-index、manifest、AGENTS、current-state、current-task
 
-短程原始证据 **不入库**：`.local/catalog/run-20261021T075139Z-821214d2/evidence/r5-short-verify-2026-10-21T08-24-27-634Z-4ec9e4/`（索引 `r5-short-verify-index.json` 于 run 根）。
+### 4.3 已推送 — 文档同步（**4e5c01d**、**f5b0e5a**、**cebc6b0**）
+
+仅 manifest/delivery 文字与远端 SHA 说明修正；**不含**业务或测试逻辑变更。最终独审 PASS 时远端 HEAD 为 **cebc6b0**。
+
+### 4.4 **`LOCAL_PREVIEW_PASS` 治理文档登记**
+
+- 五份文档：`AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`、`docs/catalog/local-preview-delivery-index.md`、本 manifest
+- 对照 [independent-local-preview-final-20261021T084549Z](../../.local/catalog/independent-local-preview-final-20261021T084549Z/independent-review.md)
+
+短程原始证据 **不入库**：`.local/catalog/run-20261021T075139Z-821214d2/evidence/r5-short-verify-2026-10-21T08-24-27-634Z-4ec9e4/`（索引 `r5-short-verify-index.json`）。
 
 不 merge、不 deploy。
