@@ -68,4 +68,4 @@
 
 ## 停止与边界
 
-**Git**：六 commit 已推送至 **9a8acb2**（manifest §4.1–§4.2）；**package.json 在 acb4865**。不 merge/deploy。`.local` 短程原始 JSON 与凭据不入库。
+**Git**：积压 + closeout 已推送，远端 **4e5c01d**（manifest §4.1–§4.2，closeout 主体 **9a8acb2**）；**package.json 在 acb4865**。不 merge/deploy。`.local` 短程原始 JSON 与凭据不入库。
