@@ -1,0 +1,1332 @@
+{
+  "batch": "20261020-final-product-decisions",
+  "scope": "current_sample_only; no_binding_reuse_inventory_or_real_service",
+  "recorded_at": "2026-10-20T03:41:45Z",
+  "authorization": "用户本轮明确授权最终商品决定：三条菲越洗面奶为升级款、WM0006/WM0008本批忽略、四项采用主库C列规格、WM0130确认、菲越WM0073两条确认、刷子两份保留待确认；不是全库或长期自动规则。",
+  "base_hashes": {
+    "match-bundle.json": "3c2babc9b13ca11fab14cb4bbce5e8617052319d06bc80c922256f6893346159",
+    "manual-decisions.effective.csv": "48544cd03154131970fce220fb2ff7c704e18d7860e2ea7c72e6a0ef1ac8d921"
+  },
+  "original_inputs": {
+    "master": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Icelerskin 商品库1.xlsx",
+      "sha256": "930e763d5c161d7452061344c99d547ecb9b4a7561d157cc2998a536c717f0f8",
+      "frozen": "input-0.frozen.xlsx"
+    },
+    "bigseller": {
+      "path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+      "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+      "frozen": "input-1.frozen.xlsx"
+    },
+    "jushuitan": {
+      "paths": [
+        {
+          "path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261015165159_200874071_1.xlsx",
+          "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+          "frozen": "input-2.frozen.xlsx"
+        },
+        {
+          "path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261016111727_201045638_1.xlsx",
+          "sha256": "7fca9bee434847ff62582b85497c7af76d8b03b32d3e599a4db029fa91fc019f",
+          "frozen": "input-3.frozen.xlsx"
+        }
+      ]
+    }
+  },
+  "source_decisions": [
+    {
+      "decision_id": "user-20261020-final-mc-e1b56fb81b0db46c",
+      "candidate_id": "mc-e1b56fb81b0db46c",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:376:菲律宾-新创启辰自建仓:6974674957349"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:376:菲律宾-新创启辰自建仓:6974674957349",
+        "scope": "match_only",
+        "warehouse": "菲律宾-新创启辰自建仓",
+        "external_sku_raw": "6974674957349",
+        "external_name": "ICE LERSKIN 氨基酸洗面奶",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "6974674957349",
+        "available_qty": "36276",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "source_file": {
+        "file_name": "库存清单20261015083723474.xlsx",
+        "frozen": "input-1.frozen.xlsx",
+        "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+        "sheet_name": "单个SKU",
+        "excel_row": 376,
+        "raw_record": {
+          "Image URL": "https://res.bigseller.pro/album/646141/202310161207121191ba9fa2d7c36689b945b17c4359be.jpeg?imageView2/1/w/300/h/300",
+          "SKU编号": "6974674957349",
+          "名称": "ICE LERSKIN 氨基酸洗面奶",
+          "GTIN": "6974674957349",
+          "重量(g)": "130.00",
+          "长(cm)": "5.00",
+          "宽(cm)": "5.00",
+          "高(cm)": "15.00",
+          "仓库": "菲律宾-新创启辰自建仓",
+          "库区": "--",
+          "货架位": "--",
+          "现有库存": 37068.0,
+          "订单已锁": 792.0,
+          "整仓可用": 36276.0,
+          "活动预留": 0.0,
+          "在途中": 39900.0,
+          "在途总成本": "15037.83",
+          "警戒库存": 0.0,
+          "预测日销量": "1650.43",
+          "预计可售天数": "22",
+          "加权成本价": "0.37",
+          "总成本价": "13715.16",
+          "销售状态": "在售",
+          "一级分类": "洗面奶",
+          "二级分类": "",
+          "三级分类": "",
+          "SKU类型": "Single SKU",
+          "备注": ""
+        }
+      },
+      "target_row": 19,
+      "target_ice": "WM0012",
+      "target_master": {
+        "row_index": 19,
+        "ice_code": "WM0012",
+        "barcode": "6974674957349",
+        "name_cn": "ICE LERSKIN 冰川水精华洗面奶",
+        "spec": "100g/瓶"
+      },
+      "decision": "confirm",
+      "operation": "version_reaffirmation",
+      "reason": "用户明确三条菲越普通洗面奶均为升级普通版，维持原主库19行WM0012，解除当前版本待决；不是新增有效选择。"
+    },
+    {
+      "decision_id": "user-20261020-final-mc-73ac4812d7d8de64",
+      "candidate_id": "mc-73ac4812d7d8de64",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:380:PH-彩妆日均万单简简单单仓:6974674957349"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:380:PH-彩妆日均万单简简单单仓:6974674957349",
+        "scope": "match_only",
+        "warehouse": "PH-彩妆日均万单简简单单仓",
+        "external_sku_raw": "6974674957349",
+        "external_name": "ICE LERSKIN 氨基酸洗面奶",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "6974674957349",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "source_file": {
+        "file_name": "库存清单20261015083723474.xlsx",
+        "frozen": "input-1.frozen.xlsx",
+        "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+        "sheet_name": "单个SKU",
+        "excel_row": 380,
+        "raw_record": {
+          "Image URL": "https://res.bigseller.pro/album/646141/202310161207121191ba9fa2d7c36689b945b17c4359be.jpeg?imageView2/1/w/300/h/300",
+          "SKU编号": "6974674957349",
+          "名称": "ICE LERSKIN 氨基酸洗面奶",
+          "GTIN": "6974674957349",
+          "重量(g)": "130.00",
+          "长(cm)": "5.00",
+          "宽(cm)": "5.00",
+          "高(cm)": "15.00",
+          "仓库": "PH-彩妆日均万单简简单单仓",
+          "库区": "Default Piling Area",
+          "货架位": "Default Shelf",
+          "现有库存": 0.0,
+          "订单已锁": 0.0,
+          "整仓可用": 0.0,
+          "活动预留": 0.0,
+          "在途中": 0.0,
+          "在途总成本": "0.00",
+          "警戒库存": 0.0,
+          "预测日销量": "0.00",
+          "预计可售天数": "--",
+          "加权成本价": "0.00",
+          "总成本价": "0.00",
+          "销售状态": "在售",
+          "一级分类": "洗面奶",
+          "二级分类": "",
+          "三级分类": "",
+          "SKU类型": "Single SKU",
+          "备注": ""
+        }
+      },
+      "target_row": 19,
+      "target_ice": "WM0012",
+      "target_master": {
+        "row_index": 19,
+        "ice_code": "WM0012",
+        "barcode": "6974674957349",
+        "name_cn": "ICE LERSKIN 冰川水精华洗面奶",
+        "spec": "100g/瓶"
+      },
+      "decision": "confirm",
+      "operation": "version_reaffirmation",
+      "reason": "用户明确三条菲越普通洗面奶均为升级普通版，维持原主库19行WM0012，解除当前版本待决；不是新增有效选择。"
+    },
+    {
+      "decision_id": "user-20261020-final-mc-b7bd376e964738cd",
+      "candidate_id": "mc-b7bd376e964738cd",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:526:越南青林湾仓库:6974674957349"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:526:越南青林湾仓库:6974674957349",
+        "scope": "match_only",
+        "warehouse": "越南青林湾仓库",
+        "external_sku_raw": "6974674957349",
+        "external_name": "ICE LERSKIN 氨基酸洗面奶",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "6974674957349",
+        "available_qty": "209",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "source_file": {
+        "file_name": "库存清单20261015083723474.xlsx",
+        "frozen": "input-1.frozen.xlsx",
+        "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+        "sheet_name": "单个SKU",
+        "excel_row": 526,
+        "raw_record": {
+          "Image URL": "https://res.bigseller.pro/album/646141/202310161207121191ba9fa2d7c36689b945b17c4359be.jpeg?imageView2/1/w/300/h/300",
+          "SKU编号": "6974674957349",
+          "名称": "ICE LERSKIN 氨基酸洗面奶",
+          "GTIN": "6974674957349",
+          "重量(g)": "130.00",
+          "长(cm)": "5.00",
+          "宽(cm)": "5.00",
+          "高(cm)": "15.00",
+          "仓库": "越南青林湾仓库",
+          "库区": "--",
+          "货架位": "--",
+          "现有库存": 237.0,
+          "订单已锁": 28.0,
+          "整仓可用": 209.0,
+          "活动预留": 0.0,
+          "在途中": 0.0,
+          "在途总成本": "0.00",
+          "警戒库存": 0.0,
+          "预测日销量": "118.41",
+          "预计可售天数": "1",
+          "加权成本价": "0.00",
+          "总成本价": "0.00",
+          "销售状态": "在售",
+          "一级分类": "洗面奶",
+          "二级分类": "",
+          "三级分类": "",
+          "SKU类型": "Single SKU",
+          "备注": ""
+        }
+      },
+      "target_row": 19,
+      "target_ice": "WM0012",
+      "target_master": {
+        "row_index": 19,
+        "ice_code": "WM0012",
+        "barcode": "6974674957349",
+        "name_cn": "ICE LERSKIN 冰川水精华洗面奶",
+        "spec": "100g/瓶"
+      },
+      "decision": "confirm",
+      "operation": "version_reaffirmation",
+      "reason": "用户明确三条菲越普通洗面奶均为升级普通版，维持原主库19行WM0012，解除当前版本待决；不是新增有效选择。"
+    },
+    {
+      "decision_id": "user-20261020-final-mc-e78031a3b38c39f1",
+      "candidate_id": "mc-e78031a3b38c39f1",
+      "source_identity": [
+        "jushuitan",
+        "WM0006",
+        "WM0006"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:743:WM0006:WM0006",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0006",
+        "external_name": "外贸GreTeam 身体油120ml",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "6984",
+        "extra": {
+          "style_code": "WM0006",
+          "product_code": "WM0006",
+          "spec": null,
+          "actual_qty": "6984",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 743,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0006",
+          "商品编码": "WM0006",
+          "商品名称": "外贸GreTeam 身体油120ml",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 6984,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 6984,
+          "公有可用数": 6984,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/4/30 16:39:52"
+        }
+      },
+      "target_row": 13,
+      "target_ice": "WM0006",
+      "target_master": {
+        "row_index": 13,
+        "ice_code": "WM0006",
+        "barcode": "714855625133",
+        "name_cn": "GreTeam身体油\n333克",
+        "spec": ""
+      },
+      "decision": "ignore",
+      "operation": "batch_ignore",
+      "reason": "用户要求本批忽略"
+    },
+    {
+      "decision_id": "user-20261020-final-mc-06e9251af096ae18",
+      "candidate_id": "mc-06e9251af096ae18",
+      "source_identity": [
+        "jushuitan",
+        "WM0008",
+        "WM0008"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:745:WM0008:WM0008",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0008",
+        "external_name": "外贸GreTeam VC精华液60ml",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "5220",
+        "extra": {
+          "style_code": "WM0008",
+          "product_code": "WM0008",
+          "spec": null,
+          "actual_qty": "5220",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 745,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0008",
+          "商品编码": "WM0008",
+          "商品名称": "外贸GreTeam VC精华液60ml",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 5220,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 5220,
+          "公有可用数": 5220,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/1/17 0:28:06"
+        }
+      },
+      "target_row": 14,
+      "target_ice": "WM0008",
+      "target_master": {
+        "row_index": 14,
+        "ice_code": "WM0008",
+        "barcode": "714855625126",
+        "name_cn": "GreTeam-vc精华\n140克",
+        "spec": ""
+      },
+      "decision": "ignore",
+      "operation": "batch_ignore",
+      "reason": "用户要求本批忽略"
+    },
+    {
+      "decision_id": "user-20261020-final-mc-75e0ce710d064c4c",
+      "candidate_id": "mc-75e0ce710d064c4c",
+      "source_identity": [
+        "jushuitan",
+        "WM0130",
+        "WM0130"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:857:WM0130:WM0130",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0130",
+        "external_name": "ICE LERSKIN 抗重力视黄醇按摩电动眼霜 20g（泰文标签版）",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "19252",
+        "extra": {
+          "style_code": "WM0130",
+          "product_code": "WM0130",
+          "spec": null,
+          "actual_qty": "19252",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 857,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0130",
+          "商品编码": "WM0130",
+          "商品名称": "ICE LERSKIN 抗重力视黄醇按摩电动眼霜 20g（泰文标签版）",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 19252,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 19252,
+          "公有可用数": 19252,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/10/9 10:13:11"
+        }
+      },
+      "target_row": 121,
+      "target_ice": "WM0130",
+      "target_master": {
+        "row_index": 121,
+        "ice_code": "WM0130",
+        "barcode": "757577983068",
+        "name_cn": "ICE LERSKIN 抗重力视黄醇按摩眼霜（泰文标签版）",
+        "spec": "20ml/支"
+      },
+      "decision": "confirm",
+      "operation": "new_selection",
+      "reason": "用户明确WM0130采用主库C列20ml/支，确认该条聚水潭记录对应原主库121行WM0130；保留来源名称20g差异，不换算g/ml。"
+    },
+    {
+      "decision_id": "user-20261020-final-mc-44b8f0236d346bc7",
+      "candidate_id": "mc-44b8f0236d346bc7",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:220:越南青林湾仓库:757577407359"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:220:越南青林湾仓库:757577407359",
+        "scope": "match_only",
+        "warehouse": "越南青林湾仓库",
+        "external_sku_raw": "757577407359",
+        "external_name": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407359",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "source_file": {
+        "file_name": "库存清单20261015083723474.xlsx",
+        "frozen": "input-1.frozen.xlsx",
+        "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+        "sheet_name": "单个SKU",
+        "excel_row": 220,
+        "raw_record": {
+          "Image URL": "https://res.bigseller.pro/sku/images/merchantsku/646141/776511_1747727497134.jpg?imageView2/1/w/300/h/300",
+          "SKU编号": "757577407359",
+          "名称": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+          "GTIN": "757577407359",
+          "重量(g)": "116.00",
+          "长(cm)": "14.00",
+          "宽(cm)": "3.50",
+          "高(cm)": "8.00",
+          "仓库": "越南青林湾仓库",
+          "库区": "--",
+          "货架位": "--",
+          "现有库存": 0.0,
+          "订单已锁": 0.0,
+          "整仓可用": 0.0,
+          "活动预留": 0.0,
+          "在途中": 0.0,
+          "在途总成本": "0.00",
+          "警戒库存": 0.0,
+          "预测日销量": "0.00",
+          "预计可售天数": "--",
+          "加权成本价": "0.00",
+          "总成本价": "0.00",
+          "销售状态": "在售",
+          "一级分类": "未分类",
+          "二级分类": "",
+          "三级分类": "",
+          "SKU类型": "Single SKU",
+          "备注": ""
+        }
+      },
+      "target_row": 67,
+      "target_ice": "WM0073",
+      "target_master": {
+        "row_index": 67,
+        "ice_code": "WM0073",
+        "barcode": "",
+        "name_cn": "ICE LERSKIN 护发精油套盒 20ml*4瓶-泰国特供版",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "operation": "resolve_defer",
+      "reason": "用户明确该条菲越757577407359为名称所示泰国特供精油套盒，确认原主库67行WM0073；仅解除此条defer，不扩大为通用条码规则。"
+    },
+    {
+      "decision_id": "user-20261020-final-mc-c8e6e17fc25361f1",
+      "candidate_id": "mc-c8e6e17fc25361f1",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:321:菲律宾-新创启辰自建仓:757577407359"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:321:菲律宾-新创启辰自建仓:757577407359",
+        "scope": "match_only",
+        "warehouse": "菲律宾-新创启辰自建仓",
+        "external_sku_raw": "757577407359",
+        "external_name": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407359",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "source_file": {
+        "file_name": "库存清单20261015083723474.xlsx",
+        "frozen": "input-1.frozen.xlsx",
+        "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+        "sheet_name": "单个SKU",
+        "excel_row": 321,
+        "raw_record": {
+          "Image URL": "https://res.bigseller.pro/sku/images/merchantsku/646141/776511_1747727497134.jpg?imageView2/1/w/300/h/300",
+          "SKU编号": "757577407359",
+          "名称": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+          "GTIN": "757577407359",
+          "重量(g)": "116.00",
+          "长(cm)": "14.00",
+          "宽(cm)": "3.50",
+          "高(cm)": "8.00",
+          "仓库": "菲律宾-新创启辰自建仓",
+          "库区": "--",
+          "货架位": "--",
+          "现有库存": 0.0,
+          "订单已锁": 0.0,
+          "整仓可用": 0.0,
+          "活动预留": 0.0,
+          "在途中": 0.0,
+          "在途总成本": "0.00",
+          "警戒库存": 0.0,
+          "预测日销量": "0.00",
+          "预计可售天数": "--",
+          "加权成本价": "0.00",
+          "总成本价": "0.00",
+          "销售状态": "在售",
+          "一级分类": "未分类",
+          "二级分类": "",
+          "三级分类": "",
+          "SKU类型": "Single SKU",
+          "备注": ""
+        }
+      },
+      "target_row": 67,
+      "target_ice": "WM0073",
+      "target_master": {
+        "row_index": 67,
+        "ice_code": "WM0073",
+        "barcode": "",
+        "name_cn": "ICE LERSKIN 护发精油套盒 20ml*4瓶-泰国特供版",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "operation": "resolve_defer",
+      "reason": "用户明确该条菲越757577407359为名称所示泰国特供精油套盒，确认原主库67行WM0073；仅解除此条defer，不扩大为通用条码规则。"
+    }
+  ],
+  "version_confirmations": [
+    {
+      "candidate_id": "mc-e1b56fb81b0db46c",
+      "target_row": 19,
+      "target_ice": "WM0012",
+      "confirmed_version": "升级普通版",
+      "decision_id": "user-20261020-final-mc-e1b56fb81b0db46c",
+      "reason": "用户明确三条菲越普通洗面奶均为升级普通版，维持原主库19行WM0012，解除当前版本待决；不是新增有效选择。"
+    },
+    {
+      "candidate_id": "mc-73ac4812d7d8de64",
+      "target_row": 19,
+      "target_ice": "WM0012",
+      "confirmed_version": "升级普通版",
+      "decision_id": "user-20261020-final-mc-73ac4812d7d8de64",
+      "reason": "用户明确三条菲越普通洗面奶均为升级普通版，维持原主库19行WM0012，解除当前版本待决；不是新增有效选择。"
+    },
+    {
+      "candidate_id": "mc-b7bd376e964738cd",
+      "target_row": 19,
+      "target_ice": "WM0012",
+      "confirmed_version": "升级普通版",
+      "decision_id": "user-20261020-final-mc-b7bd376e964738cd",
+      "reason": "用户明确三条菲越普通洗面奶均为升级普通版，维持原主库19行WM0012，解除当前版本待决；不是新增有效选择。"
+    }
+  ],
+  "specification_resolutions": [
+    {
+      "decision_id": "user-20261020-final-spec-WM0006",
+      "ice_code": "WM0006",
+      "master_row": 13,
+      "status": "closed_ignored_for_batch",
+      "source_column": null,
+      "selected_spec": null,
+      "reason": "用户明确本批忽略该JST记录，关闭本批规格待复核；保留全部差异历史，不补填空规格。",
+      "previous_audit_question": {
+        "id": "audit-spec-WM0006",
+        "kind": "new_specification_evidence_question",
+        "product": {
+          "ice_code": "WM0006",
+          "name": "GreTeam身体油\n333克",
+          "master_anchor": 13
+        },
+        "current_correspondence": {
+          "bigseller_selected": {},
+          "jushuitan_selected": [],
+          "unconfirmed_candidate_id": "mc-e78031a3b38c39f1"
+        },
+        "evidence": {
+          "master_name": "GreTeam身体油\n333克",
+          "master_spec_column": "",
+          "master_single_product_weight_kg": "0.334",
+          "master_note": "",
+          "jst_source_name": "外贸GreTeam 身体油120ml",
+          "source_origin": {
+            "original_file": "商品资料_20261015165159_200874071_1.xlsx",
+            "original_path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261015165159_200874071_1.xlsx",
+            "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-2.frozen.xlsx",
+            "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+            "sheet": "Sheet1",
+            "excel_row": 743,
+            "style_code": "WM0006",
+            "product_code": "WM0006",
+            "external_name": "外贸GreTeam 身体油120ml",
+            "available_qty": "6984"
+          }
+        },
+        "uncertain": "名称/规格分别使用克重和容量，现有资料无法证明是净容量与整件重量差异、填写口径差异或不同版本；不能自行换算或当作确定错品。",
+        "user_choice_needed": "本轮不要求提供包装或作答；资料是否及如何补正留待后续，当前保持原状。",
+        "blocks_this_readonly_batch": false,
+        "decision_unchanged": "仅新增审计疑点说明；JST仍是未人工确认候选，不写confirm，不改变主资料或原业务待决文件。"
+      },
+      "quantity_conversion_authorized": false
+    },
+    {
+      "decision_id": "user-20261020-final-spec-WM0008",
+      "ice_code": "WM0008",
+      "master_row": 14,
+      "status": "closed_ignored_for_batch",
+      "source_column": null,
+      "selected_spec": null,
+      "reason": "用户明确本批忽略该JST记录，关闭本批规格待复核；保留全部差异历史，不补填空规格。",
+      "previous_audit_question": {
+        "id": "audit-spec-WM0008",
+        "kind": "new_specification_evidence_question",
+        "product": {
+          "ice_code": "WM0008",
+          "name": "GreTeam-vc精华\n140克",
+          "master_anchor": 14
+        },
+        "current_correspondence": {
+          "bigseller_selected": {},
+          "jushuitan_selected": [],
+          "unconfirmed_candidate_id": "mc-06e9251af096ae18"
+        },
+        "evidence": {
+          "master_name": "GreTeam-vc精华\n140克",
+          "master_spec_column": "",
+          "master_single_product_weight_kg": "0.14",
+          "master_note": "",
+          "jst_source_name": "外贸GreTeam VC精华液60ml",
+          "source_origin": {
+            "original_file": "商品资料_20261015165159_200874071_1.xlsx",
+            "original_path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261015165159_200874071_1.xlsx",
+            "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-2.frozen.xlsx",
+            "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+            "sheet": "Sheet1",
+            "excel_row": 745,
+            "style_code": "WM0008",
+            "product_code": "WM0008",
+            "external_name": "外贸GreTeam VC精华液60ml",
+            "available_qty": "5220"
+          }
+        },
+        "uncertain": "名称/规格分别使用克重和容量，现有资料无法证明是净容量与整件重量差异、填写口径差异或不同版本；不能自行换算或当作确定错品。",
+        "user_choice_needed": "本轮不要求提供包装或作答；资料是否及如何补正留待后续，当前保持原状。",
+        "blocks_this_readonly_batch": false,
+        "decision_unchanged": "仅新增审计疑点说明；JST仍是未人工确认候选，不写confirm，不改变主资料或原业务待决文件。"
+      },
+      "quantity_conversion_authorized": false
+    },
+    {
+      "decision_id": "user-20261020-final-spec-WM0031",
+      "ice_code": "WM0031",
+      "master_row": 25,
+      "status": "closed_master_column_c",
+      "source_column": "C",
+      "selected_spec": "20ml/支",
+      "reason": "用户明确规格采用商品库C列；现有规格值保持，外部名称和克/毫升差异原样留存，不换算或替换源资料。",
+      "previous_audit_question": {
+        "id": "audit-spec-WM0031",
+        "kind": "selected_specification_evidence_question",
+        "product": {
+          "ice_code": "WM0031",
+          "name": "ICE LERSKIN 抗重力视黄醇按摩眼霜",
+          "master_anchor": 25
+        },
+        "current_correspondence": {
+          "bigseller_selected": {
+            "菲律宾-新创启辰自建仓": [
+              "mc-cdf9f2c6e1d11bb3"
+            ],
+            "印尼-DEE仓库": [
+              "mc-464eea9f611fa5fb"
+            ],
+            "越南青林湾仓库": [
+              "mc-897c306c9c2d05a9"
+            ]
+          },
+          "jushuitan_selected": [
+            "mc-6cc7fbd3df5c1d06"
+          ],
+          "selected_source_ids": [
+            "mc-cdf9f2c6e1d11bb3",
+            "mc-464eea9f611fa5fb",
+            "mc-897c306c9c2d05a9",
+            "mc-6cc7fbd3df5c1d06"
+          ]
+        },
+        "evidence": {
+          "master": {
+            "original_file": "Icelerskin 商品库1.xlsx",
+            "original_path": "C:\\Users\\Administrator\\Desktop\\Icelerskin 商品库1.xlsx",
+            "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-0.frozen.xlsx",
+            "sha256": "930e763d5c161d7452061344c99d547ecb9b4a7561d157cc2998a536c717f0f8",
+            "sheet": "商品库",
+            "excel_row": 25,
+            "raw_name": "ICE LERSKIN 抗重力视黄醇按摩眼霜",
+            "raw_spec": "20ml/支"
+          },
+          "sources": [
+            {
+              "candidate_id": "mc-6cc7fbd3df5c1d06",
+              "system": "jushuitan",
+              "warehouse": null,
+              "origin": {
+                "original_file": "商品资料_20261015165159_200874071_1.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261015165159_200874071_1.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-2.frozen.xlsx",
+                "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+                "sheet": "Sheet1",
+                "excel_row": 758,
+                "style_code": "WM0031",
+                "product_code": "WM0031",
+                "external_name": "ICE LERSKIN 抗重力视黄醇按摩电动眼霜 20g",
+                "available_qty": "213"
+              },
+              "raw_name": "ICE LERSKIN 抗重力视黄醇按摩电动眼霜 20g",
+              "raw_sku": "WM0031",
+              "selected_master": {
+                "row_index": 25,
+                "ice_code": "WM0031",
+                "barcode": "757577983068",
+                "name_cn": "ICE LERSKIN 抗重力视黄醇按摩眼霜",
+                "spec": "20ml/支"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            }
+          ],
+          "preserved_rejected_sources": []
+        },
+        "uncertain": "已确认商品对应不等于规格字段已核实；g与ml的口径差异既不能证明错品，也不能证明等价，不换算、不猜测哪边正确。",
+        "user_choice_needed": "本轮不要求提供包装或作答；规格是否及如何补正留待后续，当前保持原状。",
+        "blocks_this_readonly_batch": false,
+        "decision_unchanged": "所有既有选择不撤销、不降级、不新增确认；原拒绝继续保留，不写入业务待决或人工决定文件。"
+      },
+      "quantity_conversion_authorized": false
+    },
+    {
+      "decision_id": "user-20261020-final-spec-WM0062",
+      "ice_code": "WM0062",
+      "master_row": 83,
+      "status": "closed_master_column_c",
+      "source_column": "C",
+      "selected_spec": "20ml/支",
+      "reason": "用户明确规格采用商品库C列；现有规格值保持，外部名称和克/毫升差异原样留存，不换算或替换源资料。",
+      "previous_audit_question": {
+        "id": "audit-spec-WM0062",
+        "kind": "selected_specification_evidence_question",
+        "product": {
+          "ice_code": "WM0062",
+          "name": "ICE LERSKIN 气感轻薄UV防护防晒棒",
+          "master_anchor": 83
+        },
+        "current_correspondence": {
+          "bigseller_selected": {
+            "DEE-龙仔厝（ICE专属）": [
+              "mc-8b52af7271caf9ac"
+            ],
+            "菲律宾-新创启辰自建仓": [
+              "mc-9121f4d35fe93b7a"
+            ],
+            "喜运达MY仓": [
+              "mc-740242d3b155a7c6"
+            ],
+            "越南青林湾仓库": [
+              "mc-ac9b7849c1d2eff3"
+            ],
+            "印尼-DEE仓库": [
+              "mc-41f7857feed3090e"
+            ]
+          },
+          "jushuitan_selected": [],
+          "selected_source_ids": [
+            "mc-8b52af7271caf9ac",
+            "mc-9121f4d35fe93b7a",
+            "mc-740242d3b155a7c6",
+            "mc-ac9b7849c1d2eff3",
+            "mc-41f7857feed3090e"
+          ]
+        },
+        "evidence": {
+          "master": {
+            "original_file": "Icelerskin 商品库1.xlsx",
+            "original_path": "C:\\Users\\Administrator\\Desktop\\Icelerskin 商品库1.xlsx",
+            "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-0.frozen.xlsx",
+            "sha256": "930e763d5c161d7452061344c99d547ecb9b4a7561d157cc2998a536c717f0f8",
+            "sheet": "商品库",
+            "excel_row": 83,
+            "raw_name": "ICE LERSKIN 气感轻薄UV防护防晒棒",
+            "raw_spec": "20ml/支"
+          },
+          "sources": [
+            {
+              "candidate_id": "mc-8b52af7271caf9ac",
+              "system": "bigseller",
+              "warehouse": "DEE-龙仔厝（ICE专属）",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 230
+              },
+              "raw_name": "（东妆版本）ICELERSKIN 防晒棒 20g",
+              "raw_sku": "757577407342",
+              "selected_master": {
+                "row_index": 83,
+                "ice_code": "WM0062",
+                "barcode": "757577407342",
+                "name_cn": "ICE LERSKIN 气感轻薄UV防护防晒棒",
+                "spec": "20ml/支"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-9121f4d35fe93b7a",
+              "system": "bigseller",
+              "warehouse": "菲律宾-新创启辰自建仓",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 313
+              },
+              "raw_name": "（东妆版本）ICELERSKIN 防晒棒 20g",
+              "raw_sku": "757577407342",
+              "selected_master": {
+                "row_index": 83,
+                "ice_code": "WM0062",
+                "barcode": "757577407342",
+                "name_cn": "ICE LERSKIN 气感轻薄UV防护防晒棒",
+                "spec": "20ml/支"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-740242d3b155a7c6",
+              "system": "bigseller",
+              "warehouse": "喜运达MY仓",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 383
+              },
+              "raw_name": "（东妆版本）ICELERSKIN 防晒棒 20g",
+              "raw_sku": "757577407342",
+              "selected_master": {
+                "row_index": 83,
+                "ice_code": "WM0062",
+                "barcode": "757577407342",
+                "name_cn": "ICE LERSKIN 气感轻薄UV防护防晒棒",
+                "spec": "20ml/支"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-ac9b7849c1d2eff3",
+              "system": "bigseller",
+              "warehouse": "越南青林湾仓库",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 384
+              },
+              "raw_name": "（东妆版本）ICELERSKIN 防晒棒 20g",
+              "raw_sku": "757577407342",
+              "selected_master": {
+                "row_index": 83,
+                "ice_code": "WM0062",
+                "barcode": "757577407342",
+                "name_cn": "ICE LERSKIN 气感轻薄UV防护防晒棒",
+                "spec": "20ml/支"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-41f7857feed3090e",
+              "system": "bigseller",
+              "warehouse": "印尼-DEE仓库",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 385
+              },
+              "raw_name": "（东妆版本）ICELERSKIN 防晒棒 20g",
+              "raw_sku": "757577407342",
+              "selected_master": {
+                "row_index": 83,
+                "ice_code": "WM0062",
+                "barcode": "757577407342",
+                "name_cn": "ICE LERSKIN 气感轻薄UV防护防晒棒",
+                "spec": "20ml/支"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            }
+          ],
+          "preserved_rejected_sources": [
+            {
+              "candidate_id": "mc-d10dd266982ba120",
+              "system": "jushuitan",
+              "warehouse": null,
+              "origin": {
+                "original_file": "商品资料_20261015165159_200874071_1.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261015165159_200874071_1.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-2.frozen.xlsx",
+                "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+                "sheet": "Sheet1",
+                "excel_row": 789,
+                "style_code": "WM0062",
+                "product_code": "WM0062",
+                "external_name": "ICE LERSKIN 防晒棒 20g（东妆款）",
+                "available_qty": "29545"
+              },
+              "raw_name": "ICE LERSKIN 防晒棒 20g（东妆款）",
+              "raw_sku": "WM0062",
+              "selected_master": null,
+              "review_state": "rejected",
+              "review_decision": "reject"
+            }
+          ]
+        },
+        "uncertain": "已确认商品对应不等于规格字段已核实；g与ml的口径差异既不能证明错品，也不能证明等价，不换算、不猜测哪边正确。",
+        "user_choice_needed": "本轮不要求提供包装或作答；规格是否及如何补正留待后续，当前保持原状。",
+        "blocks_this_readonly_batch": false,
+        "decision_unchanged": "所有既有选择不撤销、不降级、不新增确认；原拒绝继续保留，不写入业务待决或人工决定文件。"
+      },
+      "quantity_conversion_authorized": false
+    },
+    {
+      "decision_id": "user-20261020-final-spec-WM0098",
+      "ice_code": "WM0098",
+      "master_row": 92,
+      "status": "closed_master_column_c",
+      "source_column": "C",
+      "selected_spec": "120g/瓶",
+      "reason": "用户明确规格采用商品库C列；现有规格值保持，外部名称和克/毫升差异原样留存，不换算或替换源资料。",
+      "previous_audit_question": {
+        "id": "audit-spec-WM0098",
+        "kind": "selected_specification_evidence_question",
+        "product": {
+          "ice_code": "WM0098",
+          "name": "ICE LERSKIN 三酸净化喷雾",
+          "master_anchor": 92
+        },
+        "current_correspondence": {
+          "bigseller_selected": {
+            "喜运达MY仓": [
+              "mc-71338255ce276e62"
+            ],
+            "印尼-DEE仓库": [
+              "mc-fd0079071e67da77"
+            ],
+            "DEE-龙仔厝（ICE专属）": [
+              "mc-e8b41efb03b41901"
+            ],
+            "越南青林湾仓库": [
+              "mc-38e5b39c144cfa9b"
+            ],
+            "菲律宾-新创启辰自建仓": [
+              "mc-b0aa7efbdccfc591"
+            ]
+          },
+          "jushuitan_selected": [
+            "mc-6a85591506d455d6"
+          ],
+          "selected_source_ids": [
+            "mc-71338255ce276e62",
+            "mc-fd0079071e67da77",
+            "mc-e8b41efb03b41901",
+            "mc-38e5b39c144cfa9b",
+            "mc-b0aa7efbdccfc591",
+            "mc-6a85591506d455d6"
+          ]
+        },
+        "evidence": {
+          "master": {
+            "original_file": "Icelerskin 商品库1.xlsx",
+            "original_path": "C:\\Users\\Administrator\\Desktop\\Icelerskin 商品库1.xlsx",
+            "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-0.frozen.xlsx",
+            "sha256": "930e763d5c161d7452061344c99d547ecb9b4a7561d157cc2998a536c717f0f8",
+            "sheet": "商品库",
+            "excel_row": 92,
+            "raw_name": "ICE LERSKIN 三酸净化喷雾",
+            "raw_spec": "120g/瓶"
+          },
+          "sources": [
+            {
+              "candidate_id": "mc-71338255ce276e62",
+              "system": "bigseller",
+              "warehouse": "喜运达MY仓",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 2
+              },
+              "raw_name": "ICE LERSKIN 三酸净化喷雾 120ml",
+              "raw_sku": "780103214060",
+              "selected_master": {
+                "row_index": 92,
+                "ice_code": "WM0098",
+                "barcode": "780103214060",
+                "name_cn": "ICE LERSKIN 三酸净化喷雾",
+                "spec": "120g/瓶"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-fd0079071e67da77",
+              "system": "bigseller",
+              "warehouse": "印尼-DEE仓库",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 188
+              },
+              "raw_name": "ICE LERSKIN 三酸净化喷雾 120ml",
+              "raw_sku": "780103214060",
+              "selected_master": {
+                "row_index": 92,
+                "ice_code": "WM0098",
+                "barcode": "780103214060",
+                "name_cn": "ICE LERSKIN 三酸净化喷雾",
+                "spec": "120g/瓶"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-e8b41efb03b41901",
+              "system": "bigseller",
+              "warehouse": "DEE-龙仔厝（ICE专属）",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 189
+              },
+              "raw_name": "ICE LERSKIN 三酸净化喷雾 120ml",
+              "raw_sku": "780103214060",
+              "selected_master": {
+                "row_index": 92,
+                "ice_code": "WM0098",
+                "barcode": "780103214060",
+                "name_cn": "ICE LERSKIN 三酸净化喷雾",
+                "spec": "120g/瓶"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-38e5b39c144cfa9b",
+              "system": "bigseller",
+              "warehouse": "越南青林湾仓库",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 221
+              },
+              "raw_name": "ICE LERSKIN 三酸净化喷雾 120ml",
+              "raw_sku": "780103214060",
+              "selected_master": {
+                "row_index": 92,
+                "ice_code": "WM0098",
+                "barcode": "780103214060",
+                "name_cn": "ICE LERSKIN 三酸净化喷雾",
+                "spec": "120g/瓶"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-b0aa7efbdccfc591",
+              "system": "bigseller",
+              "warehouse": "菲律宾-新创启辰自建仓",
+              "origin": {
+                "original_file": "库存清单20261015083723474.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-1.frozen.xlsx",
+                "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+                "sheet": "单个SKU",
+                "excel_row": 223
+              },
+              "raw_name": "ICE LERSKIN 三酸净化喷雾 120ml",
+              "raw_sku": "WM0098",
+              "selected_master": {
+                "row_index": 92,
+                "ice_code": "WM0098",
+                "barcode": "780103214060",
+                "name_cn": "ICE LERSKIN 三酸净化喷雾",
+                "spec": "120g/瓶"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            },
+            {
+              "candidate_id": "mc-6a85591506d455d6",
+              "system": "jushuitan",
+              "warehouse": null,
+              "origin": {
+                "original_file": "商品资料_20261015165159_200874071_1.xlsx",
+                "original_path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261015165159_200874071_1.xlsx",
+                "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-2.frozen.xlsx",
+                "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+                "sheet": "Sheet1",
+                "excel_row": 825,
+                "style_code": "WM0098",
+                "product_code": "WM0098",
+                "external_name": "ICE LERSKIN 三酸净化喷雾 120ml",
+                "available_qty": "189524"
+              },
+              "raw_name": "ICE LERSKIN 三酸净化喷雾 120ml",
+              "raw_sku": "WM0098",
+              "selected_master": {
+                "row_index": 92,
+                "ice_code": "WM0098",
+                "barcode": "780103214060",
+                "name_cn": "ICE LERSKIN 三酸净化喷雾",
+                "spec": "120g/瓶"
+              },
+              "review_state": "manual_selected",
+              "review_decision": "confirm"
+            }
+          ],
+          "preserved_rejected_sources": []
+        },
+        "uncertain": "已确认商品对应不等于规格字段已核实；g与ml的口径差异既不能证明错品，也不能证明等价，不换算、不猜测哪边正确。",
+        "user_choice_needed": "本轮不要求提供包装或作答；规格是否及如何补正留待后续，当前保持原状。",
+        "blocks_this_readonly_batch": false,
+        "decision_unchanged": "所有既有选择不撤销、不降级、不新增确认；原拒绝继续保留，不写入业务待决或人工决定文件。"
+      },
+      "quantity_conversion_authorized": false
+    },
+    {
+      "decision_id": "user-20261020-final-spec-WM0130",
+      "ice_code": "WM0130",
+      "master_row": 121,
+      "status": "closed_master_column_c",
+      "source_column": "C",
+      "selected_spec": "20ml/支",
+      "reason": "用户明确规格采用商品库C列；现有规格值保持，外部名称和克/毫升差异原样留存，不换算或替换源资料。",
+      "previous_audit_question": {
+        "id": "audit-spec-WM0130",
+        "kind": "new_specification_evidence_question",
+        "product": {
+          "ice_code": "WM0130",
+          "name": "ICE LERSKIN 抗重力视黄醇按摩眼霜（泰文标签版）",
+          "master_anchor": 121
+        },
+        "current_correspondence": {
+          "bigseller_selected": {
+            "DEE-龙仔厝（ICE专属）": [
+              "mc-fcb5534e43ffe00a"
+            ],
+            "喜运达MY仓": [
+              "mc-9effee9f0144cdfd"
+            ]
+          },
+          "jushuitan_selected": [],
+          "unconfirmed_candidate_id": "mc-75e0ce710d064c4c"
+        },
+        "evidence": {
+          "master_name": "ICE LERSKIN 抗重力视黄醇按摩眼霜（泰文标签版）",
+          "master_spec_column": "20ml/支",
+          "master_single_product_weight_kg": "0.058",
+          "master_note": "3.13电动眼霜价格砍0.37。原价8.4",
+          "jst_source_name": "ICE LERSKIN 抗重力视黄醇按摩电动眼霜 20g（泰文标签版）",
+          "source_origin": {
+            "original_file": "商品资料_20261015165159_200874071_1.xlsx",
+            "original_path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261015165159_200874071_1.xlsx",
+            "frozen_path": "D:\\try one\\ICEOS\\.local\\p0-03\\run-20261020-jst-confirmations\\evidence\\jst-2026-10-20T03-04-57-810433Z-19d1be4d\\delivery-final\\input-2.frozen.xlsx",
+            "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+            "sheet": "Sheet1",
+            "excel_row": 857,
+            "style_code": "WM0130",
+            "product_code": "WM0130",
+            "external_name": "ICE LERSKIN 抗重力视黄醇按摩电动眼霜 20g（泰文标签版）",
+            "available_qty": "19252"
+          }
+        },
+        "uncertain": "名称/规格分别使用克重和容量，现有资料无法证明是净容量与整件重量差异、填写口径差异或不同版本；不能自行换算或当作确定错品。",
+        "user_choice_needed": "本轮不要求提供包装或作答；资料是否及如何补正留待后续，当前保持原状。",
+        "blocks_this_readonly_batch": false,
+        "decision_unchanged": "仅新增审计疑点说明；JST仍是未人工确认候选，不写confirm，不改变主资料或原业务待决文件。"
+      },
+      "quantity_conversion_authorized": false
+    }
+  ],
+  "brush_preservation": [
+    {
+      "ice_code": "WM0081",
+      "master_row": 62,
+      "name": "ICE LERSKIN 泥膜配套硅胶刷",
+      "status": "pending_confirmation",
+      "reason": "用户明确两份刷子资料分别保留及待确认，不合并、不新增对应。",
+      "future_requirement": "后续正式系统也需保留两份及待确认状态；本批仅登记，不实现新页面或正式存储。",
+      "do_not_merge": true
+    },
+    {
+      "ice_code": "brush",
+      "master_row": 107,
+      "name": "硅胶刷",
+      "status": "pending_confirmation",
+      "reason": "用户明确两份刷子资料分别保留及待确认，不合并、不新增对应。",
+      "future_requirement": "后续正式系统也需保留两份及待确认状态；本批仅登记，不实现新页面或正式存储。",
+      "do_not_merge": true
+    }
+  ],
+  "previous_audit_questions": {
+    "file": "coverage/audit-questions.json",
+    "sha256": "676c08d639c71125449c6de398f0e6ac12e9a79d073fa190542d61bde1f143c3"
+  }
+}

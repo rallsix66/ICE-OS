@@ -1,0 +1,117 @@
+{
+  "batch": "20261019-four-business-confirmations",
+  "scope": "current_sample_only; no_binding_reuse_or_valuation",
+  "authorization": "用户本轮 四项业务确认落实 明确指令；继承已独立通过交付的有效决定，不回退桌面CSV",
+  "base_hashes": {
+    "match-bundle.json": "d661805b4652ee9501753512a82c9eac9896f10f5cfe57bff33965765e117d27",
+    "manual-decisions.effective.csv": "14d4d18b33af35d27d6b2d82de6d89b1c8163187217f80fafe656466a5f87316"
+  },
+  "source_confirmations": [
+    {
+      "decision_id": "user-20261019-four-1",
+      "candidate_id": "mc-59f065c77b77953a",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:513:印尼-DEE仓库:6974674957349"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:513:印尼-DEE仓库:6974674957349",
+        "scope": "match_only",
+        "warehouse": "印尼-DEE仓库",
+        "external_sku_raw": "6974674957349",
+        "external_name": "ICE LERSKIN 氨基酸洗面奶",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "6974674957349",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "target_row": 19,
+      "target_ice": "WM0012",
+      "resolves_pending_number": 2,
+      "reason": "用户明确：印尼第513行洗面奶使用升级普通版WM0012（原主库19行100g）；不选WM0128或LS101275"
+    },
+    {
+      "decision_id": "user-20261019-four-2",
+      "candidate_id": "mc-5131dbfa1ad6207d",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:482:印尼-DEE仓库:757577407076"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:482:印尼-DEE仓库:757577407076",
+        "scope": "match_only",
+        "warehouse": "印尼-DEE仓库",
+        "external_sku_raw": "757577407076",
+        "external_name": "ICE LERSKIN 防晒乳",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407076",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "target_row": 27,
+      "target_ice": "WM0039",
+      "resolves_pending_number": 3,
+      "reason": "用户明确：印尼第482行防晒乳保留普通版WM0039（原主库27行30g）；再次确认现值，不计新增有效选择"
+    },
+    {
+      "decision_id": "user-20261019-four-3",
+      "candidate_id": "mc-0b2c37c654a967b1",
+      "source_identity": [
+        "jushuitan",
+        "WM10012",
+        "WM10012"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:859:WM10012:WM10012",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM10012",
+        "external_name": "外贸GreTeam眼部精华7.5ml",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "9360",
+        "extra": {
+          "style_code": "WM10012",
+          "product_code": "WM10012",
+          "spec": null,
+          "actual_qty": "9360",
+          "cloud_available_qty": null
+        }
+      },
+      "target_row": 39,
+      "target_ice": "WM10012",
+      "resolves_pending_number": 4,
+      "reason": "用户明确：聚水潭第859行WM10012眼部精华7.5ml确认对应原主库39行"
+    }
+  ],
+  "price_confirmation": {
+    "decision_id": "user-20261019-four-4",
+    "master_anchor_row": 66,
+    "ice_code": "WM0072",
+    "source_row": 216,
+    "source_date": "2026-07-13",
+    "cost": "5.18",
+    "operating_price": "5.68",
+    "resolves_pending_number": 5,
+    "reason": "用户明确采用价格B，仅选现行成本5.18、运营价5.68；保留第66/216行所有原资料、两版价格及历史，不替换整行，不确认JST候选，不估值"
+  },
+  "retained_pending": {
+    "number": 1,
+    "candidate_ids": [
+      "mc-e1b56fb81b0db46c",
+      "mc-73ac4812d7d8de64",
+      "mc-b7bd376e964738cd"
+    ],
+    "basis": "菲越每仓仅一条同SKU，现有资料不足区分原款/升级款；保留三条WM0012既有值与版本待核对，不新增版本确认，不改LS101275",
+    "no_repeat_full_table_investigation": true
+  }
+}

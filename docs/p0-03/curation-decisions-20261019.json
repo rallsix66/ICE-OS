@@ -1,0 +1,906 @@
+{
+  "batch": "20261019-user-authorized-curation",
+  "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+  "base_bundle_sha256": "c61fb75c8a26b8ace1a9d8c40e8b09addeaafee3767386ecafb3640b80d0e403",
+  "master_groups": [
+    {
+      "ice_code": "WM0069",
+      "anchor_row": 213,
+      "source_rows": [
+        63,
+        213
+      ],
+      "primary_row": 213,
+      "price_pending": false,
+      "basis": "用户本轮第二部分逐项决定；锚点仅追溯，不按日期选价"
+    },
+    {
+      "ice_code": "WM0070",
+      "anchor_row": 214,
+      "source_rows": [
+        64,
+        214
+      ],
+      "primary_row": 214,
+      "price_pending": false,
+      "basis": "用户本轮第二部分逐项决定；锚点仅追溯，不按日期选价"
+    },
+    {
+      "ice_code": "WM0071",
+      "anchor_row": 215,
+      "source_rows": [
+        65,
+        215
+      ],
+      "primary_row": 215,
+      "price_pending": false,
+      "basis": "用户本轮第二部分逐项决定；锚点仅追溯，不按日期选价"
+    },
+    {
+      "ice_code": "WM0095",
+      "anchor_row": 115,
+      "source_rows": [
+        115,
+        218
+      ],
+      "primary_row": 115,
+      "price_pending": false,
+      "basis": "用户本轮第二部分逐项决定；锚点仅追溯，不按日期选价"
+    },
+    {
+      "ice_code": "WM0073",
+      "anchor_row": 67,
+      "source_rows": [
+        67,
+        217
+      ],
+      "primary_row": null,
+      "price_pending": false,
+      "basis": "用户本轮第二部分逐项决定；锚点仅追溯，不按日期选价"
+    },
+    {
+      "ice_code": "WM0072",
+      "anchor_row": 66,
+      "source_rows": [
+        66,
+        216
+      ],
+      "primary_row": null,
+      "price_pending": true,
+      "basis": "用户本轮第二部分逐项决定；锚点仅追溯，不按日期选价"
+    }
+  ],
+  "master_corrections": [
+    {
+      "row_index": 116,
+      "field": "ice_code",
+      "before": "WM00128",
+      "after": "WM0128",
+      "basis": "用户确认聚水潭WM0128正确，仅纠正原Excel第116行"
+    },
+    {
+      "row_index": 28,
+      "field": "barcode",
+      "before": "ICEWM0039",
+      "after": "757577407076",
+      "basis": "用户确认WM0093与WM0039共用包装条码；原H列保留为原填写记录"
+    }
+  ],
+  "source_corrections": [
+    {
+      "candidate_id": "mc-7b93742ed1c05265",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:40:DEE-龙仔厝（ICE专属）:714855625096"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:40:DEE-龙仔厝（ICE专属）:714855625096",
+        "scope": "inventory_publish",
+        "warehouse": "DEE-龙仔厝（ICE专属）",
+        "external_sku_raw": "714855625096",
+        "external_name": "布丁泥膜 1盒/10pcs",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 16,
+      "target_ice": "WM0004",
+      "reason": "用户确认：五仓714855625096为7.5g×10颗整盒；不换算数量",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-6f91d95b64a6fdaf",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:360:菲律宾-新创启辰自建仓:714855625096"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:360:菲律宾-新创启辰自建仓:714855625096",
+        "scope": "match_only",
+        "warehouse": "菲律宾-新创启辰自建仓",
+        "external_sku_raw": "714855625096",
+        "external_name": "布丁泥膜 1盒/10pcs",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 16,
+      "target_ice": "WM0004",
+      "reason": "用户确认：五仓714855625096为7.5g×10颗整盒；不换算数量",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-61885a8dc4ca4844",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:416:喜运达MY仓:714855625096"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:416:喜运达MY仓:714855625096",
+        "scope": "match_only",
+        "warehouse": "喜运达MY仓",
+        "external_sku_raw": "714855625096",
+        "external_name": "布丁泥膜 1盒/10pcs",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 16,
+      "target_ice": "WM0004",
+      "reason": "用户确认：五仓714855625096为7.5g×10颗整盒；不换算数量",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-903e1145f6399055",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:512:印尼-DEE仓库:714855625096"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:512:印尼-DEE仓库:714855625096",
+        "scope": "match_only",
+        "warehouse": "印尼-DEE仓库",
+        "external_sku_raw": "714855625096",
+        "external_name": "布丁泥膜 1盒/10pcs",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 16,
+      "target_ice": "WM0004",
+      "reason": "用户确认：五仓714855625096为7.5g×10颗整盒；不换算数量",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-397d2690ca471628",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:531:越南青林湾仓库:714855625096"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:531:越南青林湾仓库:714855625096",
+        "scope": "match_only",
+        "warehouse": "越南青林湾仓库",
+        "external_sku_raw": "714855625096",
+        "external_name": "布丁泥膜 1盒/10pcs",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "1860",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 16,
+      "target_ice": "WM0004",
+      "reason": "用户确认：五仓714855625096为7.5g×10颗整盒；不换算数量",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-351389aeafed2a6d",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:282:DEE-龙仔厝（ICE专属）:757577407083"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:282:DEE-龙仔厝（ICE专属）:757577407083",
+        "scope": "inventory_publish",
+        "warehouse": "DEE-龙仔厝（ICE专属）",
+        "external_sku_raw": "757577407083",
+        "external_name": "ICE LERSKIN 防晒水90ml",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407083",
+        "available_qty": "65617",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 84,
+      "target_ice": "WM0082",
+      "reason": "用户确认：仅DEE、MY、印尼、越南四条757577407083对应WM0082",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-092d4dc4ee903d6e",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:447:喜运达MY仓:757577407083"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:447:喜运达MY仓:757577407083",
+        "scope": "match_only",
+        "warehouse": "喜运达MY仓",
+        "external_sku_raw": "757577407083",
+        "external_name": "ICE LERSKIN 防晒水90ml",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407083",
+        "available_qty": "30867",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 84,
+      "target_ice": "WM0082",
+      "reason": "用户确认：仅DEE、MY、印尼、越南四条757577407083对应WM0082",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-9dbb5624abe3137f",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:481:印尼-DEE仓库:757577407083"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:481:印尼-DEE仓库:757577407083",
+        "scope": "match_only",
+        "warehouse": "印尼-DEE仓库",
+        "external_sku_raw": "757577407083",
+        "external_name": "ICE LERSKIN 防晒水90ml",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407083",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 84,
+      "target_ice": "WM0082",
+      "reason": "用户确认：仅DEE、MY、印尼、越南四条757577407083对应WM0082",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-2f539bfe201e90a9",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:484:越南青林湾仓库:757577407083"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:484:越南青林湾仓库:757577407083",
+        "scope": "match_only",
+        "warehouse": "越南青林湾仓库",
+        "external_sku_raw": "757577407083",
+        "external_name": "ICE LERSKIN 防晒水90ml",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407083",
+        "available_qty": "14583",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 84,
+      "target_ice": "WM0082",
+      "reason": "用户确认：仅DEE、MY、印尼、越南四条757577407083对应WM0082",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-65f1035be9c61414",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:278:DEE-龙仔厝（ICE专属）:6974674957349"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:278:DEE-龙仔厝（ICE专属）:6974674957349",
+        "scope": "inventory_publish",
+        "warehouse": "DEE-龙仔厝（ICE专属）",
+        "external_sku_raw": "6974674957349",
+        "external_name": "ICE LERSKIN 氨基酸洗面奶",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "6974674957349",
+        "available_qty": "38921",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 116,
+      "target_ice": "WM0128",
+      "reason": "用户确认：本批泰马同码同名无其他版本线索洗面奶对应WM0128",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-8e94db9591b0df05",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:442:喜运达MY仓:6974674957349"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:442:喜运达MY仓:6974674957349",
+        "scope": "match_only",
+        "warehouse": "喜运达MY仓",
+        "external_sku_raw": "6974674957349",
+        "external_name": "ICE LERSKIN 氨基酸洗面奶",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "6974674957349",
+        "available_qty": "14117",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 116,
+      "target_ice": "WM0128",
+      "reason": "用户确认：本批泰马同码同名无其他版本线索洗面奶对应WM0128",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-fce6fef5a7016726",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:257:DEE-龙仔厝（ICE专属）:757577407076"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:257:DEE-龙仔厝（ICE专属）:757577407076",
+        "scope": "inventory_publish",
+        "warehouse": "DEE-龙仔厝（ICE专属）",
+        "external_sku_raw": "757577407076",
+        "external_name": "ICE LERSKIN 防晒乳",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407076",
+        "available_qty": "39463",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 28,
+      "target_ice": "WM0093",
+      "reason": "用户确认：DEE原257行、MY原455行防晒乳对应WM0093泰版",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-49f5943c271c2fdd",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:455:喜运达MY仓:757577407076"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:455:喜运达MY仓:757577407076",
+        "scope": "match_only",
+        "warehouse": "喜运达MY仓",
+        "external_sku_raw": "757577407076",
+        "external_name": "ICE LERSKIN 防晒乳",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407076",
+        "available_qty": "969",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 28,
+      "target_ice": "WM0093",
+      "reason": "用户确认：DEE原257行、MY原455行防晒乳对应WM0093泰版",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-994fa1007b50d5be",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:348:菲律宾-新创启辰自建仓:ICEWM0039"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:348:菲律宾-新创启辰自建仓:ICEWM0039",
+        "scope": "match_only",
+        "warehouse": "菲律宾-新创启辰自建仓",
+        "external_sku_raw": "ICEWM0039",
+        "external_name": "ICELERSKIN防晒乳",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "1876",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 27,
+      "target_ice": "WM0039",
+      "reason": "用户本轮明确确认菲律宾ICEWM0039对应WM0039；保留撤销WM0093历史",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-60a48c406eacff2d",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:483:越南青林湾仓库:757577407076"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:483:越南青林湾仓库:757577407076",
+        "scope": "match_only",
+        "warehouse": "越南青林湾仓库",
+        "external_sku_raw": "757577407076",
+        "external_name": "ICE LERSKIN 防晒乳",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407076",
+        "available_qty": "7377",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 27,
+      "target_ice": "WM0039",
+      "reason": "用户确认：越南普通防晒乳对应WM0039；保留菲律宾同码reject",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-1703e5d750d89135",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:386:印尼-DEE仓库:757577407380"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:386:印尼-DEE仓库:757577407380",
+        "scope": "match_only",
+        "warehouse": "印尼-DEE仓库",
+        "external_sku_raw": "757577407380",
+        "external_name": "ICELERSKIN护发精油-无花果（泰国特供版）",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407380",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 213,
+      "target_ice": "WM0069",
+      "reason": "用户确认：印尼此具体商品原名明确泰文版；不扩大印尼默认版本",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-e6ccbb983921e936",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:387:印尼-DEE仓库:757577407397"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:387:印尼-DEE仓库:757577407397",
+        "scope": "match_only",
+        "warehouse": "印尼-DEE仓库",
+        "external_sku_raw": "757577407397",
+        "external_name": "ICELERSKIN护发精油-薰衣草（泰国特供版）",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407397",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 215,
+      "target_ice": "WM0071",
+      "reason": "用户确认：印尼此具体商品原名明确泰文版；不扩大印尼默认版本",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "authorized-correspondence"
+    },
+    {
+      "candidate_id": "mc-9c2ee3be35162427",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:202:印尼-DEE仓库:KP0001"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:202:印尼-DEE仓库:KP0001",
+        "scope": "match_only",
+        "warehouse": "印尼-DEE仓库",
+        "external_sku_raw": "KP0001",
+        "external_name": "泰国售后卡",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 108,
+      "target_ice": "WM0117",
+      "reason": "用户逐条裁决旧新ID冲突：印尼、DEE KP0001对应WM0117",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-cbb09eccb960868f",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:203:DEE-龙仔厝（ICE专属）:KP0001"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:203:DEE-龙仔厝（ICE专属）:KP0001",
+        "scope": "inventory_publish",
+        "warehouse": "DEE-龙仔厝（ICE专属）",
+        "external_sku_raw": "KP0001",
+        "external_name": "泰国售后卡",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "410824",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 108,
+      "target_ice": "WM0117",
+      "reason": "用户逐条裁决旧新ID冲突：印尼、DEE KP0001对应WM0117",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-232d0ff734f3737a",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:276:DEE-龙仔厝（ICE专属）:WM0005"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:276:DEE-龙仔厝（ICE专属）:WM0005",
+        "scope": "inventory_publish",
+        "warehouse": "DEE-龙仔厝（ICE专属）",
+        "external_sku_raw": "WM0005",
+        "external_name": "ICE LERSKIN 毛孔清洁布丁泥膜 单个",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "10383",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 12,
+      "target_ice": "WM0005",
+      "reason": "用户逐条裁决旧新ID冲突：DEE、越南WM0005单颗对应WM0005",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-7f65ab8759563748",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:518:越南青林湾仓库:WM0005"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:518:越南青林湾仓库:WM0005",
+        "scope": "match_only",
+        "warehouse": "越南青林湾仓库",
+        "external_sku_raw": "WM0005",
+        "external_name": "ICE LERSKIN 毛孔清洁布丁泥膜 单个",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "34521",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 12,
+      "target_ice": "WM0005",
+      "reason": "用户逐条裁决旧新ID冲突：DEE、越南WM0005单颗对应WM0005",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-4a3970c4d1c02088",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:437:喜运达MY仓:ICEWM0027"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:437:喜运达MY仓:ICEWM0027",
+        "scope": "match_only",
+        "warehouse": "喜运达MY仓",
+        "external_sku_raw": "ICEWM0027",
+        "external_name": "ICELERSKIN护发精油-无花果",
+        "sheet_name": "单个SKU",
+        "gtin_raw": null,
+        "available_qty": "800",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 21,
+      "target_ice": "WM0027",
+      "reason": "用户逐条裁决旧新ID冲突：MY ICEWM0027对应WM0027",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-698525a2da421892",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:281:DEE-龙仔厝（ICE专属）:757577407359"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:281:DEE-龙仔厝（ICE专属）:757577407359",
+        "scope": "inventory_publish",
+        "warehouse": "DEE-龙仔厝（ICE专属）",
+        "external_sku_raw": "757577407359",
+        "external_name": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407359",
+        "available_qty": "8550",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 67,
+      "target_ice": "WM0073",
+      "reason": "用户逐条裁决旧新ID冲突：DEE、MY、印尼757577407359对应WM0073；印尼仅此明确泰版例外",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-c2fddfa742e2ef9d",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:403:印尼-DEE仓库:757577407359"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:403:印尼-DEE仓库:757577407359",
+        "scope": "match_only",
+        "warehouse": "印尼-DEE仓库",
+        "external_sku_raw": "757577407359",
+        "external_name": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407359",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 67,
+      "target_ice": "WM0073",
+      "reason": "用户逐条裁决旧新ID冲突：DEE、MY、印尼757577407359对应WM0073；印尼仅此明确泰版例外",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-4f4bb5bef70bd89a",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:404:喜运达MY仓:757577407359"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:404:喜运达MY仓:757577407359",
+        "scope": "match_only",
+        "warehouse": "喜运达MY仓",
+        "external_sku_raw": "757577407359",
+        "external_name": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407359",
+        "available_qty": "4094",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "confirm",
+      "target_row": 67,
+      "target_ice": "WM0073",
+      "reason": "用户逐条裁决旧新ID冲突：DEE、MY、印尼757577407359对应WM0073；印尼仅此明确泰版例外",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-44b8f0236d346bc7",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:220:越南青林湾仓库:757577407359"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:220:越南青林湾仓库:757577407359",
+        "scope": "match_only",
+        "warehouse": "越南青林湾仓库",
+        "external_sku_raw": "757577407359",
+        "external_name": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407359",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "defer",
+      "target_row": null,
+      "target_ice": null,
+      "reason": "用户逐条裁决旧新ID冲突：菲律宾、越南757577407359继续留空待核对",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    },
+    {
+      "candidate_id": "mc-c8e6e17fc25361f1",
+      "source_identity": [
+        "bigseller",
+        "bigseller:单个SKU:321:菲律宾-新创启辰自建仓:757577407359"
+      ],
+      "source": {
+        "source_system": "bigseller",
+        "source_row_key": "bigseller:单个SKU:321:菲律宾-新创启辰自建仓:757577407359",
+        "scope": "match_only",
+        "warehouse": "菲律宾-新创启辰自建仓",
+        "external_sku_raw": "757577407359",
+        "external_name": "ICE LERSKIN 护发精油套盒20m*4瓶(泰国特供版)",
+        "sheet_name": "单个SKU",
+        "gtin_raw": "757577407359",
+        "available_qty": "0",
+        "extra": {
+          "is_combo": false,
+          "sku_type": "Single SKU"
+        }
+      },
+      "decision": "defer",
+      "target_row": null,
+      "target_ice": null,
+      "reason": "用户逐条裁决旧新ID冲突：菲律宾、越南757577407359继续留空待核对",
+      "authorization": "用户本轮 产品主库整理＋已确认样表对应落地 明确指令；仅本批本地资料核对",
+      "group": "ten-id-conflicts"
+    }
+  ],
+  "pending_business": [
+    {
+      "number": 1,
+      "title": "菲越普通洗面奶",
+      "options": "LS101275原款 / WM0012升级普通版",
+      "candidate_ids": [
+        "mc-e1b56fb81b0db46c",
+        "mc-73ac4812d7d8de64",
+        "mc-b7bd376e964738cd"
+      ],
+      "preserve_matches": true,
+      "status": "pending",
+      "instruction": "保留既有值和历史；本轮不生成新确认、不擅自改绑"
+    },
+    {
+      "number": 2,
+      "title": "印尼洗面奶",
+      "options": "WM0128泰文版 / WM0012升级普通版 / LS101275原款 / 暂留",
+      "candidate_ids": [
+        "mc-59f065c77b77953a"
+      ],
+      "preserve_matches": true,
+      "status": "pending",
+      "instruction": "保留既有值和历史；本轮不生成新确认、不擅自改绑"
+    },
+    {
+      "number": 3,
+      "title": "印尼防晒乳",
+      "options": "保留WM0039普通版 / WM0093泰版",
+      "candidate_ids": [
+        "mc-5131dbfa1ad6207d"
+      ],
+      "preserve_matches": true,
+      "status": "pending",
+      "instruction": "保留既有值和历史；本轮不生成新确认、不擅自改绑"
+    },
+    {
+      "number": 4,
+      "title": "WM10012眼部精华",
+      "options": "是否新增人工确认",
+      "candidate_ids": [
+        "mc-0b2c37c654a967b1"
+      ],
+      "preserve_matches": false,
+      "status": "pending",
+      "instruction": "保留既有值和历史；本轮不生成新确认、不擅自改绑"
+    },
+    {
+      "number": 5,
+      "title": "WM0072桂花泰版精油价格",
+      "options": "第66行5.00/5.50 / 第216行5.18/5.68 / 保留两版",
+      "candidate_ids": [
+        "mc-fd977bdb831a5b5b"
+      ],
+      "preserve_matches": false,
+      "status": "pending",
+      "instruction": "保留既有值和历史；本轮不生成新确认、不擅自改绑"
+    }
+  ]
+}

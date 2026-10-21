@@ -1,0 +1,935 @@
+{
+  "batch": "20261020-jst-eleven-confirmations-one-ignore",
+  "scope": "current_sample_only; no_binding_reuse_inventory_or_real_service",
+  "recorded_at": "2026-10-20T03:04:57Z",
+  "authorization_original": "那12条没错的……0007可以忽略了，这个没在经营。0070和0072在bs上确实是还没有创建，可以先不绑定。",
+  "authorization": "用户本轮明确指令：仅下列11条聚水潭对应确认、WM0007本批ignore；不要求重复确认，不扩大到同码全部记录。",
+  "base_hashes": {
+    "match-bundle.json": "c0fa4bc9814080a9e78d15ad7136276e03156254d67a3fe59e4d49c841e80936",
+    "manual-decisions.effective.csv": "a66c564942220f5df4e1043ab2b076f1cec26c3056fa8dffd5a2e2733844b58f"
+  },
+  "original_inputs": {
+    "master": {
+      "path": "C:\\Users\\Administrator\\Desktop\\Icelerskin 商品库1.xlsx",
+      "sha256": "930e763d5c161d7452061344c99d547ecb9b4a7561d157cc2998a536c717f0f8",
+      "frozen": "input-0.frozen.xlsx"
+    },
+    "bigseller": {
+      "path": "C:\\Users\\Administrator\\Desktop\\库存清单20261015083723474.xlsx",
+      "sha256": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020",
+      "frozen": "input-1.frozen.xlsx"
+    },
+    "jushuitan": {
+      "paths": [
+        {
+          "path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261015165159_200874071_1.xlsx",
+          "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+          "frozen": "input-2.frozen.xlsx"
+        },
+        {
+          "path": "C:\\Users\\Administrator\\Desktop\\商品资料_20261016111727_201045638_1.xlsx",
+          "sha256": "7fca9bee434847ff62582b85497c7af76d8b03b32d3e599a4db029fa91fc019f",
+          "frozen": "input-3.frozen.xlsx"
+        }
+      ]
+    }
+  },
+  "source_decisions": [
+    {
+      "decision_id": "user-20261020-jst-WM0069",
+      "candidate_id": "mc-f713998ca2c722a8",
+      "source_identity": [
+        "jushuitan",
+        "WM0069",
+        "WM0069"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:796:WM0069:WM0069",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0069",
+        "external_name": "ICE LERSKIN 护发精油 (无花果) 80ml-粉色-泰国特供版",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "17101",
+        "extra": {
+          "style_code": "WM0069",
+          "product_code": "WM0069",
+          "spec": null,
+          "actual_qty": "17101",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 796,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0069",
+          "商品编码": "WM0069",
+          "商品名称": "ICE LERSKIN 护发精油 (无花果) 80ml-粉色-泰国特供版",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 17101,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 17101,
+          "公有可用数": 17101,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/5/7 20:53:01"
+        }
+      },
+      "target_row": 213,
+      "target_ice": "WM0069",
+      "target_master": {
+        "row_index": 213,
+        "ice_code": "WM0069",
+        "barcode": "757577407380",
+        "name_cn": "ICE LERSKIN 护发精油 (无花果) 80ml-粉色-泰国特供版",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第796行WM0069对应现行主库锚点原第213行WM0069；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0070",
+      "candidate_id": "mc-151a8acf447c6aff",
+      "source_identity": [
+        "jushuitan",
+        "WM0070",
+        "WM0070"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:797:WM0070:WM0070",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0070",
+        "external_name": "ICE LERSKIN  护发精油(茉莉)  80ml-绿色-泰国特供版",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "11009",
+        "extra": {
+          "style_code": "WM0070",
+          "product_code": "WM0070",
+          "spec": null,
+          "actual_qty": "11009",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 797,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0070",
+          "商品编码": "WM0070",
+          "商品名称": "ICE LERSKIN  护发精油(茉莉)  80ml-绿色-泰国特供版",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 11009,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 11009,
+          "公有可用数": 11009,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/5/15 19:49:27"
+        }
+      },
+      "target_row": 214,
+      "target_ice": "WM0070",
+      "target_master": {
+        "row_index": 214,
+        "ice_code": "WM0070",
+        "barcode": "757577407373",
+        "name_cn": "ICE LERSKIN 护发精油(茉莉) 80ml-绿色-泰国特供版",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第797行WM0070对应现行主库锚点原第214行WM0070；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0071",
+      "candidate_id": "mc-4ce480743171808b",
+      "source_identity": [
+        "jushuitan",
+        "WM0071",
+        "WM0071"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:798:WM0071:WM0071",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0071",
+        "external_name": "ICE LERSKIN 护发精油 (薰衣草) 80ml-紫色-泰国特供版",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "66",
+        "extra": {
+          "style_code": "WM0071",
+          "product_code": "WM0071",
+          "spec": null,
+          "actual_qty": "66",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 798,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0071",
+          "商品编码": "WM0071",
+          "商品名称": "ICE LERSKIN 护发精油 (薰衣草) 80ml-紫色-泰国特供版",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 66,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 66,
+          "公有可用数": 66,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/8/18 19:25:52"
+        }
+      },
+      "target_row": 215,
+      "target_ice": "WM0071",
+      "target_master": {
+        "row_index": 215,
+        "ice_code": "WM0071",
+        "barcode": "757577407397",
+        "name_cn": "ICE LERSKIN 护发精油 (薰衣草) 80ml-紫色-泰国特供版",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第798行WM0071对应现行主库锚点原第215行WM0071；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0072",
+      "candidate_id": "mc-fd977bdb831a5b5b",
+      "source_identity": [
+        "jushuitan",
+        "WM0072",
+        "WM0072"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:799:WM0072:WM0072",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0072",
+        "external_name": "ICE LERSKIN 护发精油 (桂花) 80ml-橙色-泰国特供版",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "30225",
+        "extra": {
+          "style_code": "WM0072",
+          "product_code": "WM0072",
+          "spec": null,
+          "actual_qty": "30225",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 799,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0072",
+          "商品编码": "WM0072",
+          "商品名称": "ICE LERSKIN 护发精油 (桂花) 80ml-橙色-泰国特供版",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 30225,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 30225,
+          "公有可用数": 30225,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/5/7 20:53:01"
+        }
+      },
+      "target_row": 66,
+      "target_ice": "WM0072",
+      "target_master": {
+        "row_index": 66,
+        "ice_code": "WM0072",
+        "barcode": "",
+        "name_cn": "ICE LERSKIN 护发精油 (桂花) 80ml-橙色-泰国特供版",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第799行WM0072对应现行主库锚点原第66行WM0072；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0073",
+      "candidate_id": "mc-6148a4d4e40a80ba",
+      "source_identity": [
+        "jushuitan",
+        "WM0073",
+        "WM0073"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:800:WM0073:WM0073",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0073",
+        "external_name": "ICE LERSKIN 护发精油套盒 20ml*4瓶-泰国特供版",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "96",
+        "extra": {
+          "style_code": "WM0073",
+          "product_code": "WM0073",
+          "spec": null,
+          "actual_qty": "96",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 800,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0073",
+          "商品编码": "WM0073",
+          "商品名称": "ICE LERSKIN 护发精油套盒 20ml*4瓶-泰国特供版",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 96,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 96,
+          "公有可用数": 96,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/4/30 16:39:52"
+        }
+      },
+      "target_row": 67,
+      "target_ice": "WM0073",
+      "target_master": {
+        "row_index": 67,
+        "ice_code": "WM0073",
+        "barcode": "",
+        "name_cn": "ICE LERSKIN 护发精油套盒 20ml*4瓶-泰国特供版",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第800行WM0073对应现行主库锚点原第67行WM0073；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0082",
+      "candidate_id": "mc-26aa4e763d422095",
+      "source_identity": [
+        "jushuitan",
+        "WM0082",
+        "WM0082"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:809:WM0082:WM0082",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0082",
+        "external_name": "ICE LERSKIN 防晒水（泰国特供） 90ml",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "204719",
+        "extra": {
+          "style_code": "WM0082",
+          "product_code": "WM0082",
+          "spec": null,
+          "actual_qty": "204719",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 809,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0082",
+          "商品编码": "WM0082",
+          "商品名称": "ICE LERSKIN 防晒水（泰国特供） 90ml",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 204719,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 204719,
+          "公有可用数": 204719,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/9/14 19:51:41"
+        }
+      },
+      "target_row": 84,
+      "target_ice": "WM0082",
+      "target_master": {
+        "row_index": 84,
+        "ice_code": "WM0082",
+        "barcode": "757577407083",
+        "name_cn": "ICE LERSKIN 气感轻盈防晒喷雾",
+        "spec": "90ml/瓶"
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第809行WM0082对应现行主库锚点原第84行WM0082；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0092",
+      "candidate_id": "mc-30c30b04c4ff9e0d",
+      "source_identity": [
+        "jushuitan",
+        "WM0092",
+        "WM0092"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:819:WM0092:WM0092",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0092",
+        "external_name": "ICE LERSKIN防晒啫喱 55g（泰国特供版）",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "50811",
+        "extra": {
+          "style_code": "WM0092",
+          "product_code": "WM0092",
+          "spec": null,
+          "actual_qty": "50811",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 819,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0092",
+          "商品编码": "WM0092",
+          "商品名称": "ICE LERSKIN防晒啫喱 55g（泰国特供版）",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 50811,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 50811,
+          "公有可用数": 50811,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/5/5 10:23:56"
+        }
+      },
+      "target_row": 212,
+      "target_ice": "WM0092",
+      "target_master": {
+        "row_index": 212,
+        "ice_code": "WM0092",
+        "barcode": "757577407182",
+        "name_cn": "ICE LERSKIN防晒啫喱 55g（泰国特供版）",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第819行WM0092对应现行主库锚点原第212行WM0092；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0095",
+      "candidate_id": "mc-6f83255696c02117",
+      "source_identity": [
+        "jushuitan",
+        "WM0095",
+        "WM0095"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:822:WM0095:WM0095",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0095",
+        "external_name": "ICE LERSKIN 日夜爆痘急救笔 5ml_x002B_5ml",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "14511",
+        "extra": {
+          "style_code": "WM0095",
+          "product_code": "WM0095",
+          "spec": null,
+          "actual_qty": "14511",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 822,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0095",
+          "商品编码": "WM0095",
+          "商品名称": "ICE LERSKIN 日夜爆痘急救笔 5ml_x002B_5ml",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 14511,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 14511,
+          "公有可用数": 14511,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/9/9 13:12:43"
+        }
+      },
+      "target_row": 115,
+      "target_ice": "WM0095",
+      "target_master": {
+        "row_index": 115,
+        "ice_code": "WM0095",
+        "barcode": "780103214053",
+        "name_cn": "ICE LERSKIN 日夜爆痘急救笔 5ml+5ml",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第822行WM0095对应现行主库锚点原第115行WM0095；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0117",
+      "candidate_id": "mc-a4a549dc9518a3d4",
+      "source_identity": [
+        "jushuitan",
+        "WM0117",
+        "WM0117"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:844:WM0117:WM0117",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0117",
+        "external_name": "ICE LERSKIN泰国泰文版本售后卡",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "0",
+        "extra": {
+          "style_code": "WM0117",
+          "product_code": "WM0117",
+          "spec": null,
+          "actual_qty": "0",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 844,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0117",
+          "商品编码": "WM0117",
+          "商品名称": "ICE LERSKIN泰国泰文版本售后卡",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 0,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 0,
+          "公有可用数": 0,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/7/6 20:35:51"
+        }
+      },
+      "target_row": 108,
+      "target_ice": "WM0117",
+      "target_master": {
+        "row_index": 108,
+        "ice_code": "WM0117",
+        "barcode": "",
+        "name_cn": "售后卡",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第844行WM0117对应现行主库锚点原第108行WM0117；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0128",
+      "candidate_id": "mc-c3d22fb31a28db96",
+      "source_identity": [
+        "jushuitan",
+        "WM0128",
+        "WM0128"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:855:WM0128:WM0128",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0128",
+        "external_name": "ICE LERSKIN氨基酸洗面奶100g（泰文标签版）",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "78084",
+        "extra": {
+          "style_code": "WM0128",
+          "product_code": "WM0128",
+          "spec": null,
+          "actual_qty": "78084",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 855,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0128",
+          "商品编码": "WM0128",
+          "商品名称": "ICE LERSKIN氨基酸洗面奶100g（泰文标签版）",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 78084,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 78084,
+          "公有可用数": 78084,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/10/9 10:13:10"
+        }
+      },
+      "target_row": 116,
+      "target_ice": "WM0128",
+      "target_master": {
+        "row_index": 116,
+        "ice_code": "WM0128",
+        "barcode": "6974674957349",
+        "name_cn": "ICE LERSKIN 冰川水精华洗面奶（泰文标签版）",
+        "spec": "100g/瓶"
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第855行WM0128对应现行主库锚点原第116行WM0128；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0129",
+      "candidate_id": "mc-215172d1fdd95149",
+      "source_identity": [
+        "jushuitan",
+        "WM0129",
+        "WM0129"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:856:WM0129:WM0129",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0129",
+        "external_name": "ICE LERSKIN 水杨酸净透啫喱 15ml（泰文标签版）",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "38317",
+        "extra": {
+          "style_code": "WM0129",
+          "product_code": "WM0129",
+          "spec": null,
+          "actual_qty": "38317",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 856,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0129",
+          "商品编码": "WM0129",
+          "商品名称": "ICE LERSKIN 水杨酸净透啫喱 15ml（泰文标签版）",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 38317,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 0,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": 38317,
+          "公有可用数": 38317,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/9/18 19:45:38"
+        }
+      },
+      "target_row": 123,
+      "target_ice": "WM0129",
+      "target_master": {
+        "row_index": 123,
+        "ice_code": "WM0129",
+        "barcode": "780103214077",
+        "name_cn": "ICE LERSKIN 水杨酸净透啫喱 15ml（泰文标签版）",
+        "spec": ""
+      },
+      "decision": "confirm",
+      "reason": "用户本轮明确确认：聚水潭Sheet1原第856行WM0129对应现行主库锚点原第123行WM0129；仅本批人工资料选择。"
+    },
+    {
+      "decision_id": "user-20261020-jst-WM0007",
+      "candidate_id": "mc-eec4d01202d4a7de",
+      "source_identity": [
+        "jushuitan",
+        "WM0007",
+        "WM0007"
+      ],
+      "source": {
+        "source_system": "jushuitan",
+        "source_row_key": "jushuitan:744:WM0007:WM0007",
+        "scope": "match_only",
+        "warehouse": null,
+        "external_sku_raw": "WM0007",
+        "external_name": "外贸GreTeam 去角质啫喱 60g",
+        "sheet_name": "Sheet1",
+        "gtin_raw": null,
+        "available_qty": "-6120",
+        "extra": {
+          "style_code": "WM0007",
+          "product_code": "WM0007",
+          "spec": null,
+          "actual_qty": "0",
+          "cloud_available_qty": null
+        }
+      },
+      "source_file": {
+        "file_name": "商品资料_20261015165159_200874071_1.xlsx",
+        "frozen": "input-2.frozen.xlsx",
+        "sha256": "9f42843af2bfe1828f07e8ac7c96c57b16d1c397026184ed893cc2ab9de563f8",
+        "sheet_name": "Sheet1",
+        "excel_row": 744,
+        "raw_record": {
+          "图片": null,
+          "款式编码": "WM0007",
+          "商品编码": "WM0007",
+          "商品名称": "外贸GreTeam 去角质啫喱 60g",
+          "颜色及规格": null,
+          "颜色": null,
+          "规格": null,
+          "实际库存数": 0,
+          "库存锁定数": null,
+          "运营云仓可用数": null,
+          "订单占有数": 6120,
+          "安全库存下限": null,
+          "安全库存上限": 0,
+          "安全库存天数下限(交货周期)": 0,
+          "安全库存天数上限": 0,
+          "仓库待发数": 0,
+          "销退仓库存": 0,
+          "进货仓库存": 0,
+          "采购在途数": 0,
+          "调拨在途数": 0,
+          "虚拟库存数": 0,
+          "可用数": -6120,
+          "公有可用数": -6120,
+          "库存同步": "开启",
+          "主仓位": null,
+          "库存更新时间": "2026/1/17 0:28:06"
+        }
+      },
+      "target_row": 15,
+      "target_ice": "WM0007",
+      "target_master": {
+        "row_index": 15,
+        "ice_code": "WM0007",
+        "barcode": "714855625119",
+        "name_cn": "GreTeam去角质",
+        "spec": ""
+      },
+      "decision": "ignore",
+      "reason": "用户明确WM0007 GreTeam去角质已不再经营，本批忽略；不是对应错误，不推导为全系统停用或删除商品。"
+    }
+  ],
+  "bs_not_created": [
+    {
+      "ice_code": "WM0070",
+      "master_row": 214,
+      "source_system": "bigseller",
+      "status": "user_confirmed_not_created",
+      "reason": "用户确认尚未在BigSeller建档，等待后续创建",
+      "basis": "0070和0072在bs上确实是还没有创建，可以先不绑定。",
+      "inventory_implication": "未建档不等于库存为0；不生成BS来源、SKU、选择或库存数据。"
+    },
+    {
+      "ice_code": "WM0072",
+      "master_row": 66,
+      "source_system": "bigseller",
+      "status": "user_confirmed_not_created",
+      "reason": "用户确认尚未在BigSeller建档，等待后续创建",
+      "basis": "0070和0072在bs上确实是还没有创建，可以先不绑定。",
+      "inventory_implication": "未建档不等于库存为0；不生成BS来源、SKU、选择或库存数据。"
+    }
+  ]
+}
