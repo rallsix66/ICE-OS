@@ -1,63 +1,56 @@
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT, writeJson } from './prepare.mjs';
-import { priorPreviewAction } from './preview-start-prior-action.mjs';
 
 /**
- * Control-flow scenarios for owned preview markers (no real signals or workspace I/O).
+ * Runs isolated VM probes against actual start/stop-local-preview.mjs (no real signals).
  */
 export async function runPreviewStartControlFlowProbe(evidenceDir) {
-  const scenarios = [
-    {
-      name: 'running-unchanged',
-      alreadyRunning: true,
-      expectAction: 'noop',
-      forbidStop: true,
-    },
-    {
-      name: 'source-changed-or-unhealthy',
-      alreadyRunning: false,
-      expectAction: 'controlled-stop',
-      forbidStop: false,
-    },
-  ];
+  const probeScript = path.join(REPO_ROOT, 'scripts/catalog/preview-control-flow-vm-probes.mjs');
+  const env = { ...process.env };
+  if (evidenceDir) env.CATALOG_PROBE_EVIDENCE_DIR = evidenceDir;
 
-  const results = scenarios.map((scenario) => {
-    const action = priorPreviewAction({ alreadyRunning: scenario.alreadyRunning });
-    const pass = action === scenario.expectAction;
-    return {
-      scenario: scenario.name,
-      alreadyRunning: scenario.alreadyRunning,
-      action,
-      expectAction: scenario.expectAction,
-      pass,
-      note: scenario.forbidStop
-        ? 'start-local-preview must not call stop/kill/remove-marker when action is noop'
-        : 'start-local-preview must call stop-local-preview only when action is controlled-stop',
+  const run = spawnSync(
+    process.execPath,
+    ['--experimental-vm-modules', probeScript],
+    {
+      encoding: 'utf8',
+      env,
+      cwd: REPO_ROOT,
+      windowsHide: true,
+      maxBuffer: 16 * 1024 * 1024,
+    },
+  );
+
+  let parsed;
+  try {
+    const stdout = run.stdout.trim();
+    parsed = JSON.parse(stdout);
+  } catch {
+    parsed = {
+      pass: false,
+      parseError: true,
+      exitCode: run.status,
+      stdout: run.stdout,
+      stderr: run.stderr,
     };
-  });
-
-  results.push({
-    scenario: 'ownership-rejected',
-    pass: true,
-    note: 'verifyPreviewServerOwnership failure throws before priorPreviewAction (see preview-start-workspace-guard)',
-  });
-  results.push({
-    scenario: 'controlled-stop-failure',
-    pass: true,
-    note: 'stopVerifiedPreview non-zero exit throws CATALOG_PREVIEW_CONTROLLED_STOP_FAILED; marker retained by stop-local-preview',
-  });
+  }
 
   const result = {
     testedAt: new Date().toISOString(),
-    sourceModule: path.join(REPO_ROOT, 'scripts/catalog/preview-start-prior-action.mjs'),
-    results,
-    pass: results.every((r) => r.pass !== false),
+    probeScript,
+    spawnExitCode: run.status,
+    ...parsed,
+    pass: run.status === 0 && parsed.pass === true,
   };
 
-  if (evidenceDir) writeJson(path.join(evidenceDir, 'preview-start-control-flow-probe.json'), result);
+  if (evidenceDir) {
+    writeJson(path.join(evidenceDir, 'preview-start-control-flow-probe.json'), result);
+  }
+
   if (!result.pass) {
-    throw new Error(`CATALOG_START_CONTROL_FLOW_PROBE_FAILED:${JSON.stringify(result)}`);
+    throw new Error(`CATALOG_CONTROL_FLOW_PROBE_FAILED:${JSON.stringify(result)}`);
   }
   return result;
 }

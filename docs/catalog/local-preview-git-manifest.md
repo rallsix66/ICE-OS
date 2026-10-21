@@ -1,24 +1,21 @@
 # 本地真实商品预览包 — Git 三份清单（R6 / F5）
 
-状态：**R5 启停补修自验完成，待第五轮独审**；P0-03 / 商品首包 / N1A / N1C 等已验收积压 **可** 按 §4 推送；预览启停最后一 commit 单独标注待审。
+状态：**R5 功能问题已独立关闭**；**交付收尾（VM 门禁 + 短程证据 + 文档）待复核**。积压五 commit 已推送 `codex/ice-v4-planning`；§4.1 记录实际 SHA；§4.2 为本次测试/文档增量。
 
-盘点时点：2026-10-21（R3）。含商品首包、N1A/N1C、P0-03、本地预览 009–012 及 R3 启停/覆盖/自验脚本与测试。
+盘点时点：2026-10-21（R5 closeout）。§1 为已入库路径索引；不再使用「拟提交/已暂存」旧说法。
 
 ---
 
 ## 1. 拟提交（源码 / SQL / 脚本 / 测试 / 配置 / 必要文档）
 
-### 1.1 已跟踪且已有工作区修改（`git diff --name-only`）
+### 1.1 横切与 P0-02 辅助（已分散在 §4.1 各 commit）
 
-- `.gitignore`
-- `AGENTS.md`
-- `docs/current-state.md`
-- `docs/tasks/current-task.md`
-- `package.json`
-- `scripts/p0-02/postgres-process.mjs`（catalog/postgres 无窗启动复用）
-- `scripts/p0-02/process-identity.mjs`（WMI 命令行与进程创建时间；预览严格归属依赖）
-- `src/app/auth/login/page.tsx`（登录后跳转 `NEXT_PUBLIC_ICE_POST_LOGIN_PATH`）
-- `src/app/dashboard/_components/sidebar-nav.tsx`
+- `.gitignore` → **acb4865**
+- `package.json`（catalog npm scripts）→ **acb4865**（**不在** c3e1cb1）
+- `scripts/p0-02/postgres-process.mjs` → **acb4865**
+- `scripts/p0-02/process-identity.mjs` → **c3e1cb1**
+- `src/app/auth/login/page.tsx`、`src/app/dashboard/_components/sidebar-nav.tsx` → **acb4865**
+- `AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`、delivery/manifest → **c3e1cb1** 与本次 §4.2 增量
 
 ### 1.2 商品首包 — SQL（`db/catalog/`）
 
@@ -106,7 +103,9 @@
 - `scripts/catalog/run-preview-ownership-probes.mjs`
 - `scripts/catalog/run-preview-start-workspace-guard.mjs`
 - `scripts/catalog/preview-start-prior-action.mjs`
-- `scripts/catalog/run-preview-start-control-flow-probe.mjs`
+- `scripts/catalog/preview-control-flow-vm-probes.mjs`（§4.2）
+- `scripts/catalog/run-preview-start-control-flow-probe.mjs`（§4.2：spawn VM 探针，无硬编码 pass）
+- `scripts/catalog/run-preview-r5-short-verify.mjs`（§4.2：短程证据编排，仅本地运行）
 - `scripts/catalog/run-preview-double-start.mjs`
 - `scripts/catalog/run-check.mjs`
 - `scripts/catalog/run-postgres-tests.mjs`
@@ -300,7 +299,7 @@
 
 ---
 
-## 3. 取消跟踪但保留本地（已暂存 `git rm --cached`）
+## 3. 取消跟踪但保留本地（已在 d6cbeee 提交）
 
 | 路径 | 原因 |
 |---|---|
@@ -313,16 +312,28 @@
 
 ---
 
-## 4. 分批 commit 方案（→ `codex/ice-v4-planning`）
+## 4. Git 记录
 
-预览启停（§1.4 中 start/stop/ownership 与 R5 探针）建议 **单独最后一 commit**，正文注明 **R5 待独审**；其余 §1 已验收块可先行推送。
+### 4.1 已推送（2026-10-21，`origin/codex/ice-v4-planning`）
 
-1. **P0-03 工具与文档**：`tools/p0_03_match/**`、`scripts/p0-03/**`、`docs/p0-03/**`（不含原始 Excel）、`docs/product-identity-standard-v1.md`、`docs/tasks/p0-03/**`
-2. **商品首包 SQL + 核心 catalog**：`db/catalog/001–008`、`src/features/catalog`（不含 local-display/new-item/source-identity 子包若需拆分则并入 3/4）、`tests/catalog/baseline*.`、`catalog.postgres/browser`
-3. **N1A 来源身份**：`003–004` 已在 2；`source-identity/**` 源码与测试、对应 verification 报告
-4. **N1C 新品**：`007–008`、 `new-item/**` 与测试
-5. **本地预览 009–012 + 展示**：`local-display/**`、预览脚本、011/012、`instrumentation`、dashboard catalog 页、local-preview 测试
-6. **横切**：`.gitignore`、`package.json`、`postgres-process.mjs`、login/sidebar、`AGENTS.md`、`current-state`、`current-task`、delivery/manifest
-7. **取消跟踪生成物**：§3 四项 + `.gitignore` 规则确认
+| SHA | 摘要 | 主要内容 |
+|---|---|---|
+| **d6cbeee** | feat(p0-03): matching tools + PASS docs | `tools/p0_03_match/**`、`scripts/p0-03/**`、`docs/p0-03/**`（无原始 Excel）、`docs/product-identity-standard-v1.md`、`docs/tasks/p0-03/**`；§3 取消跟踪 |
+| **69144f3** | feat(catalog): SQL + features + tests | `db/catalog/**`、`src/features/catalog/**`、dashboard/API、`tests/catalog/**`、playwright/vitest catalog 配置、verification 报告 |
+| **3fdec98** | feat(catalog): prepare/postgres runners | `scripts/catalog/prepare*.mjs`、`run-*-check/postgres/browser`（**不含** start/stop/ownership） |
+| **acb4865** | chore: gitignore + **package.json** + UI | `.gitignore`、`package.json`、`postgres-process.mjs`、login/sidebar |
+| **c3e1cb1** | fix(catalog-preview): R5 ownership impl | 启停/ownership/launcher/workspace、R5 探针（初版）、`process-identity.mjs`、delivery/manifest/治理文档 |
 
-不合并、不部署；推送前再次 `git diff --check` 与 staging 区无凭据/数据库文件。
+推送后远端 HEAD 曾为 **c3e1cb1**；§4.2 增量推送后以 `git rev-parse origin/codex/ice-v4-planning` 为准。
+
+### 4.2 待推送（R5 交付收尾：测试门禁 + 文档）
+
+- `scripts/catalog/preview-control-flow-vm-probes.mjs`
+- `scripts/catalog/run-preview-start-control-flow-probe.mjs`（真实 VM start/stop 9 场景）
+- `scripts/catalog/run-preview-r5-short-verify.mjs`
+- `docs/catalog/local-preview-delivery-index.md`、`local-preview-git-manifest.md`（本文件）
+- `AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`
+
+短程原始证据 **不入库**：`.local/catalog/run-20261021T075139Z-821214d2/evidence/r5-short-verify-2026-10-21T08-24-27-634Z-4ec9e4/`（索引 `r5-short-verify-index.json` 于 run 根）。
+
+不 merge、不 deploy；推送前 `git diff --check`。

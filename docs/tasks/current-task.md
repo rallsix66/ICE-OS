@@ -2,9 +2,9 @@
 
 ## 本地真实商品预览包（当前）
 
-状态：**R5 启停补修完成，待第五轮独审**；**P0-03 / 首包 / N1A / N1C 已验收块已推送**（见 manifest §4）。交付索引：[local-preview-delivery-index.md](../catalog/local-preview-delivery-index.md)；独审：[independent-local-preview-r5-20261021T080011Z-f432e41a](../../.local/catalog/independent-local-preview-r5-20261021T080011Z-f432e41a/independent-review.md)。
+状态：**R5 功能已独立关闭**；**交付收尾（VM 门禁 + 短程证据 + 文档）待复核**。积压五 commit 已推送（manifest §4.1）。交付索引：[local-preview-delivery-index.md](../catalog/local-preview-delivery-index.md)；closeout 独审：[independent-local-preview-r5-closeout-20261021T081737Z-dab40b90](../../.local/catalog/independent-local-preview-r5-closeout-20261021T081737Z-dab40b90/independent-review.md)。
 
-范围不变：126 主资料、BS 530（430/100）、六仓、进货价货值；继承 P0/N1A/N1C。**预览 run** `run-20261021T075139Z-821214d2`。**R5 补修**：重复 start noop、受控 stop 失败不继续、移除 legacy 归属；双 start / 残缺 marker 探针。**R3-2/3/4 保持关闭**。预览启停 commit 待独审通过后与 manifest 对齐收尾。
+范围不变：126 主资料、BS 530（430/100）、六仓、进货价货值；继承 P0/N1A/N1C。**预览 run** `run-20261021T075139Z-821214d2`；短程证据 `evidence/r5-short-verify-2026-10-21T08-24-27-634Z-4ec9e4/`。**R3-2/3/4 保持关闭**；不重开业务全套。§4.2 测试/文档 commit 待推送。
 
 ## N1C — 本地隔离独立通过与文档登记（历史）
 

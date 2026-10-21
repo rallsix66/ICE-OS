@@ -1,12 +1,12 @@
 # Current Project State
 
-更新：2026-10-21（R5 启停补修 + 已验收积压可推送）。仓库 ICEOS。
+更新：2026-10-21（R5 功能关闭 + 交付收尾）。仓库 ICEOS。
 
 ## 本地真实商品预览（当前）
 
-**R5 启停补修 — 待第五轮独审** — 已按 [第五轮独审 CHANGES_REQUIRED](../.local/catalog/independent-local-preview-r5-20261021T080011Z-f432e41a/independent-review.md) 补修：健康且源码未变时 start **noop**（同 PID、保留 marker）；需重启仅走受控 stop；缺 `processCreatedAt` **拒绝**（无 legacy 兜底）。探针：连续双 start、归属 7 例、控制流决策。索引：[local-preview-delivery-index.md](./catalog/local-preview-delivery-index.md)。预览仍用自验 run `run-20261021T075139Z-821214d2` → http://127.0.0.1:3010/dashboard/catalog。商品/估值/RLS/R3-2/3/4 结论不变。
+**R5 功能问题已独立关闭**；**交付收尾待复核** — 功能项见 [R5 closeout 独审](../.local/catalog/independent-local-preview-r5-closeout-20261021T081737Z-dab40b90/independent-review.md)。仓库已纳入真实 VM start/stop 控制流门禁（9 场景）与短程证据（归属 7 例、双 start、投影 restart 一致）。索引：[local-preview-delivery-index.md](./catalog/local-preview-delivery-index.md)；短程入口 `run-20261021T075139Z-821214d2/r5-short-verify-index.json`。预览 http://127.0.0.1:3010/dashboard/catalog。商品/估值/RLS/R3-2/3/4 **不重开**。
 
-**Git 边界**：P0-03、商品首包、N1A/N1C 及依赖已按 [manifest](./catalog/local-preview-git-manifest.md) 分批推送 `codex/ice-v4-planning`；预览启停脚本单独 commit 标注待审。凭据与 `.local` 证据不入库。
+**Git**：五 commit 已推送（manifest §4.1，`package.json` 在 **acb4865**）；§4.2 测试/文档增量待推送。`.local` 原始 JSON 不入库。
 
 ## 来源身份N1A与持续新品N1C（保留）
 
