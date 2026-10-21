@@ -324,7 +324,7 @@
 | **acb4865** | chore: gitignore + **package.json** + UI | `.gitignore`、`package.json`、`postgres-process.mjs`、login/sidebar |
 | **c3e1cb1** | fix(catalog-preview): R5 ownership impl | 启停/ownership/launcher/workspace、R5 探针（初版）、`process-identity.mjs`、delivery/manifest/治理文档 |
 
-远端 HEAD：**4e5c01d**（与本地一致；closeout 功能提交 **9a8acb2**，其后 manifest HEAD 修正 **4e5c01d**）。
+远端 HEAD：以 `git rev-parse origin/codex/ice-v4-planning` 为准（closeout 功能主体 **9a8acb2**；其后仅文档 SHA 同步小提交）。
 
 ### 4.2 已推送 — **9a8acb2**（R5 交付收尾：测试门禁 + 文档）
 
