@@ -1,0 +1,44 @@
+{
+  "schema": "iceos-source-identity-fixture-config-v1",
+  "environment": "fixture",
+  "actors": [
+    { "key": "adminA", "profileId": "11111111-1111-4111-8111-111111111101", "email": "admin@catalog.test", "password": "CatalogAdmin123!", "role": "admin", "active": true },
+    { "key": "adminB", "profileId": "11111111-1111-4111-8111-111111111107", "email": "scope-b@catalog.test", "password": "CatalogScopeB123!", "role": "admin", "active": true },
+    { "key": "readOnly", "profileId": "11111111-1111-4111-8111-111111111108", "email": "read-only@catalog.test", "password": "CatalogReadOnly123!", "role": "admin", "active": true },
+    { "key": "noAmount", "profileId": "11111111-1111-4111-8111-111111111109", "email": "no-amount@catalog.test", "password": "CatalogNoAmount123!", "role": "admin", "active": true },
+    { "key": "noEvidence", "profileId": "11111111-1111-4111-8111-111111111110", "email": "no-evidence@catalog.test", "password": "CatalogNoEvidence123!", "role": "admin", "active": true },
+    { "key": "revoked", "profileId": "11111111-1111-4111-8111-111111111111", "email": "revoked@catalog.test", "password": "CatalogRevoked123!", "role": "admin", "active": true }
+  ],
+  "scopes": [
+    {
+      "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1", "system": "bigseller", "entityKind": "product_record",
+      "accountKind": "fixture_account", "accountParts": ["FIXTURE-ACCOUNT-A"],
+      "resourceKind": "fixture_dataset", "resourceParts": ["FIXTURE-PRODUCTS-A"],
+      "marketRole": "context", "marketIdentity": null, "warehouseRole": "context", "warehouseIdentity": null,
+      "scopeState": "identity_ready", "evidenceMode": "fixture", "displayName": "隔离fixture A · BS稳定ID",
+      "proofId": "eeeeeeee-aaaa-4eee-8aaa-eeeeeeeeeee1", "proofCaptureKey": "fixture-proof-a-v1", "proofFixtureId": "products-v1",
+      "contractId": "cccccccc-aaaa-4ccc-8aaa-ccccccccccc1", "strategy": "vendor_stable_id", "keyFields": ["vendorRecordId"],
+      "grants": [
+        { "profileId": "11111111-1111-4111-8111-111111111101", "read": true, "manage": true, "evidence": true, "amount": true, "enabled": true },
+        { "profileId": "11111111-1111-4111-8111-111111111104", "read": true, "manage": true, "evidence": true, "amount": true, "enabled": true },
+        { "profileId": "11111111-1111-4111-8111-111111111106", "read": true, "manage": true, "evidence": true, "amount": true, "enabled": true },
+        { "profileId": "11111111-1111-4111-8111-111111111108", "read": true, "manage": false, "evidence": true, "amount": true, "enabled": true },
+        { "profileId": "11111111-1111-4111-8111-111111111109", "read": true, "manage": true, "evidence": true, "amount": false, "enabled": true },
+        { "profileId": "11111111-1111-4111-8111-111111111110", "read": true, "manage": true, "evidence": false, "amount": true, "enabled": true },
+        { "profileId": "11111111-1111-4111-8111-111111111111", "read": true, "manage": true, "evidence": true, "amount": true, "enabled": false }
+      ]
+    },
+    {
+      "scopeId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2", "system": "jushuitan", "entityKind": "product_record",
+      "accountKind": "fixture_account", "accountParts": ["FIXTURE-ACCOUNT-B"],
+      "resourceKind": "fixture_dataset", "resourceParts": ["FIXTURE-PRODUCTS-B"],
+      "marketRole": "context", "marketIdentity": null, "warehouseRole": "context", "warehouseIdentity": null,
+      "scopeState": "identity_ready", "evidenceMode": "fixture", "displayName": "隔离fixture B · 可靠组合键",
+      "proofId": "eeeeeeee-bbbb-4eee-8bbb-eeeeeeeeeee2", "proofCaptureKey": "fixture-proof-b-v1", "proofFixtureId": "products-conflicts-v3",
+      "contractId": "cccccccc-bbbb-4ccc-8bbb-ccccccccccc2", "strategy": "scoped_business_key", "keyFields": ["sku"],
+      "grants": [
+        { "profileId": "11111111-1111-4111-8111-111111111107", "read": true, "manage": true, "evidence": true, "amount": true, "enabled": true }
+      ]
+    }
+  ]
+}

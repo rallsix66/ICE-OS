@@ -1,0 +1,25 @@
+{
+  "basisId": "iceos-local-sample-valuation-basis-20261021",
+  "confirmedAt": "2026-10-21T00:00:00.000Z",
+  "confirmedByRole": "business_user_via_implementation_packet",
+  "currency": "CNY",
+  "unitCostMeaning": "单个产品进货价",
+  "includesFreight": false,
+  "includesTax": false,
+  "priceSource": "商品库当前已采用的人民币单品进货价及其版本（match-bundle master_provenance / item_financial_revision，不回写冻结原件）",
+  "inventorySource": "BigSeller 冻结样表 input-1.frozen.xlsx「单个SKU」530 行；实物量取「现有库存」列",
+  "selectionScope": "430 条已确认 BS 样表人工选择用于本包本地展示；100 条未选择保留差异",
+  "formula": "BS样表现有库存 × 当前已采用的人民币单品进货价",
+  "disclaimer": "这是历史库存样表按当前采用进货价计算的本地估算，不是 2026-10-15 当时已记录货值、实时资产或财务结算金额",
+  "exportLabel": "2026-10-15导出样表",
+  "frozenInputSha256": {
+    "match-bundle.json": "28d8d81c7d62beb95b99ebd188467c8a8ec69a9a6a4fe17df5970d8a0c6816ae",
+    "manual-decisions.effective.csv": "4428f4c80dcdde1c47508ac9eb433baa4f9a941934ae943cdd5e0116d3b49c14",
+    "input-1.frozen.xlsx": "53d88779fb10f5269cde58204d262d724d8b2a821c24df6e3c72b0d11fc77020"
+  },
+  "notes": [
+    "WM0072 展示与估值采用 5.18；来源观测中的 5 仅作差异/历史证据",
+    "缺价为 WM10012 与缺码新品；缺价或缺对应不填 0",
+    "在途不加入现有库存；组合 SKU 表不参与本包 BS 样表库存"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "iceos-single-scope-products-v1", "environment": "fixture",
+  "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1", "accountId": "FIXTURE-ACCOUNT-A", "datasetId": "FIXTURE-PRODUCTS-A",
+  "proof": { "uniqueness": true, "stability": true, "keyChange": true, "reuse": true, "oldObservationCompatible": true },
+  "coverage": { "complete": true, "meaning": "complete synthetic reordered fixture only; no real account coverage" },
+  "sourceUpdatedAt": null, "documentModifiedAt": null,
+  "records": [
+    { "vendorRecordId": "fixture-vendor-002", "sku": "FIXTURE-SKU-A2", "name": "Fixture A second product renamed", "barcode": "0000000000002",
+      "marketContext": { "state": "known", "raw": "FIXTURE-MARKET-A", "canonical": "FIXTURE-MARKET-A", "evidenceRef": "fixture:context-proof-v2" },
+      "warehouseContext": { "state": "known", "raw": "FIXTURE-WAREHOUSE-A", "canonical": "FIXTURE-WAREHOUSE-A", "evidenceRef": "fixture:context-proof-v2" }, "sourceEffectiveAt": null, "costPriceRaw": "8877.26" },
+    { "vendorRecordId": "fixture-vendor-001", "sku": "780103214060", "name": "ICE LERSKIN 三酸净化喷雾 120ml",
+      "barcode": null, "marketContext": { "state": "known", "raw": "FIXTURE-MARKET-A", "canonical": "FIXTURE-MARKET-A", "evidenceRef": "fixture:context-proof-v2" },
+      "warehouseContext": { "state": "known", "raw": "FIXTURE-WAREHOUSE-A", "canonical": "FIXTURE-WAREHOUSE-A", "evidenceRef": "fixture:context-proof-v2" }, "sourceEffectiveAt": null, "costPriceRaw": "9988.17" },
+    { "vendorRecordId": "fixture-vendor-003", "sku": "FIXTURE-SKU-A3", "name": "Fixture identity-only addition; no catalog product created", "barcode": "0000000000004",
+      "marketContext": { "state": "not_applicable", "raw": null, "evidenceRef": "fixture:explicit-context-not-applicable" },
+      "warehouseContext": { "state": "unknown", "raw": null, "reason": "not observed" }, "sourceEffectiveAt": null, "costPriceRaw": "0" }
+  ]
+}

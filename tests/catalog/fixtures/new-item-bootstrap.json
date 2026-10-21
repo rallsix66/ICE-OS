@@ -1,0 +1,513 @@
+{
+  "fixtureMode": "fixture",
+  "scopes": [
+    {
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "system": "bigseller",
+      "entityKind": "product_record",
+      "scopeState": "identity_ready",
+      "displayName": "N1C fixture a1",
+      "accountKind": "fixture_account",
+      "resourceKind": "fixture_dataset",
+      "marketRole": "context",
+      "warehouseRole": "context",
+      "proofId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeea00",
+      "proofCaptureKey": "n1c-initial-a1",
+      "proofSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "proofSize": 2229,
+      "proofHandle": "d6/d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "contractId": "cccccccc-dddd-4ccc-8ddd-cccccccccca1",
+      "strategy": "vendor_stable_id",
+      "keyFields": [
+        "vendorRecordId"
+      ],
+      "actorId": "11111111-1111-4111-8111-111111111101",
+      "grants": [
+        {
+          "profileId": "11111111-1111-4111-8111-111111111101",
+          "read": true,
+          "manage": true,
+          "evidence": true,
+          "amount": true,
+          "publish": true
+        },
+        {
+          "profileId": "11111111-1111-4111-8111-111111111104",
+          "read": true,
+          "manage": true,
+          "publish": false,
+          "evidence": true,
+          "amount": true,
+          "enabled": true
+        },
+        {
+          "profileId": "11111111-1111-4111-8111-111111111106",
+          "read": true,
+          "manage": true,
+          "publish": true,
+          "evidence": true,
+          "amount": true,
+          "enabled": true
+        },
+        {
+          "profileId": "11111111-1111-4111-8111-111111111108",
+          "read": true,
+          "manage": false,
+          "publish": false,
+          "evidence": true,
+          "amount": true,
+          "enabled": true
+        },
+        {
+          "profileId": "11111111-1111-4111-8111-111111111109",
+          "read": true,
+          "manage": true,
+          "publish": true,
+          "evidence": true,
+          "amount": false,
+          "enabled": true
+        },
+        {
+          "profileId": "11111111-1111-4111-8111-111111111110",
+          "read": true,
+          "manage": true,
+          "publish": true,
+          "evidence": false,
+          "amount": true,
+          "enabled": true
+        },
+        {
+          "profileId": "11111111-1111-4111-8111-111111111111",
+          "read": true,
+          "manage": true,
+          "publish": true,
+          "evidence": true,
+          "amount": true,
+          "enabled": false
+        }
+      ],
+      "accountParts": [
+        "N1C-a1"
+      ],
+      "resourceParts": [
+        "N1C-product-a1"
+      ]
+    },
+    {
+      "scopeId": "cccccccc-bbbb-4ccc-8bbb-ccccccccccb2",
+      "system": "jushuitan",
+      "entityKind": "product_record",
+      "scopeState": "identity_ready",
+      "displayName": "N1C fixture b2",
+      "accountKind": "fixture_account",
+      "resourceKind": "fixture_dataset",
+      "marketRole": "context",
+      "warehouseRole": "context",
+      "proofId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeeb00",
+      "proofCaptureKey": "n1c-initial-b2",
+      "proofSha256": "98760817ef167db1702dff0069572b6c818ff684869d2cbd51f171d783f03ab2",
+      "proofSize": 722,
+      "proofHandle": "98/98760817ef167db1702dff0069572b6c818ff684869d2cbd51f171d783f03ab2",
+      "contractId": "cccccccc-dddd-4ccc-8ddd-ccccccccccb2",
+      "strategy": "vendor_stable_id",
+      "keyFields": [
+        "vendorRecordId"
+      ],
+      "actorId": "11111111-1111-4111-8111-111111111107",
+      "grants": [
+        {
+          "profileId": "11111111-1111-4111-8111-111111111107",
+          "read": true,
+          "manage": true,
+          "evidence": true,
+          "amount": true,
+          "publish": true
+        }
+      ],
+      "accountParts": [
+        "N1C-b2"
+      ],
+      "resourceParts": [
+        "N1C-product-b2"
+      ]
+    },
+    {
+      "scopeId": "cccccccc-cccc-4ccc-8ccc-ccccccccccc3",
+      "system": "feishu",
+      "entityKind": "product_record",
+      "scopeState": "unresolved",
+      "displayName": "N1C fixture c3",
+      "accountKind": "fixture_account",
+      "resourceKind": "fixture_dataset",
+      "marketRole": "context",
+      "warehouseRole": "context",
+      "proofId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeec00",
+      "proofCaptureKey": "n1c-initial-c3",
+      "proofSha256": "5e283e90bb4b6681d8a476b84658628e7bd9fea97c68b88f062cc556cff02ae9",
+      "proofSize": 197,
+      "proofHandle": "5e/5e283e90bb4b6681d8a476b84658628e7bd9fea97c68b88f062cc556cff02ae9",
+      "contractId": "cccccccc-dddd-4ccc-8ddd-ccccccccccc3",
+      "strategy": "vendor_stable_id",
+      "keyFields": [
+        "vendorRecordId"
+      ],
+      "actorId": "11111111-1111-4111-8111-111111111101",
+      "grants": [
+        {
+          "profileId": "11111111-1111-4111-8111-111111111101",
+          "read": true,
+          "manage": true,
+          "evidence": true,
+          "amount": true,
+          "publish": true
+        }
+      ],
+      "accountParts": [
+        "N1C-c3"
+      ],
+      "resourceParts": [
+        "N1C-product-c3"
+      ]
+    }
+  ],
+  "identityCaptures": [
+    {
+      "label": "r1-first",
+      "evidenceId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeeea1",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "rawFile": "new-item-scope-a.json",
+      "recordPointer": "/rows/1",
+      "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd01",
+      "observations": [
+        {
+          "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd01",
+          "recordPointer": "/rows/1",
+          "fields": {
+            "vendorRecordId": {
+              "state": "value",
+              "value": "N1C-STABLE-001",
+              "evidenceRef": "/rows/1/vendorRecordId"
+            },
+            "sku": {
+              "state": "value",
+              "value": "N1C-SKU-001",
+              "evidenceRef": "/rows/1/sku"
+            },
+            "name": {
+              "state": "value",
+              "value": "ICEOS N1C 可靠来源示例",
+              "evidenceRef": "/rows/1/nameCn"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "position": {
+            "row": 2
+          },
+          "sourceEffectiveAt": null,
+          "sourceAvailability": "not_observed",
+          "payloadSha256": "05b78bc6fdc9ff585d4ba1097b7358d22e55ca6eb6697e577a26fcb92e360292"
+        }
+      ],
+      "proofSemantics": {
+        "uniqueness": true,
+        "stability": true,
+        "keyChange": true,
+        "reuse": true,
+        "oldObservationCompatible": true
+      },
+      "register": true,
+      "link": true
+    },
+    {
+      "label": "r1-repeat",
+      "evidenceId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeeea2",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "rawFile": "new-item-scope-a.json",
+      "recordPointer": "/rows/2",
+      "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd02",
+      "observations": [
+        {
+          "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd02",
+          "recordPointer": "/rows/2",
+          "fields": {
+            "vendorRecordId": {
+              "state": "value",
+              "value": "N1C-STABLE-001",
+              "evidenceRef": "/rows/2/vendorRecordId"
+            },
+            "sku": {
+              "state": "value",
+              "value": "N1C-SKU-001",
+              "evidenceRef": "/rows/2/sku"
+            },
+            "name": {
+              "state": "value",
+              "value": "ICEOS N1C 可靠来源示例",
+              "evidenceRef": "/rows/2/nameCn"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "position": {
+            "row": 3
+          },
+          "sourceEffectiveAt": null,
+          "sourceAvailability": "not_observed",
+          "payloadSha256": "ed8bd0621c844a6fd1cd38ab18997b1439ca9189b94d3823237ac355ef7e3b46"
+        }
+      ],
+      "proofSemantics": {
+        "uniqueness": true,
+        "stability": true,
+        "keyChange": true,
+        "reuse": true,
+        "oldObservationCompatible": true
+      },
+      "register": false,
+      "link": true
+    },
+    {
+      "label": "attach-support",
+      "evidenceId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeeea6",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "rawFile": "new-item-scope-a.json",
+      "recordPointer": "/rows/6",
+      "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd06",
+      "observations": [
+        {
+          "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd06",
+          "recordPointer": "/rows/6",
+          "fields": {
+            "vendorRecordId": {
+              "state": "value",
+              "value": "N1C-ATTACH-001",
+              "evidenceRef": "/rows/6/vendorRecordId"
+            },
+            "sku": {
+              "state": "value",
+              "value": "N1C-ATTACH-SKU",
+              "evidenceRef": "/rows/6/sku"
+            },
+            "name": {
+              "state": "value",
+              "value": "ICEOS N1C 待补来源",
+              "evidenceRef": "/rows/6/nameCn"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "position": {
+            "row": 7
+          },
+          "sourceEffectiveAt": null,
+          "sourceAvailability": "not_observed",
+          "payloadSha256": "c8d8f7716f8d4fb3547ba09c44a92ec868ec927890a8a0227ead03042639bb14"
+        }
+      ],
+      "proofSemantics": {
+        "uniqueness": true,
+        "stability": true,
+        "keyChange": true,
+        "reuse": true,
+        "oldObservationCompatible": true
+      },
+      "register": true,
+      "link": true
+    },
+    {
+      "label": "version",
+      "evidenceId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeeea9",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "rawFile": "new-item-scope-a.json",
+      "recordPointer": "/rows/9",
+      "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd09",
+      "observations": [
+        {
+          "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd09",
+          "recordPointer": "/rows/9",
+          "fields": {
+            "vendorRecordId": {
+              "state": "value",
+              "value": "N1C-STABLE-001",
+              "evidenceRef": "/rows/9/vendorRecordId"
+            },
+            "sku": {
+              "state": "value",
+              "value": "N1C-SKU-001",
+              "evidenceRef": "/rows/9/sku"
+            },
+            "name": {
+              "state": "value",
+              "value": "ICEOS N1C 可靠来源示例",
+              "evidenceRef": "/rows/9/nameCn"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "position": {
+            "row": 10
+          },
+          "sourceEffectiveAt": null,
+          "sourceAvailability": "not_observed",
+          "payloadSha256": "d4508e4e220c6bab20db4993dd5b6c66e6d16ff31d187ccf09593ad6818651f8"
+        }
+      ],
+      "proofSemantics": {
+        "uniqueness": true,
+        "stability": true,
+        "keyChange": true,
+        "reuse": true,
+        "oldObservationCompatible": true
+      },
+      "register": false,
+      "link": true
+    },
+    {
+      "label": "race-first",
+      "evidenceId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeea10",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "rawFile": "new-item-scope-a.json",
+      "recordPointer": "/rows/10",
+      "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd10",
+      "observations": [
+        {
+          "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd10",
+          "recordPointer": "/rows/10",
+          "fields": {
+            "vendorRecordId": {
+              "state": "value",
+              "value": "N1C-RACE-001",
+              "evidenceRef": "/rows/10/vendorRecordId"
+            },
+            "sku": {
+              "state": "value",
+              "value": "N1C-RACE-SKU",
+              "evidenceRef": "/rows/10/sku"
+            },
+            "name": {
+              "state": "value",
+              "value": "ICEOS N1C 并发来源",
+              "evidenceRef": "/rows/10/nameCn"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "position": {
+            "row": 11
+          },
+          "sourceEffectiveAt": null,
+          "sourceAvailability": "not_observed",
+          "payloadSha256": "1b50c06492540968cc73587ee9fc185134fb0e23ca3be97cb88b7e607d702b79"
+        }
+      ],
+      "proofSemantics": {
+        "uniqueness": true,
+        "stability": true,
+        "keyChange": true,
+        "reuse": true,
+        "oldObservationCompatible": true
+      },
+      "register": true,
+      "link": true
+    },
+    {
+      "label": "race-repeat",
+      "evidenceId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeea11",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "rawFile": "new-item-scope-a.json",
+      "recordPointer": "/rows/11",
+      "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd11",
+      "observations": [
+        {
+          "observationId": "dddddddd-cccc-4ddd-8ccc-dddddddddd11",
+          "recordPointer": "/rows/11",
+          "fields": {
+            "vendorRecordId": {
+              "state": "value",
+              "value": "N1C-RACE-001",
+              "evidenceRef": "/rows/11/vendorRecordId"
+            },
+            "sku": {
+              "state": "value",
+              "value": "N1C-RACE-SKU",
+              "evidenceRef": "/rows/11/sku"
+            },
+            "name": {
+              "state": "value",
+              "value": "ICEOS N1C 并发来源",
+              "evidenceRef": "/rows/11/nameCn"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "position": {
+            "row": 12
+          },
+          "sourceEffectiveAt": null,
+          "sourceAvailability": "not_observed",
+          "payloadSha256": "957232e2817ea3dd53a1a22da2e70ad9880e0cb0c638d8023c20b258b746c1ad"
+        }
+      ],
+      "proofSemantics": {
+        "uniqueness": true,
+        "stability": true,
+        "keyChange": true,
+        "reuse": true,
+        "oldObservationCompatible": true
+      },
+      "register": false,
+      "link": true
+    }
+  ],
+  "manifestFile": "new-item-fixture-manifest.json",
+  "manifestSha256": "427bd68ddc3fbc38597999cd336fea3ba78ddaa014322968ec90bbe6dbd0cdb5"
+}

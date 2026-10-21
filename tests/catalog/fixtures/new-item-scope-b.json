@@ -1,0 +1,29 @@
+{
+  "fictional": true,
+  "scopeId": "cccccccc-bbbb-4ccc-8bbb-ccccccccccb2",
+  "privateAccount": "N1C_PRIVATE_ACCOUNT_B",
+  "costPriceRaw": "N1C_PRIVATE_AMOUNT_28.991",
+  "rows": [
+    {
+      "rowKey": "main",
+      "nameCn": "ICEOS N1C 另一范围新品",
+      "vendorRecordId": "N1C-STABLE-001",
+      "sku": "N1C-SKU-001"
+    },
+    {
+      "rowKey": "same-sku",
+      "nameCn": "ICEOS N1C 跨账号同SKU",
+      "sku": "N1C-SKU-001"
+    },
+    {
+      "rowKey": "jst-candidate",
+      "nameCn": "ICEOS N1C 虚构新品127150ml",
+      "sku": "N1C-JST-CANDIDATE"
+    },
+    {
+      "rowKey": "jst-candidate-second",
+      "nameCn": "ICEOS N1C 另一范围新品",
+      "sku": "N1C-JST-CANDIDATE-SECOND"
+    }
+  ]
+}

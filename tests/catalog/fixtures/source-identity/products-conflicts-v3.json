@@ -1,0 +1,15 @@
+{
+  "schema": "iceos-single-scope-products-v1", "environment": "fixture",
+  "scopeId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2", "accountId": "FIXTURE-ACCOUNT-B", "datasetId": "FIXTURE-PRODUCTS-B",
+  "proof": { "uniqueness": true, "stability": true, "keyChange": true, "reuse": true, "oldObservationCompatible": true },
+  "coverage": { "complete": true, "meaning": "complete synthetic conflict fixture only; duplicate keys deliberately retained" },
+  "sourceUpdatedAt": null, "documentModifiedAt": null,
+  "records": [
+    { "vendorRecordId": "fixture-vendor-001", "sku": "780103214060", "name": "Fixture B same literal SKU in a separate account", "barcode": "0000000000001",
+      "marketContext": { "state": "unknown", "raw": null, "reason": "JST fixture has no market" }, "warehouseContext": { "state": "unknown", "raw": null, "reason": "JST fixture has no warehouse" }, "sourceEffectiveAt": null, "costPriceRaw": "7766.35" },
+    { "vendorRecordId": null, "sku": "FIXTURE-DUPLICATE-B", "name": "Fixture duplicate key version one", "barcode": "0000000000005",
+      "marketContext": { "state": "unknown", "raw": null, "reason": "not observed" }, "warehouseContext": { "state": "unknown", "raw": null, "reason": "not observed" }, "sourceEffectiveAt": null, "costPriceRaw": "6655.44" },
+    { "vendorRecordId": null, "sku": "FIXTURE-DUPLICATE-B", "name": "Fixture duplicate key version two", "barcode": "0000000000005",
+      "marketContext": { "state": "unknown", "raw": null, "reason": "not observed" }, "warehouseContext": { "state": "unknown", "raw": null, "reason": "not observed" }, "sourceEffectiveAt": null, "costPriceRaw": "5544.53" }
+  ]
+}

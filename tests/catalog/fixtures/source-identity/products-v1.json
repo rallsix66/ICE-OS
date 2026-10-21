@@ -1,0 +1,18 @@
+{
+  "schema": "iceos-single-scope-products-v1", "environment": "fixture",
+  "scopeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1", "accountId": "FIXTURE-ACCOUNT-A", "datasetId": "FIXTURE-PRODUCTS-A",
+  "proof": { "uniqueness": true, "stability": true, "keyChange": true, "reuse": true, "oldObservationCompatible": true },
+  "coverage": { "complete": true, "meaning": "complete synthetic fixture only; no real account coverage" },
+  "sourceUpdatedAt": null, "documentModifiedAt": null,
+  "records": [
+    { "vendorRecordId": "fixture-vendor-001", "sku": "780103214060", "name": "ICE LERSKIN 三酸净化喷雾 120ml", "barcode": null,
+      "marketContext": { "state": "unknown", "raw": null, "reason": "not observed in fixture v1" }, "warehouseContext": { "state": "unknown", "raw": null, "reason": "not observed in fixture v1" },
+      "sourceEffectiveAt": null, "costPriceRaw": "9988.17" },
+    { "vendorRecordId": "fixture-vendor-002", "sku": "FIXTURE-SKU-A2", "name": "Fixture A second product", "barcode": "0000000000002",
+      "marketContext": { "state": "unknown", "raw": null, "reason": "not observed in fixture v1" }, "warehouseContext": { "state": "unknown", "raw": null, "reason": "not observed in fixture v1" },
+      "sourceEffectiveAt": null, "costPriceRaw": "8877.26" },
+    { "vendorRecordId": null, "sku": "FIXTURE-NO-RELIABLE-KEY", "name": "Fixture observation only", "barcode": "0000000000003",
+      "marketContext": { "state": "unknown", "raw": null, "reason": "not observed in fixture v1" }, "warehouseContext": { "state": "unknown", "raw": null, "reason": "not observed in fixture v1" },
+      "sourceEffectiveAt": null, "costPriceRaw": "0" }
+  ]
+}

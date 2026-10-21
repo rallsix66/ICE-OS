@@ -1,0 +1,2201 @@
+{
+  "manifestId": "iceos-new-item-fixture-manifest-v1",
+  "fictional": true,
+  "captures": [
+    {
+      "approvedFixtureId": "a-main",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-main",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/0"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/0",
+          "position": {
+            "row": 1,
+            "jsonPointer": "/rows/0"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 虚构新品127150ml",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/vendorRecordId"
+            },
+            "sku": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/0",
+          "payloadSha256": "c97c6550143b998987108e586d5c9fb5877380ddb39ba1d226f31216b7fcd8b2"
+        }
+      ],
+      "projectionSha256": "b2b6463604ab95f0c9d22fcce33e04da27e7b2c48ce47752fe4d6390cc4aaf33",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-r1-first",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-r1-first",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/1"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/1",
+          "position": {
+            "row": 2,
+            "jsonPointer": "/rows/1"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 可靠来源示例",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-STABLE-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-SKU-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/1",
+          "payloadSha256": "cf1d4ec2965b6f5e2249d86425128267c48eb2c60d19c7fa73febcb3290a0f74"
+        }
+      ],
+      "projectionSha256": "8f5712049a2af86749540d20561b63cf70c4bfdaafc09e4400c12f93fa6df49a",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-r1-repeat",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-r1-repeat",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/2"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/2",
+          "position": {
+            "row": 3,
+            "jsonPointer": "/rows/2"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 可靠来源示例",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-STABLE-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-SKU-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/2",
+          "payloadSha256": "f1b306492dda9ce4763dfe7dda4df52369120903323c5d1c09b6f994b353fa93"
+        }
+      ],
+      "projectionSha256": "e5618840fac550c8c7bab120bca037956fa169cd27e78b32b09bf09cb8c710fc",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-proof-old",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-proof-old",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/3"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/3",
+          "position": {
+            "row": 4,
+            "jsonPointer": "/rows/3"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 无ID资料",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/vendorRecordId"
+            },
+            "sku": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/3",
+          "payloadSha256": "adce6b0b4a24a6260277455a02185927878af919e81558529814dcc366fcbed1"
+        }
+      ],
+      "projectionSha256": "166f2f32d3737b2a3ac96e1b128610743d032f883d56ee9d848e20d9177dfefc",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-proof-new",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-proof-new",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/4"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/4",
+          "position": {
+            "row": 5,
+            "jsonPointer": "/rows/4"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 无ID资料新观测",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/vendorRecordId"
+            },
+            "sku": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/4/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/4",
+          "payloadSha256": "1840d0197ab4cb2c423ed987622a394ef7101c600ae960024ea0291935ce8668"
+        }
+      ],
+      "projectionSha256": "713ba805230cb47b9bea58e7b39d4f8f6b42134870b190cf050e07042bb44800",
+      "associationProofs": [
+        {
+          "proofKey": "same-item",
+          "semantics": "same_catalog_item",
+          "from": {
+            "kind": "product_observation",
+            "captureKey": "a-proof-new",
+            "recordPointer": "/rows/4",
+            "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+            "payloadSha256": "1840d0197ab4cb2c423ed987622a394ef7101c600ae960024ea0291935ce8668"
+          },
+          "to": {
+            "kind": "product_observation",
+            "captureKey": "a-proof-old",
+            "recordPointer": "/rows/3",
+            "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+            "payloadSha256": "adce6b0b4a24a6260277455a02185927878af919e81558529814dcc366fcbed1"
+          }
+        }
+      ],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-attach-old",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-attach-old",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/5"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/5",
+          "position": {
+            "row": 6,
+            "jsonPointer": "/rows/5"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 待补来源",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/vendorRecordId"
+            },
+            "sku": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/5/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/5",
+          "payloadSha256": "ad0bacadd5815ef48d39dbf29189b36c8dc4945aa3df7198698f1747b6664dbe"
+        }
+      ],
+      "projectionSha256": "eb043d90ca72df4d1d129168b9daa140de017529d454c77797a6a958269cd1e9",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-attach-support",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-attach-support",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/6"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/6",
+          "position": {
+            "row": 7,
+            "jsonPointer": "/rows/6"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 待补来源",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-ATTACH-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-ATTACH-SKU",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/6/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/6",
+          "payloadSha256": "67dd6c180b1a7c52f9032a1ef617eead00d7f4e83008b18d5d7466b6d180c444"
+        }
+      ],
+      "projectionSha256": "ebb26fcae1306596edc142ea6e377f2df3c3b1d582bca462f2e67b83a6786ff4",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-states",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-states",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/7"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/7",
+          "position": {
+            "row": 8,
+            "jsonPointer": "/rows/7"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 状态样例",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/7/nameCn"
+            },
+            "englishName": {
+              "state": "no_text",
+              "raw": null,
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:no_text"
+            },
+            "specification": {
+              "state": "observed",
+              "meaning": "explicit_null",
+              "raw": null,
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/7/specification"
+            },
+            "barcode": {
+              "state": "observed",
+              "meaning": "explicit_empty",
+              "raw": "",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/7/barcode"
+            },
+            "factory": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "0",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/7/factory"
+            },
+            "packaging": {
+              "state": "parse_failed",
+              "raw": null,
+              "reason": "N1C_PRIVATE_PARSE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:failed"
+            },
+            "cartonQuantity": {
+              "state": "observed",
+              "meaning": "explicit_null",
+              "raw": null,
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/7/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/7/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/7/vendorRecordId"
+            },
+            "sku": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/7/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/7",
+          "payloadSha256": "21ca66c5495487eb5cb5a0e635368341714ee0dd44468b84d5933d443680ce48"
+        }
+      ],
+      "projectionSha256": "a9f661e74052f3e7f752b2b17ff80281365849c3f8cb4d712b53d549ee330b3d",
+      "associationProofs": [],
+      "sourceAvailability": "known",
+      "sourceEffectiveAt": "2026-10-20T13:59:59.000123Z",
+      "documentAvailability": "not_observed",
+      "documentModifiedAt": null,
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-bad-name",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-bad-name",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/8"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/8",
+          "position": {
+            "row": 9,
+            "jsonPointer": "/rows/8"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "   ",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/vendorRecordId"
+            },
+            "sku": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/8/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/8",
+          "payloadSha256": "65b23b8053cb80d5d47236f7f3c1c92ea4731e588c6a6d101685b5e4c4a4cc49"
+        }
+      ],
+      "projectionSha256": "66dfdfc1161b3ec20a0611d24aa24978dc2f0688dde48051e4f96c454f3721e5",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-version",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-version",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/9"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/9",
+          "position": {
+            "row": 10,
+            "jsonPointer": "/rows/9"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 可靠来源示例",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/factory"
+            },
+            "packaging": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "新版包装 待核",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-STABLE-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-SKU-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/9/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/9",
+          "payloadSha256": "84fe72a9b443d2bf6ff2ba5e787dcf72c44a6614531172b58aede6cad8b6cf43"
+        }
+      ],
+      "projectionSha256": "b26c14fba088591b74bbca6ea34b14025c13d9e4659d48821aec6d20cca9c0a4",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "b-main",
+      "scopeId": "cccccccc-bbbb-4ccc-8bbb-ccccccccccb2",
+      "captureKey": "b-main",
+      "rawFile": "new-item-scope-b.json",
+      "bytesSha256": "98760817ef167db1702dff0069572b6c818ff684869d2cbd51f171d783f03ab2",
+      "sizeBytes": 722,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/0"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/0",
+          "position": {
+            "row": 1,
+            "jsonPointer": "/rows/0"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 另一范围新品",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-STABLE-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-SKU-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/0",
+          "payloadSha256": "1faef0d51f9205911f430d1853019220980f13dbccbbd608ec771a0d4b277b80"
+        }
+      ],
+      "projectionSha256": "825f6541e710eebce13ab84189a4c2d919dfa49667528f26c95ae0a46d0430a7",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "b-same-sku",
+      "scopeId": "cccccccc-bbbb-4ccc-8bbb-ccccccccccb2",
+      "captureKey": "b-same-sku",
+      "rawFile": "new-item-scope-b.json",
+      "bytesSha256": "98760817ef167db1702dff0069572b6c818ff684869d2cbd51f171d783f03ab2",
+      "sizeBytes": 722,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/1"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/1",
+          "position": {
+            "row": 2,
+            "jsonPointer": "/rows/1"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 跨账号同SKU",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-SKU-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/1/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/1",
+          "payloadSha256": "8116932dd2536e136e6f6bb691f827527f77e880f177638c65ca41cd267ce756"
+        }
+      ],
+      "projectionSha256": "52bbcd4c792bb58abbb6b9273ce921cee2ca35f5dea6a8ce281da7007d26c6bc",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-attach-proof",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-attach-proof",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/5"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [],
+      "projectionSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "associationProofs": [
+        {
+          "proofKey": "attach-source",
+          "semantics": "same_source_record",
+          "from": {
+            "kind": "product_observation",
+            "captureKey": "a-attach-old",
+            "recordPointer": "/rows/5",
+            "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+            "payloadSha256": "ad0bacadd5815ef48d39dbf29189b36c8dc4945aa3df7198698f1747b6664dbe"
+          },
+          "to": {
+            "kind": "identity_observation",
+            "evidenceId": "eeeeeeee-cccc-4eee-8ccc-eeeeeeeeeea6",
+            "recordPointer": "/rows/6",
+            "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+            "payloadSha256": "c8d8f7716f8d4fb3547ba09c44a92ec868ec927890a8a0227ead03042639bb14"
+          }
+        }
+      ],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-race-first",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-race-first",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/10"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/10",
+          "position": {
+            "row": 11,
+            "jsonPointer": "/rows/10"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 并发来源",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-RACE-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-RACE-SKU",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/10/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/10",
+          "payloadSha256": "5ed447a4241d77bff096efd9cc4529cd70cc1dd297f7a4e79975c04de1427e13"
+        }
+      ],
+      "projectionSha256": "8acfad3f9777fabb5d622359ed4628d2ce4a8a8e9feb1c93c8b9ed5b1e240eda",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-race-repeat",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-race-repeat",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/11"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/11",
+          "position": {
+            "row": 12,
+            "jsonPointer": "/rows/11"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 并发来源",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-RACE-001",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-RACE-SKU",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/11/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/11",
+          "payloadSha256": "662b6cbbd2148e1889cf4ab7f6ff1bafe9ceda17fb6a6d4b2acedea0589e7d27"
+        }
+      ],
+      "projectionSha256": "ab3d5fb24b5280f04fd92adcc6a5a90dadf1a5e423ab76da6bb00ac90b6b3f81",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-bs-candidate",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-bs-candidate",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/12"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/12",
+          "position": {
+            "row": 13,
+            "jsonPointer": "/rows/12"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 虚构新品127150ml",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-BS-CANDIDATE",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/12/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/12",
+          "payloadSha256": "c68f8b3574c7e651973d643e3838143ba8199a3f6b06e056f12e4a8b9cfbbb57"
+        }
+      ],
+      "projectionSha256": "8d3b09f3bcd6be48e493b41c9641319e518d1920bf163c2f1f2d75850c1f0aca",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "b-jst-candidate",
+      "scopeId": "cccccccc-bbbb-4ccc-8bbb-ccccccccccb2",
+      "captureKey": "b-jst-candidate",
+      "rawFile": "new-item-scope-b.json",
+      "bytesSha256": "98760817ef167db1702dff0069572b6c818ff684869d2cbd51f171d783f03ab2",
+      "sizeBytes": 722,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/2"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/2",
+          "position": {
+            "row": 3,
+            "jsonPointer": "/rows/2"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 虚构新品127150ml",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-JST-CANDIDATE",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/2/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/2",
+          "payloadSha256": "c23b055b87a2ed51e25074285f2bd020eeaf24fbd170b1c49a146b09f991cefc"
+        }
+      ],
+      "projectionSha256": "2da08a17d9cab99945460517e14669912070d2e6858735463b47be72e0bcb840",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "u-main",
+      "scopeId": "cccccccc-cccc-4ccc-8ccc-ccccccccccc3",
+      "captureKey": "u-main",
+      "rawFile": "new-item-scope-unresolved.json",
+      "bytesSha256": "5e283e90bb4b6681d8a476b84658628e7bd9fea97c68b88f062cc556cff02ae9",
+      "sizeBytes": 197,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/0"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/0",
+          "position": {
+            "row": 1,
+            "jsonPointer": "/rows/0"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 虚构未核实范围资料",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/vendorRecordId"
+            },
+            "sku": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/0/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/0",
+          "payloadSha256": "43364de7ed8c40a2747b8e80fa5a04729233557127ff17cf06e0a5d19f554d76"
+        }
+      ],
+      "projectionSha256": "f75aae1621dc1d0d2573ec87ddeffc3e868eaf5df0f1e4b2d71a297b86a427be",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "a-bs-candidate-second",
+      "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+      "captureKey": "a-bs-candidate-second",
+      "rawFile": "new-item-scope-a.json",
+      "bytesSha256": "d68c9c629d24220ba6d4e81a3198b6f14dd0639ae4a5447fee4366dbc8f68782",
+      "sizeBytes": 2229,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/13"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/13",
+          "position": {
+            "row": 14,
+            "jsonPointer": "/rows/13"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 另一范围新品",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-BS-CANDIDATE-SECOND",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/13/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/13",
+          "payloadSha256": "2e7dd5cfe5dc5ab3369ec9fc50d5ef41ba89fd402cfb873f2a206288508547de"
+        }
+      ],
+      "projectionSha256": "3a8110b367034600b06040c55b7a2dbba19bc0487c00bb2b1c7e99a6227f59a0",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    },
+    {
+      "approvedFixtureId": "b-jst-candidate-second",
+      "scopeId": "cccccccc-bbbb-4ccc-8bbb-ccccccccccb2",
+      "captureKey": "b-jst-candidate-second",
+      "rawFile": "new-item-scope-b.json",
+      "bytesSha256": "98760817ef167db1702dff0069572b6c818ff684869d2cbd51f171d783f03ab2",
+      "sizeBytes": 722,
+      "format": "json",
+      "parserId": "iceos-product-fixture",
+      "parserVersion": "v1",
+      "schemaVersion": "product-observation-v1",
+      "coverage": {
+        "complete": false,
+        "singleScope": true,
+        "rowPointers": [
+          "/rows/3"
+        ],
+        "hidden": "not_observed",
+        "filters": "not_observed",
+        "images": "references_only"
+      },
+      "observations": [
+        {
+          "recordPointer": "/rows/3",
+          "position": {
+            "row": 4,
+            "jsonPointer": "/rows/3"
+          },
+          "fields": {
+            "nameCn": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "ICEOS N1C 另一范围新品",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/nameCn"
+            },
+            "englishName": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/englishName"
+            },
+            "specification": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/specification"
+            },
+            "barcode": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/barcode"
+            },
+            "factory": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/factory"
+            },
+            "packaging": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/packaging"
+            },
+            "cartonQuantity": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/cartonQuantity"
+            },
+            "imageRef": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/imageRef"
+            },
+            "vendorRecordId": {
+              "state": "not_read",
+              "raw": null,
+              "reason": "N1C_PRIVATE_SOURCE_REASON",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/vendorRecordId"
+            },
+            "sku": {
+              "state": "observed",
+              "meaning": "value",
+              "raw": "N1C-JST-CANDIDATE-SECOND",
+              "evidenceRef": "N1C_PRIVATE_EVIDENCE:/rows/3/sku"
+            }
+          },
+          "marketContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "warehouseContext": {
+            "state": "unknown",
+            "raw": null,
+            "reason": "fixture context not observed"
+          },
+          "rawRef": "/rows/3",
+          "payloadSha256": "03058e2d792c7f3d45961f07b745c5dd26847bc2f100bd8b904429401db81ece"
+        }
+      ],
+      "projectionSha256": "25abfc7d419d36d027656a13fe66c3bc29bef90d09c2b6b559ab22753286377b",
+      "associationProofs": [],
+      "sourceAvailability": "not_observed",
+      "sourceEffectiveAt": null,
+      "documentAvailability": "known",
+      "documentModifiedAt": "2026-10-20T14:00:00.123456Z",
+      "collectedAt": "2026-10-20T14:00:01.654321Z"
+    }
+  ]
+}

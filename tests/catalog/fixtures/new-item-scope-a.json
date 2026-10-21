@@ -1,0 +1,88 @@
+{
+  "fictional": true,
+  "scopeId": "cccccccc-aaaa-4ccc-8aaa-cccccccccca1",
+  "privateAccount": "N1C_PRIVATE_ACCOUNT_A",
+  "privateResource": "N1C_PRIVATE_RESOURCE_A",
+  "costPriceRaw": "N1C_PRIVATE_AMOUNT_17.231",
+  "imageSecret": "https://fixture.invalid/private-image?token=N1C_PRIVATE_IMAGE",
+  "rows": [
+    {
+      "rowKey": "main",
+      "nameCn": "ICEOS N1C 虚构新品127150ml"
+    },
+    {
+      "rowKey": "r1-first",
+      "nameCn": "ICEOS N1C 可靠来源示例",
+      "vendorRecordId": "N1C-STABLE-001",
+      "sku": "N1C-SKU-001"
+    },
+    {
+      "rowKey": "r1-repeat",
+      "nameCn": "ICEOS N1C 可靠来源示例",
+      "vendorRecordId": "N1C-STABLE-001",
+      "sku": "N1C-SKU-001"
+    },
+    {
+      "rowKey": "proof-old",
+      "nameCn": "ICEOS N1C 无ID资料"
+    },
+    {
+      "rowKey": "proof-new",
+      "nameCn": "ICEOS N1C 无ID资料新观测"
+    },
+    {
+      "rowKey": "attach-old",
+      "nameCn": "ICEOS N1C 待补来源"
+    },
+    {
+      "rowKey": "attach-support",
+      "nameCn": "ICEOS N1C 待补来源",
+      "vendorRecordId": "N1C-ATTACH-001",
+      "sku": "N1C-ATTACH-SKU"
+    },
+    {
+      "rowKey": "states",
+      "nameCn": "ICEOS N1C 状态样例",
+      "factory": "0",
+      "barcode": "",
+      "specification": null,
+      "cartonQuantity": null
+    },
+    {
+      "rowKey": "bad-name",
+      "nameCn": "   "
+    },
+    {
+      "rowKey": "version",
+      "nameCn": "ICEOS N1C 可靠来源示例",
+      "vendorRecordId": "N1C-STABLE-001",
+      "sku": "N1C-SKU-001",
+      "packaging": "新版包装 待核"
+    },
+    {
+      "rowKey": "race-first",
+      "nameCn": "ICEOS N1C 并发来源",
+      "vendorRecordId": "N1C-RACE-001",
+      "sku": "N1C-RACE-SKU"
+    },
+    {
+      "rowKey": "race-repeat",
+      "nameCn": "ICEOS N1C 并发来源",
+      "vendorRecordId": "N1C-RACE-001",
+      "sku": "N1C-RACE-SKU"
+    },
+    {
+      "rowKey": "bs-candidate",
+      "nameCn": "ICEOS N1C 虚构新品127150ml",
+      "sku": "N1C-BS-CANDIDATE"
+    },
+    {
+      "rowKey": "bs-candidate-second",
+      "nameCn": "ICEOS N1C 另一范围新品",
+      "sku": "N1C-BS-CANDIDATE-SECOND"
+    }
+  ],
+  "fixtureSourceTimes": {
+    "a-states": "2026-10-20T13:59:59.000123Z"
+  }
+}
