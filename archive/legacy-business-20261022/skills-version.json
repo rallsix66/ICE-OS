@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/emilkowalski/skills",
+  "localClonePath": ".local/skills-emilkowalski/",
+  "gitignore": ".local/skills-emilkowalski/",
+  "commit": "2d228630ba1446365f614a108cb8252f1feda202",
+  "commitDate": "2026-10-11T15:58:32+02:00",
+  "skillsUsed": ["emil-design-eng", "neat-freak"],
+  "note": "Clone kept local-only; not committed to ICEOS repo."
+}

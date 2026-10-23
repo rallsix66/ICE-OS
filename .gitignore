@@ -66,6 +66,9 @@ tools/bigseller-scraper/runtime/
 # Catalog isolated runs, local preview pgdata, secrets, and evidence
 .local/catalog/
 
+# Local clone of emilkowalski/skills (nested git); register version in archive manifest only
+.local/skills-emilkowalski/
+
 # Local discovery, desktop cleanup, and ad-hoc preview logs (keep on disk only)
 .local/product-library-discovery/
 .local/desktop-cleanup/

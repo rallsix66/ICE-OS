@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run --exclude='**/concurrency.test.ts' --exclude='**/*.postgres.test.ts' --exclude='**/*.live.test.ts' --exclude='tests/p0-02/**'",
-    "test:concurrency": "vitest run src/features/sync/concurrency.test.ts",
+    "test:concurrency": "echo \"concurrency tests archived under archive/legacy-business-20261022; use RESTORE.md to run in isolation\" && exit 1",
     "test:database-contract": "vitest run --no-file-parallelism src/features/database/migrations-00001-00050-replay.postgres.test.ts src/features/database/migrations-00041-00047.postgres.test.ts src/features/database/opt5-least-privilege.postgres.test.ts src/features/database/opt6-auth-rls-initplan.postgres.test.ts src/features/database/opt6-role-policy-overlap.postgres.test.ts src/features/database/opt6-product-policy-overlap.postgres.test.ts src/features/database/opt6-00052-production-apply.postgres.test.ts",
     "test:best-live": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run src/lib/providers/best/__tests__/dry-run.live.test.ts",
     "p0-01:prepare": "node scripts/p0-01/prepare.mjs",

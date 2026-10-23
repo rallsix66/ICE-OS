@@ -10,15 +10,16 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    exclude: ['tests/p0-02/**'],
     include: [
       'src/**/*.test.ts',
+      'tests/catalog/**/*.postgres.test.ts',
       'tests/p0-01/**/*.test.ts',
       'supabase/migrations/00013_extend_user_variant_preference_favorited.test.ts',
       'supabase/migrations/00014_dynamic_alert_fields.test.ts',
     ],
+    exclude: ['tests/p0-02/**', 'archive/**'],
     alias: {
-      'server-only': path.join(__dirname, 'src', 'features', 'sync', '__mocks__', 'server-only.ts'),
+      'server-only': path.join(__dirname, 'src', 'test-utils', 'server-only-mock.ts'),
     },
   },
 })

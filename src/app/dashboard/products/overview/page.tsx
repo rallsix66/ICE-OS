@@ -1,44 +1,12 @@
 import type { Metadata } from 'next';
-import { requireActiveAuth } from '@/lib/auth';
-import { productOverviewRepository } from '@/features/product-overview/repository';
-import { productOverviewParamsSchema } from '@/features/product-overview/schema';
-import { ProductOverviewPageContent } from './_components/product-overview-page-content';
+import { SealedLegacyRoute } from '@/ui/ice-v4/sealed-route';
 
-export const metadata: Metadata = { title: '全球库存作战室' };
+export const metadata: Metadata = { title: '全球库存作战室 · 已封存' };
 
-export default async function ProductOverviewPage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    search?: string;
-    country?: string;
-    stockoutUrgency?: string;
-    page?: string;
-  }>;
-}) {
-  const [user, params] = await Promise.all([requireActiveAuth(), searchParams]);
-  const parsed = productOverviewParamsSchema.safeParse({
-    search: params.search || undefined,
-    country: params.country || undefined,
-    stockoutUrgency: params.stockoutUrgency || undefined,
-    page: params.page ?? 1,
-    pageSize: 20,
-  });
-  const filters = parsed.success ? parsed.data : productOverviewParamsSchema.parse({});
-  const result = await productOverviewRepository.getProductOverview(user.id, filters);
-
+export default function ProductOverviewSealedPage() {
   return (
-    <ProductOverviewPageContent
-      rows={result.items}
-      totalCount={result.totalCount}
-      queueCounts={result.queueCounts}
-      page={result.page}
-      pageSize={result.pageSize}
-      filters={{
-        search: filters.search ?? '',
-        country: filters.country ?? '',
-        stockoutUrgency: filters.stockoutUrgency ?? '',
-      }}
-    />
+    <SealedLegacyRoute title="全球库存作战室已封存">
+      <p>旧 public 库存 RPC 作战室与决策队列已封存，不在现役导航中开放。</p>
+    </SealedLegacyRoute>
   );
 }

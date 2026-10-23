@@ -1,12 +1,3 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/dry-run",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/golucky",
-      "schedule": "0 2 * * *"
-    }
-  ]
+  "crons": []
 }

@@ -1,7 +1,13 @@
-// P3-S2E: 在途入口收口 — /dashboard/shipments 是唯一在途维护入口
-// /dashboard/inventory/in-transit 不再做重复页面，重定向到 /dashboard/shipments
-import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+import { SealedLegacyRoute } from '@/ui/ice-v4/sealed-route';
 
-export default function InTransitInventoryPage() {
-  redirect('/dashboard/shipments');
+export const metadata: Metadata = { title: '在途库存 · 已封存' };
+
+export default function InTransitInventorySealedPage() {
+  return (
+    <SealedLegacyRoute title="在途库存视图已封存">
+      <p>旧在途库存汇总与货票关联界面已退出现役构建。</p>
+      <p>后续物流/在途能力将按新方案分包验收后再开放。</p>
+    </SealedLegacyRoute>
+  );
 }

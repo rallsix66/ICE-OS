@@ -1,39 +1,17 @@
-// 产品列表页 — Phase 1 Task 1.3
-// Server Component：读取 URL searchParams、校验权限、获取数据
-// 客户端交互（Sheet/表单/Dialog）委托给 ProductsPageContent
-import { getCurrentUser } from '@/lib/auth';
-import { productRepository } from '@/features/products/repository';
-import { ProductsPageContent } from './_components/products-page-content';
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: '产品列表',
-};
+export const metadata: Metadata = { title: '产品列表' };
 
+/** Legacy public.product 列表 — 重定向至商品库（search → q）。 */
 export default async function ProductsPage({
   searchParams,
 }: {
   searchParams: Promise<{ search?: string; page?: string }>;
 }) {
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page) || 1);
-
-  // PERF-C2B: getCurrentUser() 与 productRepository.list() 互不依赖，并行执行
-  const [user, result] = await Promise.all([
-    getCurrentUser(),
-    productRepository.list({ search: sp.search, page }),
-  ]);
-
-  const isAdmin = user?.roleName === 'admin';
-
-  return (
-    <ProductsPageContent
-      data={result.data}
-      total={result.total}
-      page={result.page}
-      pageSize={result.pageSize}
-      search={sp.search ?? ''}
-      isAdmin={isAdmin}
-    />
-  );
+  const params = new URLSearchParams();
+  if (sp.search?.trim()) params.set('q', sp.search.trim());
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  redirect(`/dashboard/catalog${suffix}`);
 }

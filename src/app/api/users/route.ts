@@ -1,4 +1,9 @@
-// API Route — Phase 4 实现
+import { sealedLegacyApiResponse } from '@/lib/sealed-legacy-api';
+
 export async function GET() {
-  return Response.json({ message: '待实现' });
+  return sealedLegacyApiResponse('legacy-users-api');
+}
+
+export async function POST() {
+  return sealedLegacyApiResponse('legacy-users-api');
 }

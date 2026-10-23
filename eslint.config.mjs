@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     ".local/**",
     // P0-02 acceptance tests run via vitest.config.p0-02.mts + scripts/p0-02/*
     "tests/p0-02/**",
+    "archive/**",
+    ".local/skills-emilkowalski/**",
   ]),
 ]);
 

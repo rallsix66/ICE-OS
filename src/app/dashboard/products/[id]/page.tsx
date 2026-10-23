@@ -1,46 +1,29 @@
-// 产品详情页 — Phase 1 Task 1.4
-// Server Component：读取 params、获取详情数据、处理 404
-// 客户端交互（编辑 Sheet）委托给 ProductDetailClient
-import { notFound } from 'next/navigation';
-import { requireActiveAuth } from '@/lib/auth';
-import { productRepository } from '@/features/products/repository';
-import { replenishmentRepository } from '@/features/replenishment/repository';
-import { ProductDetailClient } from '../_components/product-detail-client';
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { SealedLegacyRoute } from '@/ui/ice-v4/sealed-route';
 
-export const metadata: Metadata = {
-  title: '产品详情',
-};
+export const metadata: Metadata = { title: '产品详情 · 已封存' };
 
-export default async function ProductDetailPage({
+/** 旧 public.product UUID 详情 — 不按 UUID 形态猜测商品库映射。 */
+export default async function LegacyProductDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
-  // PERF-C2B: getCurrentUser() 与 productRepository.getById(id) 互不依赖，并行执行
-  const [user, product] = await Promise.all([
-    requireActiveAuth(),
-    productRepository.getById(id),
-  ]);
-
-  const isAdmin = user.roleName === 'admin';
-
-  if (!product) {
-    notFound();
-  }
-
-  const replenishmentSuggestions = await replenishmentRepository.getSuggestionsForVariants(
-    user.id,
-    product.variants.map((variant) => variant.id),
-  );
-
   return (
-    <ProductDetailClient
-      product={product}
-      isAdmin={isAdmin}
-      replenishmentSuggestions={replenishmentSuggestions}
-    />
+    <SealedLegacyRoute title="旧产品详情地址已封存">
+      <p>
+        本地 ICE 主资料在
+        {' '}
+        <Link className="underline" href="/dashboard/catalog">ICE 商品库</Link>
+        。旧路径
+        {' '}
+        <code>/dashboard/products/{id}</code>
+        {' '}
+        使用 legacy public.product 变体身份，系统不会自动映射为商品库条目 UUID。
+      </p>
+      <p>请从商品库列表按 ICE 货号或已知的商品库条目 UUID 打开详情。</p>
+    </SealedLegacyRoute>
   );
 }
