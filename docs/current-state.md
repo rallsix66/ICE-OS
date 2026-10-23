@@ -1,14 +1,22 @@
 # Current Project State
 
-更新：2026-10-21（**LOCAL_PREVIEW_PASS** 文档登记）。仓库 ICEOS。
+更新：2026-10-23（**商品库 U3 独立复审通过 `U3_LOCAL_UX_PERF_PASS`**；文档登记与分批提交完成；**LOCAL_PREVIEW_PASS** 保留）。仓库 ICEOS。
 
-## 本地真实商品预览（当前）
+## 商品库 Demo 界面与访问性能（当前包）
+
+**商品库 U3 — `U3_LOCAL_UX_PERF_PASS`（独立复审通过 2026-10-23）** — 独立报告 [independent-review.md](../.local/catalog/independent-ux-perf-u3-final-20261023/independent-review.md)；执行摘要 [progress9-delivery-summary.md](../.local/catalog/ux-perf-u3-20261022/progress9-delivery-summary.md)；证据 [evidence-index.md](../.local/catalog/ux-perf-u3-20261022/evidence-index.md)。**通过范围**仅限本地样表商品库的交互、缓存恢复、性能测量与验收门禁；**不代表**新 UI 打磨完成、真实来源接入、生产发布或全 ICEOS 验收，既有 **`LOCAL_PREVIEW_PASS`** 原范围不变。独立审查关闭三项：**R1** 冷门禁改以 `listSample/detailSample.contentReadyMs` 为唯一输入（摘要须等于 `Math.round(原始值)`，缺失/NaN/Infinity/矛盾即拒绝；执行方合并负向 51/51，独立另跑 26 项边界），用新验证器（`f8dcd797…`）复算 `runs/progress8-final5` 原始证据 → **`allRequired=true`**（原始暖 `cab3706e…`、冷 `d8cd3cfc…`、fixture `2ae987d1…` 未改写；旧验证器 `ed717297…` 单独留存）；**R2** runner 校验 `completed===126`、`completed↔itemCount`、`readOnlyEvidence.transactionReadOnly==='on'`，真实 spawn **11/11**（独立另跑 6 项边界，生产 attempts/latest 前后不变）；**R3** 全仓 tsc 总诊断 **21→5**，当前商品库 **16→0**，历史 BEST 测试 **5 条**按范围保留（不声称全仓 tsc 通过；`next build` 过滤 `*.test.*`，不能替代）。执行自验 `runs/progress9-verify-20261023-final/selfverify-steps.json` 8/8 exit 0；BUILD 未变（**`Jq2Y6jz_l7sFTKfSUPYkF`** @ 3011 pid 42900，未重建/未启停）；继承 **126×252 / 0 差异**（progress5 attempt，未重跑）与 **`LOCAL_PREVIEW_PASS`**。
+
+证据分层（勿混记）：**本次独立重跑**＝合并器 51 项正负向、26 项冷门禁边界、runner 11 项测试与 6 项边界、实际 tsc、19 项单测、eslint、diff-check、冻结原始数据复算、编译凭据/文件漂移、只读进程归属；**沿用上一轮同审查方独立结果**＝loader cache 7 + recovery 5、oracle 校准 3/3 与内容判定 25/25（应用未改）；**执行日志核验/继承**＝完整 Playwright 17/17、暖 15×20 矩阵、3 次冷进程、staging build/promote、126×252 只读候选等价，本轮只复算原始数据，未重新采样或重启。progress8 的 `allRequired=true` 在其原计时门禁下保留为历史结论，progress9 起以原始计时重算复核；progress7 的 `allRequired=true` **不能作为通过依据**（计时在 DOMContentLoaded 重开、首开前等 audit-ready、负向捕获初始化异常、`sourceHashes` 回填、详情预取失败自循环）；progress6 `allRequired=false` 为旧串行断言计时；progress5 `allRequired=true` 为**旧不完整断言口径**。
+
+**既有失败与遗留（不影响本期范围）**：全仓 tsc 仍有历史 BEST 测试 5 条诊断（`src/lib/providers/best/__tests__/client.test.ts` 3 条、`dry-run.test.ts` 2 条，均 TS2352），按用户范围不修；p95 通过伴随 WM0005 单次 **4377ms** 尾延迟，保留事实，不宣传每次即时展示；根目录历史 build 与全量旧回归不因本报告变成全绿。**下一会话**：新版 UI 打磨、新品/来源核实问题触发式入口与进一步清理，本轮不扩开发。
+
+## 本地真实商品预览（历史 PASS）
 
 **`LOCAL_PREVIEW_PASS`** — 本包独立验收完成（[最终独审](../.local/catalog/independent-local-preview-final-20261021T084549Z/independent-review.md)）。通过范围：本地真实商品及本批样表库存预览（126 资料、BS 530 展示、六仓、已确认口径货值、启停与测试证据）；**不代表**实时同步、生产启用或全库 ICEOS 已交付。索引：[local-preview-delivery-index.md](./catalog/local-preview-delivery-index.md)。
 
 **最终独审核验（2026-10-21）**：独立重跑 VM 控制流探针 9 场景 exit 0；独立重算短程 before/after 各 126 行投影 SHA 均为 `330125d4fdf1cddb00b2630822edfdcc87b6ac6cd3f21d9519e1abe2048de0fe`，时间顺序有效；只读 status/登录与进程归属通过（审查时点 PID 与短程记录可不同，见 delivery-index）。短程原始 JSON、历史全链自验与商品/估值/RLS 门禁结论为**原始日志核查或继承**，本轮未重跑 prepare、完整自验或业务回归。
 
-**Git**：catalog 积压与 closeout 测试已推送 `codex/ice-v4-planning`（manifest §4；`package.json` 在 **acb4865**）。`.local` 证据与凭据不入库；Git 无待提交变更不等于本地实例/缓存已清理（见 [工作区盘点](../.local/catalog/workspace-git-audit-20261021/workspace-git-audit.md)）。
+**Git**：catalog 积压与 closeout 测试已推送 `codex/ice-v4-planning`（manifest §4；`package.json` 在 **acb4865**）。本包累积成果（Legacy 封存与删除、ICE v4 外壳、商品库 UI/缓存/性能、013–014 增量、预览工具链、测试与文档）已在独审通过后按依赖分批提交并 push `codex/ice-v4-planning`，未 merge/deploy；提交清单与远端 SHA 见 `.local/catalog/ux-perf-u3-20261022/final-closeout/closeout-record.md`（证据目录不入库）。`.local` 证据与凭据不入库；Git 无待提交变更不等于本地实例/缓存已清理（见 [工作区盘点](../.local/catalog/workspace-git-audit-20261021/workspace-git-audit.md)）。
 
 ## 来源身份N1A与持续新品N1C（保留）
 

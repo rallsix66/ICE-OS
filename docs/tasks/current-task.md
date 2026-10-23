@@ -1,10 +1,16 @@
 # Current Task Packet
 
-## 本地真实商品预览包（当前）
+## 商品库 Demo 界面复用与访问性能（当前）
+
+状态：**`U3_LOCAL_UX_PERF_PASS`（独立复审通过 2026-10-23；文档登记与分批提交完成）**。独立报告 [independent-review.md](../../.local/catalog/independent-ux-perf-u3-final-20261023/independent-review.md)；摘要 [progress9-delivery-summary.md](../../.local/catalog/ux-perf-u3-20261022/progress9-delivery-summary.md)；证据 [evidence-index.md](../../.local/catalog/ux-perf-u3-20261022/evidence-index.md)；执行自验 `runs/progress9-verify-20261023-final/selfverify-steps.json`（8/8 exit 0）。3011 BUILD **`Jq2Y6jz_l7sFTKfSUPYkF`** @ `run-20261021T100700Z-b3c4d5e6`（pid 42900，未重启）。通过范围仅限本地样表商品库交互、缓存恢复、性能测量与验收门禁；**不代表**新 UI 完成、真实来源接入、生产发布或全 ICEOS 验收，**`LOCAL_PREVIEW_PASS`** 原范围不变。已关闭：R1 冷启动门禁以 `listSample/detailSample.contentReadyMs` 重算（摘要须等于取整规则，缺失/NaN/Infinity/矛盾即拒绝；合并负向 51/51 + 独立 26 项边界）+ 新验证器复算 `runs/progress8-final5` 原始证据 → `allRequired=true`（原始暖/冷/fixture SHA 未改写，旧验证器单独留存）；R2 runner 校验 `completed=126`/`completed↔itemCount`/`readOnlyEvidence.transactionReadOnly==='on'`（真实 spawn 11/11 + 独立 6 项边界）；R3 全仓 tsc 总诊断 **21→5**、当前商品库 **16→0**，历史 BEST 5 条按范围保留（不声称全仓 tsc 通过）。继承 126×252 / 0 差异（`progress5-20261022-180727`，未重跑）；暖 15×20 / 冷 3 轮沿用 progress8-final5 原始结果只复算不重采样。progress8 的 `allRequired=true` 在其原门禁下保留为历史；progress7 的 `allRequired=true` 为旧计时口径，**不能**作为通过依据。**无**执行方自注册 PASS，本状态依据独立报告登记。
+
+范围：旧经营模块完整源码外置 `D:/try one/ICEOS-legacy-archive/20261022/`（仓库 `archive/legacy-business-20261022/` 仅 `manifest.json`/`EXTERNAL-POINTER.json`/白名单/处置表/`RESTORE.md`/skills 版本清单）；现役仅商品库/新品/来源核实/管理审计；导航与测试对齐白名单；旧 URL/API 封存或重定向；共享 UI `src/ui/ice-v4`；继承 **`LOCAL_PREVIEW_PASS`** 与预览 run `run-20261021T100700Z-b3c4d5e6`。**下一会话**：新版 UI 打磨与新品/来源核实问题触发式入口，本轮不扩开发。
+
+## 本地真实商品预览包（历史 PASS）
 
 状态：**`LOCAL_PREVIEW_PASS`** — 独立验收完成（2026-10-21）。最终报告：[independent-local-preview-final-20261021T084549Z](../../.local/catalog/independent-local-preview-final-20261021T084549Z/independent-review.md)。交付索引：[local-preview-delivery-index.md](../catalog/local-preview-delivery-index.md)；Git 清单：[local-preview-git-manifest.md](../catalog/local-preview-git-manifest.md)。
 
-范围：126 主资料、BS 530（430/100）、六仓、进货价货值；本地样表预览与启停/测试证据；继承 P0/N1A/N1C 与 R3–R5 已关闭项。**预览 run** `run-20261021T075139Z-821214d2`；短程证据 `evidence/r5-short-verify-2026-10-21T08-24-27-634Z-4ec9e4/`（原始 JSON 仅本地）。本轮仅文档登记 PASS；不重跑 prepare/业务全套；不 merge/deploy/清场；不启动下一业务包。
+范围：126 主资料、BS 530（430/100）、六仓、进货价货值；本地样表预览与启停/测试证据；继承 P0/N1A/N1C 与 R3–R5 已关闭项。**预览 run** `run-20261021T075139Z-821214d2`（历史；R2 自验后已受控停止）。本轮 UI 包现役 run 见交付索引 **`run-20261021T100700Z-b3c4d5e6` @ 3011**。LOCAL_PREVIEW 包不重跑 prepare；不 merge/deploy/清场。
 
 ## N1C — 本地隔离独立通过与文档登记（历史）
 
