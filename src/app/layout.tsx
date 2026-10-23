@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
-  title: '库存看板系统',
-  description: '国内外库存看板 — 多人协作的库存管理工具',
+  title: 'ICE 经营工作台',
+  description: 'ICE v4 本地独立平台 — 商品资料、样表库存与来源核实',
 };
 
 export default function RootLayout({

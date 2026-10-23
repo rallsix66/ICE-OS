@@ -5,7 +5,7 @@ import { MARKETS, MAPPING_LABELS } from './fixtures';
 import { calculateValuation, canManageMappings, confirmedSnapshots, filterProducts, getProductMetrics, isSnapshotAttributable, latestSnapshots } from './model';
 import type { DemoData, DemoFilters, DemoProduct, DemoRole, MappingStatus } from './types';
 import { EmptyState, MappingPill, money, number, Pill, ProductFilters, ProductName, SectionHeading, marketName } from './widgets';
-import styles from './demo.module.css';
+import styles from '@/ui/shared/workspace-visual.module.css';
 
 function ProductSignals({ data, product }: { data: DemoData; product: DemoProduct }) {
   const rows = confirmedSnapshots(data, product.id);

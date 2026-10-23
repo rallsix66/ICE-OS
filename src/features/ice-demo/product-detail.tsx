@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { canManageMappings, canViewAmounts, getProductMetrics, isSnapshotAttributable, remainingInTransit } from './model';
 import type { DemoData, DemoRole } from './types';
 import { dateTime, EmptyState, MappingPill, marketName, money, number, Pill, ProductArt } from './widgets';
-import styles from './demo.module.css';
+import styles from '@/ui/shared/workspace-visual.module.css';
 
 const DETAIL_VIEWS = [
   { id: 'identity', label: '商品身份' },

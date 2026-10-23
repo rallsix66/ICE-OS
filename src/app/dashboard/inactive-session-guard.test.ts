@@ -14,7 +14,7 @@ import path from 'node:path';
 const ROOT = path.resolve(__dirname, '../../..');
 const LAYOUT_PATH = path.resolve(__dirname, 'layout.tsx');
 const INACTIVE_PAGE_PATH = path.resolve(__dirname, '_components/inactive-account-page.tsx');
-const SYNC_ACTIONS_PATH = path.resolve(ROOT, 'src/features/sync/server-actions.ts');
+const NAV_CONFIG_PATH = path.resolve(ROOT, 'src/ui/ice-v4/navigation-config.ts');
 const AUTH_PATH = path.resolve(ROOT, 'src/lib/auth.ts');
 
 function readFile(relativeOrAbsolute: string): string {
@@ -63,6 +63,15 @@ describe('Dashboard layout — inactive session guard', () => {
   describe('未登录状态处理', () => {
     it('getCurrentUser 返回 null 时 redirect 到 /auth/login', () => {
       expect(layoutSrc).toMatch(/redirect\s*\(\s*['"]\/auth\/login['"]\s*\)/);
+    });
+  });
+
+  describe('ICE v4 外壳', () => {
+    it('活跃分支使用 IceV4WorkspaceShell，不引用旧侧栏或 HideDashboardChrome', () => {
+      expect(layoutSrc).toContain('IceV4WorkspaceShell');
+      expect(layoutSrc).not.toContain('SidebarNav');
+      expect(layoutSrc).not.toContain('DashboardHeader');
+      expect(layoutSrc).not.toContain('HideDashboardChrome');
     });
   });
 
@@ -133,25 +142,21 @@ describe('InactiveAccountPage 组件', () => {
   });
 });
 
-// ─── Sync server-actions — requireActiveAuth 保护未被绕过 ──────────
+// ─── 现役导航 — 旧 sync 写入口已随 legacy 封存 ─────────────────────
 
-describe('Sync server-actions — requireActiveAuth 保护不变', () => {
-  const syncSrc = readFile(SYNC_ACTIONS_PATH);
+describe('现役导航配置 — 不含封存经营模块', () => {
+  const navSrc = readFile(NAV_CONFIG_PATH);
+  const shellSrc = readFile(path.resolve(ROOT, 'src/ui/ice-v4/workspace-shell.tsx'));
 
-  it('导入 requireActiveAuth', () => {
-    expect(syncSrc).toMatch(/import\s*\{[^}]*\brequireActiveAuth\b[^}]*\}\s*from/);
+  it('ICE_V4_ACTIVE_NAV_HREFS 仅登记商品库模块', () => {
+    const activeBlock = navSrc.match(/ICE_V4_ACTIVE_NAV_HREFS\s*=\s*\[([\s\S]*?)\]\s*as const/)?.[1] ?? '';
+    expect(activeBlock).toContain('/dashboard/catalog');
+    expect(activeBlock).not.toContain('/dashboard/sync');
   });
 
-  it('多个导出函数内部调用了 requireActiveAuth()', () => {
-    const matches = syncSrc.match(/await\s+requireActiveAuth\s*\(\)/g);
-    expect(matches).not.toBeNull();
-    expect(matches!.length).toBeGreaterThanOrEqual(5);
-  });
-
-  it('getSyncRunsPaginated 内部调用 requireActiveAuth()', () => {
-    // 这是堆栈中出现的函数，必须确认未被修改
-    const fnBody = extractFunctionBody(syncSrc, 'getSyncRunsPaginated');
-    expect(fnBody).toContain('requireActiveAuth');
+  it('workspace-shell 侧栏不含封存 href', () => {
+    expect(shellSrc).not.toContain("href: '/dashboard/sync'");
+    expect(shellSrc).not.toContain("href: '/dashboard/shipments'");
   });
 });
 
@@ -177,13 +182,3 @@ describe('auth.ts — requireActiveAuth 保持现有行为', () => {
 });
 
 // ─── Helpers ────────────────────────────────────────────────────────
-
-/** 从源文件中提取具名导出函数的函数体（简化匹配） */
-function extractFunctionBody(src: string, fnName: string): string {
-  const regex = new RegExp(
-    `export\\s+async\\s+function\\s+${fnName}\\s*\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`,
-    'm'
-  );
-  const match = src.match(regex);
-  return match?.[1] ?? '';
-}

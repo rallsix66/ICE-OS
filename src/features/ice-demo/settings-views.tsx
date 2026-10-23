@@ -6,7 +6,7 @@ import { latestSnapshots } from './model';
 import { ROLE_LABELS } from './settings-model';
 import type { DemoAccess, DemoData, DemoPermissions, DemoRole, DemoSourceConfig, DemoSourceId, DemoView } from './types';
 import { dateTime, marketName, Pill, SectionHeading, TextLink } from './widgets';
-import styles from './demo.module.css';
+import styles from '@/ui/shared/workspace-visual.module.css';
 
 const SOURCES: { id: DemoSourceId; name: string; purpose: string; description: string }[] = [
   { id: 'bigseller', name: 'BigSeller', purpose: '海外库存', description: '按仓采集完整快照，实物、可售与来源在途分开保存。' },

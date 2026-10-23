@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { clearDetailCache } from '@/features/catalog/shell/catalog-detail-cache';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 
@@ -14,6 +15,7 @@ export function LogoutButton() {
   async function handleLogout() {
     setLoading(true);
     const supabase = createClient();
+    clearDetailCache();
     await supabase.auth.signOut();
     router.push('/auth/login');
     router.refresh();

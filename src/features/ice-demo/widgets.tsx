@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Package, Search, ArrowUpRight } from 'lucide-react';
 import { MARKETS, MAPPING_LABELS } from './fixtures';
 import type { DemoFilters, DemoProduct, MappingStatus, Market, Valuation } from './types';
-import styles from './demo.module.css';
+import styles from '@/ui/shared/workspace-visual.module.css';
 
 export function number(value: number | null): string {
   return value === null ? '—' : new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 }).format(value);

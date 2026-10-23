@@ -12,7 +12,7 @@ import { MarketLogisticsView } from './logistics-view';
 import { DataSyncView, PermissionSettingsView } from './settings-views';
 import { EmptyState } from './widgets';
 import { ProductDetail } from './product-detail';
-import styles from './demo.module.css';
+import styles from '@/ui/shared/workspace-visual.module.css';
 
 const NAV = [
   { id: 'overview', label: '经营总览', icon: LayoutDashboard, caption: '资源与经营信号' },

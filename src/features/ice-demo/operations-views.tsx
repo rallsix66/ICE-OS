@@ -5,7 +5,7 @@ import { MARKETS } from './fixtures';
 import { confirmedSnapshots, filterLogs, getScenarioFacts, isSnapshotAttributable, remainingInTransit } from './model';
 import type { DemoData, DemoSnapshot, LogFilters, Market, ScenarioId } from './types';
 import { dateTime, EmptyState, MappingPill, marketName, money, number, Pill, ProductName, SectionHeading } from './widgets';
-import styles from './demo.module.css';
+import styles from '@/ui/shared/workspace-visual.module.css';
 
 const SCENARIOS: ScenarioId[] = ['shipping', 'arrived', 'snapshot', 'reverse'];
 

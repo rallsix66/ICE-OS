@@ -7,7 +7,7 @@ import { filterShipments, latestTrackingEvent } from './settings-model';
 import { LogisticsView } from './operations-views';
 import type { DemoData, Market, ScenarioId, ShipmentFilters, ShipmentStatusFilter } from './types';
 import { EmptyState, marketName, money, number, Pill, SectionHeading } from './widgets';
-import styles from './demo.module.css';
+import styles from '@/ui/shared/workspace-visual.module.css';
 
 const STATUS_TABS: { id: ShipmentStatusFilter; label: string }[] = [
   { id: 'all', label: '全部货票' }, { id: 'active', label: '运输在途' },
