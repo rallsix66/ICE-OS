@@ -46,6 +46,58 @@ export async function withAppDb<T>(
   return withTransactionOnPool(getP002AppPool(), identity, fn);
 }
 
+export type ReadOnlyDbSessionEvidence = {
+  backendPid: number;
+  currentUser: string;
+  transactionReadOnly: string;
+};
+
+export async function withReadOnlyAppDb<T>(
+  identity: DbIdentity | null,
+  fn: (client: PoolClient, evidence: ReadOnlyDbSessionEvidence) => Promise<T>,
+): Promise<T> {
+  const pool = getP002AppPool();
+  const client = await pool.connect();
+  let broken = false;
+  try {
+    await client.query('BEGIN READ ONLY');
+    if (identity?.profileUserId) {
+      await client.query(`SELECT set_config('request.jwt.claim.sub', $1, true)`, [identity.profileUserId]);
+    } else {
+      await client.query(`SELECT set_config('request.jwt.claim.sub', '', true)`);
+    }
+    const evidenceRow = (await client.query<{
+      backend_pid: number;
+      current_user: string;
+      transaction_read_only: string;
+    }>(`SELECT pg_backend_pid() AS backend_pid, current_user, current_setting('transaction_read_only') AS transaction_read_only`)).rows[0]!;
+    if (evidenceRow.transaction_read_only !== 'on') {
+      throw new Error('APP_DB_READ_ONLY_NOT_ACTIVE');
+    }
+    const evidence: ReadOnlyDbSessionEvidence = {
+      backendPid: evidenceRow.backend_pid,
+      currentUser: evidenceRow.current_user,
+      transactionReadOnly: evidenceRow.transaction_read_only,
+    };
+    const result = await fn(client, evidence);
+    await client.query('ROLLBACK');
+    return result;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      broken = true;
+    }
+    throw error;
+  } finally {
+    if (broken) {
+      client.release(true);
+    } else {
+      client.release();
+    }
+  }
+}
+
 export type SyncDbScope =
   | { mode: 'golucky' }
   | { mode: 'warehouse'; warehouseId: string }
