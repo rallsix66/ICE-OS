@@ -3,7 +3,8 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { REPO_ROOT, safeEnv, writeJson } from './prepare.mjs';
+import { REPO_ROOT, writeJson } from './prepare.mjs';
+import { previewOperatingEnv, readPreviewOperatingConfig } from './preview-operating-config.mjs';
 import { verifyPreviewServerOwnership } from './preview-process-ownership.mjs';
 
 function portListening(host, port) {
@@ -30,9 +31,13 @@ export async function runPreviewStartWorkspaceGuard(evidenceDir) {
   fs.mkdirSync(wrongWorkspace, { recursive: true });
   fs.writeFileSync(markerPath, `${JSON.stringify({ ...marker, workspace: wrongWorkspace }, null, 2)}\n`);
 
+  const guardPreviewConfig = {
+    port: marker.port ?? readPreviewOperatingConfig().port,
+    mode: marker.previewMode ?? readPreviewOperatingConfig().mode,
+  };
   const rejectStart = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/start-local-preview.mjs'), '--run-id', runId], {
     encoding: 'utf8',
-    env: safeEnv(),
+    env: previewOperatingEnv(guardPreviewConfig),
     windowsHide: true,
   });
 
@@ -51,15 +56,14 @@ export async function runPreviewStartWorkspaceGuard(evidenceDir) {
   manifestJson.sourceSnapshotHash = '0'.repeat(64);
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifestJson, null, 2)}\n`);
 
-  const previewPort = marker.port ?? Number(process.env.CATALOG_PREVIEW_PORT ?? 3010);
   const refreshStart = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/start-local-preview.mjs'), '--run-id', runId], {
     encoding: 'utf8',
-    env: safeEnv({ CATALOG_PREVIEW_PORT: String(previewPort) }),
+    env: previewOperatingEnv(guardPreviewConfig),
     windowsHide: true,
     timeout: 300_000,
   });
 
-  const listeningAfter = await portListening('127.0.0.1', previewPort);
+  const listeningAfter = await portListening('127.0.0.1', guardPreviewConfig.port);
   const markerAfter = fs.existsSync(markerPath) ? JSON.parse(fs.readFileSync(markerPath, 'utf8')) : null;
   const controlledRefresh = {
     exitCode: refreshStart.status,

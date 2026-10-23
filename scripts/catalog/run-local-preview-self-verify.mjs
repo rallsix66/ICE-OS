@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT, newEvidence, runCommand, safeEnv, writeJson } from './prepare.mjs';
+import { previewOperatingEnv, readPreviewOperatingConfig } from './preview-operating-config.mjs';
 import { prepareLocalPreview } from './prepare-local-preview.mjs';
 import { ensurePreviewWorkspace } from './ensure-preview-workspace.mjs';
 import { runPreviewOwnershipNegative } from './run-preview-ownership-negative.mjs';
@@ -31,6 +32,9 @@ function captureDisplaySnapshot(label, env, outPath) {
   });
   return JSON.parse(fs.readFileSync(outPath, 'utf8'));
 }
+
+const previewConfig = readPreviewOperatingConfig();
+const previewEnv = () => previewOperatingEnv(previewConfig);
 
 const runId = `run-${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z-${crypto.randomBytes(4).toString('hex')}`;
 const root = path.join(REPO_ROOT, '.local/catalog', runId);
@@ -99,7 +103,7 @@ function releasePreviewPortForRun(port, exceptRunId) {
     const marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'));
     if (Number(marker.port) !== port) continue;
     runCommand(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/stop-local-preview.mjs'), '--run-id', otherRunId], {
-      env: safeEnv(),
+      env: previewEnv(),
       evidenceDir,
       name: `release-port-${otherRunId}`,
     });
@@ -109,7 +113,7 @@ function releasePreviewPortForRun(port, exceptRunId) {
 function previewLeftRunningNow() {
   try {
     const code = runCommand(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/status-local-preview.mjs'), '--run-id', runId], {
-      env: safeEnv(),
+      env: previewEnv(),
       evidenceDir,
       name: 'preview-left-running-check',
     });
@@ -214,11 +218,11 @@ const { workspace } = ensurePreviewWorkspace(instanceRoot);
 
 const script = (rel) => path.join(REPO_ROOT, rel);
 
-releasePreviewPortForRun(Number(process.env.CATALOG_PREVIEW_PORT ?? 3010), runId);
+releasePreviewPortForRun(previewConfig.port, runId);
 
 if (step('start-local-preview', () =>
   runCommand(process.execPath, [script('scripts/catalog/start-local-preview.mjs'), '--run-id', runId], {
-    env: safeEnv(),
+    env: previewEnv(),
     evidenceDir,
     name: 'start-local-preview',
   }))) {
@@ -237,6 +241,8 @@ env = loadRunEnv();
   let errorMessage;
   try {
     process.env.CATALOG_DOUBLE_START_RUN_ID = runId;
+    process.env.CATALOG_PREVIEW_PORT = String(previewConfig.port);
+    process.env.CATALOG_PREVIEW_NEXT_MODE = previewConfig.mode;
     await runPreviewDoubleStart(evidenceDir);
   } catch (error) {
     failed = true;
@@ -251,7 +257,7 @@ env = loadRunEnv();
 
 if (step('status-local-preview', () =>
   runCommand(process.execPath, [script('scripts/catalog/status-local-preview.mjs'), '--run-id', runId], {
-    env: safeEnv(),
+    env: previewEnv(),
     evidenceDir,
     name: 'status-local-preview',
   }))) {
@@ -307,7 +313,9 @@ const browserEvidence = path.join(evidenceDir, 'browser');
 fs.mkdirSync(browserEvidence, { recursive: true });
 const browserEnv = safeEnv({
   ...env,
-  CATALOG_BASE_URL: 'http://127.0.0.1:3010',
+  CATALOG_BASE_URL: previewConfig.authBaseUrl,
+  CATALOG_PREVIEW_PORT: String(previewConfig.port),
+  CATALOG_PREVIEW_NEXT_MODE: previewConfig.mode,
   CATALOG_TEST_EVIDENCE_DIR: browserEvidence,
   CATALOG_BROWSER_OUTPUT: path.join(browserEvidence, 'output'),
   CATALOG_BROWSER_REPORT: path.join(browserEvidence, 'report.json'),
@@ -352,7 +360,7 @@ try {
 
 if (step('stop-local-preview', () =>
   runCommand(process.execPath, [script('scripts/catalog/stop-local-preview.mjs'), '--run-id', runId], {
-    env: safeEnv(),
+    env: previewEnv(),
     evidenceDir,
     name: 'stop-local-preview',
   }))) {
@@ -363,7 +371,7 @@ if (step('stop-local-preview', () =>
 
 if (step('restart-local-preview', () =>
   runCommand(process.execPath, [script('scripts/catalog/start-local-preview.mjs'), '--run-id', runId], {
-    env: safeEnv(),
+    env: previewEnv(),
     evidenceDir,
     name: 'restart-local-preview',
   }))) {
@@ -376,7 +384,7 @@ env = loadRunEnv();
 
 if (step('status-after-restart', () =>
   runCommand(process.execPath, [script('scripts/catalog/status-local-preview.mjs'), '--run-id', runId], {
-    env: safeEnv(),
+    env: previewEnv(),
     evidenceDir,
     name: 'status-after-restart',
   }))) {
@@ -433,11 +441,16 @@ persistLog({
     previewDoubleStart: path.join(evidenceDir, 'preview-double-start.json'),
     browserReport: path.join(browserEvidence, 'report.json'),
   },
-  previewUrl: leftRunning ? 'http://127.0.0.1:3010/dashboard/catalog' : null,
+  previewConfig,
+  previewUrl: leftRunning ? previewConfig.catalogUrl : null,
   commands: {
-    start: `node scripts/catalog/start-local-preview.mjs --run-id ${runId}`,
-    status: `node scripts/catalog/status-local-preview.mjs --run-id ${runId}`,
-    stop: `node scripts/catalog/stop-local-preview.mjs --run-id ${runId}`,
+    powershell: [
+      `$env:CATALOG_PREVIEW_PORT='${previewConfig.port}'`,
+      `$env:CATALOG_PREVIEW_NEXT_MODE='${previewConfig.mode}'`,
+      `node scripts/catalog/start-local-preview.mjs --run-id ${runId}`,
+      `node scripts/catalog/status-local-preview.mjs --run-id ${runId}`,
+      `node scripts/catalog/stop-local-preview.mjs --run-id ${runId}`,
+    ],
   },
 });
 

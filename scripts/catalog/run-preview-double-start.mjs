@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT, writeJson } from './prepare.mjs';
+import { previewOperatingEnv, readPreviewOperatingConfig } from './preview-operating-config.mjs';
 import { pidAlive } from './preview-process-ownership.mjs';
 
 async function loginReachable(baseUrl) {
@@ -32,10 +33,11 @@ export async function runPreviewDoubleStart(evidenceDir) {
     throw new Error(`CATALOG_DOUBLE_START_PREVIEW_NOT_HEALTHY:pid ${before.pid} not alive; start preview once before this probe`);
   }
   const startScript = path.join(REPO_ROOT, 'scripts/catalog/start-local-preview.mjs');
+  const childEnv = previewOperatingEnv(readPreviewOperatingConfig());
 
   const first = spawnSync(process.execPath, [startScript, '--run-id', runId], {
     encoding: 'utf8',
-    env: process.env,
+    env: childEnv,
     windowsHide: true,
   });
   const afterFirst = JSON.parse(fs.readFileSync(markerPath, 'utf8'));
@@ -43,7 +45,7 @@ export async function runPreviewDoubleStart(evidenceDir) {
 
   const second = spawnSync(process.execPath, [startScript, '--run-id', runId], {
     encoding: 'utf8',
-    env: process.env,
+    env: childEnv,
     windowsHide: true,
   });
   const afterSecond = JSON.parse(fs.readFileSync(markerPath, 'utf8'));

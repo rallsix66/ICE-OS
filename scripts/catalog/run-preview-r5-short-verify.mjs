@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT, collectWorkspaceSourceHashes, newEvidence, runCommand, safeEnv, writeJson } from './prepare.mjs';
+import { previewOperatingEnv, readPreviewOperatingConfig } from './preview-operating-config.mjs';
 import { runPreviewOwnershipNegative } from './run-preview-ownership-negative.mjs';
 import { runPreviewOwnershipProbes } from './run-preview-ownership-probes.mjs';
 import { runPreviewStartControlFlowProbe } from './run-preview-start-control-flow-probe.mjs';
@@ -36,7 +37,10 @@ function loadRunEnv(runId) {
   return { root, env: safeEnv({ ...envJson, CATALOG_RUN_ROOT: root, CATALOG_SOURCE_ROOT: REPO_ROOT }) };
 }
 
-const runId = process.env.CATALOG_SHORT_VERIFY_RUN_ID ?? 'run-20261021T075139Z-821214d2';
+const previewConfig = readPreviewOperatingConfig();
+const previewEnv = () => previewOperatingEnv(previewConfig);
+
+const runId = process.env.CATALOG_SHORT_VERIFY_RUN_ID ?? 'run-20261021T100700Z-b3c4d5e6';
 const { root, env: initialEnv } = loadRunEnv(runId);
 const evidenceDir = process.env.CATALOG_SHORT_VERIFY_EVIDENCE_DIR
   ?? newEvidence(root, 'r5-short-verify');
@@ -77,13 +81,15 @@ await runPreviewStartControlFlowProbe(evidenceDir);
 log.push({ name: 'preview-start-control-flow-probe', exitCode: 0 });
 
 runCommand(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/start-local-preview.mjs'), '--run-id', runId], {
-  env: safeEnv(),
+  env: previewEnv(),
   evidenceDir,
   name: 'ensure-preview-before-double-start',
 });
 log.push({ name: 'ensure-preview-before-double-start', exitCode: 0 });
 
 process.env.CATALOG_DOUBLE_START_RUN_ID = runId;
+process.env.CATALOG_PREVIEW_PORT = String(previewConfig.port);
+process.env.CATALOG_PREVIEW_NEXT_MODE = previewConfig.mode;
 await runPreviewDoubleStart(evidenceDir);
 log.push({ name: 'preview-double-start', exitCode: 0 });
 
@@ -100,7 +106,7 @@ record('snapshot-before-stop', () => {
 
 record('stop-local-preview', () => {
   runCommand(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/stop-local-preview.mjs'), '--run-id', runId], {
-    env: safeEnv(),
+    env: previewEnv(),
     evidenceDir,
     name: 'stop-local-preview',
   });
@@ -108,7 +114,7 @@ record('stop-local-preview', () => {
 
 record('restart-local-preview', () => {
   runCommand(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/start-local-preview.mjs'), '--run-id', runId], {
-    env: safeEnv(),
+    env: previewEnv(),
     evidenceDir,
     name: 'restart-local-preview',
   });
@@ -116,7 +122,7 @@ record('restart-local-preview', () => {
 
 record('status-after-restart', () => {
   runCommand(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/status-local-preview.mjs'), '--run-id', runId], {
-    env: safeEnv(),
+    env: previewEnv(),
     evidenceDir,
     name: 'status-after-restart',
   });
@@ -150,7 +156,8 @@ const index = {
   frozenSourceSnapshotHash,
   failed,
   finishedAt: new Date().toISOString(),
-  previewUrl: 'http://127.0.0.1:3010/dashboard/catalog',
+  previewConfig,
+  previewUrl: previewConfig.catalogUrl,
   steps: log,
   artifacts: {
     frozenSource: path.join(evidenceDir, 'frozen-source-snapshot.json'),
