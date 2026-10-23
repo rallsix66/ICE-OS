@@ -61,6 +61,97 @@ export function buildCandidates(item: CatalogItemDto, observations: (DifferenceO
 }
 
 /** Cell grid grouping is local preview only; it never creates source identity. */
+export type AuditObservation = DifferenceObservation & {
+  reviewState: string | null;
+  selectedItemId: string | null;
+  existingDecisionRef: string | null;
+  conflicts?: string[];
+  entryKey?: string;
+  legacyCandidateId?: string | null;
+  scope?: Record<string, unknown>;
+  coverage?: Record<string, unknown>;
+};
+
+/** True when an observation could appear in findCandidates for this item (including existing choice). */
+export function wouldMatchItemCandidate(
+  item: Pick<CatalogItemDto, 'itemId' | 'iceCode' | 'nameCn' | 'barcodeRefs'>,
+  observation: CandidateObservation,
+): boolean {
+  if (observation.selectedItemId === item.itemId) return true;
+  const name = normalizeName(item.nameCn);
+  const barcodes = item.barcodeRefs.map(fieldValue).filter((value): value is string => value !== null);
+  const basis: CandidateDto['basis'] = [];
+  if (item.iceCode && ['sku', 'styleCode', 'productCode'].some((key) => fieldValue(observation.fields[key]) === item.iceCode)) basis.push('exact_code_hint');
+  const sourceBarcode = fieldValue(observation.fields.barcode);
+  if (sourceBarcode && barcodes.includes(sourceBarcode)) basis.push('exact_barcode_hint');
+  const sourceNameRaw = fieldValue(observation.fields.name);
+  const sourceName = sourceNameRaw ? normalizeName(sourceNameRaw) : '';
+  if (name && sourceName && (name.includes(sourceName) || sourceName.includes(name))) basis.push('name_hint');
+  return basis.length > 0;
+}
+
+/**
+ * Minimal observation set equivalent to passing the full BS/JST pool into buildCandidates,
+ * plus all Feishu rows for buildDifferences.
+ */
+export function scopeObservationsForItemAudit(
+  item: CatalogItemDto,
+  all: AuditObservation[],
+  options?: { verifyEquivalence?: boolean },
+): AuditObservation[] {
+  const feishu = all.filter((o) => o.sourceSystem === 'feishu');
+  const pool = all.filter(
+    (o): o is AuditObservation & { sourceSystem: 'bigseller' | 'jushuitan' } =>
+      o.sourceSystem === 'bigseller' || o.sourceSystem === 'jushuitan',
+  );
+  const included = new Set<string>();
+  for (const o of pool) {
+    if (wouldMatchItemCandidate(item, o)) included.add(o.observationId);
+  }
+  let expanded = true;
+  while (expanded) {
+    expanded = false;
+    const skuKeys = new Set<string>();
+    const barcodeKeys = new Set<string>();
+    for (const o of pool) {
+      if (!included.has(o.observationId)) continue;
+      const sku = fieldValue(o.fields.sku);
+      const bc = fieldValue(o.fields.barcode);
+      if (sku) skuKeys.add(`${o.sourceSystem}\0${sku}`);
+      if (bc) barcodeKeys.add(`${o.sourceSystem}\0${bc}`);
+    }
+    for (const o of pool) {
+      if (included.has(o.observationId)) continue;
+      const sku = fieldValue(o.fields.sku);
+      const bc = fieldValue(o.fields.barcode);
+      if (sku && skuKeys.has(`${o.sourceSystem}\0${sku}`)) {
+        included.add(o.observationId);
+        expanded = true;
+      }
+      if (bc && barcodeKeys.has(`${o.sourceSystem}\0${bc}`)) {
+        included.add(o.observationId);
+        expanded = true;
+      }
+    }
+  }
+  const scoped = [...feishu, ...pool.filter((o) => included.has(o.observationId))];
+  if (options?.verifyEquivalence === false) return scoped;
+  const eligible = all.filter((o) => o.sourceSystem !== 'feishu');
+  for (const source of ['bigseller', 'jushuitan'] as const) {
+    const before = buildCandidates(item, eligible, source);
+    const after = buildCandidates(item, scoped.filter((o) => o.sourceSystem !== 'feishu'), source);
+    const missing = before.filter((c) => !after.some((a) => a.observationId === c.observationId));
+    const changed = before.filter((c) => {
+      const match = after.find((a) => a.observationId === c.observationId);
+      return match && JSON.stringify(match.conflicts) !== JSON.stringify(c.conflicts);
+    });
+    if (missing.length || changed.length) {
+      throw new Error(`CATALOG_CANDIDATE_SCOPE_MISMATCH:${item.itemId}:${source}`);
+    }
+  }
+  return scoped;
+}
+
 export function buildDifferences(item: Pick<CatalogItemDto, 'iceCode' | 'nameCn' | 'fields'>, observations: DifferenceObservation[]): CatalogDifference[] {
   if (!item.iceCode) return [];
   const rows = new Map<string, Map<string, DifferenceObservation>>();

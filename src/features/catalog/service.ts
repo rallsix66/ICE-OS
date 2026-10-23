@@ -7,7 +7,8 @@ import { loadFrozenFeishu } from './sources/frozen-feishu-adapter';
 import { buildCandidates, buildDifferences } from './candidate-service';
 import { appendNonPriceRevisionSchema, assignInitialCodeSchema, importFrozenObservationsSchema, publishBaselineSchema } from './schema';
 import { assignNewItemCode, appendNewItemRevision, getNewItemWriteContext, recoverNewItemRequest } from './new-item/service';
-import { basisDocumentSha256, buildCatalogDisplayOverview, CatalogDisplayReadError, prepareBsSampleImportPayload } from './local-display/service';
+import { basisDocumentSha256, buildCatalogDisplayOverview, buildCatalogListFallbackFromItems, CatalogDisplayReadError, prepareBsSampleImportPayload } from './local-display/service';
+import { toCatalogListClientPayload } from './local-display/list-client-types';
 import { warehouseScopeView } from './local-display/warehouse-valuation';
 async function writeAccess(identity: Parameters<typeof catalogRepository.originKind>[0], itemId: string) {
   const kind = await catalogRepository.originKind(identity, itemId);
@@ -19,14 +20,92 @@ async function writeAccess(identity: Parameters<typeof catalogRepository.originK
 export async function getCatalogOverview() {
   const identity = await requireCatalogAdmin();
   const amountAllowed = await requireCatalogAdmin('amount:read').then(() => true).catch(() => false);
-  const [items, release, decisions, observations] = await Promise.all([
-    catalogRepository.list(identity, { baselinePublishedOnly: true }), catalogRepository.release(identity), catalogRepository.decisions(identity), catalogRepository.observations(identity),
+  const [release, stats, displayStatusBundle] = await Promise.all([
+    catalogRepository.release(identity),
+    catalogRepository.adminSummaryCounts(identity),
+    (async () => {
+      let display: Awaited<ReturnType<typeof buildCatalogDisplayOverview>> = null;
+      let displayStatus: 'loaded' | 'not_imported' | 'read_failed' | 'forbidden' = 'not_imported';
+      let displayError: string | null = null;
+      try {
+        display = await buildCatalogDisplayOverview(identity, { amountAllowed });
+        displayStatus = display ? 'loaded' : 'not_imported';
+      } catch (error) {
+        if (error instanceof CatalogDisplayReadError) {
+          displayStatus = error.code === 'forbidden' ? 'forbidden' : 'read_failed';
+          displayError = error.message;
+        } else {
+          displayStatus = 'read_failed';
+          displayError = 'BS 样表库存投影读取失败';
+        }
+      }
+      return { display, displayStatus, displayError };
+    })(),
+  ]);
+  return {
+    release,
+    display: displayStatusBundle.display,
+    displayStatus: displayStatusBundle.displayStatus,
+    displayError: displayStatusBundle.displayError,
+    stats: {
+      items: stats.items,
+      coded: stats.coded,
+      observations: release?.observationCount ?? stats.observations,
+      choices: stats.choices,
+      history: stats.history,
+    },
+  };
+}
+
+export async function getCatalogAdminDecisionsPage(offset: number, limit: number) {
+  const identity = await requireCatalogAdmin();
+  const safeOffset = Math.max(0, Math.floor(offset));
+  const safeLimit = Math.min(200, Math.max(1, Math.floor(limit)));
+  return catalogRepository.decisionsPage(identity, { offset: safeOffset, limit: safeLimit });
+}
+
+export async function getCatalogAdminObservationsPage(offset: number, limit: number) {
+  const identity = await requireCatalogAdmin();
+  const safeOffset = Math.max(0, Math.floor(offset));
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+  return catalogRepository.observationsPage(identity, { offset: safeOffset, limit: safeLimit });
+}
+
+export async function getCatalogListPage() {
+  const identity = await requireCatalogAdmin();
+  const amountAllowed = await requireCatalogAdmin('amount:read').then(() => true).catch(() => false);
+  let items: Awaited<ReturnType<typeof catalogRepository.list>>;
+  try {
+    items = await catalogRepository.list(identity, { baselinePublishedOnly: true });
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: string }).code) : '';
+    return {
+      itemsLoadFailed: true as const,
+      itemsLoadError: code === '42501' ? '主商品资料读取被拒绝（权限不足）' : '主商品资料读取失败',
+      displayStatus: 'read_failed' as const,
+      displayError: null,
+      itemCount: 0,
+      amountAllowed,
+      payload: null,
+      auxiliaryErrors: [] as string[],
+    };
+  }
+  let sourceSearchTokens = new Map<string, string[]>();
+  let bsNotCreatedIds = new Set<string>();
+  const auxiliaryErrors: string[] = [];
+  await Promise.all([
+    catalogRepository.sourceSearchTokensByItem(identity).then((tokens) => { sourceSearchTokens = tokens; }).catch(() => {
+      auxiliaryErrors.push('已确认来源 SKU 检索索引读取失败；主资料仍可用，来源 SKU 搜索可能不完整。');
+    }),
+    catalogRepository.bsNotCreatedItemIds(identity).then((ids) => { bsNotCreatedIds = ids; }).catch(() => {
+      auxiliaryErrors.push('BS 未建档标记读取失败；主资料仍可用，状态标记可能不完整。');
+    }),
   ]);
   let display: Awaited<ReturnType<typeof buildCatalogDisplayOverview>> = null;
   let displayStatus: 'loaded' | 'not_imported' | 'read_failed' | 'forbidden' = 'not_imported';
   let displayError: string | null = null;
   try {
-    display = await buildCatalogDisplayOverview(identity, { amountAllowed });
+    display = await buildCatalogDisplayOverview(identity, { amountAllowed, preload: { items, bsNotCreatedIds } });
     displayStatus = display ? 'loaded' : 'not_imported';
   } catch (error) {
     if (error instanceof CatalogDisplayReadError) {
@@ -37,9 +116,18 @@ export async function getCatalogOverview() {
       displayError = 'BS 样表库存投影读取失败';
     }
   }
-  return { items, release, decisions, observations, display, displayStatus, displayError, stats: { items: items.length, coded: items.filter((i) => i.iceCode !== null).length,
-    observations: release?.observationCount ?? 0, choices: decisions.filter((d) => d.entryKind === 'candidate_snapshot' && d.selectedItemId !== null).length,
-    history: decisions.filter((d) => d.entryKind !== 'candidate_snapshot').length } };
+  const payload = display
+    ? toCatalogListClientPayload(display, sourceSearchTokens)
+    : await buildCatalogListFallbackFromItems(identity, items, amountAllowed, { bsNotCreatedIds, sourceSearchTokens });
+  return {
+    itemsLoadFailed: false as const,
+    payload,
+    displayStatus,
+    displayError,
+    itemCount: items.length,
+    amountAllowed,
+    auxiliaryErrors,
+  };
 }
 
 export async function importCatalogBsSampleInventory(input: unknown) {
@@ -70,9 +158,11 @@ export async function getCatalogItemBsSample(itemId: string, warehouse?: string)
     throw new CatalogDisplayReadError('read_failed', 'BS 样表库存投影读取失败', error);
   }
   if (!meta) return { status: 'not_imported' as const, exportLabel: null, rows: [], adoptedUnitCost: null, valuation: null, basisDocumentSha256: null };
-  const financial = amountAllowed ? await catalogRepository.amounts(identity, itemId) : null;
-  const decisions = await catalogRepository.decisions(identity, itemId);
-  const notCreatedBs = decisions.some((d) => d.entryKind === 'history:batch_bs_not_created' && d.summary.sourceSystem === 'bigseller' && d.summary.status === 'user_confirmed_not_created');
+  const [financial, flags] = await Promise.all([
+    amountAllowed ? catalogRepository.amounts(identity, itemId) : Promise.resolve(null),
+    catalogRepository.itemStatusFlags(identity, itemId),
+  ]);
+  const notCreatedBs = flags.bsNotCreated;
   const inventorySlices = (rows as Array<Record<string, unknown>>).map((r) => ({
     itemId,
     warehouse: String(r.warehouse),
@@ -91,18 +181,79 @@ export async function getCatalogItemBsSample(itemId: string, warehouse?: string)
   };
 }
 
-export async function getCatalogDetail(itemId: string, options: { revision?: number } = {}) {
+export async function getCatalogDetailCore(itemId: string, options: { revision?: number } = {}) {
   if (!/^[a-f\d-]{36}$/i.test(itemId) || (options.revision !== undefined && (!Number.isInteger(options.revision) || options.revision < 1))) throw new Error('CATALOG_INVALID_INPUT');
   const identity = await requireCatalogAdmin('history:read');
-  const [item, history, observations, decisions, artifacts] = await Promise.all([
-    catalogRepository.get(identity, itemId, options.revision), catalogRepository.history(identity, itemId),
-    catalogRepository.observations(identity), catalogRepository.decisions(identity, itemId), catalogRepository.artifacts(identity),
+  const [item, flags, access] = await Promise.all([
+    catalogRepository.get(identity, itemId, options.revision),
+    catalogRepository.itemStatusFlags(identity, itemId),
+    writeAccess(identity, itemId),
   ]);
   if (!item) throw new Error('CATALOG_NOT_FOUND');
+  return { item, flags, writeAccess: access, historical: options.revision !== undefined };
+}
+
+export async function getCatalogDetailHistory(itemId: string) {
+  if (!/^[a-f\d-]{36}$/i.test(itemId)) throw new Error('CATALOG_INVALID_INPUT');
+  const identity = await requireCatalogAdmin('history:read');
+  return catalogRepository.history(identity, itemId);
+}
+
+export async function getCatalogDetailAudit(itemId: string) {
+  if (!/^[a-f\d-]{36}$/i.test(itemId)) throw new Error('CATALOG_INVALID_INPUT');
+  const identity = await requireCatalogAdmin('history:read');
+  const item = await catalogRepository.get(identity, itemId);
+  if (!item) throw new Error('CATALOG_NOT_FOUND');
+  const [observations, decisions] = await Promise.all([
+    catalogRepository.observationsForItem(identity, item),
+    catalogRepository.decisions(identity, itemId),
+  ]);
+  const artifacts: Awaited<ReturnType<typeof catalogRepository.artifacts>> = [];
   const candidates = { bigseller: buildCandidates(item, observations, 'bigseller'), jushuitan: buildCandidates(item, observations, 'jushuitan') };
   const related = new Set([...candidates.bigseller, ...candidates.jushuitan].map((c) => c.observationId));
-  return { item, history, candidates, decisions, observations: observations.filter((o) => related.has(o.observationId) || o.sourceSystem === 'feishu'),
-    differences: buildDifferences(item, observations), artifacts, writeAccess: await writeAccess(identity, itemId) };
+  return {
+    candidates,
+    decisions,
+    observations: observations.filter((o) => related.has(o.observationId) || o.sourceSystem === 'feishu'),
+    differences: buildDifferences(item, observations),
+    artifacts,
+  };
+}
+
+export async function getCatalogDetail(itemId: string, options: { revision?: number } = {}) {
+  const core = await getCatalogDetailCore(itemId, options);
+  const history = core.historical ? await getCatalogDetailHistory(itemId) : [];
+  return {
+    item: core.item,
+    history,
+    candidates: { bigseller: [], jushuitan: [] },
+    decisions: [],
+    observations: [],
+    differences: [],
+    artifacts: [],
+    flags: core.flags,
+    writeAccess: core.writeAccess,
+  };
+}
+
+export async function getCatalogDetailView(itemId: string, warehouse?: string) {
+  const core = await getCatalogDetailCore(itemId);
+  let bsSample: Awaited<ReturnType<typeof getCatalogItemBsSample>> | null = null;
+  let bsSampleError: CatalogDisplayReadError | null = null;
+  if (!core.historical) {
+    try {
+      bsSample = await getCatalogItemBsSample(itemId, warehouse);
+    } catch (error) {
+      bsSampleError = error instanceof CatalogDisplayReadError
+        ? error
+        : new CatalogDisplayReadError('read_failed', 'BS 样表库存投影读取失败', error);
+    }
+  }
+  return {
+    ...core,
+    bsSample,
+    bsSampleError: bsSampleError ? { code: bsSampleError.code, message: bsSampleError.message } : null,
+  };
 }
 
 export async function prepareCatalogBaseline() {
@@ -177,6 +328,11 @@ export async function getCatalogAmounts(itemId: string) {
   const observationAmounts = await Promise.all(relevant.map(async (o) => ({ observationId: o.observationId,
     position: o.position, amounts: await catalogRepository.observationAmounts(identity, o.observationId) })));
   return { adopted, observations: observationAmounts };
+}
+
+export async function getCatalogDetailArtifacts() {
+  const identity = await requireCatalogAdmin('history:read');
+  return catalogRepository.artifacts(identity);
 }
 
 export async function getEvidenceArtifact(artifactId: string) {

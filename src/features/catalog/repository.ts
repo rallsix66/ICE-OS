@@ -3,6 +3,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { withAppDb, type DbIdentity } from '@/lib/database/app-db';
+import { normalizeName, scopeObservationsForItemAudit, wouldMatchItemCandidate } from './candidate-service';
 import type { CatalogItemDto, CatalogItemRevisionDto, FieldObservation, PreparedBaseline, PreparedFrozenObservations, PreparedFinancial, SourceSystem } from './types';
 
 export interface CatalogRelease {
@@ -47,21 +48,192 @@ function revisionDto(row: RevisionRow): CatalogItemRevisionDto {
   return { ...itemDto(row), revisionAudit: { reason: row.reason, actorId: row.actor_id,
     recordedAt: row.recorded_at.toISOString(), evidenceRef: row.evidence_ref } };
 }
+const choiceCountsJoin = `LEFT JOIN (
+  SELECT d.selected_item_id AS item_id,
+    count(*) FILTER (WHERE n.system = 'bigseller')::bigint AS bigseller,
+    count(*) FILTER (WHERE n.system = 'jushuitan')::bigint AS jushuitan
+  FROM catalog.decision_evidence d
+  JOIN catalog.source_observation o ON o.id = d.observation_id
+  JOIN catalog.observation_batch b ON b.id = o.batch_id
+  JOIN catalog.source_dataset ds ON ds.id = b.dataset_id
+  JOIN catalog.source_namespace n ON n.id = ds.namespace_id
+  WHERE d.entry_kind = 'candidate_snapshot' AND d.selected_item_id IS NOT NULL
+  GROUP BY d.selected_item_id
+) choice_counts ON choice_counts.item_id = i.id`;
+
 const itemSelect = `SELECT i.id AS item_id,r.revision,r.ice_code_snapshot,i.new_product_confirmed,r.name_cn,r.fields,r.evidence_ref,
  r.reason,r.actor_id,r.recorded_at,
- (SELECT count(*) FROM catalog.decision_evidence d JOIN catalog.source_observation o ON o.id=d.observation_id
- JOIN catalog.observation_batch b ON b.id=o.batch_id JOIN catalog.source_dataset ds ON ds.id=b.dataset_id
- JOIN catalog.source_namespace n ON n.id=ds.namespace_id WHERE d.selected_item_id=i.id AND d.entry_kind='candidate_snapshot' AND n.system='bigseller')::text AS bigseller,
- (SELECT count(*) FROM catalog.decision_evidence d JOIN catalog.source_observation o ON o.id=d.observation_id
- JOIN catalog.observation_batch b ON b.id=o.batch_id JOIN catalog.source_dataset ds ON ds.id=b.dataset_id
- JOIN catalog.source_namespace n ON n.id=ds.namespace_id WHERE d.selected_item_id=i.id AND d.entry_kind='candidate_snapshot' AND n.system='jushuitan')::text AS jushuitan
- FROM catalog.catalog_item i JOIN catalog.item_current c ON c.item_id=i.id JOIN catalog.item_revision r ON r.item_id=i.id`;
+ coalesce(choice_counts.bigseller, 0)::text AS bigseller,
+ coalesce(choice_counts.jushuitan, 0)::text AS jushuitan
+ FROM catalog.catalog_item i
+ JOIN catalog.item_current c ON c.item_id = i.id
+ JOIN catalog.item_revision r ON r.item_id = i.id
+ ${choiceCountsJoin}`;
 
 async function rpc<T>(client: PoolClient, name: string, values: unknown[]): Promise<T> {
   // Function names are module constants, never request input.
   const args = values.map((_, i) => `$${i + 1}`).join(',');
   const result = await client.query<{ result: T }>(`SELECT catalog.${name}(${args}) AS result`, values);
   return result.rows[0]!.result;
+}
+
+const OBSERVATION_ROW_FROM = `FROM catalog.source_observation o
+  JOIN catalog.observation_batch b ON b.id=o.batch_id
+  JOIN catalog.source_dataset ds ON ds.id=b.dataset_id
+  JOIN catalog.source_namespace n ON n.id=ds.namespace_id
+  LEFT JOIN catalog.decision_evidence d ON d.observation_id=o.id AND d.entry_kind='candidate_snapshot'`;
+
+const OBSERVATION_ROW_SELECT = `SELECT o.id AS "observationId",n.system AS "sourceSystem",o.entry_key AS "entryKey",
+  o.legacy_candidate_id AS "legacyCandidateId",o.position,o.scope,o.fields,o.review_state AS "reviewState",o.raw_ref AS "rawRef",b.coverage,
+  d.selected_item_id AS "selectedItemId",d.id AS "existingDecisionRef",coalesce(d.summary->'flags','[]'::jsonb) AS conflicts ${OBSERVATION_ROW_FROM}`;
+
+async function queryObservationRows(client: PoolClient, where: string, params: unknown[]): Promise<SafeObservation[]> {
+  const tail = where ? ` WHERE ${where}` : '';
+  const { rows } = await client.query(`${OBSERVATION_ROW_SELECT}${tail} ORDER BY n.system,o.entry_key`, params);
+  return rows as SafeObservation[];
+}
+
+async function queryObservationRowsByIds(client: PoolClient, observationIds: string[]): Promise<SafeObservation[]> {
+  if (!observationIds.length) return [];
+  return queryObservationRows(client, 'o.id = ANY($1::uuid[])', [observationIds]);
+}
+
+async function queryFeishuObservationsForItem(client: PoolClient, iceCode: string, nameCn: string): Promise<SafeObservation[]> {
+  const { rows } = await client.query<{ observation_id: string }>(
+    `WITH match AS (
+      SELECT DISTINCT g.position->>'sheet' AS sheet, g.position->>'row' AS row
+      FROM catalog.source_observation g
+      JOIN catalog.observation_batch gb ON gb.id = g.batch_id
+      JOIN catalog.source_dataset gds ON gds.id = gb.dataset_id
+      JOIN catalog.source_namespace gn ON gn.id = gds.namespace_id
+      JOIN catalog.source_observation bn ON bn.position->>'sheet' = g.position->>'sheet'
+        AND bn.position->>'row' = g.position->>'row'
+      JOIN catalog.observation_batch bnb ON bnb.id = bn.batch_id
+      JOIN catalog.source_dataset bnds ON bnds.id = bnb.dataset_id
+      JOIN catalog.source_namespace bnn ON bnn.id = bnds.namespace_id
+      WHERE gn.system = 'feishu'
+        AND bnn.system = 'feishu'
+        AND g.position->>'cell' LIKE 'G%'
+        AND g.fields->'value'->>'raw' = $1
+        AND bn.position->>'cell' LIKE 'B%'
+        AND bn.fields->'value'->>'raw' = $2
+    )
+    SELECT o.id AS observation_id
+    FROM catalog.source_observation o
+    JOIN catalog.observation_batch b ON b.id = o.batch_id
+    JOIN catalog.source_dataset ds ON ds.id = b.dataset_id
+    JOIN catalog.source_namespace n ON n.id = ds.namespace_id
+    JOIN match m ON o.position->>'sheet' = m.sheet AND o.position->>'row' = m.row
+    WHERE n.system = 'feishu'`,
+    [iceCode, nameCn],
+  );
+  return queryObservationRowsByIds(client, rows.map((row) => row.observation_id));
+}
+
+async function queryBsJstObservationsForItem(client: PoolClient, item: CatalogItemDto): Promise<SafeObservation[]> {
+  const selected = await client.query<{ observation_id: string }>(
+    `SELECT d.observation_id
+     FROM catalog.decision_evidence d
+     JOIN catalog.source_observation o ON o.id = d.observation_id
+     JOIN catalog.observation_batch b ON b.id = o.batch_id
+     JOIN catalog.source_dataset ds ON ds.id = b.dataset_id
+     JOIN catalog.source_namespace n ON n.id = ds.namespace_id
+     WHERE d.entry_kind = 'candidate_snapshot'
+       AND d.selected_item_id = $1::uuid
+       AND n.system IN ('bigseller', 'jushuitan')`,
+    [item.itemId],
+  );
+  const byId = new Map<string, SafeObservation>();
+  const merge = (rows: SafeObservation[]) => {
+    for (const row of rows) byId.set(row.observationId, row);
+  };
+  merge(await queryObservationRowsByIds(client, selected.rows.map((r) => r.observation_id)));
+  const observedRawEquals = (key: string, param: string) => `(
+    o.fields->'${key}'->>'state' = 'observed'
+    AND o.fields->'${key}'->>'meaning' = 'value'
+    AND o.fields->'${key}'->>'raw' = ${param}
+  )`;
+  if (item.iceCode) {
+    merge(await queryObservationRows(client, `n.system IN ('bigseller','jushuitan') AND (
+      ${observedRawEquals('sku', '$1')}
+      OR ${observedRawEquals('styleCode', '$1')}
+      OR ${observedRawEquals('productCode', '$1')}
+    )`, [item.iceCode]));
+  }
+  const barcodeValues = [...new Set(
+    item.barcodeRefs
+      .map((field) => (field.state === 'observed' && field.meaning === 'value' ? field.raw : null))
+      .filter((value): value is string => Boolean(value)),
+  )];
+  if (barcodeValues.length) {
+    merge(await queryObservationRows(client, `n.system IN ('bigseller','jushuitan')
+      AND o.fields->'barcode'->>'state' = 'observed'
+      AND o.fields->'barcode'->>'meaning' = 'value'
+      AND o.fields->'barcode'->>'raw' = ANY($1::text[])`, [barcodeValues]));
+  }
+  if (item.nameCn) {
+    const normalized = normalizeName(item.nameCn);
+    merge(await queryObservationRows(client, `n.system IN ('bigseller','jushuitan')
+      AND o.fields->'name'->>'state' = 'observed'
+      AND o.fields->'name'->>'meaning' = 'value'
+      AND o.fields->'name'->>'raw' IS NOT NULL
+      AND (
+        position($1 in lower(regexp_replace(o.fields->'name'->>'raw', '\\s', '', 'g'))) > 0
+        OR position(lower(regexp_replace(o.fields->'name'->>'raw', '\\s', '', 'g')) in $1) > 0
+      )`, [normalized]));
+  }
+  const jushuitanPool = await queryObservationRows(client, `n.system = 'jushuitan'`, []);
+  for (const row of jushuitanPool) {
+    if (wouldMatchItemCandidate(item, { ...row, sourceSystem: 'jushuitan' })) byId.set(row.observationId, row);
+  }
+  return [...byId.values()];
+}
+
+function observedFieldRaw(fields: Record<string, FieldObservation>, key: string): string | null {
+  const field = fields[key];
+  return field?.state === 'observed' && field.meaning === 'value' ? field.raw : null;
+}
+
+async function fetchItemAuditObservationPool(client: PoolClient, item: CatalogItemDto): Promise<SafeObservation[]> {
+  const byId = new Map<string, SafeObservation>();
+  const add = (rows: SafeObservation[]) => {
+    for (const row of rows) byId.set(row.observationId, row);
+  };
+
+  if (item.iceCode) {
+    add(await queryFeishuObservationsForItem(client, item.iceCode, item.nameCn));
+  }
+
+  add(await queryBsJstObservationsForItem(client, item));
+
+  let expanded = true;
+  while (expanded) {
+    expanded = false;
+    const skuKeys = new Set<string>();
+    const barcodeKeys = new Set<string>();
+    for (const observation of byId.values()) {
+      if (observation.sourceSystem !== 'bigseller' && observation.sourceSystem !== 'jushuitan') continue;
+      const sku = observedFieldRaw(observation.fields, 'sku');
+      const barcode = observedFieldRaw(observation.fields, 'barcode');
+      if (sku) skuKeys.add(`${observation.sourceSystem}\0${sku}`);
+      if (barcode) barcodeKeys.add(`${observation.sourceSystem}\0${barcode}`);
+    }
+    const skus = [...skuKeys].map((key) => key.split('\0')[1]!).filter(Boolean);
+    const barcodes = [...barcodeKeys].map((key) => key.split('\0')[1]!).filter(Boolean);
+    if (!skus.length && !barcodes.length) break;
+    const extra = await queryObservationRows(client, `n.system IN ('bigseller','jushuitan') AND (
+      ($1::text[] <> '{}'::text[] AND (o.fields->'sku'->>'raw') = ANY($1::text[]))
+      OR ($2::text[] <> '{}'::text[] AND (o.fields->'barcode'->>'raw') = ANY($2::text[]))
+    )`, [skus, barcodes]);
+    for (const row of extra) {
+      if (!byId.has(row.observationId)) {
+        byId.set(row.observationId, row);
+        expanded = true;
+      }
+    }
+  }
+
+  return [...byId.values()];
 }
 
 /** An uncertain COMMIT is reconciled by the original request, never replayed blind. */
@@ -96,13 +268,18 @@ export const catalogRepository = {
       return row ? row.first_release_id === null ? 'new_item' : 'baseline' : null;
     });
   },
+  async listOnClient(
+    client: PoolClient,
+    identity: DbIdentity,
+    options: { baselinePublishedOnly?: boolean } = {},
+  ): Promise<CatalogItemDto[]> {
+    await client.query('SELECT catalog.require_admin()');
+    const baselineFilter = options.baselinePublishedOnly ? ' AND i.first_release_id IS NOT NULL' : '';
+    const result = await client.query<ItemRow>(`${itemSelect} WHERE r.revision=c.revision${baselineFilter} ORDER BY r.name_cn,i.id`);
+    return result.rows.map(itemDto);
+  },
   async list(identity: DbIdentity, options: { baselinePublishedOnly?: boolean } = {}): Promise<CatalogItemDto[]> {
-    return withAppDb(identity, async (c) => {
-      await c.query('SELECT catalog.require_admin()');
-      const baselineFilter = options.baselinePublishedOnly ? ' AND i.first_release_id IS NOT NULL' : '';
-      const result = await c.query<ItemRow>(`${itemSelect} WHERE r.revision=c.revision${baselineFilter} ORDER BY r.name_cn,i.id`);
-      return result.rows.map(itemDto);
-    });
+    return withAppDb(identity, (c) => catalogRepository.listOnClient(c, identity, options));
   },
   async get(identity: DbIdentity, itemId: string, revision?: number): Promise<CatalogItemDto | null> {
     return withAppDb(identity, async (c) => {
@@ -114,9 +291,150 @@ export const catalogRepository = {
   async history(identity: DbIdentity, itemId: string): Promise<CatalogItemRevisionDto[]> {
     return withAppDb(identity, async (c) => {
       await c.query('SELECT catalog.require_admin()');
-      const result = await c.query<RevisionRow>(`${itemSelect} WHERE i.id=$1 ORDER BY r.revision DESC`, [itemId]);
+      const historySelect = `SELECT i.id AS item_id,r.revision,r.ice_code_snapshot,i.new_product_confirmed,r.name_cn,r.fields,r.evidence_ref,
+ r.reason,r.actor_id,r.recorded_at,
+ coalesce(choice_counts.bigseller, 0)::text AS bigseller,
+ coalesce(choice_counts.jushuitan, 0)::text AS jushuitan
+ FROM catalog.catalog_item i
+ JOIN catalog.item_revision r ON r.item_id = i.id
+ ${choiceCountsJoin}`;
+      const result = await c.query<RevisionRow>(`${historySelect} WHERE i.id=$1 ORDER BY r.revision DESC`, [itemId]);
       return result.rows.map(revisionDto);
     });
+  },
+  async bsNotCreatedItemIds(identity: DbIdentity): Promise<Set<string>> {
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const { rows } = await c.query<{ id: string }>(
+        `SELECT DISTINCT selected_item_id AS id FROM catalog.decision_evidence
+         WHERE entry_kind = 'history:batch_bs_not_created'
+           AND summary->>'sourceSystem' = 'bigseller'
+           AND summary->>'status' = 'user_confirmed_not_created'
+           AND selected_item_id IS NOT NULL`,
+      );
+      return new Set(rows.map((row) => row.id));
+    });
+  },
+  async itemStatusFlags(identity: DbIdentity, itemId: string): Promise<{ bsNotCreated: boolean; brushPending: boolean }> {
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const { rows } = await c.query<{ bs_not_created: boolean; brush_pending: boolean }>(
+        `SELECT
+          EXISTS(
+            SELECT 1 FROM catalog.decision_evidence
+            WHERE selected_item_id = $1
+              AND entry_kind = 'history:batch_bs_not_created'
+              AND summary->>'sourceSystem' = 'bigseller'
+              AND summary->>'status' = 'user_confirmed_not_created'
+          ) AS bs_not_created,
+          EXISTS(
+            SELECT 1 FROM catalog.decision_evidence
+            WHERE selected_item_id = $1
+              AND entry_kind = 'history:batch_brush_preservation'
+              AND summary->>'status' = 'pending_confirmation'
+          ) AS brush_pending`,
+        [itemId],
+      );
+      const row = rows[0];
+      return { bsNotCreated: Boolean(row?.bs_not_created), brushPending: Boolean(row?.brush_pending) };
+    });
+  },
+  async sourceSearchTokensByItem(identity: DbIdentity): Promise<Map<string, string[]>> {
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const { rows } = await c.query<{ item_id: string; tokens: string[] }>(
+        `SELECT d.selected_item_id AS item_id,
+          array_agg(DISTINCT sku.raw ORDER BY sku.raw) AS tokens
+         FROM catalog.decision_evidence d
+         JOIN catalog.source_observation o ON o.id = d.observation_id
+         CROSS JOIN LATERAL (
+           SELECT NULLIF(trim(both FROM o.fields #>> '{sku,raw}'), '') AS raw
+           WHERE o.fields #>> '{sku,state}' = 'observed'
+             AND o.fields #>> '{sku,meaning}' = 'value'
+         ) sku
+         WHERE d.entry_kind = 'candidate_snapshot'
+           AND d.selected_item_id IS NOT NULL
+           AND sku.raw IS NOT NULL
+         GROUP BY d.selected_item_id`,
+      );
+      return new Map(rows.map((row) => [row.item_id, row.tokens ?? []]));
+    });
+  },
+  async adminSummaryCounts(identity: DbIdentity): Promise<{
+    items: number; coded: number; observations: number; choices: number; history: number;
+  }> {
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const { rows } = await c.query<{ items: string; coded: string; observations: string; choices: string; history: string }>(
+        `SELECT
+          (SELECT count(*)::text FROM catalog.catalog_item i WHERE i.first_release_id IS NOT NULL) AS items,
+          (SELECT count(*)::text FROM catalog.catalog_item i
+            JOIN catalog.item_current c ON c.item_id = i.id
+            JOIN catalog.item_revision r ON r.item_id = i.id AND r.revision = c.revision
+            WHERE i.first_release_id IS NOT NULL AND r.ice_code_snapshot IS NOT NULL) AS coded,
+          (SELECT count(*)::text FROM catalog.source_observation) AS observations,
+          (SELECT count(*)::text FROM catalog.decision_evidence WHERE entry_kind = 'candidate_snapshot' AND selected_item_id IS NOT NULL) AS choices,
+          (SELECT count(*)::text FROM catalog.decision_evidence WHERE entry_kind <> 'candidate_snapshot') AS history`,
+      );
+      const row = rows[0]!;
+      return {
+        items: Number(row.items),
+        coded: Number(row.coded),
+        observations: Number(row.observations),
+        choices: Number(row.choices),
+        history: Number(row.history),
+      };
+    });
+  },
+  async decisionsPage(identity: DbIdentity, options: { offset: number; limit: number }): Promise<{ total: number; rows: SafeDecision[] }> {
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const totalRow = (await c.query<{ count: string }>('SELECT count(*)::text AS count FROM catalog.decision_evidence')).rows[0]!;
+      const { rows } = await c.query(
+        `SELECT id AS "decisionId",entry_kind AS "entryKind",entry_key AS "entryKey",
+        observation_id AS "observationId",selected_item_id AS "selectedItemId",selected_jushuitan_ref AS "selectedJushuitanRef",
+        review_state AS "reviewState",raw_ref AS "rawRef",summary FROM catalog.decision_evidence
+        ORDER BY entry_kind, entry_key OFFSET $1 LIMIT $2`,
+        [options.offset, options.limit],
+      );
+      return { total: Number(totalRow.count), rows: rows as SafeDecision[] };
+    });
+  },
+  async observationsPage(identity: DbIdentity, options: { offset: number; limit: number }): Promise<{ total: number; rows: SafeObservation[] }> {
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const totalRow = (await c.query<{ count: string }>('SELECT count(*)::text AS count FROM catalog.source_observation')).rows[0]!;
+      const { rows } = await c.query(
+        `SELECT o.id AS "observationId",n.system AS "sourceSystem",o.entry_key AS "entryKey",
+        o.legacy_candidate_id AS "legacyCandidateId",o.position,o.scope,o.fields,o.review_state AS "reviewState",o.raw_ref AS "rawRef",b.coverage,
+        d.selected_item_id AS "selectedItemId",d.id AS "existingDecisionRef",coalesce(d.summary->'flags','[]'::jsonb) AS conflicts FROM catalog.source_observation o
+        JOIN catalog.observation_batch b ON b.id=o.batch_id JOIN catalog.source_dataset ds ON ds.id=b.dataset_id
+        JOIN catalog.source_namespace n ON n.id=ds.namespace_id LEFT JOIN catalog.decision_evidence d ON d.observation_id=o.id AND d.entry_kind='candidate_snapshot'
+        ORDER BY n.system,o.entry_key OFFSET $1 LIMIT $2`,
+        [options.offset, options.limit],
+      );
+      return { total: Number(totalRow.count), rows: rows as SafeObservation[] };
+    });
+  },
+  async allObservationsWithDecisionsOnClient(client: PoolClient, identity: DbIdentity): Promise<SafeObservation[]> {
+    void identity;
+    await client.query('SELECT catalog.require_admin()');
+    return queryObservationRows(client, '', []);
+  },
+  async allObservationsWithDecisions(identity: DbIdentity): Promise<SafeObservation[]> {
+    return withAppDb(identity, (c) => catalogRepository.allObservationsWithDecisionsOnClient(c, identity));
+  },
+  async observationsForItemOnClient(
+    client: PoolClient,
+    identity: DbIdentity,
+    item: CatalogItemDto,
+  ): Promise<SafeObservation[]> {
+    await client.query('SELECT catalog.require_admin()');
+    const pool = await fetchItemAuditObservationPool(client, item);
+    return scopeObservationsForItemAudit(item, pool, { verifyEquivalence: false }) as SafeObservation[];
+  },
+  async observationsForItem(identity: DbIdentity, item: CatalogItemDto): Promise<SafeObservation[]> {
+    return withAppDb(identity, (c) => catalogRepository.observationsForItemOnClient(c, identity, item));
   },
   async release(identity: DbIdentity): Promise<CatalogRelease | null> {
     return withAppDb(identity, async (c) => {
@@ -180,6 +498,10 @@ export const catalogRepository = {
   },
   async amounts(identity: DbIdentity, itemId: string): Promise<PreparedFinancial | null> {
     return withAppDb(identity, (c) => rpc(c, 'read_item_amounts', [itemId]));
+  },
+  async baselineAmountsMap(identity: DbIdentity): Promise<Map<string, PreparedFinancial | null>> {
+    const raw = await withAppDb(identity, (c) => rpc<Record<string, PreparedFinancial | null>>(c, 'read_baseline_item_amounts_map', []));
+    return new Map(Object.entries(raw ?? {}));
   },
   async observationAmounts(identity: DbIdentity, observationId: string): Promise<Record<string, FieldObservation> | null> {
     return withAppDb(identity, (c) => rpc(c, 'read_observation_amounts', [observationId]));

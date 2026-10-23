@@ -21,6 +21,8 @@ export interface CatalogDisplayRow {
     confirmedLineCount: number;
     warehouseOnHand: Record<string, string | null>;
     warehouseScopes: Record<string, WarehouseScopeView>;
+    /** Line-level inventory fingerprint per warehouse scope (includes `all`). */
+    inventoryProjectionByWarehouse: Record<string, string>;
     estimatedValueCny: string | null;
     valuationState: CatalogDisplayValuationState;
     valuationReason: string | null;

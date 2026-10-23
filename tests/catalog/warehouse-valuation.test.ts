@@ -7,8 +7,14 @@ const itemId = '11111111-1111-4111-8111-111111111199';
 const financial = (cost: string): PreparedFinancial => ({
   cost: { state: 'observed', meaning: 'value', raw: cost, evidenceRef: 'fixture' },
   operatingPrice: { state: 'observed', meaning: 'value', raw: '0', evidenceRef: 'fixture' },
-  financialRevision: 1,
   sourceRow: 1,
+  versions: [],
+  currency: 'unknown',
+  unit: 'unknown',
+  tax: 'unknown',
+  freight: 'unknown',
+  valuationAuthorized: false,
+  rawRef: 'fixture',
 });
 
 const rows = [

@@ -40,8 +40,10 @@ describe('local preview display read path', () => {
     const basis = await basisDocumentSha256();
     expect(overview!.basisDocumentSha256).toBe(basis);
     const wm0072 = overview!.rows.find((r) => r.item.iceCode === 'WM0072');
-    expect(wm0072?.adoptedUnitCost?.state).toBe('priced');
-    expect(wm0072?.adoptedUnitCost?.amountCny).toBe('5.18');
+    const wm0072Adopted = wm0072?.adoptedUnitCost;
+    expect(wm0072Adopted?.state).toBe('priced');
+    if (wm0072Adopted?.state !== 'priced') throw new Error('WM0072 must carry a priced adopted unit cost');
+    expect(wm0072Adopted.amountCny).toBe('5.18');
     const valued = overview!.rows.find((r) => r.bsSample.valuationState === 'valued');
     expect(valued?.bsSample.estimatedValueCny).toMatch(/^\d+(\.\d+)?$/);
     const scoped = wm0072?.bsSample.warehouseScopes;

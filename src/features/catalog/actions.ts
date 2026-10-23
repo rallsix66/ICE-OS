@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import type { ActionResult } from '@/types/common';
-import { appendCatalogNonPriceRevision, assignCatalogInitialCode, getCatalogAmounts, importCatalogFrozenObservations,
-  prepareCatalogBaseline, publishCatalogBaseline, recoverCatalogNewItemRequest } from './service';
+import { appendCatalogNonPriceRevision, assignCatalogInitialCode, getCatalogAdminDecisionsPage, getCatalogAdminObservationsPage,
+  getCatalogAmounts, getCatalogDetailArtifacts, getCatalogDetailAudit, getCatalogDetailHistory, getCatalogDetailView, getCatalogItemBsSample,
+  importCatalogFrozenObservations, prepareCatalogBaseline, publishCatalogBaseline, recoverCatalogNewItemRequest } from './service';
 
 /** Never echo PostgreSQL details, Zod input values, paths or financial source data. */
 async function perform<T>(fn: () => Promise<T>, mutation = false): Promise<ActionResult<T> & { outcome?: 'unknown' }> {
@@ -50,4 +51,32 @@ export async function appendNonPriceRevisionAction(input: unknown) { return perf
 export async function getCatalogAmountsAction(itemId: string) { return perform(() => getCatalogAmounts(itemId)); }
 export async function recoverCatalogNewItemRequestAction(input: { kind: 'initial_code' | 'nonprice_revision'; input: unknown }) {
   return perform(() => recoverCatalogNewItemRequest(input));
+}
+
+export async function fetchCatalogDetailViewAction(itemId: string, warehouse?: string) {
+  return perform(() => getCatalogDetailView(itemId, warehouse?.trim() || undefined));
+}
+
+export async function fetchCatalogDetailHistoryAction(itemId: string) {
+  return perform(() => getCatalogDetailHistory(itemId));
+}
+
+export async function fetchCatalogDetailAuditAction(itemId: string) {
+  return perform(() => getCatalogDetailAudit(itemId));
+}
+
+export async function fetchCatalogDetailArtifactsAction() {
+  return perform(() => getCatalogDetailArtifacts());
+}
+
+export async function fetchCatalogAdminDecisionsAction(offset: number, limit: number) {
+  return perform(() => getCatalogAdminDecisionsPage(offset, limit));
+}
+
+export async function fetchCatalogAdminObservationsAction(offset: number, limit: number) {
+  return perform(() => getCatalogAdminObservationsPage(offset, limit));
+}
+
+export async function fetchCatalogItemBsSampleAction(itemId: string, warehouse?: string) {
+  return perform(() => getCatalogItemBsSample(itemId, warehouse?.trim() || undefined));
 }

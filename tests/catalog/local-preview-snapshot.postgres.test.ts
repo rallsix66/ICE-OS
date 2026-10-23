@@ -15,7 +15,6 @@ function canonicalProjection(overview: NonNullable<Awaited<ReturnType<typeof bui
       itemId: r.item.itemId,
       adoptedUnitCostCny: r.adoptedUnitCost?.state === 'priced' ? r.adoptedUnitCost.amountCny : r.adoptedUnitCost?.state ?? null,
       bsConfirmedLines: r.bsSample.confirmedLineCount,
-      bsUnselectedLines: r.bsSample.unselectedLineCount,
       valuationState: r.bsSample.valuationState,
       onHandTotal: r.bsSample.confirmedOnHandTotal,
     }))

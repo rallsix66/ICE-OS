@@ -7,7 +7,12 @@ const chromiumLogFile = path.join(evidenceDirectory, 'chromium-debug.log');
 
 export default defineConfig({
   testDir: './tests/catalog',
-  testMatch: ['**/catalog.browser.pw.ts', '**/local-preview.browser.pw.ts'],
+  testMatch: [
+    '**/local-preview.browser.pw.ts',
+    '**/local-preview-ux-regression.pw.ts',
+    '**/local-preview-z-detail-recovery.pw.ts',
+    '**/catalog-detail-loader-cache.pw.ts',
+  ],
   workers: 1,
   fullyParallel: false,
   timeout: 120_000,
