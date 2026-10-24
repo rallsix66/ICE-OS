@@ -157,11 +157,11 @@ async function verify014AuditObservationPoolIndexes(client) {
 
 export { VERIFY_013_BASELINE_AMOUNTS_BATCH_SQL, evaluate013CatalogRow, normalizeFunctionBody };
 
-function assertIncrementObjectVerified(relativePath, checkResult, { afterApply = false } = {}) {
+function assertIncrementObjectVerified(relativePath, checkResult, { afterApply = false, requireInstalled = false } = {}) {
   if (!checkResult.installed) {
-    if (afterApply) {
+    if (afterApply || requireInstalled) {
       throw new Error(
-        `CATALOG_SQL_INCREMENT_VERIFY_FAILED:${relativePath}:object still missing after applying increment SQL`,
+        `CATALOG_SQL_INCREMENT_VERIFY_FAILED:${relativePath}:object is not installed in the database`,
       );
     }
     return;
@@ -193,14 +193,19 @@ export async function syncCatalogSqlIncrements(ownerClient, instanceRoot, option
   let applied = manifest.applied;
 
   if (options.recordOnly?.length) {
+    /* recordOnly 只能登记“数据库对象已实际安装且定义/授权核验通过”的条目；
+       不能再凭 manifest 或文件存在生成成功凭证。 */
     for (const entry of options.recordOnly) {
       if (!CATALOG_SQL_INCREMENT_PATHS.includes(entry.path)) continue;
+      const checkInstalled = DB_INSTALLED_CHECKS[entry.path];
+      const checkResult = checkInstalled ? await checkInstalled(ownerClient) : { installed: false, verified: false, reason: 'no_check' };
+      assertIncrementObjectVerified(entry.path, checkResult, { requireInstalled: true });
       const existing = applied.find((row) => row.path === entry.path);
       if (existing && existing.sha256 !== entry.sha256) {
         throw new Error(`CATALOG_SQL_INCREMENT_HASH_MISMATCH:${entry.path}:manifest=${existing.sha256}:file=${entry.sha256}`);
       }
       if (!existing) {
-        applied.push({ path: entry.path, sha256: entry.sha256, appliedAt: new Date().toISOString(), source: 'prepare-local-preview' });
+        applied.push({ path: entry.path, sha256: entry.sha256, appliedAt: new Date().toISOString(), source: 'record-only-verified' });
       }
     }
     writeIncrementManifest(instanceRoot, applied);
@@ -210,27 +215,32 @@ export async function syncCatalogSqlIncrements(ownerClient, instanceRoot, option
   for (const relative of CATALOG_SQL_INCREMENT_PATHS) {
     const sha256 = sha256File(relative);
     const existing = applied.find((row) => row.path === relative);
-    if (existing?.sha256 === sha256) continue;
     if (existing && existing.sha256 !== sha256) {
       throw new Error(`CATALOG_SQL_INCREMENT_HASH_MISMATCH:${relative}:manifest=${existing.sha256}:file=${sha256}`);
     }
     const checkInstalled = DB_INSTALLED_CHECKS[relative];
-    const checkResult = checkInstalled ? await checkInstalled(ownerClient) : { installed: false, verified: false };
+    if (!checkInstalled) throw new Error(`CATALOG_SQL_INCREMENT_NO_DB_CHECK:${relative}`);
+    /* manifest 命中也要核数据库对象；只核文件/记录会把缺 014 的库误判为已安装。 */
+    const checkResult = await checkInstalled(ownerClient);
     if (checkResult.installed) {
       assertIncrementObjectVerified(relative, checkResult);
-      applied.push({
-        path: relative,
-        sha256,
-        appliedAt: new Date().toISOString(),
-        source: 'reconciled-from-database',
-      });
+      if (!existing) {
+        applied.push({
+          path: relative,
+          sha256,
+          appliedAt: new Date().toISOString(),
+          source: 'reconciled-from-database',
+        });
+      }
       continue;
     }
     await ownerClient.query(fs.readFileSync(path.join(REPO_ROOT, relative), 'utf8'));
     await ownerClient.query('RESET ROLE; RESET ALL');
-    const afterApply = checkInstalled ? await checkInstalled(ownerClient) : { installed: false, verified: false, reason: 'missing' };
+    const afterApply = await checkInstalled(ownerClient);
     assertIncrementObjectVerified(relative, afterApply, { afterApply: true });
-    applied.push({ path: relative, sha256, appliedAt: new Date().toISOString(), source: 'apply-catalog-increments' });
+    const next = { path: relative, sha256, appliedAt: new Date().toISOString(), source: 'apply-catalog-increments' };
+    if (existing) Object.assign(existing, next);
+    else applied.push(next);
   }
   writeIncrementManifest(instanceRoot, applied);
   return applied;

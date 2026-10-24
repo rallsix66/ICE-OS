@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   REPO_ROOT, readArgs, openRun, newEvidence, writeJson, safeEnv, runCommand, assertLiveInstance,
 } from './prepare.mjs';
-import { CATALOG_SQL_INCREMENT_PATHS, sha256File, syncCatalogSqlIncrements } from './catalog-sql-increments.mjs';
+import { syncCatalogSqlIncrements } from './catalog-sql-increments.mjs';
 
 const LOCAL_SQL = [
   'db/catalog/009_local_display.sql',
@@ -48,9 +48,8 @@ export async function prepareLocalPreview(argv = process.argv.slice(2)) {
   const owner = new pg.Client({ connectionString: ownerUrl });
   await owner.connect();
   try {
-    await syncCatalogSqlIncrements(owner, run.instanceRoot, {
-      recordOnly: CATALOG_SQL_INCREMENT_PATHS.map((relative) => ({ path: relative, sha256: sha256File(relative) })),
-    });
+    /* 走真实增量链：manifest 命中仍核 DB；缺 014 时实际执行 014，不再 recordOnly 虚报。 */
+    await syncCatalogSqlIncrements(owner, run.instanceRoot);
   } finally {
     await owner.end();
   }
