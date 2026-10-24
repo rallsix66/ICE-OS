@@ -1,0 +1,728 @@
+/* 商品库内容层样式（content-ui 独占）：F11 来源证据/历史中文摘要 + 原始证据层；F12 管理与审计只读记录表。
+   只在本文件新增规则，不改 workspace-visual.module.css / ice-v4.module.css，避免影响 Demo 消费者。 */
+
+.page {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  max-width: 100%;
+  color: #273244;
+}
+
+.pageHeader {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #7485ae;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.pageTitle {
+  margin: 0;
+  color: #273244;
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.lead {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 2px 0;
+  color: #7485ae;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.backLink:hover {
+  color: #5266d7;
+}
+
+/* ---------- 面板 ---------- */
+
+.panel {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid #e6e8ec;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px 13px;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.panelHeading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.panelTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.panelNote {
+  margin: 0;
+  color: #79828f;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.panelBody {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+.badge {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: 1px solid #dfe4ee;
+  border-radius: 999px;
+  background: #f8f9fc;
+  color: #5c6c86;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.badgeIndigo {
+  border-color: #c9d3f5;
+  background: #eef1ff;
+  color: #4057c0;
+}
+
+.badgeWarn {
+  border-color: #ecd9b4;
+  background: #fdf7ec;
+  color: #8a6420;
+}
+
+/* ---------- 阅读说明 / 中文摘要 ---------- */
+
+.legend {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #e6e8ec;
+  border-radius: 11px;
+  background: #f8f9fc;
+}
+
+.legendTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.legendList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.summaryGrid > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.summaryGrid dt {
+  margin: 0;
+  color: #8a94a1;
+  font-size: 11px;
+  font-weight: 450;
+}
+
+.summaryGrid dd {
+  margin: 0;
+  color: #3c4859;
+  font-size: 13px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.summaryLine {
+  margin: 0;
+  color: #3c4859;
+  font-size: 13px;
+  line-height: 1.75;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: #79828f;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.notEnabled {
+  color: #8a6420;
+}
+
+.positive {
+  color: #267451;
+}
+
+.codeCell {
+  color: #6b7686;
+  font-size: 11px;
+  line-height: 1.65;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+/* ---------- 记录 / 分区 ---------- */
+
+.recordList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.record {
+  display: grid;
+  gap: 9px;
+  padding: 14px 0;
+  border-top: 1px solid #f0f1f4;
+  min-width: 0;
+}
+
+.record:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.recordTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.recordMeta {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 13px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.subsection {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.subsectionTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ---------- 原始证据展开层 ---------- */
+
+.rawDetails {
+  min-width: 0;
+  border-top: 1px dashed #e4e8ef;
+  padding-top: 9px;
+}
+
+.rawDetails > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #7485ae;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.rawDetails > summary:hover {
+  color: #5266d7;
+}
+
+.rawBody {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 8px;
+}
+
+.rawText {
+  margin: 0;
+  color: #6b7686;
+  font-size: 11px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.rawPre {
+  max-height: 320px;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #f8f9fc;
+  color: #55606f;
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+/* ---------- 表格（本页局部滚动，不撑破页面） ---------- */
+
+.tableScroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid #eef0f3;
+  border-radius: 9px;
+  scrollbar-width: thin;
+  scrollbar-color: #cfd5df #f7f8fa;
+}
+
+.table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th {
+  padding: 9px 12px;
+  border-bottom: 1px solid #e9ecf1;
+  background: #f9fafc;
+  color: #8a94a1;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f2f3f6;
+  color: #4d5a6b;
+  font-size: 13px;
+  line-height: 1.65;
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+  background: #fafbfe;
+}
+
+.tableNote {
+  margin: 0;
+  color: #8a94a1;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* ---------- 状态 / 恢复 ---------- */
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  min-height: 34px;
+}
+
+.errorBox {
+  display: grid;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid #efd9d6;
+  border-left: 3px solid #c0554f;
+  border-radius: 8px;
+  background: #fdf6f5;
+}
+
+.errorText {
+  margin: 0;
+  color: #8d3a35;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.emptyBox {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px dashed #dfe4ee;
+  border-radius: 9px;
+  background: #f8f9fc;
+}
+
+.emptyText {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+/* ---------- 表单（保留既有字段与标签，只统一间距/字号） ---------- */
+
+.fieldRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  min-width: 0;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: #3c4859;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.field > :is(input, select) {
+  min-height: 34px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 7px;
+  background: #fff;
+  color: #273244;
+  font: inherit;
+  font-size: 13px;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+.maintenanceNote {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #ecd9b4;
+  border-radius: 8px;
+  background: #fdf7ec;
+}
+
+.maintenanceText {
+  margin: 0;
+  color: #7a5a1b;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+/* ---------- R8：从待处理/详情带入的原记录/原观测定位高亮（一次性，无动画） ---------- */
+
+.recordFocused,
+.panelFocused {
+  scroll-margin-top: 24px;
+  outline: 3px solid #8495ed;
+  outline-offset: 3px;
+  border-radius: 9px;
+}
+
+.recordFocused:focus-visible,
+.panelFocused:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: 3px;
+}
+
+/* ---------- R6：相关处理入口（逐侧状态 + 独立重试，弹窗与直链共用） ---------- */
+
+.attachmentBlock {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e6e8ec;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.attachmentHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.attachmentTitle {
+  margin: 0 0 4px;
+  color: #344154;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attachmentNote {
+  margin: 0;
+  color: #79828f;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.attachmentSides {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.attachmentSide {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px dashed #e4e8ef;
+}
+
+.attachmentSide:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.attachmentSideHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.attachmentSideTitle {
+  margin: 0;
+  color: #3c4859;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attachmentSideNote {
+  margin: 0;
+  color: #79828f;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.attachmentSideError {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #efd9d6;
+  border-left: 3px solid #c0554f;
+  border-radius: 8px;
+  background: #fdf6f5;
+}
+
+.attachmentSideErrorText {
+  margin: 0;
+  color: #8d3a35;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---------- R6：管理页读取骨架（固定高度，避免加载态截图跳动；不做动画） ---------- */
+
+.skeletonBlock {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+
+.skeletonRow {
+  height: 34px;
+  border: 1px solid #eef0f3;
+  border-radius: 7px;
+  background: #f8f9fc;
+}
+
+.skeletonRowShort {
+  width: 62%;
+}
+
+.skeletonNote {
+  margin: 0;
+  color: #79828f;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* ---------- U3/R9：数据维护 · 商品技术档案入口 ---------- */
+
+.evidenceEntry {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.evidenceList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidenceItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #fafbfe;
+}
+
+.evidenceItemTitle {
+  margin: 0;
+  color: #3c4859;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.evidenceLink {
+  color: #5266d7;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+/* ---------- R9：启用态处理页（新品/来源）统一表单与状态 ---------- */
+
+.formFieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 13px;
+  border: 1px solid #eef0f3;
+  border-radius: 9px;
+  background: #fbfcfe;
+}
+
+.formFieldset > legend {
+  padding: 0 6px;
+  color: #344154;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.formFieldset > p {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.checkLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #3c4859;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.checkLabel input {
+  width: 15px;
+  height: 15px;
+  accent-color: #5266d7;
+}
+
+.inlineCode {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f1f3f8;
+  color: #55606f;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+@media (max-width: 700px) {
+  .panelHeader {
+    padding: 14px 14px 12px;
+  }
+
+  .panelBody {
+    padding: 14px;
+  }
+
+  .summaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .table {
+    min-width: 620px;
+  }
+
+  .attachmentHead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

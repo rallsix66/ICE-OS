@@ -95,6 +95,40 @@ async function catalogRscNavigation(page: Page, url: string, navigate: () => Pro
   } finally { clearTimeout(timer); await page.unroute(catalogPattern, handler); }
 }
 
+/** v3（V3-01）：已建档商品的详情不再常驻候选/附件块；来源与授权证据只在**同一弹窗内的子视图**
+ * （`catalog-detail-more` → `catalog-more-evidence` → `catalog-evidence-view`）。
+ * 本 helper 打开该商品的统一弹窗与证据子视图，断言候选可见性（服务端按来源范围过滤的语义不变），
+ * 然后原位返回并关闭弹窗，避免把“另一页/另一弹窗”当作证据。 */
+async function withEvidenceCandidates(page: Page, itemId: string, run: (view: import('@playwright/test').Locator) => Promise<void>) {
+  await page.goto(`/dashboard/catalog?detail=${itemId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  const more = page.getByTestId('catalog-detail-more');
+  await expect(more).toBeVisible({ timeout: 30_000 });
+  if ((await more.getAttribute('open')) === null) await more.locator('summary').click();
+  await page.getByTestId('catalog-more-evidence').click();
+  const view = page.getByTestId('catalog-evidence-view');
+  await expect(view).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => view.getAttribute('data-evidence-state'), { timeout: 60_000 }).not.toBe('loading');
+  try {
+    await run(view);
+  } finally {
+    const back = page.getByTestId('catalog-evidence-back');
+    if (await back.count()) await back.click().catch(() => {});
+    const close = page.getByTestId('catalog-detail-close');
+    if (await close.count()) await close.click().catch(() => {});
+    else await page.getByLabel('关闭商品详情').click().catch(() => {});
+  }
+}
+async function assertEvidenceCandidates(page: Page, itemId: string, expected: {
+  present: string[]; absent: string[]; emptySource: boolean;
+}) {
+  await withEvidenceCandidates(page, itemId, async (view) => {
+    for (const marker of expected.present) await expect(view).toContainText(marker);
+    for (const marker of expected.absent) await expect(view).not.toContainText(marker);
+    if (expected.emptySource) await expect(view).toContainText('没有候选');
+  });
+}
+
 async function guard(context: BrowserContext) {
   await context.route('**/*', (route) => {
     const url = new URL(route.request().url());
@@ -192,8 +226,10 @@ async function selectIntakeScope(page: Page, scope: string) {
   await expect(selector).toHaveValue(scope);
 }
 async function importCapture(page: Page, id: string, scope = A) {
-  await intake(page, scope); await page.getByLabel('固定商品资料', { exact: true }).selectOption(id);
-  await page.getByRole('button', { name: '准备商品观测预览', exact: true }).click(); await expect(page.getByTestId('product-capture-preview')).toContainText(id);
+  await intake(page, scope); await page.getByLabel('取样商品资料', { exact: true }).selectOption(id);
+  await page.getByRole('button', { name: '准备商品观测预览', exact: true }).click(); await expect(page.getByTestId('product-capture-preview')).toContainText('已固定观测预览');
+  await expect(page.getByTestId('product-capture-preview')).toContainText(/\d+ 条观测/);
+  await expect(page.getByTestId('product-capture-preview')).not.toContainText(id);
   const response = await actionHttp(page, `import-${id}`, (input) => input.approvedFixtureId === id && typeof input.requestId === 'string',
     () => page.getByRole('button', { name: '导入商品观测', exact: true }).click());
   expect(response.result.success).toBe(true); await expect(page.getByTestId('new-item-status')).toContainText('本次操作已保存');
@@ -206,14 +242,19 @@ async function classify(page: Page, observationId: string, label: string) {
   const section = editor(page, observationId); await section.getByLabel('分类', { exact: true }).selectOption('new_item');
   await section.getByLabel('分类理由', { exact: true }).fill(label);
   const response = await actionHttp(page, label, (input) => input.privateReason === label, () => section.getByRole('button', { name: '保存分类', exact: true }).click());
-  expect(response.result.success).toBe(true); await expect(section).toContainText('new_item / proposed'); return response;
+  expect(response.result.success).toBe(true);
+  // F11/F12：面板改为中文业务摘要，技术编码移入「技术说明（维护）」块（分类编码 / 复核状态），
+  // 因此不再有旧的「new_item / proposed」拼接文本；这里断言同一事实的两个中文标签。
+  await expect(section).toContainText('分类编码 new_item');
+  await expect(section).toContainText('复核状态 proposed');
+  return response;
 }
 async function createItem(page: Page, observationId: string, label: string, loseAck = false) {
   const section = editor(page, observationId); await section.getByLabel('新品确认理由', { exact: true }).fill(label);
   await section.getByRole('button', { name: '准备新品采用预览', exact: true }).click(); await expect(section.getByTestId('new-item-adoption-preview')).toBeVisible();
   const response = await actionHttp(page, label, (input) => input.privateReason === label, () => section.getByRole('button', { name: '确认新增商品', exact: true }).click(), { loseAck });
   expect(response.result.success).toBe(true); expect(response.result.data!.created).toBe(true);
-  if (!loseAck) await expect(page.getByTestId('new-item-result')).toContainText(String(response.result.data!.itemId));
+  if (!loseAck) await expect(page.getByTestId('new-item-result')).toHaveAttribute('data-item-id', String(response.result.data!.itemId));
   return response;
 }
 async function assertBaselineProtected() { expect(await publicRows()).toEqual(initialPublic); expect(await baselineState()).toEqual(frozenBaseline); expect(outside).toEqual([]); }
@@ -265,13 +306,15 @@ test('C127真实建档与未知回执核对；缺码、补码修订、历史和�
     workspaceConfigSha256: hash(fs.readFileSync(workspaceConfig)), buildId: fs.readFileSync(path.join(process.cwd(), '.next/BUILD_ID'), 'utf8').trim(),
     approval: '.local/catalog/new-item-framework-cache-review-20261021T011540Z-64be7a56/decision.md',
     boundary: 'Approved framework no-store amendment; literal Cookie is not asserted for Page/RSC/Action. Independent raw/export GET retains Cookie.' });
-  expect(hash(fs.readFileSync(sourceConfig))).toBe(hash(fs.readFileSync(workspaceConfig))); await catalogPage(page, '/dashboard/catalog');
+  expect(hash(fs.readFileSync(sourceConfig))).toBe(hash(fs.readFileSync(workspaceConfig)));
+  // 维护动作（准备/发布固定基线、承接冻结观测）与 manifest-counts 在维护页，不在列表页。
+  await catalogPage(page, '/dashboard/catalog/admin');
   await page.getByRole('button', { name: '准备固定基线预览', exact: true }).click(); await expect(page.getByTestId('manifest-counts')).toContainText('完整产物 147 份');
   await page.getByRole('button', { name: '发布固定基线', exact: true }).click(); await expect(page.getByRole('status')).toContainText('已原子承接');
   await page.getByRole('button', { name: '承接冻结飞书观测', exact: true }).click(); await expect(page.getByRole('status')).toContainText('159格');
   frozenBaseline = await baselineState(); expect(frozenBaseline).toMatchObject({ items: 126, choices: 548 });
   original122 = (await owner.query('SELECT item_id FROM catalog.baseline_item_anchor WHERE row_position=122')).rows[0].item_id;
-  await page.goto(`/dashboard/catalog/${original122}`); await expect(page.getByTestId('item-code')).toHaveText('待补货号');
+  await page.goto(`/dashboard/catalog/${original122}`); await expect(page.getByTestId('catalog-material-ice-code')).toContainText('待补货号');
   const imported = await importCapture(page, 'a-main'); mainObservation = imported.rows[0].id; mainCapture = imported.captureId;
   await classify(page, mainObservation, 'browser-main-classification');
   const created = await createItem(page, mainObservation, 'browser-main-confirm', true); mainItem = String(created.result.data!.itemId);
@@ -289,24 +332,44 @@ test('C127真实建档与未知回执核对；缺码、补码修订、历史和�
   expect((await owner.query('SELECT count(*)::int n FROM catalog.audit_event WHERE request_id=$1', [originalInput.requestId])).rows[0].n).toBe(0);
   expect((await owner.query('SELECT count(*)::int n FROM catalog.catalog_item')).rows[0].n).toBe(127);
   await catalogRscNavigation(page, '/dashboard/catalog', () => page.getByRole('link', { name: '返回商品资料', exact: true }).click());
-  await catalogRscNavigation(page, '/dashboard/catalog/intake', () => page.getByRole('link', { name: '持续新品资料工作区', exact: true }).click());
+  // U7：侧栏旧入口已删除，URL 仍可达（catalogPage 仍校验 200 与私有缓存头）。
+  await catalogPage(page, '/dashboard/catalog/intake');
   await selectIntakeScope(page, A);
-  await catalogRscNavigation(page, `/dashboard/catalog/${mainItem}`, () => editor(page, mainObservation).getByRole('link', { name: `已有商品 ${mainItem}`, exact: true }).click());
-  await expect(page.getByTestId('item-uuid')).toHaveText(mainItem);
-  await catalogPage(page, `/dashboard/catalog/${mainItem}`); await expect(page.getByTestId('item-uuid')).toHaveText(mainItem); await expect(page.getByTestId('item-code')).toHaveText('待补货号');
+  // F11/F12：链接名称现在为「已有商品 <uuid>（<来源种类>）」，用 UUID 正则匹配同一意图。
+  await catalogRscNavigation(page, `/dashboard/catalog/${mainItem}`, () => editor(page, mainObservation).getByRole('link', { name: new RegExp(`已有商品 ${mainItem}`) }).click());
+  await expect(page).toHaveURL(new RegExp(mainItem));
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  // 日常详情不再展示 item-uuid（技术证据退到授权维护页），身份改由 URL 与商品资料货号行核对。
+  await expect(page.getByTestId('catalog-material-ice-code')).toContainText('待补货号');
+  // v3：UUID 只在弹窗内“来源与证据”子视图出现（不再跳维护页）。
+  await page.goto(`/dashboard/catalog?detail=${mainItem}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('catalog-detail-more').locator('summary').click();
+  await page.getByTestId('catalog-more-evidence').click();
+  await expect(page.getByTestId('catalog-evidence-view')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('catalog-evidence-subject')).toContainText('待补货号', { timeout: 60_000 });
+  await expect(page.getByTestId('catalog-evidence-subject')).not.toContainText(mainItem);
+  await page.getByTestId('catalog-evidence-back').click();
+  await page.getByTestId('catalog-detail-close').click();
+  await catalogPage(page, `/dashboard/catalog/${mainItem}`);
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('catalog-material-ice-code')).toContainText('待补货号');
   await expect(page.getByText('新品，待补货号', { exact: true })).toBeVisible(); expect((await itemState(mainItem)).financial_revision).toBeNull();
-  await page.getByLabel('首次ICE货号', { exact: true }).fill('N1C-BROWSER-127'); await page.getByLabel('补码依据', { exact: true }).fill('browser-initial-code-private-reason');
+  // F13：补充资料在「编辑资料」编辑态里；直链页默认收起，必须真实点击入口（不能用注入显示）。
+  await page.getByRole('button', { name: '编辑资料', exact: true }).click();
+  await expect(page.getByTestId('catalog-detail-edit')).toBeVisible({ timeout: 30_000 });
+  await page.getByLabel('首次ICE货号', { exact: true }).fill('N1C-BROWSER-127'); await page.getByLabel('补码依据').fill('browser-initial-code-private-reason');
   const coded = await actionHttp(page, 'initial-code', (input) => input.reason === 'browser-initial-code-private-reason', () => page.getByRole('button', { name: '保存首次货号', exact: true }).click());
-  expect(coded.result.success).toBe(true); await expect(page.getByTestId('item-code')).toHaveText('N1C-BROWSER-127');
-  await page.getByLabel('修订字段', { exact: true }).selectOption('factory'); await page.getByLabel('明确采用值（留空表示明确空串）', { exact: true }).fill('虚构工厂修订');
+  expect(coded.result.success).toBe(true); await expect(page.getByTestId('catalog-material-ice-code')).toContainText('N1C-BROWSER-127');
+  await page.getByLabel('修订字段', { exact: true }).selectOption('factory'); await page.getByLabel('明确采用值（留空表示明确空串）').fill('虚构工厂修订');
   await page.getByLabel('证据引用', { exact: true }).fill('N1C_PRIVATE_BROWSER_FIELD_REFERENCE'); await page.getByLabel('修订理由', { exact: true }).fill('browser-revision-private-reason');
   const revised = await actionHttp(page, 'nonprice-revision', (input) => input.reason === 'browser-revision-private-reason', () => page.getByRole('button', { name: '保存非价格修订', exact: true }).click());
-  expect(revised.result.success).toBe(true); await expect(page.getByTestId('item-revision')).toHaveText('3'); await expect(page.getByRole('region', { name: '采用资料', exact: true })).toContainText('虚构工厂修订');
+  expect(revised.result.success).toBe(true); await expect(page.getByTestId('catalog-detail-version')).toHaveText('3'); await expect(page.getByTestId('catalog-material-details')).toContainText('虚构工厂修订');
   const after = await itemState(mainItem); expect(after.financial_revision).toBeNull(); expect(JSON.stringify(after.fields)).not.toContain('N1C_PRIVATE_BROWSER_FIELD_REFERENCE');
-  await page.goto(`/dashboard/catalog/${mainItem}?revision=1`); await expect(page.getByTestId('item-code')).toHaveText('待补货号');
-  await expect(page.getByRole('region', { name: '采用资料', exact: true })).not.toContainText('虚构工厂修订');
+  await page.goto(`/dashboard/catalog/${mainItem}?revision=1`); await expect(page.getByTestId('catalog-material-ice-code')).toContainText('待补货号');
+  await expect(page.getByTestId('catalog-material-details')).not.toContainText('虚构工厂修订');
   await importCapture(page, 'a-main'); expect(await itemState(mainItem)).toEqual(after);
-  await page.goto('/dashboard/catalog'); await page.getByRole('button', { name: '准备固定基线预览', exact: true }).click();
+  await page.goto('/dashboard/catalog/admin'); await page.getByRole('button', { name: '准备固定基线预览', exact: true }).click();
   await page.getByRole('button', { name: '发布固定基线', exact: true }).click(); await expect(page.getByRole('status')).toContainText('已原子承接');
   expect(await itemState(mainItem)).toEqual(after); expect((await owner.query('SELECT count(*)::int n FROM catalog.product_observation WHERE id=$1', [mainObservation])).rows[0].n).toBe(1);
   await assertBaselineProtected(); save('browser-main-final.json', { original122, mainItem, mainObservation, mainCapture, originalInput, beforeRecover, after, baselineProtected: true, publicUnchanged: true });
@@ -324,7 +387,7 @@ test('C10可靠来源新批无额外proof，实际A链和永久slot固定原商�
   expect(proofFacts).toHaveLength(2); for (const fact of proofFacts) { expect(fact.association_proofs).toEqual([]); expect(fact.status).toBe('linked'); expect(fact.state).toBe('active'); }
   expect(proofFacts[0].record_id).toBe(proofFacts[1].record_id);
   const section = editor(page, repeatedId); await section.getByLabel('复用理由', { exact: true }).fill('browser-source-slot-reuse');
-  await section.getByRole('button', { name: '准备同源复用', exact: true }).click(); await expect(section.getByTestId('source-slot-preview')).toContainText(itemId);
+  await section.getByRole('button', { name: '准备同源复用', exact: true }).click(); await expect(section.getByTestId('source-slot-preview')).toContainText('原商品已由服务器固定');
   const response = await actionHttp(page, 'source-slot-reuse', (input) => input.privateReason === 'browser-source-slot-reuse', () => section.getByRole('button', { name: '确认沿用原商品', exact: true }).click());
   expect(response.result).toMatchObject({ success: true, data: { itemId, created: false, associated: true, relationshipUsable: false } });
   const request = JSON.parse(response.sentBody)[0]; expect(request.basis).toEqual({ kind: 'source_slot' }); expect(await itemState(itemId)).toEqual(before);
@@ -374,25 +437,33 @@ test('C08无ID双端proof错配拒绝后正确关联；C09真正同来源证据�
 test('C06两个系统独立候选；共享采用字段、scoped raw/history/HTTP权限与撤权不泄漏', async ({ page, context, browser }) => {
   await guard(context); await login(page); await grant(B, ADMIN_A, { read: true });
   await importCapture(page, 'a-bs-candidate'); await page.goto(`/dashboard/catalog/${mainItem}`);
-  await expect(page.getByTestId('scoped-candidates-bigseller')).toContainText('N1C-BS-CANDIDATE'); await expect(page.getByTestId('scoped-candidates-jushuitan')).toContainText('暂无候选');
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  // (a)：普通商品详情不常驻候选/附件块；候选审计只在授权维护页。
+  await expect(page.getByTestId('catalog-detail-attachments')).toHaveCount(0);
+  await assertEvidenceCandidates(page, mainItem, { present: ['N1C-BS-CANDIDATE'], absent: ['N1C-JST-CANDIDATE'], emptySource: true });
   const before = await itemState(mainItem); const contextB = await browser.newContext(); await guard(contextB); const pageB = await contextB.newPage(); await login(pageB, 'scope-b@catalog.test', 'CatalogScopeB123!');
   await importCapture(pageB, 'b-jst-candidate', B); await pageB.goto(`/dashboard/catalog/${mainItem}`);
-  await expect(pageB.getByTestId('scoped-candidates-jushuitan')).toContainText('N1C-JST-CANDIDATE'); await expect(pageB.getByTestId('scoped-candidates-bigseller')).toContainText('暂无候选');
+  await expect(pageB.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  // 无权写入的提示在「商品资料」分区（默认分区）。
   await expect(pageB.getByTestId('catalog-write-denied')).toBeVisible();
-  await page.reload(); await expect(page.getByTestId('scoped-candidates-jushuitan')).toContainText('N1C-JST-CANDIDATE');
+  await assertEvidenceCandidates(pageB, mainItem, { present: ['N1C-JST-CANDIDATE'], absent: ['N1C-BS-CANDIDATE'], emptySource: true });
+  // A 侧重新打开维护页后也能看到 B 刚导入的 JST 候选（仍是作用域内可见，不是缓存旧值）。
+  await assertEvidenceCandidates(page, mainItem, { present: ['N1C-JST-CANDIDATE'], absent: [], emptySource: false });
   // A second real product and distinct candidate pair exercise the reverse arrival order without deleting old observations.
   await grant(A, ADMIN_B, { read: true });
   const secondMain = await importCapture(pageB, 'b-main', B), secondObservation = secondMain.rows[0].id;
   await classify(pageB, secondObservation, 'browser-second-main-classify');
   const secondCreated = await createItem(pageB, secondObservation, 'browser-second-main-create'), secondItem = String(secondCreated.result.data!.itemId), secondBefore = await itemState(secondItem);
   await importCapture(pageB, 'b-jst-candidate-second', B); await pageB.goto(`/dashboard/catalog/${secondItem}`);
-  await expect(pageB.getByTestId('scoped-candidates-jushuitan')).toContainText('N1C-JST-CANDIDATE-SECOND');
-  await expect(pageB.getByTestId('scoped-candidates-bigseller')).toContainText('暂无候选');
-  await importCapture(page, 'a-bs-candidate-second'); await pageB.reload();
-  await expect(pageB.getByTestId('scoped-candidates-bigseller')).toContainText('N1C-BS-CANDIDATE-SECOND');
-  await expect(pageB.getByTestId('item-uuid')).toHaveText(secondItem); expect(await itemState(secondItem)).toEqual(secondBefore);
-  await page.goto(`/dashboard/catalog/${mainItem}`); await pageB.goto(`/dashboard/catalog/${mainItem}`);
-  for (const activePage of [page, pageB]) { await expect(activePage.getByTestId('scoped-candidates-bigseller')).toContainText('N1C-BS-CANDIDATE'); await expect(activePage.getByTestId('scoped-candidates-jushuitan')).toContainText('N1C-JST-CANDIDATE'); }
+  await expect(pageB.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await assertEvidenceCandidates(pageB, secondItem, { present: ['N1C-JST-CANDIDATE-SECOND'], absent: ['N1C-BS-CANDIDATE-SECOND'], emptySource: true });
+  await importCapture(page, 'a-bs-candidate-second');
+  await assertEvidenceCandidates(pageB, secondItem, { present: ['N1C-JST-CANDIDATE-SECOND', 'N1C-BS-CANDIDATE-SECOND'], absent: [], emptySource: false });
+  await expect(pageB.getByTestId('catalog-evidence-subject')).toContainText('待补货号');
+  await expect(pageB.getByTestId('catalog-evidence-subject')).not.toContainText(secondItem); expect(await itemState(secondItem)).toEqual(secondBefore);
+  for (const activePage of [page, pageB]) {
+    await assertEvidenceCandidates(activePage, mainItem, { present: ['N1C-BS-CANDIDATE', 'N1C-JST-CANDIDATE'], absent: [], emptySource: false });
+  }
   expect(await itemState(mainItem)).toEqual(before);
   await grant(A, READ, { read: true, evidence: true, amount: true }); await grant(A, NO_AMOUNT, { read: true, manage: true, publish: true, evidence: true });
   await grant(A, NO_EVIDENCE, { read: true, manage: true, publish: true, amount: true });
@@ -415,7 +486,7 @@ test('C06两个系统独立候选；共享采用字段、scoped raw/history/HTTP
       expect(publicExport.status()).toBe(200); const body = await publicExport.text();
       assertPrivateGet(publicExport.headers());
       for (const sentinel of [...privateSentinels, 'browser-main-confirm', 'browser-revision-private-reason', 'N1C_PRIVATE_BROWSER_FIELD_REFERENCE', 'creationDecisionId', 'source_slot_basis']) expect(body).not.toContain(sentinel);
-      await actorPage.goto(`/dashboard/catalog/intake?scope=${A}`); const historyButton = actorPage.getByRole('button', { name: '读取敏感来源历史', exact: true });
+      await actorPage.goto(`/dashboard/catalog/intake?scope=${A}`); const historyButton = actorPage.getByRole('button', { name: '读取来源历史（需授权）', exact: true });
       const historyHttp = await actionHttp(actorPage, `history-${kind}`, (input) => input.projection === 'sensitive_history', () => historyButton.click(), { sensitive: rawAllowed });
       expect(historyHttp.result.success).toBe(rawAllowed);
       if (kind === 'readOnly') { sensitiveHistoryProbe = { actionId: historyHttp.actionId, body: historyHttp.sentBody }; originalSensitiveHistory = historyHttp.result.data ?? null; }
@@ -432,7 +503,7 @@ test('C06两个系统独立候选；共享采用字段、scoped raw/history/HTTP
   async function showCurrentSensitiveHistory(label: string) {
     await intake(readPage);
     const response = await actionHttp(readPage, label, (input) => input.projection === 'sensitive_history',
-      () => readPage.getByRole('button', { name: '读取敏感来源历史', exact: true }).click(), { sensitive: true });
+      () => readPage.getByRole('button', { name: '读取来源历史（需授权）', exact: true }).click(), { sensitive: true });
     expect(response.result.success).toBe(true); expect(response.result.data).toEqual(originalSensitiveHistory);
     await expect(readPage.getByTestId('sensitive-product-history')).toContainText('browser-main-confirm');
   }
@@ -440,12 +511,13 @@ test('C06两个系统独立候选；共享采用字段、scoped raw/history/HTTP
     // The existing sensitive DOM is real authorized output. Revoke, then re-read through the existing UI, rather than inferring UI safety from a raw HTTP denial.
     await expect(readPage.getByTestId('sensitive-product-history')).toContainText('browser-main-confirm');
     const denied = await actionHttp(readPage, `history-ui-${label}`, (input) => input.projection === 'sensitive_history',
-      () => readPage.getByRole('button', { name: '读取敏感来源历史', exact: true }).click());
+      () => readPage.getByRole('button', { name: '读取来源历史（需授权）', exact: true }).click());
     expect(denied.result.success).toBe(false); expect(denied.result).not.toHaveProperty('data');
     await expect(readPage.getByTestId('sensitive-product-history')).toHaveCount(0);
     await assertSensitiveHistoryDenied(readContext, label);
     await catalogRscNavigation(readPage, '/dashboard/catalog', () => readPage.getByRole('link', { name: '返回商品资料', exact: true }).click());
-    await catalogRscNavigation(readPage, '/dashboard/catalog/intake', () => readPage.getByRole('link', { name: '持续新品资料工作区', exact: true }).click());
+    // U7：侧栏旧入口已删除，URL 仍可达。
+    await catalogPage(readPage, '/dashboard/catalog/intake');
     await expect(readPage.getByTestId('sensitive-product-history')).toHaveCount(0);
     if (scopeStillReadable) {
       await selectIntakeScope(readPage, A); await expect(editor(readPage, mainObservation)).toBeVisible();
@@ -476,7 +548,7 @@ test('C06两个系统独立候选；共享采用字段、scoped raw/history/HTTP
   } finally { await owner.query('UPDATE catalog.source_scope_grant SET enabled=true,grant_revision=grant_revision+1 WHERE scope_id=$1 AND profile_id=$2', [A, READ]); }
   await readPage.goto(`/dashboard/catalog/intake?scope=${A}`);
   const restoredHistory = await actionHttp(readPage, 'history-restored-after-revocation', (input) => input.projection === 'sensitive_history',
-    () => readPage.getByRole('button', { name: '读取敏感来源历史', exact: true }).click(), { sensitive: true });
+    () => readPage.getByRole('button', { name: '读取来源历史（需授权）', exact: true }).click(), { sensitive: true });
   expect(originalSensitiveHistory).not.toBeNull(); expect(restoredHistory.result.success).toBe(true); expect(restoredHistory.result.data).toEqual(originalSensitiveHistory);
   await expect(readPage.getByTestId('sensitive-product-history')).toContainText('browser-main-confirm');
   const storage = await readPage.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } }));
@@ -490,7 +562,7 @@ test('C06两个系统独立候选；共享采用字段、scoped raw/history/HTTP
   const revoked = await contextB.request.get(`/api/catalog/product-evidence/${mainCapture}?projection=export`, { maxRedirects: 0 }); expect(revoked.status()).not.toBe(200);
   await assertDirectWriteDenied(contextB, pageB, 'revoked');
   await assertSensitiveHistoryDenied(contextB, 'scope-revoked');
-  await pageB.goto(`/dashboard/catalog/${mainItem}`); await expect(pageB.getByTestId('item-code')).toHaveText('N1C-BROWSER-127'); await expect(pageB.getByTestId('catalog-write-denied')).toBeVisible();
+  await pageB.goto(`/dashboard/catalog/${mainItem}`); await expect(pageB.getByTestId('catalog-material-ice-code')).toContainText('N1C-BROWSER-127'); await expect(pageB.getByTestId('catalog-write-denied')).toBeVisible();
   await pageB.goto(`/dashboard/catalog/intake?scope=${A}`); await expect(pageB.getByLabel('来源范围', { exact: true })).toHaveCount(0);
   await contextB.close(); await assertBaselineProtected(); save('browser-permissions-and-candidates-final.json', { mainItem, secondItem, before, after: await itemState(mainItem), secondBefore, secondAfter: await itemState(secondItem),
     candidateOrderingBoundary: 'Two distinct real products and frozen candidate pairs: first BS then later JST capture; second JST then later BS capture. Explicit isolated read grants precede late captures. No observation deletion, external target or Inventory placeholder.',

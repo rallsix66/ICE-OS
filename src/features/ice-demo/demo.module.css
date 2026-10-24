@@ -1,5 +1,0 @@
-/* Demo-only layout tweaks; shared visual rules live in workspace-visual.module.css */
-
-.demoRoot {
-  min-height: 100vh;
-}

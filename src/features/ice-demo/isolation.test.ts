@@ -65,6 +65,10 @@ describe('ICE v4 Demo is isolated from the live application', () => {
         }
         if (target && (inside(target, resolve(ROOT, 'src/components/ui'))
           || target === resolve(ROOT, 'src/lib/utils'))) return;
+        // 已批准的共享视觉层：Demo 与真实商品库共用同一套视觉 token/类名（纯 CSS，不含数据、
+        // 权限或业务逻辑）。本包 F17 按产品方向更新该条判定；隔离的其余安全断言（无 process/
+        // fetch/Server Action/网络/认证布局等）全部保留，不因此放宽。
+        if (target && inside(target, resolve(ROOT, 'src/ui/shared')) && dependency.endsWith('.module.css')) return;
         violations.push(`${relative(ROOT, path)} imports ${dependency}`);
       });
     }

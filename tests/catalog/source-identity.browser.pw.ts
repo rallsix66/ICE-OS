@@ -47,9 +47,10 @@ async function frozenState() {
     (SELECT md5(jsonb_agg(to_jsonb(f) ORDER BY item_id,financial_revision)::text) FROM catalog_private.item_financial_revision f) AS financial_hash`)).rows[0];
 }
 async function importFixture(page: Page, fixtureId: string) {
-  await page.getByLabel('固定fixture', { exact: true }).selectOption(fixtureId);
+  await page.getByLabel('取样样本文件', { exact: true }).selectOption(fixtureId);
   await page.getByRole('button', { name: '准备来源观测预览', exact: true }).click();
-  await expect(page.getByTestId('identity-preview')).toContainText(fixtureId);
+  await expect(page.getByTestId('identity-preview')).toContainText('样本观测预览已准备');
+  await expect(page.getByTestId('identity-preview')).not.toContainText(fixtureId);
   await page.getByRole('button', { name: '原子导入来源观测', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('观测已原子保存');
   await expect(page.getByTestId('identity-preview')).toHaveCount(0);
@@ -245,7 +246,8 @@ test.afterAll(async () => { await app.end(); await owner.end(); });
 test('fixture观测、来源UUID、原选择关联、两种浏览器未知回执恢复、上下文重排与历史/raw/导出', async ({ page, context }) => {
   await guard(context); const beforePublic = await publicRows();
   await login(page);
-  await page.goto('/dashboard/catalog');
+  // 维护动作（准备/发布固定基线、承接冻结观测）与 manifest-counts 在维护页，不在列表页。
+  await page.goto('/dashboard/catalog/admin');
   await page.getByRole('button', { name: '准备固定基线预览', exact: true }).click();
   await expect(page.getByTestId('manifest-counts')).toContainText('完整产物 147 份');
   await expect(page.getByTestId('manifest-counts')).toContainText('子集 129 份');
@@ -282,9 +284,32 @@ test('fixture观测、来源UUID、原选择关联、两种浏览器未知回执
   await expect(page.getByTestId('identity-link')).toContainText(`frozen:${origin.observation_id}`);
   await expect(page.getByTestId('identity-record-frozen-choices')).toContainText(origin.selected_item_id);
   await expect(page.getByTestId('identity-record-frozen-choices')).toContainText('manual_selected');
+  // Lead 裁决 (a)：已建档商品的详情不再常驻来源附注附件块（U3 产品决定，
+  // 附件只在确有处理事项时出现）；历史版本与内部身份证据从授权维护页核对。
   await page.goto(`/dashboard/catalog/${origin.selected_item_id}?revision=1`);
-  await expect(page.getByRole('region', { name: '当前来源核实附注', exact: true })).toContainText(recordId);
-  await expect(page.getByTestId('identity-attachment-counts')).toContainText('真实长期身份核实 0');
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('catalog-detail-attachments')).toHaveCount(0);
+  // v3：历史版本与来源证据都在同一弹窗内；旧独立维护页不再作为日常路径。
+  await page.goto(`/dashboard/catalog?detail=${origin.selected_item_id}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('catalog-tab-history').click();
+  const revisionSwitch = page.locator('[data-testid^="revision-switch-"]').first();
+  await expect(revisionSwitch).toBeVisible({ timeout: 60_000 });
+  await revisionSwitch.click();
+  await expect(page.getByTestId('catalog-detail-history-badge')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('catalog-detail-more').locator('summary').click();
+  await page.getByTestId('catalog-more-evidence').click();
+  const evidenceView = page.getByTestId('catalog-evidence-view');
+  await expect(evidenceView).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => evidenceView.getAttribute('data-evidence-state'), { timeout: 60_000 }).not.toBe('loading');
+  // 身份用「历史版本」+ 货号文字表达；UUID 不得出现在证据子视图主文里（V3-02）。
+  await expect(page.getByTestId('catalog-evidence-subject')).toContainText('历史版本', { timeout: 60_000 });
+  await expect(page.getByTestId('catalog-evidence-subject')).not.toContainText(origin.selected_item_id);
+  await expect(page.getByTestId('catalog-evidence-title')).toBeVisible();
+  await page.getByTestId('catalog-evidence-back').click();
+  await page.getByTestId('catalog-detail-back-current').or(page.getByTestId('catalog-history-back-current')).first().click();
+  await page.getByTestId('catalog-detail-close').click();
+  // 该商品当前仍无正式长期关系（真实长期身份核实 0 的事实由后续 relationshipUsable:false 断言继续覆盖）。
   await page.goto(`/dashboard/catalog/sources?scope=${A}`);
   const record = page.getByTestId(`identity-record-${recordId}`);
   await record.getByLabel('身份操作').selectOption('revoke');
@@ -309,7 +334,7 @@ test('fixture观测、来源UUID、原选择关联、两种浏览器未知回执
   const reverified = await recordHead(recordId); expect(reverified.id).toBe(recordId); expect(reverified.revision).toBe(3);
   expect(reverified.scope_id).toBe(A); expect(reverified.state).toBe('active'); expect(reverified.active_claim_id).toBe(head1.active_claim_id);
   await expect(record.getByTestId('source-record-revision')).toHaveText('3');
-  await expect(record).toContainText('已核实（fixture）');
+  await expect(record).toContainText('已核实（本地样本）');
   await expect(page.getByTestId(`identity-observation-${v2.id}`)).toContainText('市场 known · 仓库 known');
   const safe = await page.request.get(`/api/catalog/source-evidence/${CAPTURE_A2}?projection=export`);
   expect(safe.status()).toBe(200); expect(safe.headers()['cache-control']).toContain('no-store'); expect(safe.headers().vary).toContain('Cookie');
@@ -474,7 +499,7 @@ test('补修R1/R2：暂停后撤销观测关联；旧证明拒绝恢复，真正
 
   const restore = async (proof: Awaited<ReturnType<typeof importRepairProof>>, reason: string) => {
     await record.getByLabel('身份操作').selectOption('reverify'); await record.getByLabel('新证明').selectOption(proof.evidenceId);
-    await record.getByLabel('复核合同').selectOption(CONTRACT_A); await record.getByLabel('复核观测').selectOption(proof.observationId);
+    await record.getByLabel('复核规则').selectOption(CONTRACT_A); await record.getByLabel('复核观测').selectOption(proof.observationId);
     await record.getByLabel('复核理由').fill(reason);
     return submitHttpAction(page, reason, () => record.getByRole('button', { name: '保存身份状态', exact: true }).click());
   };
@@ -501,7 +526,7 @@ test('补修R1/R2：暂停后撤销观测关联；旧证明拒绝恢复，真正
   expect(trulyNewProof.bytesSha256).not.toBe(freshAfterSuspend.bytesSha256);
   await page.reload(); const latestHttp = await restore(trulyNewProof, 'N1A-R2-truly-new-proof-after-latest-tombstone');
   expect(latestHttp.result).toMatchObject({ status: 'success', data: { recordId, revision: 7, state: 'active', claimId: headBefore.active_claim_id, relationshipUsable: false } });
-  await expect(record.getByTestId('source-record-revision')).toHaveText('7'); await expect(record).toContainText('已核实（fixture）');
+  await expect(record.getByTestId('source-record-revision')).toHaveText('7'); await expect(record).toContainText('已核实（本地样本）');
   const finalHead = await recordHead(recordId);
   expect(finalHead).toMatchObject({ id: recordId, revision: 7, state: 'active', active_claim_id: headBefore.active_claim_id, current_contract_id: CONTRACT_A });
   const finalHistory = (await owner.query('SELECT * FROM catalog.source_identity_request WHERE source_record_id=$1 ORDER BY record_revision', [recordId])).rows;
@@ -544,7 +569,7 @@ test('残余R2：不相干B新证明与A旧观测真实拒绝，包含A的新证
     old_evidence_id: CAPTURE_A2, submitted_proof: unrelated.evidenceId });
   await page.reload();
   await record.getByLabel('身份操作').selectOption('reverify'); await record.getByLabel('新证明').selectOption(unrelated.evidenceId);
-  await record.getByLabel('复核合同').selectOption(CONTRACT_A); await record.getByLabel('复核观测').selectOption(oldObservation.id);
+  await record.getByLabel('复核规则').selectOption(CONTRACT_A); await record.getByLabel('复核观测').selectOption(oldObservation.id);
   await record.getByLabel('复核理由').fill('N1A-residual-R2-B-proof-plus-old-A-observation');
   const beforeRejected = await scopedIdentityState();
   const rejectedHttp = await submitHttpAction(page, 'N1A-residual-R2-B-proof-plus-old-A-observation', () => record.getByRole('button', { name: '保存身份状态', exact: true }).click());
@@ -557,11 +582,11 @@ test('残余R2：不相干B新证明与A旧观测真实拒绝，包含A的新证
   expect(actualMembers).toEqual([{ id: actualA.observationId, evidence_id: actualA.evidenceId, vendor: 'fixture-vendor-001' }]);
   await page.reload();
   await record.getByLabel('身份操作').selectOption('reverify'); await record.getByLabel('新证明').selectOption(actualA.evidenceId);
-  await record.getByLabel('复核合同').selectOption(CONTRACT_A); await record.getByLabel('复核观测').selectOption(actualA.observationId);
+  await record.getByLabel('复核规则').selectOption(CONTRACT_A); await record.getByLabel('复核观测').selectOption(actualA.observationId);
   await record.getByLabel('复核理由').fill('N1A-residual-R2-A-proof-with-actual-A-member');
   const restoredHttp = await submitHttpAction(page, 'N1A-residual-R2-A-proof-with-actual-A-member', () => record.getByRole('button', { name: '保存身份状态', exact: true }).click());
   expect(restoredHttp.result).toMatchObject({ status: 'success', data: { recordId, revision: 9, state: 'active', claimId: initial.active_claim_id, relationshipUsable: false } });
-  await expect(record.getByTestId('source-record-revision')).toHaveText('9'); await expect(record).toContainText('已核实（fixture）');
+  await expect(record.getByTestId('source-record-revision')).toHaveText('9'); await expect(record).toContainText('已核实（本地样本）');
   const finalHead = await recordHead(recordId), finalHistory = (await owner.query('SELECT * FROM catalog.source_identity_request WHERE source_record_id=$1 ORDER BY record_revision', [recordId])).rows;
   expect(finalHead).toMatchObject({ id: recordId, revision: 9, state: 'active', active_claim_id: initial.active_claim_id });
   expect(finalHistory).toHaveLength(9); expect(finalHistory.slice(0, 7)).toEqual(historyBefore);
@@ -615,10 +640,29 @@ test('残余R3：冻结原仓known冲突真实拒绝，原人工选择和历史�
   const frozenAfter = (await owner.query('SELECT to_jsonb(fo) frozen FROM catalog.source_observation fo WHERE id=$1', [frozen.id])).rows[0].frozen;
   const decisionsAfter = (await owner.query('SELECT * FROM catalog.decision_evidence WHERE observation_id=$1 ORDER BY id', [frozen.id])).rows;
   expect(frozenAfter).toEqual(frozen); expect(decisionsAfter).toEqual(decisionsBefore);
-  await page.goto(`/dashboard/catalog/${selected.selected_item_id}?revision=1`);
-  await expect(page.getByTestId('item-uuid')).toHaveText(selected.selected_item_id); await expect(page.getByTestId('revision-history-1')).toBeVisible();
-  await page.getByText('查看本商品决定与历史索引', { exact: true }).click();
-  const originalHistory = await page.getByRole('region', { name: '差异与决定', exact: true }).locator('details').filter({ hasText: '查看本商品决定与历史索引' }).locator('pre').innerText();
+  // v3（V3-01）：历史版本与来源/原始证据都在同一弹窗内，不再跳独立维护页。
+  await page.goto(`/dashboard/catalog?detail=${selected.selected_item_id}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('catalog-tab-history').click();
+  await expect(page.getByTestId('catalog-tab-history')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('catalog-history-list')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('[data-testid^="revision-history-"][data-current="true"]').first()).toBeVisible({ timeout: 60_000 });
+  // 切到历史版本（弹窗内，不换壳），再从“来源与证据”子视图读取原始 JSON。
+  await page.locator('[data-testid^="revision-switch-"]').last().click();
+  await expect(page.getByTestId('catalog-detail-history-badge')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('catalog-detail-more').locator('summary').click();
+  await page.getByTestId('catalog-more-evidence').click();
+  const evidenceSubview = page.getByTestId('catalog-evidence-view');
+  await expect(evidenceSubview).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => evidenceSubview.getAttribute('data-evidence-state'), { timeout: 60_000 }).not.toBe('loading');
+  await expect(page.getByTestId('catalog-evidence-subject')).toContainText('历史版本', { timeout: 60_000 });
+  await expect(page.getByTestId('catalog-evidence-subject')).not.toContainText(selected.selected_item_id);
+  // 原始 JSON 折叠区（只在此子视图出现）；展开仅为读取文本，不复制到日常详情。
+  const rawJson = page.getByTestId('evidence-raw-json');
+  await expect(rawJson).toHaveCount(1, { timeout: 60_000 });
+  const rawFold = page.locator('details').filter({ has: rawJson });
+  if (await rawFold.count() && (await rawFold.first().getAttribute('open')) === null) await rawFold.first().locator('summary').click();
+  const originalHistory = await rawJson.innerText();
   expect(originalHistory).toContain(selected.decision_id); expect(originalHistory).toContain(frozen.id);
   expect(originalHistory).toContain('manual_selected'); expect(originalHistory).toContain(selected.selected_item_id);
   expect(await publicRows()).toEqual(publicBefore); expect(await frozenState()).toEqual(frozenBefore);

@@ -1,0 +1,172 @@
+/* 工作台外壳（issues-nav 名下）：只补充账户主栏、数据维护入口与退出反馈。
+   基座视觉仍来自 ice-v4.module.css（= shared/workspace-visual.module.css），此处不改共享文件。
+   一级导航只有 ICE 商品库；侧栏不再有“其它处理入口/旧入口未启用”占位。 */
+
+/* ── 账户主栏：身份 + 中文角色直接可见 ─────────────────────── */
+
+.accountMenu {
+  position: relative;
+}
+
+.accountSummary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 4px 9px 4px 5px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.accountSummary::-webkit-details-marker {
+  display: none;
+}
+
+.accountSummary:hover {
+  border-color: #e3e9f6;
+  background: #f7f9fe;
+}
+
+.accountSummary:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: 3px;
+}
+
+.accountIdentity {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.accountName {
+  max-width: 168px;
+  overflow: hidden;
+  color: #3b475c;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountRole {
+  color: #6d7b91;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.accountCaret {
+  flex: 0 0 auto;
+  color: #93a0b3;
+}
+
+.accountPanelRole {
+  margin: 0 0 8px;
+  color: #4f5e75;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.accountPanelText {
+  margin: 0 0 7px;
+  color: #616e83;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+/* ── 数据维护（仅管理员账户菜单内，不是一级导航） ───────────── */
+
+.accountMaintenance {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0 9px;
+  padding: 10px 11px;
+  border: 1px solid #e3e8f4;
+  border-radius: 8px;
+  background: #f8f9fd;
+}
+
+.accountMaintenanceLink {
+  color: #4057c0;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid #c7d0ea;
+  justify-self: start;
+}
+
+.accountMaintenanceLink:hover {
+  color: #2f46b0;
+  border-bottom-color: #2f46b0;
+}
+
+.accountMaintenanceSubLink {
+  color: #5f6f9a;
+  font-size: 11px;
+  text-decoration: none;
+  justify-self: start;
+  border-bottom: 1px dotted #c7d0ea;
+}
+
+.accountMaintenanceSubLink:hover {
+  color: #3d4f8c;
+}
+
+.accountMaintenanceNote {
+  margin: 4px 0 0;
+  color: #7b869c;
+  font-size: 11px;
+  line-height: 1.75;
+}
+
+.rawCodes {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e4e8f1;
+  color: #7d8798;
+  font-size: 11px;
+}
+
+.rawCodes > summary {
+  cursor: pointer;
+  color: #75829a;
+}
+
+.rawCodes > p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.8;
+}
+
+/* ── 退出登录：可访问名称由按钮 aria-label 提供，失败必须可见 ── */
+
+.logoutGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.logoutError {
+  max-width: 220px;
+  color: #9a4b33;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@media (max-width: 700px) {
+  .accountName {
+    max-width: 96px;
+  }
+
+  .accountCaret {
+    display: none;
+  }
+
+  .logoutError {
+    max-width: 180px;
+  }
+}

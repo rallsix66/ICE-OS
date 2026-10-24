@@ -1,46 +1,40 @@
-import { CatalogDisplayReadError } from '@/features/catalog/local-display/service';
-import { getCatalogDetailCore, getCatalogItemBsSample } from '@/features/catalog/service';
-import { CatalogDetail } from '@/features/catalog/components/catalog-detail';
-import { getSourceIdentityPanel } from '@/features/catalog/source-identity/service';
-import { SourceIdentityAttachment } from '@/features/catalog/components/source-identity-panel';
-import { getNewItemDetailPanel } from '@/features/catalog/new-item/service';
-import { NewItemDetailAttachment } from '@/features/catalog/components/new-item-intake';
+import { redirect } from 'next/navigation';
+import { safeCatalogReturnHref } from '@/features/catalog/shell/safe-return';
+import { isCatalogDetailId, normalizeRevisionParam } from '@/features/catalog/shell/catalog-url-params';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function CatalogDetailPage({ params, searchParams }: {
-  params: Promise<{ id: string }>; searchParams: Promise<{ revision?: string; warehouse?: string }>;
+/**
+ * V3-01：商品详情只有一套“商品库背景 + 固定弹窗”体验。
+ *
+ * 旧收藏/直链/新标签 `/dashboard/catalog/<id>?revision=&warehouse=&from=` 兼容重定向到同一弹窗：
+ * - 合法版本进入弹窗内只读历史视图；
+ * - 非法版本保留 `revision=invalid` 让弹窗显示明确错误，不静默退回当前资料；
+ * - 只透传安全站内 from，不放宽为任意外站回跳。
+ */
+export default async function CatalogLegacyDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ revision?: string; warehouse?: string; from?: string }>;
 }) {
   const { id } = await params;
-  const { revision, warehouse } = await searchParams;
-  const requestedRevision = revision === undefined ? undefined : Number(revision);
-  const validRevision = requestedRevision === undefined || (Number.isInteger(requestedRevision) && requestedRevision >= 1);
-  const warehouseFilter = warehouse?.trim() ? warehouse.trim() : undefined;
-  const core = validRevision ? await getCatalogDetailCore(id, { revision: requestedRevision }).catch(() => null) : null;
-  if (core) {
-    const identityPanel = await getSourceIdentityPanel(id).catch(() => null);
-    const productPanel = await getNewItemDetailPanel(core.item).catch(() => null);
-    let bsSample: Awaited<ReturnType<typeof getCatalogItemBsSample>> | null = null;
-    let bsSampleError: CatalogDisplayReadError | null = null;
-    if (requestedRevision === undefined) {
-      try {
-        bsSample = await getCatalogItemBsSample(id, warehouseFilter);
-      } catch (error) {
-        bsSampleError = error instanceof CatalogDisplayReadError ? error : new CatalogDisplayReadError('read_failed', 'BS 样表库存投影读取失败', error);
-      }
-    }
-    return <>
-      <CatalogDetail
-        key={core.item.itemId}
-        core={core}
-        bsSample={requestedRevision === undefined ? bsSample : null}
-        bsSampleError={requestedRevision === undefined ? bsSampleError : null}
-        warehouseFilter={warehouseFilter}
-      />
-      {identityPanel?.enabled && <SourceIdentityAttachment panel={identityPanel} />}
-      {productPanel?.enabled && <NewItemDetailAttachment panel={productPanel} />}
-    </>;
+  const { revision, warehouse, from } = await searchParams;
+  if (!isCatalogDetailId(id)) {
+    redirect('/dashboard/catalog');
   }
-  return <main className="p-6"><h1 className="text-xl font-semibold">商品资料不可用</h1><p>账号没有访问权限，或所请求资料、版本不存在。</p></main>;
+
+  const query = new URLSearchParams();
+  query.set('detail', id);
+  const warehouseValue = typeof warehouse === 'string' ? warehouse.trim() : '';
+  if (warehouseValue && warehouseValue !== 'all') query.set('warehouse', warehouseValue);
+  if (typeof revision === 'string' && revision.trim() !== '') {
+    const parsed = normalizeRevisionParam(revision.trim());
+    query.set('revision', parsed > 0 ? String(parsed) : 'invalid');
+  }
+  const safeFrom = safeCatalogReturnHref(typeof from === 'string' ? from : undefined);
+  if (safeFrom) query.set('from', safeFrom);
+  redirect(`/dashboard/catalog?${query.toString()}`);
 }

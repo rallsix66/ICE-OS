@@ -27,7 +27,15 @@ function independentBrowserClient() {
         return { error: null, data: { user: {}, session: {} } };
       },
       async signOut() {
-        await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'include' });
+        /* V3-04：退出必须真正结束服务端会话；Better Auth 需要 JSON 请求体，空 POST 会 415。 */
+        const response = await fetch('/api/auth/sign-out', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          cache: 'no-store',
+          body: '{}',
+        });
+        if (!response.ok) return { error: { message: '退出登录失败' } as AuthError };
         return { error: null };
       },
     },

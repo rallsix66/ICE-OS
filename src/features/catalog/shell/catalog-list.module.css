@@ -1,0 +1,915 @@
+/*
+ * 商品库列表页本地样式（list-ui 独占）。
+ * 只用于 shell/catalog-products-page.tsx：工具栏、样表说明、商品表与窄屏摘要卡片。
+ * 不改 workspace-visual.module.css，避免影响 Demo 消费者。
+ */
+
+/* ---------- 工具栏 / 控件 ---------- */
+
+.toolbar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.searchField {
+  display: flex;
+  min-width: 0;
+  min-height: 38px;
+  flex: 1 1 300px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid #e1e5eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #a0a8b5;
+}
+
+.searchField:focus-within {
+  border-color: #8495ed;
+}
+
+.searchField input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: #3f4c60;
+  font-size: 13px;
+}
+
+.searchField input::placeholder {
+  color: #a6aeb9;
+}
+
+.searchField input:focus-visible {
+  outline: none;
+}
+
+.select {
+  min-height: 38px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 7px 30px 7px 11px;
+  border: 1px solid #e1e5eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #4b5a70;
+  font-size: 13px;
+}
+
+.toolbarButton {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border: 1px solid #dde3ee;
+  border-radius: 7px;
+  background: #fff;
+  color: #5b6b86;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.toolbarButton:hover {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+  color: #5266d7;
+}
+
+.issueEntry {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  color: #7485ae;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.issueEntry:hover {
+  color: #5266d7;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.issueEntryAlert {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid #f0e2c8;
+  border-radius: 7px;
+  background: #fbf6ea;
+  color: #a37e45;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.issueEntryAlert:hover {
+  border-color: #e6cf9f;
+  background: #faf0da;
+}
+
+.issueFailed {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 6px;
+  color: #a37e45;
+  font-size: 12px;
+}
+
+.issueRetry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #6b7ba4;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.issueRetry:disabled {
+  color: #a0a8b4;
+  text-decoration: none;
+}
+
+/* ---------- 状态与错误（F06：读取失败 / 无权 / 未启用 / 辅助读取失败分开） ---------- */
+
+.noticeList {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  color: #8b7c5f;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.noticeItem {
+  margin: 0;
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e6e8ec;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+
+.noticeText {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.noticeText strong {
+  display: block;
+  color: #4a5568;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.noticeText p {
+  margin: 4px 0 0;
+  color: #7c8798;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.noticeDetail {
+  color: #98a3b2;
+}
+
+.noticeAlert {
+  border-color: #f0ded8;
+  background: #fcf6f2;
+}
+
+.noticeWarn {
+  border-color: #f0e7d6;
+  background: #fbf8f0;
+}
+
+.retryButton {
+  display: inline-flex;
+  min-height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border: 1px solid #d9d0be;
+  border-radius: 7px;
+  background: #fff;
+  color: #7c6a49;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.retryButton:hover {
+  border-color: #c6b895;
+  background: #fffdf7;
+}
+
+/* ---------- 样表日期（V3-02：列表只保留一处简短日期；来源与价格口径在弹窗内按需查看） ---------- */
+
+.sampleDate {
+  margin: 0 0 10px;
+  color: #7c8798;
+  font-size: 12px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 面板与表头 ---------- */
+
+.panel {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid #e6e8ec;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 17px 18px 14px;
+}
+
+.panelTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.panelBody {
+  min-width: 0;
+}
+
+/* ---------- 商品表 ---------- */
+
+.tableShell {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-top: 1px solid #edf0f4;
+  scrollbar-width: thin;
+  scrollbar-color: #cfd5df #f7f8fa;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: left;
+}
+
+.table th {
+  padding: 11px 12px;
+  border-bottom: 1px solid #e9ecf1;
+  background: #f9fafc;
+  color: #7c8798;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.table td {
+  padding: 13px 12px;
+  border-bottom: 1px solid #f0f1f4;
+  color: #4c586a;
+  font-size: 13px;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.cell {
+  vertical-align: middle;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: 18px;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 18px;
+}
+
+.table tbody tr.row:hover > td {
+  background: #fafbfe;
+}
+
+.table tbody tr.row[data-expanded='true'] > td {
+  background: #fbfcff;
+}
+
+.colIdentity {
+  width: 32%;
+}
+
+.colStock {
+  width: 11%;
+}
+
+.colPrice {
+  width: 13%;
+}
+
+.colValue {
+  width: 15%;
+}
+
+.colStatus {
+  width: 14%;
+}
+
+.colActions {
+  width: 15%;
+}
+
+.numericHead {
+  text-align: right;
+}
+
+.metricCell {
+  text-align: right;
+}
+
+.metricValue {
+  display: block;
+  color: #40506a;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.metricValueStrong {
+  display: block;
+  color: #364560;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+/* 库存单元格含“无已确认库存/本仓无对应”等文字状态：允许换行，避免窄列溢出。 */
+.metricValueInventory {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 估算货值不是金额时（缺价/未建档/无权限等原因文案）允许换行，金额本身保持不折行。 */
+.metricValueText {
+  color: #6b7686;
+  font-size: 13px;
+  font-weight: 550;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 商品身份 ---------- */
+
+.identity {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.art {
+  display: grid;
+  width: 32px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 7px;
+  background: #f4f5f8;
+  color: #8b8a80;
+}
+
+.identityText {
+  min-width: 0;
+}
+
+.identityCode {
+  display: block;
+  color: #7485ae;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  line-height: 1.5;
+}
+
+.nameButton {
+  display: block;
+  max-width: 100%;
+  margin-top: 1px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #3f4d61;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.nameButton:hover {
+  color: #5266d7;
+}
+
+.identitySpec {
+  display: block;
+  margin-top: 2px;
+  color: #8a95a4;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.moreButton {
+  margin-top: 5px;
+  padding: 1px 0;
+  border: 0;
+  background: none;
+  color: #6b7ba4;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.moreButton:hover {
+  color: #5266d7;
+}
+
+/* ---------- 状态 / 操作 ---------- */
+
+.statusChip {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.toneGreen {
+  border-color: #e4eee7;
+  background: #f0f6f1;
+  color: #5f8a70;
+}
+
+.toneAmber {
+  border-color: #f0e7d6;
+  background: #fbf5e9;
+  color: #a37e45;
+}
+
+.actionGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.actionButton {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border: 1px solid #dee4ef;
+  border-radius: 6px;
+  background: #fff;
+  color: #5b6b86;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.actionButton:hover {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+  color: #5266d7;
+}
+
+/* ---------- 更多资料（次级明细，可展开；不删字段） ---------- */
+
+.moreRow[data-expanded='false'] {
+  display: none;
+}
+
+.moreRow > .moreCell {
+  padding: 0 18px 14px;
+  border-bottom: 1px solid #f0f1f4;
+  background: #fbfcfe;
+}
+
+.moreGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 20px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #edf0f4;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.moreItem {
+  min-width: 0;
+}
+
+.moreItem dt {
+  color: #96a1b0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.moreItem dd {
+  margin: 2px 0 0;
+  color: #4c586a;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 分页（U6：上一页 / 页码直选 / 下一页 / 第 N / M 页） ---------- */
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 10px;
+  padding: 14px 18px;
+  border-top: 1px solid #f0f1f4;
+}
+
+.pageNumbers {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pageButton {
+  display: inline-flex;
+  min-width: 32px;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border: 1px solid #dee4ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #5b6b86;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pageButton:hover:not(:disabled) {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+  color: #5266d7;
+}
+
+.pageButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pageNumber {
+  padding: 6px 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pageNumberCurrent,
+.pageNumberCurrent:hover {
+  border-color: #b8c3e8;
+  background: #eef2ff;
+  color: #4057c0;
+  font-weight: 600;
+}
+
+.pageNumber[aria-current='page'] {
+  cursor: default;
+}
+
+.pageEllipsis {
+  padding: 0 2px;
+  color: #9aa6b8;
+  font-size: 12px;
+}
+
+.pageStatus {
+  color: #6b7686;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 可访问通知（视觉隐藏，读屏可听）：第 N 页，共 M 页，X 款。 */
+.liveStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- 空状态（非筛选造成的空数据） ---------- */
+
+.emptyPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 42px 20px;
+  color: #a3adbd;
+  text-align: center;
+}
+
+.emptyPanel h3 {
+  margin: 0;
+  color: #677589;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.emptyPanel p {
+  margin: 0;
+  max-width: 420px;
+  color: #9aa3b0;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* ---------- 响应式：表格密度（≥1001px，含 1100/1440 目标宽） ---------- */
+
+@media (max-width: 1200px) {
+  .table th {
+    padding: 10px;
+  }
+
+  .table td {
+    padding: 12px 10px;
+  }
+
+  .table th:first-child,
+  .table td:first-child {
+    padding-left: 14px;
+  }
+
+  .table th:last-child,
+  .table td:last-child {
+    padding-right: 14px;
+  }
+
+  .metricValueStrong {
+    font-size: 13px;
+  }
+
+  .actionGroup {
+    gap: 6px;
+  }
+
+  .statusChip {
+    white-space: normal;
+  }
+
+  .metricValue {
+    font-size: 13px;
+  }
+}
+
+/* ---------- 响应式：紧凑摘要卡片（≤1000px，含 635 目标宽；同一份 DOM/CSS） ---------- */
+
+@media (max-width: 1000px) {
+  .searchField {
+    flex-basis: 100%;
+  }
+
+  .panelHead {
+    padding: 15px 16px 12px;
+  }
+
+  .tableShell {
+    overflow: visible;
+    border-top: 0;
+  }
+
+  .table {
+    display: block;
+  }
+
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .table tbody {
+    display: block;
+    padding: 12px;
+  }
+
+  .table tbody tr.row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 10px;
+    row-gap: 10px;
+    margin-bottom: 10px;
+    padding: 13px;
+    border: 1px solid #e9ecf1;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .table tbody tr.row:last-of-type {
+    margin-bottom: 0;
+  }
+
+  .table tbody tr.row > td {
+    padding: 0;
+    border: 0;
+  }
+
+  .table tbody tr.row:hover > td,
+  .table tbody tr.row[data-expanded='true'] > td {
+    background: transparent;
+  }
+
+  .colIdentity {
+    grid-column: 1 / -1;
+    width: auto;
+  }
+
+  .colStock,
+  .colPrice,
+  .colValue {
+    grid-column: span 1;
+    width: auto;
+  }
+
+  .colStatus {
+    grid-column: 1 / 2;
+    align-self: center;
+    width: auto;
+  }
+
+  .colActions {
+    grid-column: 2 / 4;
+    width: auto;
+  }
+
+  .numericHead {
+    text-align: left;
+  }
+
+  .metricCell {
+    text-align: left;
+  }
+
+  .metricCell::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    color: #98a3b2;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  .metricValue {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .metricValueStrong {
+    font-size: 16px;
+    font-weight: 650;
+  }
+
+  .metricValueText {
+    font-size: 14px;
+    font-weight: 550;
+  }
+
+  .statusChip {
+    white-space: normal;
+  }
+
+  .actionGroup {
+    justify-content: flex-end;
+  }
+
+  .moreRow[data-expanded='false'] {
+    display: none;
+  }
+
+  .moreRow[data-expanded='true'] {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .moreRow > .moreCell {
+    display: block;
+    padding: 0 2px 2px;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .moreGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    border-top: 0;
+    border-radius: 8px;
+  }
+
+  .pagination {
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+    border-top: 1px solid #f0f1f4;
+  }
+
+  .pageStatus {
+    flex: 1 0 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .toolbar {
+    gap: 8px;
+  }
+
+  .toolbarButton {
+    flex: 0 0 auto;
+  }
+
+  .select {
+    flex: 1 1 120px;
+  }
+
+  .identity {
+    gap: 8px;
+  }
+
+  .art {
+    width: 28px;
+    height: 30px;
+  }
+
+  .table tbody {
+    padding: 10px;
+  }
+
+  .table tbody tr.row {
+    padding: 12px;
+  }
+
+  .moreGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

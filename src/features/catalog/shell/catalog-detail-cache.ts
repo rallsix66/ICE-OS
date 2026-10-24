@@ -275,6 +275,68 @@ export function scopesMatch(
   return true;
 }
 
+/**
+ * V3-03：已取得“全部仓库”明细时，同一商品版本/权限/口径下的单仓视图可本地派生：
+ * 明细按仓筛选，汇总取列表同版本对应仓投影（服务端已按同一精确规则计算）。
+ * 单仓响应不能推断其他仓；数据不完整时返回 null，由调用方局部读取。
+ */
+export function allWarehouseAuthorityMatches(
+  view: CatalogDetailView,
+  listRow: Pick<CatalogListClientRow, 'itemId' | 'itemRevision' | 'bsSample' | 'inventoryProjectionByWarehouse'> | undefined,
+  context: CatalogDetailCacheContext,
+): boolean {
+  if (!listRow || listRow.itemId !== view.item.itemId) return false;
+  if (listRow.itemRevision !== view.item.revision) return false;
+  const sample = view.bsSample;
+  if (!sample || sample.status !== 'loaded') return false;
+  /* V4-05：全仓总数相同不能证明分仓/锁定/在途明细未变；必须核完整的全仓明细投影。 */
+  const serverAll = listRow.inventoryProjectionByWarehouse?.all;
+  if (!serverAll) return false;
+  const viewAll = buildDetailInventoryProjectionTokenFromRows(
+    (sample.rows ?? []) as InventoryProjectionRow[],
+    'all',
+  );
+  if (viewAll !== serverAll) return false;
+  const viewToken = buildListProjectionTokenFromView(view, 'all', context.amountAllowed);
+  const listToken = buildListProjectionToken(listRow, 'all', context.amountAllowed);
+  if (viewToken !== listToken) return false;
+  const responseBasis = responseDisplayBasisSha256(view);
+  return !responseBasis || responseBasis === context.displayBasisSha256;
+}
+
+export function deriveWarehouseView(params: {
+  view: CatalogDetailView;
+  target: string;
+  listRow: Pick<CatalogListClientRow, 'itemId' | 'itemRevision' | 'bsSample' | 'inventoryProjectionByWarehouse'> | undefined;
+  context: CatalogDetailCacheContext;
+}): CatalogDetailView | null {
+  const { view, listRow } = params;
+  const wh = normalizeDetailWarehouse(params.target);
+  if (wh === 'all') return null;
+  if (view.historical) return null;
+  if (view.bsSampleError) return null;
+  const sample = view.bsSample;
+  if (!sample || sample.status !== 'loaded') return null;
+  if (!listRow || listRow.itemId !== view.item.itemId || listRow.itemRevision !== view.item.revision) return null;
+  const scoped = listRow.bsSample.warehouseScopes?.[wh];
+  if (!scoped) return null;
+  const rows = (sample.rows ?? []) as BsInventoryRow[];
+  /* 派生结果必须再次核对目标仓的完整明细投影；不能用全仓合计掩盖分仓行变化。 */
+  const targetRows = rows.filter((row) => String(row.warehouse ?? '') === wh);
+  const serverTarget = listRow.inventoryProjectionByWarehouse?.[wh];
+  if (!serverTarget) return null;
+  if (buildDetailInventoryProjectionTokenFromRows(targetRows as InventoryProjectionRow[], wh) !== serverTarget) return null;
+  /* 目标仓汇总显示有已确认行，但全仓明细里拿不到该仓行：数据不完整，必须局部读取。 */
+  if (scoped.confirmedLineCount > 0 && targetRows.length === 0) return null;
+  /* 全仓明细必须确实包含多个仓（单仓响应不能冒充全仓）。 */
+  const warehouses = new Set(rows.map((row) => String(row.warehouse ?? '')).filter(Boolean));
+  if (warehouses.size < 2) return null;
+  return {
+    ...view,
+    bsSample: { ...sample, rows: targetRows, valuation: scoped },
+  } as CatalogDetailView;
+}
+
 export type CacheEntry = {
   view: CatalogDetailView;
   scope: CatalogDetailScope;
@@ -363,7 +425,7 @@ export function clearDetailCache(): void {
 export function maskDetailViewForAuthFailure(view: CatalogDetailView): CatalogDetailView {
   const masked = {
     ...view,
-    bsSampleError: view.bsSampleError ?? { code: 'forbidden', message: '当前账户无权读取金额或样表投影。' },
+    bsSampleError: view.bsSampleError ?? { code: 'forbidden', message: '当前账户无权读取金额或库存数据。' },
   } as CatalogDetailView;
   if (view.bsSample && view.bsSample.status === 'loaded') {
     masked.bsSample = {

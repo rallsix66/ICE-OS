@@ -1,6 +1,15 @@
 import { expect, test, type Browser, type Page, type Route } from '@playwright/test';
-import { captureCatalogAction, patchCatalogActionFailure, type CatalogActionProbe } from './catalog-detail-action-probe.pw';
+import { patchCatalogActionFailure, type CatalogActionProbe } from './catalog-detail-action-probe.pw';
 
+/**
+ * v3（V3-01/V3-08）：来源与授权证据不再是独立页面，而是**同一商品弹窗内的子视图**
+ * （`catalog-detail-more` → `catalog-more-evidence` → `catalog-evidence-view`，`catalog-evidence-back` 原位返回）。
+ *
+ * 本文件保留 v2 的失败恢复语义并迁移到子视图：
+ * - 有界一次性审计请求、失败后只手动重试、迟到响应不串商品；
+ * - 受限金额按需读取、传输失败清空旧值且可重试；
+ * - 日常详情仍不得出现技术证据（原始 JSON/UUID/金额按钮）。
+ */
 const WM0043 = 'WM0043';
 const WM0072 = 'WM0072';
 const AUDIT_FAILURE_MESSAGE = '审计区读取失败（隔离探针）';
@@ -14,46 +23,69 @@ async function login(page: Page) {
   await page.getByTestId('catalog-counts').waitFor();
 }
 
-async function openDetail(page: Page, iceCode: string) {
+function row(page: Page, iceCode: string) {
+  return page.getByTestId(`catalog-row-${iceCode}`);
+}
+
+/** 从列表真实点击打开统一弹窗；返回该商品的 UUID（v3 仍由 URL detail 参数承载）。 */
+async function openDetailFromList(page: Page, iceCode: string) {
   await page.getByLabel(/搜索/).fill(iceCode);
-  const row = page.getByTestId(`catalog-row-${iceCode}`);
-  await expect(row).toBeVisible({ timeout: 30_000 });
-  await row.getByRole('button', { name: '查看详情' }).click();
+  const target = row(page, iceCode);
+  await expect(target).toBeVisible({ timeout: 30_000 });
+  await target.getByRole('button', { name: /查看详情|查看/ }).first().click();
   await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 30_000 });
-  // item-uuid lives inside a collapsed <details>, so innerText() would be empty; textContent() is the render text.
-  const itemId = ((await page.getByTestId('item-uuid').textContent()) ?? '').trim();
-  expect(itemId, 'detail must belong to the requested item').toMatch(/^[0-9a-f-]{36}$/);
+  const itemId = new URL(page.url()).searchParams.get('detail') ?? '';
+  expect(itemId, 'detail URL must carry the item UUID').toMatch(/^[0-9a-f-]{36}$/);
   return itemId;
 }
 
-function candidatesPanel(page: Page) {
-  return page.locator('details').filter({ hasText: 'JST 与 BS 来源候选' });
+async function closeDialog(page: Page) {
+  const v3 = page.getByTestId('catalog-detail-close');
+  if (await v3.count()) { await v3.click(); return; }
+  await page.getByLabel('关闭商品详情').click();
+}
+
+async function resolveItemId(page: Page, iceCode: string) {
+  const itemId = await openDetailFromList(page, iceCode);
+  await closeDialog(page);
+  await expect(row(page, iceCode)).toBeVisible();
+  return itemId;
+}
+
+function evidenceView(page: Page) {
+  return page.getByTestId('catalog-evidence-view');
+}
+
+/** 打开弹窗内“来源与证据”子视图（更多菜单 → 菜单项），并等到非 loading 终态。 */
+async function openEvidenceSubview(page: Page) {
+  const more = page.getByTestId('catalog-detail-more');
+  await expect(more).toBeVisible({ timeout: 30_000 });
+  if ((await more.getAttribute('open')) === null) await more.locator('summary').click();
+  const entry = page.getByTestId('catalog-more-evidence');
+  await expect(entry).toBeVisible({ timeout: 30_000 });
+  await entry.click();
+  const view = evidenceView(page);
+  await expect(view).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(async () => view.getAttribute('data-evidence-state'), { timeout: 60_000 })
+    .not.toBe('loading');
+  return view;
+}
+
+function candidates(page: Page) {
+  /* V4-02：来源子视图改为业务记录；测试仍要求真实记录行存在。 */
+  return page.locator('[data-testid^="source-record-"]');
 }
 
 /**
- * Learn the audit server-action id (and WM0043's candidate ids) from a clean session.
- *
- * The audit action id must not be guessed from request order: opening the detail fires the detail-view
- * action first and the audit prefetch second, so "first POST containing the item id" is the view action.
- * The id is therefore identified by its *response payload* (it carries `candidates`, the view carries
- * `bsSample`), and the captured id is then used to intercept the audit prefetch before it starts.
+ * 学习审计 server action id：打开子视图时审计请求自动发起一次（有界），
+ * 用响应负载识别（带 candidates 且不带 bsSample/金额），不靠请求顺序猜。
  */
-async function discoverAuditAction(browser: Browser) {
+async function discoverAuditAction(browser: Browser, itemId: string): Promise<CatalogActionProbe> {
   const probeCtx = await browser.newContext();
   const probePage = await probeCtx.newPage();
   await login(probePage);
-  const itemId = await openDetail(probePage, WM0043);
-  await candidatesPanel(probePage).locator('summary').click();
-  await expect(probePage.getByRole('heading', { name: 'JST', exact: true })).toBeVisible({ timeout: 60_000 });
-  const candidateIds = await probePage
-    .locator('[data-testid^="catalog-candidate-"]')
-    .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid') ?? ''));
-  await probeCtx.close();
-
-  const captureCtx = await browser.newContext();
-  const capturePage = await captureCtx.newPage();
-  await login(capturePage);
-  const seen: Array<{ actionId: string; hasCandidates: boolean; hasBsSample: boolean; bytes: number }> = [];
+  const seen: Array<{ actionId: string; hasCandidates: boolean; hasSourceView: boolean; hasBsSample: boolean; hasAmounts: boolean }> = [];
   const handler = async (route: Route) => {
     const request = route.request();
     if (request.method() !== 'POST') return route.fallback();
@@ -65,42 +97,33 @@ async function discoverAuditAction(browser: Browser) {
     seen.push({
       actionId,
       hasCandidates: text.includes('"candidates"'),
+      hasSourceView: text.includes('"systems"') && text.includes('"sourceRecorded"'),
       hasBsSample: text.includes('"bsSample"'),
-      bytes: text.length,
+      hasAmounts: text.includes('"operatingPrice"') || text.includes('"amountCny"'),
     });
     const headers = { ...response.headers() };
     delete headers['content-length'];
     delete headers['content-encoding'];
     await route.fulfill({ response, headers, body: text });
   };
-  await capturePage.route('**/*', handler);
+  await probePage.route('**/*', handler);
   try {
-    await openDetail(capturePage, WM0043);
-    await candidatesPanel(capturePage).locator('summary').click();
-    await expect(capturePage.getByRole('heading', { name: 'JST', exact: true })).toBeVisible({ timeout: 60_000 });
+    await openDetailFromList(probePage, WM0043);
+    await openEvidenceSubview(probePage);
+    await expect(probePage.getByTestId('evidence-audit-state')).toBeVisible({ timeout: 60_000 });
   } finally {
-    await capturePage.unroute('**/*', handler);
-    await captureCtx.close();
+    await probePage.unroute('**/*', handler);
+    await probeCtx.close();
   }
-  const audit = seen.find((entry) => entry.hasCandidates && !entry.hasBsSample);
+  const audit = seen.find((entry) => entry.hasSourceView && !entry.hasBsSample);
   if (!audit) throw new Error(`AUDIT_ACTION_DISCOVERY_FAILED:${JSON.stringify(seen)}`);
-  return {
-    probe: { actionId: audit.actionId, contentType: 'text/plain;charset=UTF-8', bodyIncludes: itemId },
-    itemId,
-    candidateIds,
-  };
+  return { actionId: audit.actionId, contentType: 'text/plain;charset=UTF-8', bodyIncludes: itemId };
 }
 
 type AuditPolicy = (hit: number) => { kind: 'pass' } | { kind: 'fail'; message: string } | { kind: 'delay'; ms: number };
 
-/**
- * The intercept is installed before the detail is opened, because the audit prefetch fires on mount.
- * Waiting for the prefetch to succeed first and only then injecting would not test the first request.
- */
 async function installAuditRoute(page: Page, probe: CatalogActionProbe, policy: AuditPolicy) {
   const state = { hits: 0 };
-  // In-flight handler work must settle before the page closes, otherwise Playwright reports a teardown
-  // error that has nothing to do with the assertion under test.
   const pending = new Set<Promise<void>>();
   const handle = async (route: Route) => {
     const request = route.request();
@@ -144,61 +167,67 @@ async function installAuditRoute(page: Page, probe: CatalogActionProbe, policy: 
   };
 }
 
-test.describe('catalog detail partition recovery', () => {
-  test('persistent audit failure does not auto-loop and keeps the error visible', async ({ browser }) => {
-    const { probe } = await discoverAuditAction(browser);
+test.describe('catalog evidence subview recovery (v3 unified dialog)', () => {
+  test('persistent audit failure does not auto-loop and keeps the error visible in-dialog', async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await login(page);
+    const itemId = await resolveItemId(page, WM0043);
+    const probe = await discoverAuditAction(browser, itemId);
     const route = await installAuditRoute(page, probe, () => ({ kind: 'fail', message: AUDIT_FAILURE_MESSAGE }));
     try {
-      await openDetail(page, WM0043);
-      await candidatesPanel(page).locator('summary').click();
-      const error = page.getByTestId('catalog-audit-error');
-      await expect(error).toBeVisible({ timeout: 60_000 });
-      await expect(error).toContainText(AUDIT_FAILURE_MESSAGE);
-      // Opening the other audit partition must not start another request either.
-      await page.locator('details').filter({ hasText: '来源差异与原始观测 JSON' }).locator('summary').click();
+      await openDetailFromList(page, WM0043);
+      const view = await openEvidenceSubview(page);
+      await expect(page.getByTestId('evidence-audit-state')).toHaveAttribute('data-audit-state', 'error', { timeout: 60_000 });
+      await expect(view).toContainText('来源记录读取失败');
+      await expect(page.getByTestId('evidence-candidate-count')).toHaveText('—');
       await page.waitForTimeout(1_500);
-      await expect(error).toBeVisible();
       expect(route.state.hits, 'one bounded prefetch only').toBe(1);
-      await expect(page.locator('[data-testid^="catalog-candidate-"]')).toHaveCount(0);
+      await expect(candidates(page)).toHaveCount(0);
+      // 原位返回后，日常详情仍不得出现技术证据
+      await page.getByTestId('catalog-evidence-back').click();
+      await expect(evidenceView(page)).toHaveCount(0);
+      for (const forbidden of ['catalog-audit-json', 'evidence-raw-json', 'item-uuid', 'bs-basis-sha']) {
+        await expect(page.getByTestId(forbidden), `${forbidden} must stay out of daily detail`).toHaveCount(0);
+      }
     } finally {
       await route.dispose();
       await ctx.close();
     }
   });
 
-  test('manual retry issues one request and restores candidates', async ({ browser }) => {
-    const { probe } = await discoverAuditAction(browser);
+  test('manual retry issues one request and restores candidates + raw evidence', async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await login(page);
-    const route = await installAuditRoute(page, probe, (hit) => (
-      hit === 1 ? { kind: 'fail', message: AUDIT_FAILURE_MESSAGE } : { kind: 'pass' }
-    ));
+    const itemId = await resolveItemId(page, WM0043);
+    const probe = await discoverAuditAction(browser, itemId);
+    const route = await installAuditRoute(page, probe, (hit) => (hit === 1 ? { kind: 'fail', message: AUDIT_FAILURE_MESSAGE } : { kind: 'pass' }));
     try {
-      await openDetail(page, WM0043);
-      await candidatesPanel(page).locator('summary').click();
-      const error = page.getByTestId('catalog-audit-error');
-      await expect(error).toBeVisible({ timeout: 60_000 });
+      await openDetailFromList(page, WM0043);
+      const view = await openEvidenceSubview(page);
+      await expect(page.getByTestId('evidence-audit-state')).toHaveAttribute('data-audit-state', 'error', { timeout: 60_000 });
       expect(route.state.hits).toBe(1);
-      await error.getByRole('button', { name: '重试' }).click();
-      await expect(page.getByRole('heading', { name: 'JST', exact: true })).toBeVisible({ timeout: 60_000 });
-      await expect(page.locator('[data-testid^="catalog-candidate-"]').first()).toBeVisible();
+      const retry = view.getByRole('button', { name: '重试' }).first();
+      await expect(retry).toBeVisible();
+      await retry.click();
+      await expect(page.getByTestId('evidence-audit-state')).toHaveAttribute('data-audit-state', 'loaded', { timeout: 60_000 });
+      await expect(page.getByTestId('evidence-candidate-count')).toHaveText(/\d+/);
+      await expect(candidates(page).first()).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByTestId('evidence-amounts')).toContainText('2.94');
       expect(route.state.hits, 'retry must send exactly one extra request').toBe(2);
-      await expect(error).toHaveCount(0);
     } finally {
       await route.dispose();
       await ctx.close();
     }
   });
 
-  test('rapid expand while the prefetch is still in flight waits for the first response', async ({ browser }) => {
-    const { probe } = await discoverAuditAction(browser);
+  test('delayed first audit response renders once without duplicating the request', async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await login(page);
+    const itemId = await resolveItemId(page, WM0043);
+    const probe = await discoverAuditAction(browser, itemId);
     let delayed = false;
     const route = await installAuditRoute(page, probe, () => {
       if (delayed) return { kind: 'pass' };
@@ -206,23 +235,36 @@ test.describe('catalog detail partition recovery', () => {
       return { kind: 'delay', ms: 1_500 };
     });
     try {
-      await openDetail(page, WM0043);
-      await candidatesPanel(page).locator('summary').click();
-      await expect(page.getByRole('heading', { name: 'JST', exact: true })).toBeVisible({ timeout: 60_000 });
-      expect(route.state.hits, 'expanding must not duplicate the in-flight prefetch').toBe(1);
-      await expect(page.locator('[data-testid^="catalog-candidate-"]').first()).toBeVisible();
+      await openDetailFromList(page, WM0043);
+      const view = await openEvidenceSubview(page);
+      await expect(view).toHaveAttribute('data-evidence-state', /ready|empty/, { timeout: 60_000 });
+      await expect(page.getByTestId('evidence-audit-state')).toHaveAttribute('data-audit-state', /loaded|empty/, { timeout: 60_000 });
+      expect(route.state.hits, 'opening the subview must not duplicate the in-flight prefetch').toBe(1);
     } finally {
       await route.dispose();
       await ctx.close();
     }
   });
 
-  test('late audit response after closing and switching never leaks into another item', async ({ browser }) => {
-    const { probe, candidateIds } = await discoverAuditAction(browser);
-    expect(candidateIds.length).toBeGreaterThan(0);
+  test('late audit response after switching items never leaks into another item', async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await login(page);
+    const wm0043ItemId = await resolveItemId(page, WM0043);
+    const wm0072ItemId = await resolveItemId(page, WM0072);
+    const probe = await discoverAuditAction(browser, wm0043ItemId);
+    const candidatesBefore = await (async () => {
+      const probeCtx = await browser.newContext();
+      const probePage = await probeCtx.newPage();
+      await login(probePage);
+      await openDetailFromList(probePage, WM0043);
+      await openEvidenceSubview(probePage);
+      await expect(candidates(probePage).first()).toBeVisible({ timeout: 60_000 });
+      const ids = await candidates(probePage).evaluateAll((els) => els.map((el) => el.getAttribute('data-testid') ?? ''));
+      await probeCtx.close();
+      return ids;
+    })();
+    expect(candidatesBefore.length).toBeGreaterThan(0);
     let delayed = false;
     const route = await installAuditRoute(page, probe, () => {
       if (delayed) return { kind: 'pass' };
@@ -230,59 +272,46 @@ test.describe('catalog detail partition recovery', () => {
       return { kind: 'delay', ms: 2_000 };
     });
     try {
-      await openDetail(page, WM0043);
-      await page.getByLabel('关闭商品详情').click();
-      await expect(page.getByTestId(`catalog-row-${WM0043}`)).toBeVisible();
-      const wm0072ItemId = await openDetail(page, WM0072);
-      await candidatesPanel(page).locator('summary').click();
-      await expect(page.getByRole('heading', { name: 'JST', exact: true })).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByTestId('item-uuid')).toHaveText(wm0072ItemId);
-      // Wait for the delayed WM0043 response to be delivered, then prove it did not land here.
+      await openDetailFromList(page, WM0043);
+      await openEvidenceSubview(page);          // 审计迟到
+      await closeDialog(page);
+      await openDetailFromList(page, WM0072);   // 切到另一个商品
+      const view = await openEvidenceSubview(page);
+      await expect(view).toHaveAttribute('data-evidence-state', /ready|empty/, { timeout: 60_000 });
+      const subject = page.getByTestId('catalog-evidence-subject');
+      await expect(subject).toContainText('WM0072', { timeout: 60_000 });
+      await expect(subject).not.toContainText('WM0043');
+      await expect(subject).not.toContainText(wm0072ItemId);
       await page.waitForTimeout(2_500);
-      await expect(page.getByTestId('item-uuid')).toHaveText(wm0072ItemId);
-      for (const testId of candidateIds) {
-        await expect(page.getByTestId(testId)).toHaveCount(0);
-      }
-      await expect(page.getByRole('heading', { name: 'JST', exact: true })).toBeVisible();
+      await expect(subject).toContainText('WM0072');
+      await expect(subject).not.toContainText(wm0043ItemId);
+      for (const testId of candidatesBefore) await expect(page.getByTestId(testId)).toHaveCount(0);
     } finally {
       await route.dispose();
       await ctx.close();
     }
   });
 
-  test('restricted amounts: transport failure clears values and retry works', async ({ browser }) => {
-    const discoverCtx = await browser.newContext();
-    const discoverPage = await discoverCtx.newPage();
-    await login(discoverPage);
-    const itemId = await openDetail(discoverPage, WM0043);
-    const detailProbe = await captureCatalogAction(discoverPage, async () => {
-      await discoverPage.getByTestId('load-restricted-amounts').click();
-      await expect(discoverPage.getByTestId('restricted-amounts')).toBeVisible({ timeout: 15_000 });
-    }, itemId);
-    await discoverCtx.close();
-
+  test('price read failure clears values and retry restores the business source view', async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await login(page);
-    await openDetail(page, WM0043);
-
-    let hits = 0;
-    await page.route('**/*', async (route) => {
-      const request = route.request();
-      if (request.method() !== 'POST') return route.fallback();
-      if (request.headers()['next-action'] !== detailProbe.actionId) return route.fallback();
-      const postData = request.postData() ?? '';
-      if (!postData.includes(detailProbe.bodyIncludes)) return route.fallback();
-      hits += 1;
-      if (hits === 1) return route.abort('failed');
-      return route.fallback();
-    });
-    await page.getByTestId('load-restricted-amounts').click();
-    await expect(page.getByTestId('restricted-amounts-error')).toBeVisible();
-    await expect(page.getByTestId('restricted-amounts')).toHaveCount(0);
-    await page.getByTestId('load-restricted-amounts').click();
-    await expect(page.getByTestId('restricted-amounts')).toBeVisible({ timeout: 15_000 });
-    expect(hits).toBeGreaterThanOrEqual(1);
-    await ctx.close();
+    const itemId = await resolveItemId(page, WM0043);
+    const probe = await discoverAuditAction(browser, itemId);
+    const route = await installAuditRoute(page, probe, (hit) => (hit === 1 ? { kind: 'fail', message: AUDIT_FAILURE_MESSAGE } : { kind: 'pass' }));
+    try {
+      await openDetailFromList(page, WM0043);
+      const view = await openEvidenceSubview(page);
+      await expect(view).toHaveAttribute('data-evidence-state', 'error', { timeout: 60_000 });
+      /* 失败时整块来源内容不可用：旧价格不显示，也不当成 0。 */
+      await expect(page.getByTestId('evidence-amounts')).toHaveCount(0);
+      await view.getByRole('button', { name: /重试/ }).first().click();
+      await expect(view).toHaveAttribute('data-evidence-state', 'ready', { timeout: 60_000 });
+      await expect(page.getByTestId('evidence-amounts')).toContainText('2.94', { timeout: 30_000 });
+      expect(route.state.hits).toBeGreaterThanOrEqual(2);
+    } finally {
+      await route.dispose();
+      await ctx.close();
+    }
   });
 });

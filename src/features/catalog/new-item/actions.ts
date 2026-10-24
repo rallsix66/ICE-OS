@@ -30,7 +30,7 @@ async function perform<T>(operation: () => Promise<T>, mutation = false): Promis
       B_PROVIDER_REQUIRED: '目标历史接口尚不完整，本次操作未执行。',
       PRODUCT_CAPTURE_ENVELOPE_INVALID: '商品观测封套或时间格式不合法，未导入。',
       PRODUCT_CAPTURE_PIN_CONFLICT: '固定资料、预览或受信封套不一致，未导入。',
-      IMAGE_PUBLICATION_NOT_IMPLEMENTED: '本包不发布图片引用，原图片证据仍受限保留。',
+      IMAGE_PUBLICATION_NOT_IMPLEMENTED: '本包不发布图片引用，原图片证明保留。',
       NEW_ITEM_MODULE_DISABLED: '持续新品模块尚未在本次隔离环境启用。',
       NEW_ITEM_FORBIDDEN: '当前账号没有本次来源或发布权限。',
       NEW_ITEM_SCOPED_ACTION_REQUIRED: '这份资料须通过当前来源范围授权操作。',

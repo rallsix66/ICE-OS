@@ -1,4 +1,20 @@
 import { test, expect, type BrowserContext, type Page, type Route } from '@playwright/test';
+
+/**
+ * 真实页面承接 / 新品同 UUID / 补码旧版本 / 修订重导 / 金额显式读取。
+ *
+ * !! 本文件不在任何 playwright.config*.ts 的 testMatch 中，本包未运行它（lead 决定：只做
+ *    testid / URL 迁移，不扩大主套件范围）。其流程还早于更早的包：
+ *    - 「准备固定基线预览 / 发布固定基线 / 承接冻结飞书观测 / manifest-counts / catalog-counts
+ *      的 126·548 文案」已经只在开发维护页 `/dashboard/catalog/admin`，不在 `/dashboard/catalog`；
+ *    - 列表行名称已从链接改成按钮（`查看详情` 打开弹窗），旧的「点行链接进详情」不再成立。
+ *    因此本文件即使完成下列契约迁移也不保证可跑通，属于历史未运行资产。
+ *
+ * 已按 repair-matrix §4 迁移：item-code → catalog-material-ice-code；item-revision →
+ *    catalog-detail-version；item-uuid / restricted-amounts / load-restricted-amounts /
+ *    候选审计 / 原始 JSON → `/dashboard/catalog/admin/evidence?item=<uuid>`；
+ *    历史与「采用资料」→ 变更记录 / 商品资料分区（必须先真实点击分区）。
+ */
 import { Pool } from 'pg';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -137,14 +153,19 @@ async function assertHistoryMetadata(page: Page, itemId: string, expectedRevisio
     expect(actual.revisionAudit).toEqual(expected);
     expect(Object.keys(actual.revisionAudit).sort()).toEqual(['reason', 'actorId', 'recordedAt', 'evidenceRef'].sort());
     await page.goto(`/dashboard/catalog/${itemId}?revision=${revision}`);
-    const history = page.getByTestId(`revision-history-${revision}`);
+    await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('catalog-tab-history').click();
+    await expect(page.getByTestId('catalog-tab-history')).toHaveAttribute('aria-selected', 'true');
+    const history = page.getByTestId(`revision-history-${revision}`).or(page.getByTestId(`revision-${revision}`));
     await expect(history.getByTestId('revision-reason')).toHaveText(expected.reason);
     await expect(history.getByTestId('revision-actor')).toHaveText(expected.actorId);
     await expect(history.getByTestId('revision-recorded-at')).toHaveText(expected.recordedAt);
     await expect(history.getByTestId('revision-evidence')).toHaveText(expected.evidenceRef);
-    await expect(page.getByRole('region', { name: '资料历史', exact: true })).toContainText('不代表来源业务更新时间');
-    await expect(page.getByTestId('item-code')).toHaveText(row.ice_code_snapshot ?? '待补货号');
-    await expect(page.getByRole('region', { name: '采用资料', exact: true })).toContainText(row.fields.factory.raw || '明确空串');
+    await expect(page.getByRole('region', { name: '变更记录', exact: true })).toContainText('不代表来源业务更新时间');
+    // 直链页头部身份（货号·名称）与商品资料分区（真实点击）。
+    await expect(page.getByTestId('catalog-detail-title')).toContainText(row.ice_code_snapshot ?? '待补货号');
+    await page.getByTestId('catalog-tab-material').click();
+    await expect(page.getByTestId('catalog-material-details')).toContainText(row.fields.factory.raw || '明确空串');
     const dom = { reason: await history.getByTestId('revision-reason').textContent(), actorId: await history.getByTestId('revision-actor').textContent(),
       recordedAt: await history.getByTestId('revision-recorded-at').textContent(), evidenceRef: await history.getByTestId('revision-evidence').textContent() };
     expect(dom).toEqual(expected);
@@ -162,7 +183,8 @@ test('真实页面承接、新品同UUID、补码旧版本、修订重导及金�
   await guard(context);
   const before = await oldRows();
   await login(page, 'admin@catalog.test', 'CatalogAdmin123!');
-  await page.goto('/dashboard/catalog');
+  // 维护动作（准备/发布固定基线、承接冻结观测）与 catalog-counts 的 126·548 摘要现在只在维护页。
+  await page.goto('/dashboard/catalog/admin');
   page.on('request', (request) => {
     const id = request.headers()['next-action'];
     if (id && !observedAction) observedAction = { id, body: request.postData() ?? '', contentType: request.headers()['content-type'] ?? 'text/plain;charset=UTF-8' };
@@ -175,16 +197,27 @@ test('真实页面承接、新品同UUID、补码旧版本、修订重导及金�
   await expect(page.getByTestId('catalog-counts')).toContainText('资料 126');
   await expect(page.getByTestId('catalog-counts')).toContainText('548');
   await page.getByRole('button', { name: '承接冻结飞书观测', exact: true }).click();
+  // 回到列表做搜索（列表搜索标签已改为「搜索货号、中英文名、69编码或已确认来源SKU」）。
+  await page.goto('/dashboard/catalog');
   await expect(page.getByRole('status')).toContainText('159格');
-  await page.getByLabel('搜索名称或ICE货号').fill('烟酰胺提亮精华水150ml');
+  await page.getByLabel(/搜索/).fill('烟酰胺提亮精华水150ml');
   await page.getByRole('link', { name: 'ICE LERSKIN 烟酰胺提亮精华水150ml', exact: true }).click();
   await expect(page.getByText('新品，待补货号', { exact: true })).toBeVisible();
   await expect(page.getByTestId('item-code')).toHaveText('待补货号');
-  const itemId = (await page.getByTestId('item-uuid').innerText()).trim();
-  const initialRevision = Number(await page.getByTestId('item-revision').innerText());
+  // 日常详情不再输出 item-uuid（技术证据退出日常详情，U3）：UUID 从 URL detail 参数读取。
+  const itemId = (new URL(page.url()).searchParams.get('detail') ?? '').trim();
+  const initialRevision = Number(await page.getByTestId('catalog-detail-version').innerText());
   expect(await page.getByRole('button', { name: /改绑|撤销|正式关系启用|换表/ }).count()).toBe(0);
-  await expect(page.getByRole('region', { name: '独立来源候选' })).toContainText('JST');
-  await expect(page.getByRole('region', { name: '独立来源候选' })).toContainText('BS');
+  // v3：证据在弹窗内子视图（本文件历史未运行，仅迁移契约）。
+  await page.goto(`/dashboard/catalog?detail=${itemId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('catalog-detail-more').locator('summary').click();
+  await page.getByTestId('catalog-more-evidence').click();
+  await expect(page.getByTestId('catalog-evidence-view')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('catalog-evidence-audit')).toContainText('JST', { timeout: 60_000 });
+  await expect(page.getByTestId('catalog-evidence-audit')).toContainText('BS');
+  await page.goto(`/dashboard/catalog?detail=${itemId}`);
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
   await page.getByLabel('首次ICE货号').fill('TEST-CATALOG-NEW-122');
   await page.getByLabel('补码依据').fill('仅本地隔离fixture测试，不是实际业务货号');
   const beforeCode = await revisionSnapshot(itemId);
@@ -192,8 +225,8 @@ test('真实页面承接、新品同UUID、补码旧版本、修订重导及金�
   await page.getByRole('button', { name: '保存首次货号', exact: true }).click();
   await recoverOriginalRequest(page, itemId, beforeCode, codeInjection, 'initial-code',
     { code: 'TEST-CATALOG-NEW-122', reason: '仅本地隔离fixture测试，不是实际业务货号' });
-  await expect(page.getByTestId('item-code')).toHaveText('TEST-CATALOG-NEW-122');
-  await expect(page.getByTestId('item-uuid')).toHaveText(itemId);
+  await expect(page.getByTestId('catalog-material-ice-code')).toContainText('TEST-CATALOG-NEW-122');
+  await expect(page.getByTestId('catalog-detail-version')).toHaveText(String(initialRevision + 2));
   await page.getByLabel('修订字段', { exact: true }).selectOption('factory');
   await page.getByLabel('明确采用值（留空表示明确空串）').fill('ISOLATED TEST FACTORY');
   await page.getByLabel('证据引用', { exact: true }).fill('fixture:browser-nonprice');
@@ -204,26 +237,32 @@ test('真实页面承接、新品同UUID、补码旧版本、修订重导及金�
   await recoverOriginalRequest(page, itemId, beforeRevision, revisionInjection, 'nonprice',
     { reason: '本地隔离资料修订测试', fields: { factory: { state: 'observed', meaning: 'value', raw: 'ISOLATED TEST FACTORY', evidenceRef: 'fixture:browser-nonprice' } } });
   await expect(page.getByRole('status')).toContainText('资料修订已保存');
-  await expect(page.getByTestId('item-revision')).toHaveText(String(initialRevision + 2));
-  const currentRevision = Number(await page.getByTestId('item-revision').innerText());
+  const currentRevision = Number(await page.getByTestId('catalog-detail-version').innerText());
   expect(currentRevision).toBe(initialRevision + 2);
   await assertHistoryMetadata(page, itemId, [initialRevision, initialRevision + 1, currentRevision]);
   await page.goto(`/dashboard/catalog/${itemId}?revision=${initialRevision}`);
-  await expect(page.getByTestId('item-code')).toHaveText('待补货号');
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('catalog-material-ice-code')).toContainText('待补货号');
   await page.goto('/dashboard/catalog');
   await page.getByRole('button', { name: '准备固定基线预览', exact: true }).click();
   await expect(page.getByRole('button', { name: '发布固定基线', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '发布固定基线', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('已原子承接');
   await page.goto(`/dashboard/catalog/${itemId}`);
-  await expect(page.getByTestId('item-code')).toHaveText('TEST-CATALOG-NEW-122');
-  await expect(page.getByTestId('item-revision')).toHaveText(String(currentRevision));
-  await expect(page.getByRole('region', { name: '采用资料' })).toContainText('ISOLATED TEST FACTORY');
+  await expect(page.getByTestId('catalog-material-ice-code')).toContainText('TEST-CATALOG-NEW-122');
+  await expect(page.getByTestId('catalog-detail-version')).toHaveText(String(currentRevision));
+  await expect(page.getByTestId('catalog-material-details')).toContainText('ISOLATED TEST FACTORY');
   const codeItem = (await owner.query(`SELECT item_id FROM catalog.catalog_item_code WHERE ice_code='WM0072'`)).rows[0].item_id;
   await page.goto(`/dashboard/catalog/${codeItem}`);
   await expect(page.getByText('本批冻结说明：该系统尚未建档（用户已确认）；不代表实时账号状态或库存0。', { exact: true })).toBeVisible();
+  // 受限金额读取只在授权维护页（日常详情已无该入口）。
+  await page.goto(`/dashboard/catalog?detail=${codeItem}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('catalog-detail-more').locator('summary').click();
+  await page.getByTestId('catalog-more-evidence').click();
+  await expect(page.getByTestId('catalog-evidence-view')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('restricted-amounts')).toHaveCount(0);
-  await page.getByRole('button', { name: '读取受限金额', exact: true }).click();
+  await page.getByTestId('load-restricted-amounts').click();
   await expect(page.getByTestId('restricted-amounts')).toContainText('5.18');
   await expect(page.getByTestId('restricted-amounts')).toContainText('5.68');
   await expect(page.getByTestId('restricted-amounts')).toContainText('5.5');
@@ -262,8 +301,11 @@ test('匿名、运营、停用拒绝资料、raw、历史、导出和金额，�
       expect(await deniedAction.text()).toMatch(/当前账户无权访问商品资料|商品资料操作未完成/);
     }
     await page.goto(`/dashboard/catalog/${itemId}?revision=1`);
-    await expect(page.getByTestId('item-uuid')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '读取受限金额' })).toHaveCount(0);
+    for (const forbidden of ['item-uuid', 'bs-basis-sha', 'catalog-audit-json', 'load-restricted-amounts', 'restricted-amounts']) {
+      await expect(page.getByTestId(forbidden)).toHaveCount(0);
+    }
+    await page.goto(`/dashboard/catalog?detail=${itemId}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('catalog-evidence-view')).toHaveCount(0);
     expect(await page.evaluate(() => Object.keys(localStorage))).toEqual([]);
     await context.close();
   }

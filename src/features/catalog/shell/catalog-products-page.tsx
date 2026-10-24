@@ -1,54 +1,107 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Package, Search } from 'lucide-react';
-import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
-import { EmptyState, Pill, SectionHeading } from '@/ui/ice-v4/primitives';
+import { useRouter } from 'next/navigation';
+import { AlertTriangle, Package, Search } from 'lucide-react';
+import { EmptyState } from '@/ui/ice-v4/primitives';
 import type { CatalogListClientPayload, CatalogListClientRow } from '../local-display/list-client-types';
 import { clientRowAsDisplayRow } from '../local-display/list-client-types';
-import { applyWarehouseScopeToDisplayRow, coverageForWarehouseFilter } from '../local-display/client-scope';
-import type { AdoptedUnitCost } from '../local-display/adopted-price';
-import { formatEstimatedValueCell, formatInventoryCell } from '../local-display/list-row-display';
+import { applyWarehouseScopeToDisplayRow } from '../local-display/client-scope';
+import {
+  formatAdoptedUnitCostCell,
+  formatEstimatedValueCell,
+  formatInventoryCell,
+  formatSampleLabel,
+  pageEntries,
+} from '../local-display/list-row-display';
+import type { CatalogIssueToolbarModel } from '../issues/types';
 import type { useCatalogUrlState } from './use-catalog-url-state';
+import styles from './catalog-list.module.css';
 
-function moneyFromAdopted(adopted: AdoptedUnitCost | null): string {
-  if (!adopted || adopted.state !== 'priced') return adopted ? '成本待补充' : '—';
-  return `¥${adopted.amountCny}`;
-}
+const PAGE_SIZE = 20;
 
-type DisplayAvailability = 'not_imported' | 'read_failed' | 'forbidden' | undefined;
+type UrlApi = ReturnType<typeof useCatalogUrlState>;
+type DisplayStatus = 'loaded' | 'not_imported' | 'read_failed' | 'forbidden';
 
-function statusPill(row: CatalogListClientRow) {
-  if (row.materialStatus.includes('待补货号')) return <Pill tone="amber">新品，待补货号</Pill>;
-  if (row.materialStatus.includes('尚未建档')) return <Pill tone="amber">BS尚未建档</Pill>;
-  return <Pill tone="green">资料已承接</Pill>;
-}
 
 function fieldOrPending(value: string | null | undefined, pendingLabel = '待补') {
   const trimmed = value?.trim();
   return trimmed ? trimmed : pendingLabel;
 }
 
-type UrlApi = ReturnType<typeof useCatalogUrlState>;
+function statusChip(row: CatalogListClientRow) {
+  if (row.materialStatus.includes('待补货号')) return <span className={`${styles.statusChip} ${styles.toneAmber}`}>新品，待补货号</span>;
+  if (row.materialStatus.includes('尚未建档')) return <span className={`${styles.statusChip} ${styles.toneAmber}`}>BS尚未建档</span>;
+  return <span className={`${styles.statusChip} ${styles.toneGreen}`}>资料已承接</span>;
+}
+
+/** 工具栏固定“待处理”入口：有真实问题才显示计数；读取失败可重试；无权不显示计数、不制造警报。 */
+function IssueToolbarEntry({
+  issues,
+  retrying,
+  onRetry,
+}: {
+  issues: CatalogIssueToolbarModel | undefined;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  if (issues?.state === 'read_failed') {
+    return (
+      <span className={styles.issueFailed} role="status">
+        待处理读取失败
+        <button type="button" className={styles.issueRetry} onClick={onRetry} disabled={retrying} aria-label="重新读取待处理">
+          {retrying ? '重试中…' : '重试'}
+        </button>
+      </span>
+    );
+  }
+  if (issues?.state === 'ok' && issues.issueCount > 0) {
+    return (
+      <Link className={styles.issueEntryAlert} href="/dashboard/catalog/issues">
+        <AlertTriangle size={14} strokeWidth={1.8} aria-hidden />
+        待处理 {issues.issueCount} 项 / {issues.itemCount} 款
+      </Link>
+    );
+  }
+  // ok && 0 项、forbidden、未接线（null/undefined）都只保留安静入口，不制造警报。
+  return (
+    <Link className={styles.issueEntry} href="/dashboard/catalog/issues">
+      待处理
+    </Link>
+  );
+}
 
 export function CatalogProductsPage({
   payload,
   displayStatus,
   displayError,
   itemCount,
-  auxiliaryErrors,
+  auxiliaryErrors = [],
+  issues,
   url,
 }: {
   payload: CatalogListClientPayload | null;
-  displayStatus: 'loaded' | 'not_imported' | 'read_failed' | 'forbidden';
+  displayStatus: DisplayStatus;
   displayError: string | null;
   itemCount: number;
-  auxiliaryErrors: string[];
+  auxiliaryErrors?: string[];
+  issues?: CatalogIssueToolbarModel;
   url: UrlApi;
 }) {
-  const { q: query, warehouse, page, setQuery, setWarehouse, setPage, resetFilters, openDetail } = url;
-  const pageSize = 20;
+  const { q: query, warehouse, page, setQuery, setWarehouse, setPage, normalizePage, resetFilters, openDetail } = url;
+  const router = useRouter();
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [retrying, startRetry] = useTransition();
+  const paginationRef = useRef<HTMLElement | null>(null);
+  const pendingPageAnchor = useRef<{ top: number | null } | null>(null);
+  /** 每次需要恢复分页位置时递增；与 currentPage 解耦，使“搜索收敛但页码不变”也能触发一次恢复。 */
+  const [anchorToken, setAnchorToken] = useState(0);
+
+  const retry = useCallback(() => {
+    if (retrying) return; // 防止重复发起并发刷新
+    startRetry(() => router.refresh());
+  }, [retrying, startRetry, router]);
 
   const displayOverview = useMemo(() => {
     if (!payload) return null;
@@ -83,110 +136,347 @@ export function CatalogProductsPage({
     return hay.includes(query.toLowerCase());
   }), [viewRows, query]);
 
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const coverage = displayOverview && payload ? coverageForWarehouseFilter(displayOverview, warehouse) : null;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // 渲染即用有效页：越界页码（page=999 等）不会出现“第999/7页 + 空表”，随后由 effect 规范化 URL。
+  const currentPage = Math.min(Math.max(1, Math.floor(page)), pageCount);
+  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageButtons = pageEntries(currentPage, pageCount);
+
+  useEffect(() => {
+    if (page !== currentPage) normalizePage(pageCount);
+  }, [page, currentPage, pageCount, normalizePage]);
+
+  /**
+   * U6/V3-05：保持底部分页控件在视口中的位置。
+   * - `always`：点击页码/上一页/下一页（控件必然可见）时记录；
+   * - `if-visible`：搜索、切仓、清空导致页数收敛时，仅当用户当前正看着分页区才恢复，
+   *   避免把停在页面顶部的用户强行拽到底部。
+   */
+  const capturePaginationAnchor = useCallback((mode: 'always' | 'if-visible') => {
+    const nav = paginationRef.current;
+    if (!nav) return;
+    const rect = nav.getBoundingClientRect();
+    if (mode === 'if-visible' && (rect.top < 0 || rect.top > window.innerHeight)) return;
+    pendingPageAnchor.current = { top: rect.top };
+    setAnchorToken((token) => token + 1);
+  }, []);
+
+  /**
+   * 换页/页数收敛后把同一分页控件调回原视口位置：
+   * 等一帧渲染 + 再一帧布局稳定，按 rect.top 差值回调 scrollY，夹取到合法 document 范围；
+   * 末页条目变少导致文档变矮时允许上移，但不回页面顶部。
+   * 关闭详情恢复阅读位置仍由 useCatalogUrlState 的 scrollY 机制负责，这里不与之竞争。
+   */
+  useEffect(() => {
+    const pending = pendingPageAnchor.current;
+    if (!pending) return;
+    pendingPageAnchor.current = null;
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const nav = paginationRef.current;
+        if (!nav) return;
+        if (pending.top !== null) {
+          const currentTop = nav.getBoundingClientRect().top;
+          const delta = currentTop - pending.top;
+          if (Math.abs(delta) >= 0.5) {
+            const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+            const nextScroll = Math.min(Math.max(0, window.scrollY + delta), maxScroll);
+            window.scrollTo({ top: nextScroll, left: 0 });
+          }
+        }
+        // 兜底：位置调整后分页控件仍需在视口内（夹取后极端情况下也不留在屏外）。
+        const rect = nav.getBoundingClientRect();
+        if (rect.top < 0) {
+          window.scrollBy({ top: rect.top - 8, left: 0 });
+        } else if (rect.bottom > window.innerHeight) {
+          window.scrollBy({ top: rect.bottom - window.innerHeight + 8, left: 0 });
+        }
+        // 焦点不在此处搬动：页码按钮按 page number 稳定 keyed，被点的页码按钮换页后仍是当前页并保持焦点；
+        // 结果变化只用 aria-live 通知，不自动聚焦表头或其它控件。
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [anchorToken]);
+
+  const goToPage = useCallback((next: number) => {
+    const target = Math.min(Math.max(1, Math.floor(next)), pageCount);
+    if (target === currentPage) return;
+    capturePaginationAnchor('always');
+    setPage(target);
+  }, [currentPage, pageCount, capturePaginationAnchor, setPage]);
+
+  const handleQueryChange = useCallback((nextQuery: string) => {
+    capturePaginationAnchor('if-visible');
+    setQuery(nextQuery);
+  }, [capturePaginationAnchor, setQuery]);
+
+  const handleWarehouseChange = useCallback((nextWarehouse: string) => {
+    capturePaginationAnchor('if-visible');
+    setWarehouse(nextWarehouse);
+  }, [capturePaginationAnchor, setWarehouse]);
+
+  const handleReset = useCallback(() => {
+    capturePaginationAnchor('if-visible');
+    resetFilters();
+  }, [capturePaginationAnchor, resetFilters]);
+
   const exportLabel = payload?.exportLabel ?? null;
-  const projectionUnavailable: DisplayAvailability = displayStatus === 'loaded' ? undefined : displayStatus;
+  const sampleLabel = formatSampleLabel(exportLabel);
+  const projectionUnavailable = displayStatus === 'loaded' ? undefined : displayStatus;
+  const isFiltering = query.trim().length > 0;
+  const moreId = (itemId: string) => `catalog-row-more-${itemId}`;
 
   return (
     <>
-      <div className={demoStyles.filters} style={{ marginBottom: 16 }}>
-        <label className={demoStyles.searchInput}>
-          <Search size={16} />
-          <input aria-label="搜索货号、中英文名、69编码或已确认来源SKU" placeholder="货号 / 名称 / 69编码 / 来源SKU" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <div className={styles.toolbar}>
+        <label className={styles.searchField}>
+          <Search size={16} aria-hidden />
+          <input
+            type="search"
+            aria-label="搜索货号、中英文名、69编码或已确认来源SKU"
+            placeholder="货号 / 名称 / 69编码 / 来源SKU"
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+          />
         </label>
         {payload && (
-          <select aria-label="仓库筛选" value={warehouse} onChange={(e) => setWarehouse(e.target.value)}>
+          <select className={styles.select} aria-label="仓库筛选" data-testid="catalog-warehouse-filter" value={warehouse} onChange={(e) => handleWarehouseChange(e.target.value)}>
             <option value="all">全部仓库</option>
             {payload.warehouseOptions.map((wh) => <option key={wh} value={wh}>{wh}</option>)}
           </select>
         )}
-        <button type="button" className={demoStyles.secondaryButton} onClick={() => resetFilters()}>清空</button>
-        <Link className={demoStyles.textLink} href="/dashboard/catalog/intake">持续新品资料</Link>
+        {/* 明确的手动刷新：读取失败时可重试，正常浏览也可主动刷新同一筛选结果（不改变 q/warehouse/page）。 */}
+        <button
+          type="button"
+          className={styles.toolbarButton}
+          data-testid="catalog-list-refresh"
+          aria-label="刷新列表"
+          disabled={retrying}
+          onClick={retry}
+        >
+          {retrying ? '刷新中…' : '刷新'}
+        </button>
+        <button type="button" className={styles.toolbarButton} onClick={handleReset}>清空</button>
+        <IssueToolbarEntry issues={issues} retrying={retrying} onRetry={retry} />
       </div>
 
-      {auxiliaryErrors.map((msg) => <p key={msg} className={demoStyles.notice} role="status">{msg}</p>)}
-      {displayStatus === 'forbidden' && <p className={demoStyles.notice} role="alert">BS 样表库存投影读取被拒绝（权限不足）。</p>}
-      {displayStatus === 'read_failed' && <p className={demoStyles.notice} role="alert">{displayError ?? 'BS 样表库存投影读取失败'}</p>}
-
-      {displayStatus === 'loaded' && payload && coverage && (
-        <section className={demoStyles.panel} data-testid="catalog-display-banner" style={{ marginBottom: 16 }}>
-          <p><strong>{exportLabel ?? 'BS 样表'}</strong> · 已确认 BS 库存行 {coverage.bsConfirmedLines} · 未选择 {coverage.bsUnselectedLines}{warehouse !== 'all' ? ` · 仓库 ${warehouse}` : ''}</p>
-          <p className={demoStyles.subtle}>本地估算：样表现有库存 × 采用人民币单品进货价（不含运费、不含税）。</p>
-          <p>{warehouse !== 'all' ? '本仓统计 · ' : ''}有数值进货价 {coverage.pricedItemCount} 份 · 可估值 {coverage.valuedItemCount} 份 · 缺价：{coverage.missingPriceIceCodes.join('、') || '无'}</p>
-        </section>
+      {auxiliaryErrors.length > 0 && (
+        <ul className={styles.noticeList} role="status">
+          {auxiliaryErrors.map((msg) => <li key={msg} className={styles.noticeItem}>{msg}</li>)}
+        </ul>
       )}
-      {displayStatus === 'not_imported' && <p className={demoStyles.subtle}>尚未载入 BS 样表库存投影。</p>}
 
-      <p data-testid="catalog-counts" className={demoStyles.subtle} style={{ marginBottom: 12 }}>默认展示 {itemCount} 份真实主资料（不含测试建档 C127 流程产物）</p>
+      {displayStatus === 'read_failed' && (
+        <div className={`${styles.notice} ${styles.noticeAlert}`} role="alert">
+          <div className={styles.noticeText}>
+            <strong>库存数据读取失败（网络或传输异常）</strong>
+            <p>商品主资料仍可浏览；库存、进货价与货值暂不可用。{displayError ? <span className={styles.noticeDetail}>（{displayError}）</span> : null}</p>
+          </div>
+          <button type="button" className={styles.retryButton} onClick={retry} disabled={retrying}>
+            {retrying ? '正在重新读取…' : '重试'}
+          </button>
+        </div>
+      )}
 
-      <section className={demoStyles.panel}>
-        <SectionHeading title={`商品资料 · ${filtered.length} 款`} action={<span className={demoStyles.subtle}>每行一款商品，点击查看完整身份与来源</span>} />
-        {filtered.length === 0 ? (
-          <EmptyState onReset={() => resetFilters()} />
-        ) : (
-          <div className={demoStyles.tableScroll}>
-            <table className={demoStyles.table}>
-              <thead>
-                <tr>
-                  <th>商品 / 公司货号</th>
-                  <th>69编码</th>
-                  <th>中文名称 / 英文名称</th>
-                  <th>规格 / 单位 / 分类</th>
-                  <th>来源对应关系</th>
-                  <th>单位参考成本</th>
-                  <th>BS样表库存</th>
-                  <th>估算货值（人民币）</th>
-                  <th>状态</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((row) => {
-                  const shareHref = `/dashboard/catalog/${row.itemId}${warehouse !== 'all' ? `?warehouse=${encodeURIComponent(warehouse)}` : ''}`;
-                  const english = fieldOrPending(row.englishName);
-                  const category = fieldOrPending(row.categoryText);
-                  const barcode = fieldOrPending(row.barcodeText);
-                  const unit = fieldOrPending(row.unitText, '—');
-                  const choices = row.humanChoices.bigseller + row.humanChoices.jushuitan;
-                  const unitCostLabel = moneyFromAdopted(row.adoptedUnitCost);
-                  const inventoryLabel = formatInventoryCell(row, warehouse, projectionUnavailable);
-                  const estimatedLabel = formatEstimatedValueCell(row, warehouse, projectionUnavailable);
-                  return (
-                    <tr key={row.itemId} data-testid={row.iceCode ? `catalog-row-${row.iceCode}` : undefined}>
-                      <td>
-                        <button type="button" className={demoStyles.productName} style={{ border: 'none', background: 'transparent', textAlign: 'left', width: '100%', cursor: 'pointer' }} onClick={() => openDetail(row.itemId)}>
-                          <span className={demoStyles.productArt} aria-hidden><Package size={20} strokeWidth={1.3} /></span>
-                          <span><strong>{row.nameCn}</strong><small>{fieldOrPending(row.iceCode, '待补货号')} <span className={demoStyles.faint}>/ {row.specificationText || '—'}</span></small></span>
-                        </button>
-                      </td>
-                      <td className={demoStyles.codeCell}>{barcode}</td>
-                      <td><span>{row.nameCn}</span><small className={demoStyles.cellSub}>{english}</small></td>
-                      <td>{row.specificationText || '—'} / {unit}<small className={demoStyles.cellSub}>{category}</small></td>
-                      <td>{choices} 条本批已确认<small className={demoStyles.cellSub}>正式长期关系未启用</small></td>
-                      <td data-testid="catalog-unit-cost">{unitCostLabel}</td>
-                      <td data-testid="catalog-bs-inventory">{inventoryLabel}</td>
-                      <td data-testid="catalog-estimated-value">{estimatedLabel}</td>
-                      <td>{statusPill(row)}</td>
-                      <td>
-                        <button type="button" className={demoStyles.smallButton} onClick={() => openDetail(row.itemId)}>查看详情</button>
-                        <Link href={shareHref} className={demoStyles.textLink} style={{ marginLeft: 8 }} target="_blank" rel="noreferrer">新标签</Link>
-                      </td>
+      {displayStatus === 'forbidden' && (
+        <div className={`${styles.notice} ${styles.noticeWarn}`} role="status">
+          <div className={styles.noticeText}>
+            <strong>无权读取库存数据</strong>
+            <p>当前账号无权读取 BS 样表库存；主商品资料仍可浏览，库存与金额不显示。</p>
+          </div>
+        </div>
+      )}
+
+      {displayStatus === 'not_imported' && (
+        <div className={`${styles.notice} ${styles.noticeWarn}`} role="status">
+          <div className={styles.noticeText}>
+            <strong>库存数据当前未启用 / 未覆盖</strong>
+            <p>尚未载入 BS 样表库存；库存与估值列显示“样表未导入”，不当作 0。</p>
+          </div>
+        </div>
+      )}
+
+      {displayStatus === 'loaded' && payload?.exportLabel && (
+        <p className={styles.sampleDate} data-testid="catalog-sample-date">{sampleLabel}</p>
+      )}
+
+      <section className={styles.panel} aria-label="商品资料列表" data-list-scroll-anchor="catalog-list">
+        <div className={styles.panelHead}>
+          <h2 className={styles.panelTitle} data-testid="catalog-counts">
+            商品资料 · {filtered.length === itemCount ? filtered.length : `${filtered.length} / ${itemCount}`} 款
+          </h2>
+        </div>
+
+        <div className={styles.panelBody}>
+          {filtered.length === 0 ? (
+            isFiltering ? (
+              <EmptyState onReset={handleReset} />
+            ) : (
+              <div className={styles.emptyPanel} role="status">
+                <Package size={26} strokeWidth={1.4} aria-hidden />
+                <h3>暂无可展示的真实商品资料</h3>
+                <p>当前资料库还没有已承接的基线商品；这不是“筛选无结果”。</p>
+              </div>
+            )
+          ) : (
+            <>
+              <div className={styles.tableShell}>
+                <table className={styles.table} aria-label="商品资料列表">
+                  <thead>
+                    <tr>
+                      <th scope="col" className={styles.colIdentity}>商品身份（货号 / 名称 / 规格）</th>
+                      <th scope="col" className={`${styles.colStock} ${styles.numericHead}`}>当前仓已确认库存</th>
+                      <th scope="col" className={`${styles.colPrice} ${styles.numericHead}`}>采用进货价（人民币/单品）</th>
+                      <th scope="col" className={`${styles.colValue} ${styles.numericHead}`}>估算货值（人民币）</th>
+                      <th scope="col" className={styles.colStatus}>资料 / 问题</th>
+                      <th scope="col" className={styles.colActions}>操作</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {filtered.length > pageSize && (
-          <div className={demoStyles.buttonRow}>
-            <button type="button" className={demoStyles.secondaryButton} disabled={page <= 1} aria-label="上一页" onClick={() => setPage(page - 1)}>上一页</button>
-            <span className={demoStyles.subtle} aria-live="polite">第 {page} / {Math.ceil(filtered.length / pageSize)} 页</span>
-            <button type="button" className={demoStyles.secondaryButton} disabled={page >= Math.ceil(filtered.length / pageSize)} aria-label="下一页" onClick={() => setPage(page + 1)}>下一页</button>
-          </div>
-        )}
-        <p className={demoStyles.tableFootnote}>商品资料为统一身份档案；缺失字段显示待补，不用演示数据填充。审计与技术说明见「管理与审计」或详情展开区。</p>
+                  </thead>
+                  <tbody>
+                    {pageRows.map((row) => {
+                      const expanded = expandedItemId === row.itemId;
+                      const unitCostLabel = formatAdoptedUnitCostCell(row.adoptedUnitCost);
+                      const inventoryLabel = formatInventoryCell(row, warehouse, projectionUnavailable);
+                      const estimatedLabel = formatEstimatedValueCell(row, warehouse, projectionUnavailable);
+                      const choices = row.humanChoices.bigseller + row.humanChoices.jushuitan;
+                      return [
+                        <tr
+                          key={row.itemId}
+                          className={styles.row}
+                          data-testid={row.iceCode ? `catalog-row-${row.iceCode}` : undefined}
+                          data-expanded={expanded ? 'true' : 'false'}
+                        >
+                          <td className={`${styles.cell} ${styles.colIdentity}`} data-label="商品">
+                            <div className={styles.identity}>
+                              <span className={styles.art} aria-hidden><Package size={18} strokeWidth={1.4} /></span>
+                              <div className={styles.identityText}>
+                                <span className={styles.identityCode}>{fieldOrPending(row.iceCode, '待补货号')}</span>
+                                <button type="button" className={styles.nameButton} onClick={() => openDetail(row.itemId)}>
+                                  {row.nameCn}
+                                </button>
+                                <span className={styles.identitySpec}>
+                                  {fieldOrPending(row.specificationText, '规格待补')}
+                                  {row.unitText ? ` · ${row.unitText}` : ''}
+                                </span>
+                                <button
+                                  type="button"
+                                  className={styles.moreButton}
+                                  aria-expanded={expanded}
+                                  aria-controls={moreId(row.itemId)}
+                                  onClick={() => setExpandedItemId(expanded ? null : row.itemId)}
+                                >
+                                  {expanded ? '收起资料' : '更多资料'}
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                          <td className={`${styles.cell} ${styles.colStock} ${styles.metricCell}`} data-label="当前仓已确认库存">
+                            <span className={`${styles.metricValue} ${styles.metricValueInventory}`} data-testid="catalog-bs-inventory">{inventoryLabel}</span>
+                          </td>
+                          <td className={`${styles.cell} ${styles.colPrice} ${styles.metricCell}`} data-label="采用进货价">
+                            <span className={styles.metricValue} data-testid="catalog-unit-cost">{unitCostLabel}</span>
+                          </td>
+                          <td className={`${styles.cell} ${styles.colValue} ${styles.metricCell}`} data-label="估算货值（人民币）">
+                            <span
+                              className={`${styles.metricValueStrong} ${estimatedLabel.startsWith('¥') ? '' : styles.metricValueText}`}
+                              data-testid="catalog-estimated-value"
+                            >
+                              {estimatedLabel}
+                            </span>
+                          </td>
+                          <td className={`${styles.cell} ${styles.colStatus}`} data-label="资料 / 问题">
+                            {statusChip(row)}
+                          </td>
+                          <td className={`${styles.cell} ${styles.colActions}`} data-label="操作">
+                            <div className={styles.actionGroup}>
+                              <button type="button" className={styles.actionButton} onClick={() => openDetail(row.itemId)}>查看详情</button>
+                            </div>
+                          </td>
+                        </tr>,
+                        <tr
+                          key={`${row.itemId}-more`}
+                          id={moreId(row.itemId)}
+                          className={styles.moreRow}
+                          data-expanded={expanded ? 'true' : 'false'}
+                        >
+                          <td colSpan={6} className={styles.moreCell}>
+                            <dl className={styles.moreGrid}>
+                              <div className={styles.moreItem}><dt>69编码</dt><dd>{fieldOrPending(row.barcodeText)}</dd></div>
+                              <div className={styles.moreItem}><dt>英文名称</dt><dd>{fieldOrPending(row.englishName)}</dd></div>
+                              <div className={styles.moreItem}><dt>分类</dt><dd>{fieldOrPending(row.categoryText)}</dd></div>
+                              <div className={styles.moreItem}><dt>单位</dt><dd>{fieldOrPending(row.unitText, '—')}</dd></div>
+                              <div className={styles.moreItem}><dt>来源对应</dt><dd>{choices} 条本批已确认</dd></div>
+                              <div className={styles.moreItem}>
+                                <dt>采用进货价原值</dt>
+                                <dd>{row.adoptedUnitCost?.state === 'priced' ? row.adoptedUnitCost.amountCny : '无'}</dd>
+                              </div>
+                              <div className={styles.moreItem}>
+                                <dt>估算货值原值</dt>
+                                <dd>{row.bsSample.estimatedValueCny ?? '无'}</dd>
+                              </div>
+                            </dl>
+                          </td>
+                        </tr>,
+                      ];
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {pageCount > 1 && (
+                <nav ref={paginationRef} className={styles.pagination} aria-label="商品资料分页" data-testid="catalog-pagination">
+                  <button
+                    type="button"
+                    className={styles.pageButton}
+                    aria-label="上一页"
+                    aria-disabled={currentPage <= 1}
+                    disabled={currentPage <= 1}
+                    onClick={() => goToPage(currentPage - 1)}
+                  >
+                    上一页
+                  </button>
+                  <span className={styles.pageNumbers}>
+                    {pageButtons.map((entry, index) => (
+                      entry === 'ellipsis' ? (
+                        <span key={`ellipsis-${index}`} className={styles.pageEllipsis} aria-hidden>…</span>
+                      ) : (
+                        <button
+                          key={entry}
+                          type="button"
+                          data-page={entry}
+                          className={`${styles.pageButton} ${styles.pageNumber} ${entry === currentPage ? styles.pageNumberCurrent : ''}`}
+                          aria-label={`第 ${entry} 页`}
+                          aria-current={entry === currentPage ? 'page' : undefined}
+                          onClick={() => goToPage(entry)}
+                        >
+                          {entry}
+                        </button>
+                      )
+                    ))}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.pageButton}
+                    aria-label="下一页"
+                    aria-disabled={currentPage >= pageCount}
+                    disabled={currentPage >= pageCount}
+                    onClick={() => goToPage(currentPage + 1)}
+                  >
+                    下一页
+                  </button>
+                  <span className={styles.pageStatus} data-testid="catalog-page-label">第 {currentPage} / {pageCount} 页</span>
+                  <span className={styles.liveStatus} role="status" aria-live="polite">
+                    第 {currentPage} 页，共 {pageCount} 页，{filtered.length} 款
+                  </span>
+                </nav>
+              )}
+            </>
+          )}
+        </div>
       </section>
     </>
   );

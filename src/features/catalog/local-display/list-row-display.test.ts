@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogListClientRow } from './list-client-types';
-import { formatEstimatedValueCell, formatInventoryCell } from './list-row-display';
+import { formatAdoptedUnitCostCell, formatEstimatedValueCell, formatInventoryCell } from './list-row-display';
 
 function row(overrides: Partial<CatalogListClientRow> = {}): CatalogListClientRow {
   return {
@@ -107,6 +107,7 @@ describe('list row display cells', () => {
   it('distinguishes no confirmed BS lines from real zero stock', () => {
     const noConfirmed = row({
       bsSample: {
+        ...row().bsSample,
         confirmedOnHandTotal: null,
         confirmedLineCount: 0,
             warehouseScopes: {},
@@ -120,6 +121,7 @@ describe('list row display cells', () => {
 
     const zeroAll = row({
       bsSample: {
+        ...row().bsSample,
         confirmedOnHandTotal: '0',
         confirmedLineCount: 1,
         warehouseScopes: {
@@ -139,5 +141,41 @@ describe('list row display cells', () => {
     expect(formatInventoryCell(zeroAll, 'all')).toBe('0');
     expect(formatInventoryCell(zeroAll, '菲越')).toBe('0');
     expect(formatEstimatedValueCell(zeroAll, '菲越')).toBe('¥0.00');
+  });
+
+  it('groups estimated value with thousands separators and fixed 2 decimals, inventory stays raw', () => {
+    const largeValue = row({
+      bsSample: {
+        ...row().bsSample,
+        confirmedOnHandTotal: '7355',
+        confirmedLineCount: 1,
+        estimatedValueCny: '21623.7',
+        valuationState: 'valued',
+        valuationReason: null,
+        warehouseScopes: {
+          菲越: {
+            confirmedOnHandTotal: '4946',
+            confirmedLineCount: 1,
+            estimatedValueCny: '14541.24',
+            valuationState: 'valued',
+            valuationReason: null,
+          },
+        },
+      },
+    });
+    expect(formatInventoryCell(largeValue, 'all')).toBe('7355');
+    expect(formatEstimatedValueCell(largeValue, 'all')).toBe('¥21,623.70');
+    expect(formatInventoryCell(largeValue, '菲越')).toBe('4946');
+    expect(formatEstimatedValueCell(largeValue, '菲越')).toBe('¥14,541.24');
+  });
+
+  it('keeps adopted unit price precision while adding thousands separators', () => {
+    const priced = (amountCny: string) => row({ adoptedUnitCost: { state: 'priced', amountCny, evidenceRef: 'e', sourceRow: 1 } });
+    expect(formatAdoptedUnitCostCell(priced('5.18').adoptedUnitCost)).toBe('¥5.18');
+    expect(formatAdoptedUnitCostCell(priced('4.4').adoptedUnitCost)).toBe('¥4.4');
+    expect(formatAdoptedUnitCostCell(priced('1200.5').adoptedUnitCost)).toBe('¥1,200.5');
+    expect(formatAdoptedUnitCostCell(null)).toBe('—');
+    expect(formatAdoptedUnitCostCell({ state: 'missing', reason: '当前资料无可用数值进货价' })).toBe('成本待补充');
+    expect(formatAdoptedUnitCostCell({ state: 'parse_failed', reason: '进货价解析失败' })).toBe('成本待补充');
   });
 });

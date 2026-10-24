@@ -1,0 +1,1155 @@
+/**
+ * detail-ui 独占样式（商品详情：弹窗 + 直链共用投影）。
+ *
+ * 只服务真实商品库详情；不改 src/ui/shared/workspace-visual.module.css（Demo 也在用）。
+ * 结构契约：header 固定 + 唯一滚动体 .detailBody；直链用 data-detail-container="page"
+ * 关闭内部滚动，避免在无 max-height 的页面里出现双滚动条。
+ */
+
+/* ---- 弹窗容器：header 固定、body 唯一滚动 ---- */
+
+.dialogShell {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  /* U1：外框固定。切换分区 / 加载 / 空态 / 失败态都不改变弹窗位置与尺寸。 */
+  height: min(92vh, 960px);
+  max-height: calc(100dvh - 24px);
+  /* R3 + emil-design-eng：真实商品详情是高频入口，去掉缩放/淡入的位移入场，
+     缓存已即时供数时不再多等一次布局稳定；遮罩透明度保留（不影响几何）。 */
+  animation: none !important;
+  transition: none !important;
+}
+
+.headerActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.headerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid #d8deea;
+  border-radius: 6px;
+  background: #fff;
+  color: #4057c0;
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.headerButton[aria-pressed="true"] {
+  border-color: #aebbe9;
+  background: #eef1ff;
+  color: #31449b;
+}
+
+.detailBody {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 26px 28px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #ccd4e4 #f8f9fc;
+  scrollbar-gutter: stable;
+}
+
+/* 滚动可发现性：Windows/Chromium 下 overlay 滚动条在截图与自动隐藏时会“看不见”，
+   显式绘制滚动条，避免用户误以为内容已到底（F01 的原始问题就是滚不动/看不出能滚）。 */
+.detailBody::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.detailBody::-webkit-scrollbar-track {
+  background: #f8f9fc;
+  border-left: 1px solid #eef1f6;
+}
+
+.detailBody::-webkit-scrollbar-thumb {
+  border: 2px solid #f8f9fc;
+  border-radius: 6px;
+  background: #c3ccdb;
+}
+
+.detailBody::-webkit-scrollbar-thumb:hover {
+  background: #a9b6ca;
+}
+
+.detailBody:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: -3px;
+}
+
+/* 直链页在文档流里，不要变成固定高度滚动体（否则出现双滚动条）。 */
+.detailBody[data-detail-container="page"] {
+  flex: 0 0 auto;
+  gap: 16px;
+  padding: 0;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
+.coreReady {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+/* ---- 状态行 / 离开提示 ---- */
+
+.statusLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
+  background: #f7f9fd;
+  color: #5c6f8c;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.statusLineError {
+  border-color: #f1d9d8;
+  background: #fdf6f6;
+  color: #9d4f4d;
+}
+
+.statusLineStale {
+  border-color: #ebe5d7;
+  background: #fbf8ef;
+  color: #8b7a54;
+}
+
+.statusLineInfo {
+  border-color: #e3e8f2;
+  background: #f7f9fd;
+  color: #5c6f8c;
+}
+
+.leaveNotice {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 11px 26px;
+  border-bottom: 1px solid #ebe5d7;
+  background: #fbf8ef;
+  color: #8b7a54;
+  font-size: 12px;
+}
+
+/* ---- 首屏概览 ---- */
+
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #e3e8f2;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #fbfcff 0%, #ffffff 100%);
+}
+
+.overviewIdentity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+.overviewKicker {
+  margin: 0;
+  color: #9faabc;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.overviewMeta {
+  margin: 0;
+  color: #667a96;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.overviewGrid {
+  display: grid;
+  /* 自适应列：避免宽屏出现“三张一行 + 一张孤儿”的大片留白。 */
+  grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.overviewItem {
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid #eaeef5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.overviewItem dt {
+  margin: 0;
+  color: #93a0b3;
+  font-size: 11px;
+}
+
+.overviewItem dd {
+  margin: 6px 0 0;
+  color: #445a78;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.overviewHint {
+  display: block;
+  margin-top: 4px;
+  color: #98a2b2;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.7;
+}
+
+.overviewNote {
+  margin: 0;
+  color: #98a2b2;
+  font-size: 11px;
+  line-height: 1.9;
+}
+
+/* ---- 分区 ---- */
+
+.sectionStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.section {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #e6e8ec;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: #2d3f5a;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.sectionNote {
+  margin: 4px 0 0;
+  color: #98a2b2;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.subDetails {
+  border-top: 1px solid #eef0f5;
+  padding-top: 12px;
+}
+
+.subDetails > summary {
+  cursor: pointer;
+  color: #4c607c;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.subDetails > summary:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: 3px;
+}
+
+.subDetailsBody {
+  margin-top: 10px;
+}
+
+/* ---- 商品资料 ---- */
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  min-width: 0;
+}
+
+.heroText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.heroName {
+  margin: 0;
+  color: #3d5374;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.heroMeta {
+  margin: 0;
+  color: #7b8ba4;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.heroCaption {
+  margin: 0;
+  color: #a3adbb;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.identityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 30px;
+  margin: 0;
+}
+
+.identityGrid > div {
+  min-width: 0;
+  padding: 11px 0;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.identityGrid dt {
+  margin: 0 0 4px;
+  color: #93a0b3;
+  font-size: 11px;
+}
+
+.identityGrid dd {
+  margin: 0;
+  color: #5b708f;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.auditGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.auditGrid > div {
+  min-width: 0;
+}
+
+.auditGrid dt {
+  margin: 0 0 2px;
+  color: #93a0b3;
+  font-size: 11px;
+}
+
+.auditGrid dd {
+  margin: 0;
+  color: #5b708f;
+  overflow-wrap: anywhere;
+}
+
+.codeCell {
+  color: #66799a;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* ---- 库存与来源 ---- */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.facts > div {
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid #eaeef5;
+  border-radius: 8px;
+  background: #fafbfd;
+}
+
+.facts dt {
+  margin: 0;
+  color: #93a0b3;
+  font-size: 11px;
+}
+
+.facts dd {
+  margin: 6px 0 0;
+  color: #445a78;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.controlsLabel {
+  color: #8d98aa;
+  font-size: 11px;
+}
+
+.chip {
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid #dce1e8;
+  border-radius: 999px;
+  background: #fff;
+  color: #5a687a;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: #8495ed;
+  background: #eef1ff;
+  color: #31449b;
+  /* V4-01：选中态不得改变字重/占位宽度；只用边框、底色和内描边表达。 */
+  box-shadow: inset 0 0 0 1px #8495ed;
+}
+
+.chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ---- 变更记录 ---- */
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyItem {
+  padding: 10px 12px;
+  border: 1px solid #eef0f5;
+  border-radius: 8px;
+  background: #fcfdff;
+}
+
+.historyLink {
+  color: #4057c0;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.historyMeta {
+  margin: 5px 0 0;
+  color: #98a2b2;
+  font-size: 11px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+/* ---- 编辑资料 ---- */
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #eaeef5;
+  border-radius: 9px;
+  background: #fcfdff;
+}
+
+.formTitle {
+  margin: 0;
+  color: #3d5374;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: #5a687a;
+  font-size: 12px;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.currentValue {
+  padding: 7px 10px;
+  border: 1px dashed #dbe2ee;
+  border-radius: 6px;
+  background: #f7f9fd;
+  color: #5d7292;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.fieldHint {
+  color: #98a2b2;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.select {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #33465f;
+  font: inherit;
+  font-size: 12px;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #5a687a;
+  font-size: 12px;
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.formMessage {
+  margin: 0;
+  color: #5c6f8c;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.pendingBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #ebe5d7;
+  border-radius: 8px;
+  background: #fbf8ef;
+  color: #8b7a54;
+  font-size: 12px;
+}
+
+.deniedNote {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
+  background: #f7f9fd;
+  color: #5c6f8c;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+/* ---- 直链页脚（返回壳） ---- */
+
+.pageRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 26px;
+  min-width: 0;
+}
+
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.returnBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  font-size: 12px;
+}
+
+.returnLink {
+  color: #5266d7;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pageTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 18px;
+}
+
+.pageTitle {
+  margin: 0;
+  color: #273244;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.pageMeta {
+  margin: 6px 0 0;
+  color: #7b8ba4;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+/* ---- 焦点环（新控件必须可见） ---- */
+
+.section :where(button, a, input, select, textarea):focus-visible,
+.overview :where(button, a, input, select, textarea):focus-visible,
+.detailBody :where(button, a, input, select, textarea):focus-visible,
+.leaveNotice :where(button, a):focus-visible,
+.pageHeader :where(button, a):focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: 3px;
+}
+
+/* ---- 响应式 ---- */
+
+@media (max-width: 900px) {
+  .detailBody {
+    padding: 16px 18px 24px;
+  }
+
+  .overviewGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  /* 635 宽：标题独占一行、操作区另起一行右对齐。
+     否则共享 .detailHeader 的 space-between 会把标题挤成 4–5 行窄列，头部高达约 300px。 */
+  .dialogShell .dialogHeader {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px 12px;
+    padding: 15px 16px 13px;
+  }
+
+  .dialogShell .dialogHeader > div:first-child {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .dialogShell .dialogHeader .headerActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .detailBody {
+    padding: 14px 14px 22px;
+  }
+
+  .leaveNotice {
+    padding: 10px 14px;
+  }
+
+  .section {
+    padding: 14px;
+  }
+
+  .overview {
+    padding: 14px;
+  }
+
+  .overviewGrid,
+  .facts,
+  .identityGrid,
+  .formRow,
+  .auditGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .facts {
+    gap: 8px;
+  }
+
+  .hero {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pageTitle {
+    font-size: 18px;
+  }
+
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detailBody {
+    scroll-behavior: auto;
+  }
+}
+
+/* ---- U1：固定外壳 + 分区栏 ---- */
+
+.dialogHeader {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid #eef0f5;
+  background: #fff;
+}
+
+.dialogTitleBlock {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dialogMeta {
+  margin: 0;
+  color: #7c8ba1;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.dialogBodyWrap {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.dialogStatus {
+  flex: 0 0 auto;
+  padding: 10px 20px 0;
+}
+
+.dialogFrame {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+/* 分区栏固定在外框内，不参与正文滚动；高频切换故不做任何位移动画。 */
+.tabBar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 14px;
+  border-bottom: 1px solid #eef0f5;
+  background: #fff;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabBar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #667a96;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: #2d3f5a;
+}
+
+.tab:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: -3px;
+}
+
+.tabActive {
+  color: #31449b;
+  border-bottom-color: #5266d7;
+  font-weight: 650;
+}
+
+/* 直链页：滚动长文时分区栏仍可见（弹窗内由固定外框保证）。 */
+.pageRoot .tabBar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  border-top: 1px solid #eef0f5;
+  box-shadow: 0 6px 14px -12px rgba(23, 37, 64, 0.35);
+  margin-bottom: 2px;
+}
+
+@media (max-width: 700px) {
+  .pageRoot .tabBar {
+    padding: 0 6px;
+  }
+}
+
+/* ---- 更多菜单（低频动作收在此处，不再占用标题区） ---- */
+
+.moreMenu {
+  position: relative;
+}
+
+.moreMenu > summary {
+  list-style: none;
+}
+
+.moreMenu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.morePanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  min-width: 196px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid #dfe4ee;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(23, 37, 64, 0.16);
+}
+
+.moreItem {
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: #2d3f5a;
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.moreItem:hover {
+  background: #f3f6fc;
+}
+
+.moreItem:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: 1px;
+}
+
+/* ---- U2：概览按库存阶段组织 ---- */
+
+.overviewHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+
+.overviewSub {
+  display: block;
+  margin-top: 6px;
+  color: #445a78;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.overviewSubLabel {
+  display: block;
+  margin-bottom: 1px;
+  color: #93a0b3;
+  font-size: 10.5px;
+  font-weight: 400;
+}
+
+.overviewValueWarn {
+  color: #7b6a3f;
+}
+
+.identityWarn {
+  color: #8a6d1f;
+  font-weight: 600;
+}
+
+.processing {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #eef0f5;
+}
+
+/* ---- 短视口：优先保住关闭按钮与正文可用高度 ---- */
+
+@media (max-height: 620px) {
+  .dialogShell {
+    height: calc(100dvh - 12px);
+    max-height: calc(100dvh - 12px);
+  }
+
+  .dialogHeader {
+    padding: 9px 16px 7px;
+    gap: 6px 12px;
+  }
+
+  .tab {
+    min-height: 34px;
+    padding: 6px 11px;
+  }
+
+  .detailBody {
+    padding-top: 12px;
+  }
+}
+
+/* ---- V3-01：历史版本与来源证据（同一弹窗内） ---- */
+
+.currentBadge,
+.historyBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  vertical-align: 1px;
+}
+
+.currentBadge {
+  color: #1f6b45;
+  background: #e8f6ee;
+  border: 1px solid #c6e8d4;
+}
+
+.historyBadge {
+  color: #8a5a12;
+  background: #fdf3e1;
+  border: 1px solid #f0dcb4;
+}
+
+.switchNotice {
+  color: #8a5a12;
+}
+
+.historyRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.historyVersion {
+  color: #2d3f5a;
+  font-size: 13px;
+}
+
+.historyCurrentBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid #c6e8d4;
+  border-radius: 999px;
+  color: #1f6b45;
+  background: #e8f6ee;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.historyChanges {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: #56657c;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+/* 来源与证据子视图：同一弹窗内容区，独立滚动，不叠第二个弹窗。 */
+.evidenceLayer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.evidenceScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 18px 24px;
+  overscroll-behavior: contain;
+}
+
+/* ---- V3-02：窄屏/短屏压缩概览，让分区实际内容进入首屏 ---- */
+
+@media (max-width: 760px) {
+  .overview {
+    gap: 8px;
+    padding: 12px 12px 10px;
+  }
+
+  .overviewGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .overviewItem {
+    padding: 8px 10px;
+  }
+
+  .overviewItem dd {
+    margin-top: 3px;
+    font-size: 13px;
+  }
+
+  .overviewHint {
+    margin-top: 2px;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .overviewMeta {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+}
+
+@media (max-height: 620px) {
+  .overview {
+    gap: 6px;
+    padding: 9px 12px;
+  }
+
+  .overviewGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .overviewItem {
+    padding: 7px 9px;
+  }
+
+  .overviewItem dt {
+    font-size: 10px;
+  }
+
+  .overviewItem dd {
+    margin-top: 2px;
+    font-size: 12px;
+  }
+
+  .overviewHint {
+    display: none;
+  }
+}
+
+/* 证据子视图打开时，详情区必须真正让位（.coreReady 的 display:flex 会覆盖 UA [hidden]）。 */
+.coreReady[hidden] {
+  display: none !important;
+}
+

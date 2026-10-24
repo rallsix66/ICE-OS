@@ -1,0 +1,535 @@
+/* issues-nav 专属样式：只读问题索引页 + 旧入口安全引导页。
+   设计语言沿用深蓝外壳、浅底白面板、靛蓝交互色；不新建主题、不加动画。 */
+
+.page {
+  --issues-text: #273244;
+  --issues-muted: #79828f;
+  --issues-line: #e6e8ec;
+  --issues-indigo: #5266d7;
+  display: block;
+  max-width: 1080px;
+  padding-bottom: 8px;
+  color: var(--issues-text);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.page :where(button, a):focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: 3px;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #9299a5;
+  font-size: 11px;
+  letter-spacing: 1.1px;
+}
+
+.title {
+  margin: 0;
+  color: #233044;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  line-height: 1.4;
+}
+
+.lede {
+  max-width: 760px;
+  margin: 0;
+  color: #67748a;
+  font-size: 13px;
+}
+
+.headerActions,
+.guidanceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.headerActions a,
+.guidanceActions a,
+.inlineLink {
+  color: #46558c;
+  text-decoration: none;
+  text-underline-offset: 3px;
+  border-bottom: 1px solid #c7d0ea;
+}
+
+.headerActions a:hover,
+.guidanceActions a:hover,
+.inlineLink:hover {
+  color: var(--issues-indigo);
+  border-bottom-color: var(--issues-indigo);
+}
+
+.summaryBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  margin: 16px 0;
+  padding: 15px 18px;
+  border: 1px solid var(--issues-line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.count {
+  color: #344054;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+
+.countMeta {
+  color: var(--issues-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.breakdownItem {
+  padding: 3px 9px;
+  border: 1px solid #e3e7f1;
+  border-radius: 5px;
+  background: #f6f7fb;
+  color: #646f86;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage {
+  margin: 0 0 18px;
+  padding: 16px 18px;
+  border: 1px solid #e2e7f4;
+  border-radius: 11px;
+  background: #f4f6fc;
+}
+
+.coverageTitle {
+  margin: 0 0 4px;
+  color: #3d4a68;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.coverageList {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.coverageItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  color: #5b677d;
+  font-size: 12px;
+}
+
+.coverageBadgeOn,
+.coverageBadgeOff,
+.coverageBadgePartial,
+.coverageBadgeFailed {
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.coverageBadgeOn {
+  border: 1px solid #d8e6dd;
+  background: #f0f6f2;
+  color: #4f7a5f;
+}
+
+.coverageBadgeOff {
+  border: 1px solid #ecdfcb;
+  background: #fbf5ea;
+  color: #96773f;
+}
+
+.coverageBadgePartial {
+  border: 1px solid #e2ddf0;
+  background: #f5f2fb;
+  color: #6a5a90;
+}
+
+.coverageBadgeFailed {
+  border: 1px solid #eeddd7;
+  background: #fdf3ef;
+  color: #9a5a41;
+}
+
+.coverageItemText {
+  margin: 0;
+  min-width: 0;
+}
+
+.coverageDetails {
+  margin-top: 5px;
+  color: #6c7894;
+  font-size: 11px;
+  line-height: 1.85;
+}
+
+.coverageDetails > summary {
+  color: #75829a;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.coverageSubTitle {
+  margin: 6px 0 2px;
+  color: #5d6a80;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.coverageSubList {
+  margin: 0;
+  padding-left: 16px;
+  color: #6c7894;
+  font-size: 11px;
+  line-height: 1.85;
+}
+
+.coverageNote {
+  margin: 0;
+  color: #6c7894;
+  font-size: 11px;
+  line-height: 1.9;
+}
+
+.stateCard {
+  margin: 0 0 18px;
+  padding: 17px 18px;
+  border: 1px solid var(--issues-line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.stateCardAlert {
+  border-color: #eeddd7;
+  background: #fdf7f4;
+}
+
+.stateTitle {
+  margin: 0 0 6px;
+  color: #3b475c;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stateCardAlert .stateTitle {
+  color: #8a5a41;
+}
+
+.stateText {
+  margin: 0 0 8px;
+  color: #67748a;
+  font-size: 13px;
+}
+
+.stateMeta {
+  margin: 0;
+  color: var(--issues-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.retryButton,
+.secondaryAction {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid #dee4ef;
+  border-radius: 6px;
+  background: #fff;
+  color: #5d6f94;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.retryButton:hover,
+.secondaryAction:hover {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+  color: var(--issues-indigo);
+}
+
+.issueList {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.issueCard {
+  padding: 16px 18px;
+  border: 1px solid var(--issues-line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.issueTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 6px;
+}
+
+.issueKind {
+  padding: 2px 8px;
+  border: 1px solid #f0e7d6;
+  border-radius: 5px;
+  background: #fbf5e9;
+  color: #9a7c47;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.issueTitle {
+  margin: 0;
+  color: #3b475c;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.issueIce {
+  color: #7d8aa0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+}
+
+.moduleTag {
+  padding: 2px 8px;
+  border: 1px solid #e3e7f1;
+  border-radius: 5px;
+  background: #f6f7fb;
+  color: #6b7689;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.issueState {
+  margin: 0 0 10px;
+  color: #7c879a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.issueSummary {
+  margin: 0 0 10px;
+  color: #5f6c81;
+  font-size: 13px;
+}
+
+.issueDetails {
+  margin: 0 0 10px;
+  border-top: 1px dashed #e7eaf1;
+  padding-top: 8px;
+}
+
+.issueDetails > summary {
+  color: #7c879a;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.issueMeta {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  color: #6c7894;
+  font-size: 11px;
+  line-height: 1.85;
+}
+
+.issueMeta dt {
+  color: #8f99a8;
+}
+
+.issueMeta dd {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.issueLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #46558c;
+  font-size: 13px;
+  text-decoration: none;
+  border-bottom: 1px solid #c7d0ea;
+  text-underline-offset: 3px;
+}
+
+.issueLink:hover {
+  color: var(--issues-indigo);
+  border-bottom-color: var(--issues-indigo);
+}
+
+/* 动作 / 关闭依据 / 可见权限 / 只读参考入口（V3-05：无处理入口时如实说明，不放按钮） */
+.issueActionNote {
+  margin: 0 0 6px;
+  color: #67748a;
+  font-size: 12px;
+  line-height: 1.85;
+}
+
+.issuePermission {
+  margin: 0 0 10px;
+  color: #8d96a4;
+  font-size: 11px;
+}
+
+.issueActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.issueNoAction {
+  color: #8a6446;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.issueReference {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #6b7a92;
+  font-size: 12px;
+  text-decoration: none;
+  border-bottom: 1px dotted #c7d0ea;
+}
+
+.issueReference:hover {
+  color: var(--issues-indigo);
+  border-bottom-color: var(--issues-indigo);
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding: 34px 20px;
+  border: 1px solid var(--issues-line);
+  border-radius: 11px;
+  background: #fff;
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  color: #4c596c;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.emptyText {
+  margin: 0;
+  color: var(--issues-muted);
+  font-size: 12px;
+}
+
+.hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #dfe5f7;
+  border-radius: 8px;
+  background: #f2f4fc;
+  color: #566589;
+  font-size: 12px;
+  line-height: 1.85;
+}
+
+.hintText {
+  margin: 0;
+}
+
+.hintClose {
+  margin: -2px -2px 0 auto;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.footnote {
+  margin: 14px 0 0;
+  color: #98a1af;
+  font-size: 11px;
+  line-height: 1.9;
+}
+
+@media (max-width: 700px) {
+  .title {
+    font-size: 21px;
+  }
+
+  .summaryBar {
+    gap: 6px 12px;
+    padding: 13px 14px;
+  }
+
+  .count {
+    font-size: 20px;
+  }
+
+  .breakdown {
+    margin-left: 0;
+  }
+
+  .coverage,
+  .stateCard,
+  .issueCard {
+    padding: 14px;
+  }
+
+  .coverageItem {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}

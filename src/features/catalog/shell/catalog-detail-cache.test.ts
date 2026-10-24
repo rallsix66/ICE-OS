@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allWarehouseAuthorityMatches,
   buildDetailInventoryProjectionToken,
+  buildDetailInventoryProjectionTokenFromRows,
+  buildListProjectionToken,
   buildListProjectionTokenFromView,
   clearDetailCache,
+  deriveWarehouseView,
   detailScopeFromView,
   invalidateDetailCacheForPrincipal,
   invalidateDetailCacheItem,
@@ -216,5 +220,85 @@ describe('catalog detail cache scope', () => {
     invalidateDetailCacheForPrincipal('user-a');
     expect(readDetailCache({ itemId: 'id-5', warehouse: 'all' }, contextA)).toBeNull();
     expect(readDetailCache({ itemId: 'id-6', warehouse: 'all' }, contextB)).not.toBeNull();
+  });
+});
+
+describe('V4-05 全仓派生必须核完整明细投影', () => {
+  const PH = '菲律宾-新创启辰自建仓';
+  const DEE = 'DEE-龙仔厝（ICE专属）';
+  type InventoryRow = {
+    warehouse: string; sku: string; onHand: string; orderLocked: string;
+    warehouseAvailable: string; activityReserved: string; inTransit: string;
+  };
+  const row = (warehouse: string, sku: string, onHand: string, orderLocked = '0'): InventoryRow => ({
+    warehouse, sku, onHand, orderLocked, warehouseAvailable: onHand, activityReserved: '0', inTransit: '0',
+  });
+  function listRowFor(id: string, revision: number, rows: InventoryRow[]) {
+    const allToken = buildDetailInventoryProjectionTokenFromRows(rows, 'all');
+    const phToken = buildDetailInventoryProjectionTokenFromRows(rows, PH);
+    const deeToken = buildDetailInventoryProjectionTokenFromRows(rows, DEE);
+    return {
+      itemId: id,
+      itemRevision: revision,
+      bsSample: {
+        confirmedOnHandTotal: '30',
+        estimatedValueCny: '60',
+        valuationState: 'valued',
+        valuationReason: null,
+        confirmedLineCount: 2,
+        warehouseScopes: {
+          [PH]: { confirmedOnHandTotal: rows.filter((r) => r.warehouse === PH).reduce((n, r) => n + Number(r.onHand), 0).toString(), estimatedValueCny: '40', valuationState: 'valued', valuationReason: null, confirmedLineCount: 1 },
+          [DEE]: { confirmedOnHandTotal: rows.filter((r) => r.warehouse === DEE).reduce((n, r) => n + Number(r.onHand), 0).toString(), estimatedValueCny: '20', valuationState: 'valued', valuationReason: null, confirmedLineCount: 1 },
+        },
+      },
+      inventoryProjectionByWarehouse: { all: allToken, [PH]: phToken, [DEE]: deeToken },
+    } as never;
+  }
+  function viewFor(id: string, revision: number, rows: InventoryRow[]) {
+    const base = mockView(id, revision, '60');
+    return {
+      ...base,
+      bsSample: {
+        ...base.bsSample!,
+        rows,
+        valuation: { ...base.bsSample!.valuation, confirmedOnHandTotal: '30', confirmedLineCount: 2 },
+      },
+    } as CatalogDetailView;
+  }
+
+  it('旧 PH10/DEE20 缓存 + 新 PH20/DEE10（全仓合计仍 30）不得派生旧明细', () => {
+    const cachedRows = [row(PH, 'SKU-PH', '10'), row(DEE, 'SKU-DEE', '20')];
+    const newRows = [row(PH, 'SKU-PH', '20'), row(DEE, 'SKU-DEE', '10')];
+    const cached = viewFor('id-all', 1, cachedRows);
+    const newList = listRowFor('id-all', 1, newRows);
+    expect(allWarehouseAuthorityMatches(cached, newList, contextA)).toBe(false);
+    expect(deriveWarehouseView({ view: cached, target: PH, listRow: newList, context: contextA })).toBeNull();
+  });
+
+  it('仅锁定/在途变化、合计不变时也拒绝全仓派生', () => {
+    const cached = viewFor('id-lock-all', 1, [row(PH, 'SKU-PH', '10', '0'), row(DEE, 'SKU-DEE', '20')]);
+    const changed = listRowFor('id-lock-all', 1, [row(PH, 'SKU-PH', '10', '3'), row(DEE, 'SKU-DEE', '20')]);
+    expect(allWarehouseAuthorityMatches(cached, changed, contextA)).toBe(false);
+  });
+
+  it('全仓明细与目标仓投影都一致时才允许派生，并返回目标仓行', () => {
+    const rows = [row(PH, 'SKU-PH', '10'), row(DEE, 'SKU-DEE', '20')];
+    const cached = viewFor('id-ok', 1, rows);
+    const list = listRowFor('id-ok', 1, rows);
+    // eslint-disable-next-line no-console -- temporary diagnostic
+    expect(allWarehouseAuthorityMatches(cached, list, contextA)).toBe(true);
+    const derived = deriveWarehouseView({ view: cached, target: PH, listRow: list, context: contextA });
+    expect(derived?.bsSample?.rows).toHaveLength(1);
+    expect(derived?.bsSample?.valuation?.estimatedValueCny).toBe('40');
+  });
+
+  it('全仓一致但目标仓投影不一致时仍拒绝派生', () => {
+    const rows = [row(PH, 'SKU-PH', '10'), row(DEE, 'SKU-DEE', '20')];
+    const cached = viewFor('id-target-bad', 1, rows);
+    const list = listRowFor('id-target-bad', 1, rows);
+    const listInventory = (list as unknown as { inventoryProjectionByWarehouse: Record<string, string> }).inventoryProjectionByWarehouse;
+    listInventory[PH] = `${PH}\0bad-target-token`;
+    expect(allWarehouseAuthorityMatches(cached, list, contextA)).toBe(true);
+    expect(deriveWarehouseView({ view: cached, target: PH, listRow: list, context: contextA })).toBeNull();
   });
 });

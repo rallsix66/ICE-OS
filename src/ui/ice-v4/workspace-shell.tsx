@@ -2,28 +2,25 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  ChevronRight,
-  Package,
-  Settings,
-  ClipboardList,
-  Sparkles,
-} from 'lucide-react';
+import { ChevronRight, ChevronDown, Package } from 'lucide-react';
 import { LogoutButton } from '@/app/dashboard/_components/logout-button';
+import { ICE_V4_DATA_MAINTENANCE_HREF } from './navigation-config';
 import styles from './ice-v4.module.css';
-
-type NavModuleState = 'available' | 'disabled';
+import shellStyles from './shell.module.css';
 
 type NavItem = {
   href: string;
   label: string;
   caption: string;
   icon: typeof Package;
-  adminOnly?: boolean;
-  moduleKey?: 'intake' | 'sources';
   match?: (pathname: string) => boolean;
 };
 
+/**
+ * 一级常驻导航：只保留「ICE 商品库」。
+ * 数据维护（基线/冻结观测/人工决定/原始证据）按既有管理员权限收进账户菜单；
+ * 新品/来源旧 URL 保留安全引导与后端能力，但不再常驻侧栏。
+ */
 const NAV: NavItem[] = [
   {
     href: '/dashboard/catalog',
@@ -32,63 +29,57 @@ const NAV: NavItem[] = [
     icon: Package,
     match: (pathname) =>
       pathname === '/dashboard/catalog'
-      || /^\/dashboard\/catalog\/[0-9a-f-]{36}$/i.test(pathname),
-  },
-  {
-    href: '/dashboard/catalog/intake',
-    label: '持续新品',
-    caption: '来源范围新品资料工作区',
-    icon: Sparkles,
-    moduleKey: 'intake',
-    match: (pathname) => pathname.startsWith('/dashboard/catalog/intake'),
-  },
-  {
-    href: '/dashboard/catalog/sources',
-    label: '来源核实',
-    caption: '来源身份与观测核实',
-    icon: ClipboardList,
-    moduleKey: 'sources',
-    match: (pathname) => pathname.startsWith('/dashboard/catalog/sources'),
-  },
-  {
-    href: '/dashboard/catalog/admin',
-    label: '管理与审计',
-    caption: '基线、样表与审计入口',
-    icon: Settings,
-    adminOnly: true,
-    match: (pathname) => pathname.startsWith('/dashboard/catalog/admin'),
+      || /^\/dashboard\/catalog\/[0-9a-f-]{36}$/i.test(pathname)
+      || pathname.startsWith('/dashboard/catalog/issues'),
   },
 ];
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: '管理员',
+  operator: '运营人员',
+  viewer: '只读查看',
+};
+
+function roleLabel(roleName: string): string {
+  return ROLE_LABELS[roleName] ?? '受限角色';
+}
 
 function resolveActive(pathname: string, items: NavItem[]) {
   return (
     items.find((item) => (
       item.match?.(pathname)
       ?? (pathname === item.href || pathname.startsWith(`${item.href}/`))
-    )) ?? NAV[0]
+    )) ?? items[0]
   );
 }
 
-function moduleAvailabilityLabel(state: NavModuleState | undefined) {
-  if (!state) return null;
-  return state === 'available' ? '可用' : '未启用';
+/** 面包屑文案：子页面不改一级导航归属，只改当前页标签。 */
+function pageLabel(pathname: string, fallback: string): string {
+  if (pathname.startsWith('/dashboard/catalog/issues')) return '待处理';
+  if (pathname.startsWith('/dashboard/catalog/intake')) return '持续新品（旧入口）';
+  if (pathname.startsWith('/dashboard/catalog/sources')) return '来源核实（旧入口）';
+  if (pathname.startsWith('/dashboard/catalog/admin/evidence')) return '数据来源';
+  if (pathname.startsWith('/dashboard/catalog/admin')) return '数据维护';
+  if (/^\/dashboard\/catalog\/[0-9a-f-]{36}$/i.test(pathname)) return '商品详情';
+  return fallback;
 }
 
 export function IceV4WorkspaceShell({
   displayName,
   roleName,
-  navModules,
   children,
 }: {
   displayName: string;
   roleName: string;
-  navModules?: { intake: NavModuleState; sources: NavModuleState };
+  /** @deprecated 侧栏已不展示模块可用性；保留入参仅为兼容既有布局接线。 */
+  navModules?: { intake: 'available' | 'disabled'; sources: 'available' | 'disabled' };
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const isAdmin = roleName === 'admin';
-  const visibleNav = NAV.filter((item) => !item.adminOnly || isAdmin);
-  const active = resolveActive(pathname, visibleNav);
+  const currentRole = roleLabel(roleName);
+  const active = resolveActive(pathname, NAV);
+  const currentPage = pageLabel(pathname, active.label);
   const initials = displayName.slice(0, 2).toUpperCase();
   const showPageHeading = pathname === '/dashboard/catalog';
 
@@ -101,27 +92,19 @@ export function IceV4WorkspaceShell({
         </div>
         <div className={styles.workspaceLabel}><span className={styles.workspaceDot} />经营工作台 <span>v4</span></div>
         <nav aria-label="工作台导航" className={styles.navigation}>
-          {visibleNav.map((item) => {
+          {NAV.map((item) => {
             const isActive = item.href === active.href;
-            const moduleState = item.moduleKey && navModules ? navModules[item.moduleKey] : undefined;
-            const availability = moduleAvailabilityLabel(moduleState);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={isActive ? styles.navActive : undefined}
                 aria-current={isActive ? 'page' : undefined}
-                data-nav-module={item.moduleKey}
-                data-nav-availability={availability ?? undefined}
+                data-nav-primary="true"
               >
                 <item.icon size={19} strokeWidth={1.6} aria-hidden />
                 <span className={styles.navLinkText}>
                   <span>{item.label}</span>
-                  {availability && (
-                    <small className={moduleState === 'available' ? styles.navBadgeOn : styles.navBadgeOff}>
-                      {availability}
-                    </small>
-                  )}
                 </span>
                 {isActive && <span className={styles.navDot} aria-hidden />}
               </Link>
@@ -129,31 +112,50 @@ export function IceV4WorkspaceShell({
           })}
         </nav>
         <div className={styles.sidebarBottom}>
-          <strong>本地独立平台</strong>
-          <p>仅开放已验收商品库能力；旧经营模块已封存。演示数据见 /demo/ice-v4。</p>
-          <span>权限由服务端校验</span>
+          <strong>本地独立资料环境</strong>
+          <p>商品库使用本地样表资料；演示数据见 /demo/ice-v4。</p>
         </div>
       </aside>
       <div className={styles.workspace}>
         <header className={styles.topbar}>
           <div className={styles.breadcrumb}>
-            工作台<ChevronRight size={13} aria-hidden /><strong>{active.label}</strong>
+            工作台<ChevronRight size={13} aria-hidden /><strong>{currentPage}</strong>
           </div>
           <div className={styles.topbarRight}>
             <span className={styles.demoTag} style={{ background: '#eef1ff', color: '#4057c0' }}>
               <span style={{ background: '#5266d7' }} aria-hidden />真实资料
             </span>
-            <details className={styles.accountMenu}>
-              <summary className={styles.avatar} aria-label={`当前账户 ${displayName}，角色 ${roleName}`}>
-                {initials}
+            <details className={`${styles.accountMenu} ${shellStyles.accountMenu}`} data-testid="ice-v4-account-menu">
+              <summary
+                className={shellStyles.accountSummary}
+                aria-label={`当前账户 ${displayName}，角色${currentRole}`}
+              >
+                <span className={styles.avatar} aria-hidden>{initials}</span>
+                <span className={shellStyles.accountIdentity}>
+                  <strong className={shellStyles.accountName}>{displayName}</strong>
+                  <small className={shellStyles.accountRole}>{currentRole}</small>
+                </span>
+                <ChevronDown size={14} aria-hidden className={shellStyles.accountCaret} />
               </summary>
-              <div className={styles.accountPanel} role="region" aria-label="账户与可用能力">
+              <div className={styles.accountPanel} role="region" aria-label="账户与可用操作" data-testid="ice-v4-account-panel">
                 <strong>{displayName}</strong>
-                <p>角色：{roleName === 'admin' ? '管理员（catalog:admin）' : roleName}</p>
-                <p className={styles.subtle}>已启用：商品库浏览、样表库存投影、管理与审计（管理员）。金额读取需 amount:read。完整用户/权限矩阵属后续功能包。</p>
+                <p className={shellStyles.accountPanelRole}>当前角色：{currentRole}</p>
+                <p className={shellStyles.accountPanelText}>
+                  可查看商品资料、库存明细、变更记录和已授权的数据来源。
+                </p>
+                {isAdmin && (
+                  <div className={shellStyles.accountMaintenance} data-testid="ice-v4-maintenance-block">
+                    <Link
+                      className={shellStyles.accountMaintenanceLink}
+                      href={ICE_V4_DATA_MAINTENANCE_HREF}
+                      data-testid="ice-v4-maintenance-entry"
+                    >
+                      数据维护
+                    </Link>
+                  </div>
+                )}
               </div>
             </details>
-            <span className={styles.subtle} style={{ fontSize: 12 }}>{displayName}</span>
             <LogoutButton />
           </div>
         </header>

@@ -1,28 +1,71 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package } from 'lucide-react';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import { Pill } from '@/ui/ice-v4/primitives';
-import { adoptedUnitCostFromFinancial } from '../local-display/adopted-price';
-import { CATALOG_FIELD_LABELS, fieldAuditValue, fieldBusinessValue } from '../local-display/field-labels';
-import { assignInitialCodeAction, appendNonPriceRevisionAction, fetchCatalogDetailArtifactsAction, fetchCatalogDetailAuditAction, fetchCatalogDetailHistoryAction, getCatalogAmountsAction, recoverCatalogNewItemRequestAction } from '../actions';
-import type { getCatalogDetailAudit, getCatalogDetailCore, getCatalogItemBsSample } from '../service';
-import type { CatalogItemRevisionDto, FieldObservation } from '../types';
+import { adoptedUnitCostFromFinancial, type AdoptedUnitCost } from '../local-display/adopted-price';
+import { formatCnyPrice, formatCnyValue } from '../local-display/money-display';
+import {
+  CATALOG_FIELD_LABELS,
+  fieldAuditValue,
+  fieldBusinessValue,
+  optionalFieldRow,
+} from '../local-display/field-labels';
+import {
+  appendNonPriceRevisionAction,
+  assignInitialCodeAction,
+  checkCatalogRequestOutcomeAction,
+  fetchCatalogDetailHistoryAction,
+} from '../actions';
+import { DetailAttachments, type DetailAttachmentsModel } from './detail-attachments';
+import { DetailRetryButton } from './detail-retry-button';
+import { InventorySourceHint } from './inventory-source-hint';
+import { useUnsavedLeaveGuard } from './use-unsaved-leave-guard';
+import styles from './catalog-detail.module.css';
+import type { getCatalogDetailCore, getCatalogItemBsSample } from '../service';
+import type { CatalogRevisionHistoryDto, FieldObservation } from '../types';
 
 export type CatalogDetailCoreView = Awaited<ReturnType<typeof getCatalogDetailCore>>;
-type CatalogDetailAuditView = Awaited<ReturnType<typeof getCatalogDetailAudit>>;
 type BsSampleDetail = Awaited<ReturnType<typeof getCatalogItemBsSample>>;
 type CodeRequest = { itemId: string; expectedRevision: number; requestId: string; code: string; reason: string };
 type RevisionRequest = { itemId: string; expectedRevision: number; requestId: string; reason: string; fields: Record<string, FieldObservation> };
 type PendingRequest = { kind: 'initial_code'; input: CodeRequest } | { kind: 'nonprice_revision'; input: RevisionRequest };
 
-const PRIMARY_FIELD_KEYS = ['nameCn', 'englishName', 'specification', 'unit', 'category', 'factory', 'packaging', 'cartonQuantity', 'barcode', 'width', 'height', 'depth', 'weight', 'imageRef'] as const;
+type EditDraft = { code: string; codeReason: string; field: string; fieldValue: string; evidenceRef: string; reason: string; confirmEmpty: boolean };
+const EMPTY_DRAFT: EditDraft = { code: '', codeReason: '', field: 'factory', fieldValue: '', evidenceRef: '', reason: '', confirmEmpty: false };
+
+/**
+ * 可修订字段：只保留冻结输入中确有来源列的业务字段。
+ * `packaging` 在本批 126 份主资料中没有来源列（baseline-adapter 无该映射），
+ * 因此不再作为默认可填项；已有历史值仍按原样读取和展示，不改写。
+ */
+const REVISION_FIELDS: Array<{ value: string; label: string }> = [
+  { value: 'factory', label: '工厂' },
+  { value: 'specification', label: '规格' },
+  { value: 'nameCn', label: '中文名称' },
+  { value: 'barcode', label: '辅助条码' },
+  { value: 'cartonQuantity', label: '装箱数量' },
+  { value: 'englishName', label: '英文名称' },
+  { value: 'imageRef', label: '图片引用' },
+];
+
+/** 商品资料分区：真实来源列（尺寸/重量/装箱）分组，单产品与外箱不混用。 */
+const SINGLE_SIZE_KEYS = ['length', 'width', 'height'] as const;
+const CARTON_SIZE_KEYS = ['cartonLength', 'cartonWidth', 'cartonHeight'] as const;
+
+const SECTIONS = [
+  { key: 'material', label: '商品资料' },
+  { key: 'inventory', label: '库存明细' },
+  { key: 'history', label: '变更记录' },
+] as const;
+export type CatalogDetailSection = (typeof SECTIONS)[number]['key'];
+
+type Fact = { value: string; hint?: string | null; warn?: boolean };
 
 function bsSelectionLabel(state: string) {
   if (state === 'confirmed') return '已确认';
@@ -34,414 +77,1511 @@ function qtyCell(value: unknown) {
   return value == null ? '—' : String(value);
 }
 
-function BsSampleBusinessBlock({
-  itemId,
-  bsSample,
-  bsSampleError,
-  warehouse,
-}: {
-  itemId: string;
-  bsSample: BsSampleDetail | null;
-  bsSampleError: { code: string; message: string } | null;
-  warehouse?: string;
-}) {
-  if (bsSampleError) {
-    return <section className={demoStyles.panel} role="alert" data-testid="catalog-bs-sample-error">
-      <h2 className="font-semibold">BS 样表库存</h2>
-      <p>{bsSampleError.message}</p>
-      <p className={demoStyles.subtle}>{bsSampleError.code === 'forbidden' ? '权限不足，不是「尚未导入」。' : '请检查实例 SQL 与估值口径文件。'}</p>
-    </section>;
-  }
-  if (bsSample?.status === 'not_imported') {
-    return <p className={demoStyles.subtle} data-testid="catalog-bs-sample-not-imported">尚未载入 BS 样表库存投影。</p>;
-  }
-  if (bsSample?.status !== 'loaded') return null;
-  const adopted = adoptedUnitCostFromFinancial(bsSample.adoptedUnitCost);
-  const exportLabel = typeof bsSample.exportLabel === 'string' ? bsSample.exportLabel : 'BS 样表';
-  const valuation = bsSample.valuation;
-  const rows = bsSample.rows as Array<Record<string, unknown>>;
-  const filtered = warehouse ? rows.filter((r) => r.warehouse === warehouse) : rows;
-  return <section className={demoStyles.panel} aria-label="BS样表库存" data-testid="catalog-bs-sample-panel" data-warehouse-scope={warehouse ?? 'all'}>
-    <h2 className="font-semibold">BS 样表库存与估算货值</h2>
-    <p className={demoStyles.subtle}>{exportLabel} · 人民币单品进货价（不含运费、不含税）</p>
-    {warehouse && <p className={demoStyles.subtle}>当前仓库：<strong>{warehouse}</strong> · <Link className={demoStyles.inlineLink} href={`/dashboard/catalog/${itemId}`}>查看全部仓库</Link></p>}
-    <dl className={demoStyles.identityGrid}>
-      <div><dt>采用进货价</dt><dd>{adopted.state === 'priced' ? <span data-testid="bs-adopted-unit-cost">¥{adopted.amountCny}</span> : adopted.reason ?? '缺价'}</dd></div>
-      <div><dt>估算货值（{warehouse ?? '全部仓库'}）</dt><dd>
-        {valuation.valuationState === 'valued' ? <strong data-testid="bs-estimated-value">¥{valuation.estimatedValueCny}</strong>
-          : valuation.valuationReason ?? valuation.valuationState}
-      </dd></div>
-      <div><dt>已确认样表行</dt><dd>{filtered.filter((r) => r.selectionState === 'confirmed').length} 行</dd></div>
-    </dl>
-    {!filtered.length && <p className={demoStyles.subtle}>{warehouse ? '本仓无对应 BS 样表行（不当作 0）' : '暂无样表行'}</p>}
-    {filtered.length > 0 && <div className={demoStyles.tableScroll}><table className={demoStyles.table} data-testid="catalog-bs-sample-inventory-table">
-      <thead><tr>
-        <th>仓库</th><th>SKU</th><th>选择</th><th>现有</th><th>订单已锁</th><th>整仓可用</th><th>活动预留</th><th>在途</th>
-      </tr></thead>
-      <tbody>{filtered.map((r) => <tr key={`${String(r.excelRow)}-${String(r.warehouse)}`} data-testid={`bs-row-${String(r.warehouse)}-${String(r.sku)}`}>
-        <td>{String(r.warehouse)}</td><td>{String(r.sku)}</td><td>{bsSelectionLabel(String(r.selectionState))}</td>
-        <td data-testid="bs-on-hand">{qtyCell(r.onHand)}</td>
-        <td data-testid="bs-order-locked">{qtyCell(r.orderLocked)}</td>
-        <td data-testid="bs-warehouse-available">{qtyCell(r.warehouseAvailable)}</td>
-        <td data-testid="bs-activity-reserved">{qtyCell(r.activityReserved)}</td>
-        <td data-testid="bs-in-transit">{qtyCell(r.inTransit)}</td>
-      </tr>)}</tbody>
-    </table></div>}
-  </section>;
+/**
+ * V3-02：体积等小数值不用裸科学计数法，也不能因为两位小数把小正数变成 0。
+ * 正常可读值原样保留（不改写底层精确值），仅把 1e-5 这类形态转成十进制并去掉多余零。
+ */
+export function formatMeasureValue(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  if (!/^[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?$/i.test(trimmed)) return trimmed;
+  if (!/e/i.test(trimmed) && Math.abs(Number(trimmed)) >= 0.01) return trimmed;
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) return trimmed;
+  const fixed = value.toFixed(10);
+  const withoutZero = fixed.replace(/0+$/, '').replace(/\.$/, '');
+  return withoutZero === '-0' ? '0' : withoutZero;
 }
 
-export function CatalogDetail({
-  core,
-  bsSample = null,
-  bsSampleError = null,
-  warehouseFilter,
-  embedded = false,
-  onRevisionSaved,
+/** 附加字段只在确有真实值时显示；未读取/无文本/解析失败不制造空项。 */
+function legacyFieldValue(field: FieldObservation | undefined): string | null {
+  if (!field) return null;
+  if (field.state !== 'observed') return null;
+  if (field.meaning === 'explicit_empty') return '明确为空';
+  if (field.meaning === 'explicit_null') return '明确空值';
+  const raw = field.raw?.trim();
+  return raw ? raw : null;
+}
+
+/** 缺值 / 明确为空 / 未读取 的表述互斥，不把缺失写成 0。 */
+export function catalogSpecFact(item: CatalogDetailCoreView['item']): Fact {
+  const field = item.fields.specification ?? item.specification;
+  const business = fieldBusinessValue(field);
+  const unit = fieldBusinessValue(item.fields.unit);
+  const unitPart = unit === '待补' || unit === '未知' || unit === '解析失败' ? '' : ` / ${unit}`;
+  if (business === '待补') return { value: '规格缺失（待补）', hint: '单位待补', warn: true };
+  if (business === '未知') return { value: '规格未知', hint: null, warn: true };
+  if (business === '解析失败') return { value: '规格解析失败', hint: null, warn: true };
+  return { value: `${business}${unitPart}`, hint: unitPart ? null : '单位待补' };
+}
+
+function imageCaption(item: CatalogDetailCoreView['item']): string {
+  const field = item.fields.imageRef;
+  if (!field) return '暂无图片';
+  if (field.state === 'not_read') return '暂无图片';
+  if (field.state === 'parse_failed') return '图片引用解析失败';
+  if (field.state === 'no_text') return '暂无图片';
+  if (field.state !== 'observed') return '暂无图片';
+  if (field.meaning === 'explicit_empty' || field.meaning === 'explicit_null') return '暂无图片';
+  const raw = field.raw.trim();
+  if (raw) return '已记录图片引用，暂未展示';
+  return '暂无图片';
+}
+
+export function warehouseLabelOf(warehouse?: string): string {
+  const trimmed = warehouse?.trim();
+  return trimmed && trimmed !== 'all' ? trimmed : '全部仓库';
+}
+
+/**
+ * 海外库存（当前仓已确认 BS 现有库存）。
+ * 数量与货值都来自同一仓库范围投影；未确认、缺价、未建档、读取失败、无权限分别表达，不写 0。
+ */
+function overseasInventoryFact(params: {
+  historical: boolean;
+  bsSample: BsSampleDetail | null;
+  bsSampleError: { code: string; message: string } | null;
+  bsNotCreated: boolean;
+}): Fact {
+  if (params.historical) return { value: '—', hint: '历史版本不显示当前库存' };
+  if (params.bsSampleError) {
+    return {
+      value: params.bsSampleError.code === 'forbidden' ? '无读取权限（不是 0）' : '读取失败（不是 0）',
+      hint: params.bsSampleError.message,
+      warn: true,
+    };
+  }
+  const sample = params.bsSample;
+  if (!sample || sample.status !== 'loaded') return { value: '—', hint: '样表未导入', warn: true };
+  if (params.bsNotCreated) return { value: '—', hint: 'BS 未建档', warn: true };
+  const scope = sample.valuation;
+  if (scope.confirmedOnHandTotal !== null) {
+    const isZero = scope.confirmedOnHandTotal === '0';
+    return {
+      value: isZero ? '0 件（已确认为零）' : `${scope.confirmedOnHandTotal} 件`,
+      hint: `${scope.confirmedLineCount} 行已确认`,
+    };
+  }
+  if (scope.valuationState === 'no_warehouse_line') return { value: '—', hint: scope.valuationReason ?? '本仓无样表行', warn: true };
+  if (scope.valuationState === 'no_inventory') return { value: '—', hint: scope.valuationReason ?? '无已确认库存', warn: true };
+  return { value: '—', hint: scope.valuationReason ?? '库存不可确认', warn: true };
+}
+
+/** 已估值货值：只表示当前可估值范围（海外已确认库存），不冒充国内＋海外＋在途总货值。 */
+function valuatedFact(params: {
+  historical: boolean;
+  bsSample: BsSampleDetail | null;
+  bsSampleError: { code: string; message: string } | null;
+}): Fact {
+  if (params.historical) return { value: '—', hint: '历史版本不显示估算货值' };
+  if (params.bsSampleError) {
+    return {
+      value: params.bsSampleError.code === 'forbidden' ? '不可见' : '读取失败',
+      hint: params.bsSampleError.code === 'forbidden' ? '账号没有金额读取权限，金额限制在服务端生效' : params.bsSampleError.message,
+      warn: true,
+    };
+  }
+  const sample = params.bsSample;
+  if (!sample || sample.status !== 'loaded') return { value: '—', hint: '样表未导入', warn: true };
+  const scope = sample.valuation;
+  if (scope.valuationState === 'valued' && scope.estimatedValueCny !== null) {
+    return { value: formatCnyValue(scope.estimatedValueCny) ?? `¥${scope.estimatedValueCny}`, hint: '当前仓已确认 × 进货价' };
+  }
+  return { value: '不可估值', hint: scope.valuationReason ?? '当前口径无法估算货值', warn: true };
+}
+
+function unitCostFact(params: { historical: boolean; adopted: AdoptedUnitCost | null; bsSampleError: { code: string; message: string } | null }): Fact {
+  if (params.historical) return { value: '历史版本不显示当前价格', hint: '历史快照只代表当时资料版本，不掺当前价格' };
+  if (params.bsSampleError) {
+    return {
+      value: params.bsSampleError.code === 'forbidden' ? '不可见' : '价格读取失败',
+      hint: params.bsSampleError.code === 'forbidden' ? '账号没有金额读取权限（服务端限制）' : params.bsSampleError.message,
+      warn: true,
+    };
+  }
+  const adopted = params.adopted;
+  if (!adopted) return { value: '价格未读取', hint: '未取得当前采用价格版本', warn: true };
+  if (adopted.state === 'priced') return { value: formatCnyPrice(adopted.amountCny) ?? `¥${adopted.amountCny}`, hint: '人民币 / 单品 · 不含运费不含税' };
+  return { value: adopted.reason, hint: '缺价不当作 0', warn: true };
+}
+
+function OverviewCard({
+  label,
+  fact,
+  testId,
+  extra,
 }: {
-  core: CatalogDetailCoreView;
-  bsSample?: BsSampleDetail | null;
-  bsSampleError?: { code: string; message: string } | null;
-  warehouseFilter?: string;
-  embedded?: boolean;
-  onRevisionSaved?: () => void;
+  label: string;
+  fact: Fact;
+  testId: string;
+  extra?: React.ReactNode;
 }) {
-  const { item, flags, writeAccess, historical } = core;
+  return (
+    <div className={styles.overviewItem}>
+      <dt>{label}</dt>
+      <dd>
+        <span data-testid={testId} className={fact.warn ? styles.overviewValueWarn : undefined}>{fact.value}</span>
+        {fact.hint ? <span className={styles.overviewHint}>{fact.hint}</span> : null}
+        {extra}
+      </dd>
+    </div>
+  );
+}
+
+function SpecLine({ item }: { item: CatalogDetailCoreView['item'] }) {
+  const spec = catalogSpecFact(item);
+  return (
+    <span className={spec.warn ? styles.identityWarn : undefined} data-testid="catalog-detail-spec">
+      {spec.value}
+    </span>
+  );
+}
+
+/** 尺寸/重量分组：只显示确有来源值的小项；全部缺失时整行不显示（不制造“待补”墙）。 */
+function dimensionLine(item: CatalogDetailCoreView['item'], keys: readonly string[]) {
+  const parts = keys
+    .map((key) => ({ key, value: fieldBusinessValue(item.fields[key]) }))
+    .filter((part) => part.value !== '待补');
+  if (parts.length === 0) return null;
+  return parts.map((part) => `${CATALOG_FIELD_LABELS[part.key] ?? part.key} ${part.value}`).join(' · ');
+}
+
+function MaterialRow({ label, children, testId }: { label: string; children: React.ReactNode; testId?: string }) {
+  return (
+    <div data-testid={testId}>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * F13 编辑资料：只允许既有首次补码与非价格修订范围。
+ *
+ * V3-04（R4/V2-02）：草稿、提示与“结果未知的原请求”分键存储，且键必须带当前主体：
+ * - `catalog:edit-state:v3:<principalKey>:<itemId>`          普通未提交草稿
+ * - `catalog:pending-request:v3:<principalKey>:<itemId>`     可能已提交但结果未知的原请求
+ * 恢复时同时校验 version/principalKey/itemId，账户切换后 B 不会读到 A 的输入或 requestId。
+ * 旧的无主体键 `catalog:edit-state:<itemId>` 无法确认所有者：不读取、不迁移、不删除，只在编辑区报告隔离保留。
+ * 放弃草稿不得删除待核请求；核对只读，只有显式“重试原请求”才以同 requestId/参数/expectedRevision 重投。
+ */
+type StoredDraft = { version: 3; principalKey: string; itemId: string; draft: EditDraft; notice: string; savedAt: number };
+type StoredPendingRequest = { version: 3; principalKey: string; itemId: string; pendingRequest: PendingRequest; savedAt: number };
+
+const DRAFT_STORAGE_PREFIX = 'catalog:edit-state:v3:';
+const PENDING_STORAGE_PREFIX = 'catalog:pending-request:v3:';
+const LEGACY_DRAFT_PREFIX = 'catalog:edit-state:';
+
+function editStorageKey(prefix: string, principalKey: string, itemId: string): string {
+  return `${prefix}${principalKey}:${itemId}`;
+}
+
+function readStoredValue<T>(key: string, guard: (value: T) => boolean): T | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as T;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return guard(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredValue(key: string, value: unknown | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!value) window.sessionStorage.removeItem(key);
+    else window.sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* 隐私模式等禁用存储时保持内存态，不阻断编辑 */
+  }
+}
+
+function readStoredDraft(principalKey: string, itemId: string): StoredDraft | null {
+  return readStoredValue<StoredDraft>(
+    editStorageKey(DRAFT_STORAGE_PREFIX, principalKey, itemId),
+    (value) => value.version === 3 && value.principalKey === principalKey && value.itemId === itemId && Boolean(value.draft),
+  );
+}
+
+function readStoredPendingRequest(principalKey: string, itemId: string): StoredPendingRequest | null {
+  return readStoredValue<StoredPendingRequest>(
+    editStorageKey(PENDING_STORAGE_PREFIX, principalKey, itemId),
+    (value) => value.version === 3 && value.principalKey === principalKey && value.itemId === itemId
+      && Boolean(value.pendingRequest && value.pendingRequest.input),
+  );
+}
+
+function writeStoredDraft(principalKey: string, itemId: string, value: StoredDraft | null) {
+  writeStoredValue(editStorageKey(DRAFT_STORAGE_PREFIX, principalKey, itemId), value);
+}
+
+function writeStoredPendingRequest(principalKey: string, itemId: string, value: StoredPendingRequest | null) {
+  writeStoredValue(editStorageKey(PENDING_STORAGE_PREFIX, principalKey, itemId), value);
+}
+
+/** 只检测旧键是否存在；不读取内容、不认领给当前登录者、不删除。 */
+function hasLegacyDraft(itemId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return Boolean(window.sessionStorage.getItem(`${LEGACY_DRAFT_PREFIX}${itemId}`));
+  } catch {
+    return false;
+  }
+}
+
+function DetailEditPanel({ core, principalKey, onDirtyChange, onSaved, registerDraftBridge }: {
+  core: CatalogDetailCoreView;
+  /** V3-04：草稿/待核请求必须与当前登录主体绑定，不能只按 itemId 存取。 */
+  principalKey: string;
+  onDirtyChange?: (dirty: boolean) => void;
+  onSaved?: () => void;
+  /** 供外层（关闭/切分区/后退/切版本提示）落盘或清理草稿；待核请求单独保留。 */
+  registerDraftBridge?: (bridge: { persist: () => void; clearDraft: () => void; clearAll: () => void }) => void;
+}) {
+  const { item } = core;
   const router = useRouter();
   const [busy, startTransition] = useTransition();
-  const [message, setMessage] = useState('');
-  const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null);
-  const [amounts, setAmounts] = useState<unknown>(null);
-  const [audit, setAudit] = useState<CatalogDetailAuditView | null>(null);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditError, setAuditError] = useState<string | null>(null);
-  const [history, setHistory] = useState<CatalogItemRevisionDto[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyEmptyConfirmed, setHistoryEmptyConfirmed] = useState(false);
-  const [auditEmptyConfirmed, setAuditEmptyConfirmed] = useState(false);
-  const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; logicalName: string }> | null>(null);
-  const [artifactsLoading, setArtifactsLoading] = useState(false);
-  const [artifactsError, setArtifactsError] = useState<string | null>(null);
-  const [artifactsEmptyConfirmed, setArtifactsEmptyConfirmed] = useState(false);
-  const [amountsLoading, setAmountsLoading] = useState(false);
-  const [amountsError, setAmountsError] = useState<string | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
-  const codeForm = useRef<HTMLFormElement>(null);
-  const revisionForm = useRef<HTMLFormElement>(null);
+  /* 首次渲染即恢复“本主体、本商品”的草稿与未核对原请求（V3-04）；不在 effect 里 setState。 */
+  const [initialDraft] = useState(() => readStoredDraft(principalKey, item.itemId));
+  const [initialPending] = useState(() => readStoredPendingRequest(principalKey, item.itemId));
+  const [legacyQuarantined] = useState(() => hasLegacyDraft(item.itemId));
+  const [message, setMessage] = useState(initialDraft?.notice ?? '');
+  const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(initialPending?.pendingRequest ?? null);
+  const [draft, setDraft] = useState<EditDraft>(() => ({ ...EMPTY_DRAFT, ...(initialDraft?.draft ?? {}) }));
+  const [restored] = useState(Boolean(initialDraft || initialPending));
   const specField = item.fields.specification ?? item.specification;
-  const specBusiness = specField ? fieldBusinessValue(specField) : fieldBusinessValue(item.specification);
-  const barcodeBusiness = fieldBusinessValue(item.fields.barcode) !== '待补'
-    ? fieldBusinessValue(item.fields.barcode)
-    : fieldBusinessValue(item.barcodeRefs[0]);
+
+  const dirty = draft.code.trim() !== '' || draft.codeReason.trim() !== ''
+    || draft.fieldValue !== '' || draft.evidenceRef.trim() !== '' || draft.reason.trim() !== ''
+    || draft.confirmEmpty;
+
+  /* 草稿与待核请求分别落盘：放弃编辑只清草稿，不抹掉原 requestId 与核对依据。 */
+  useEffect(() => {
+    if (!dirty) { writeStoredDraft(principalKey, item.itemId, null); return; }
+    writeStoredDraft(principalKey, item.itemId, {
+      version: 3, principalKey, itemId: item.itemId, draft, notice: message, savedAt: Date.now(),
+    });
+  }, [dirty, draft, message, principalKey, item.itemId]);
+
+  useEffect(() => {
+    if (!pendingRequest) { writeStoredPendingRequest(principalKey, item.itemId, null); return; }
+    writeStoredPendingRequest(principalKey, item.itemId, {
+      version: 3, principalKey, itemId: item.itemId, pendingRequest, savedAt: Date.now(),
+    });
+  }, [pendingRequest, principalKey, item.itemId]);
+
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  /* 收起/卸载编辑表单时清空“未保存”标记，避免下次进入编辑态被上一轮草稿误判。 */
+  useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
+
+  useEffect(() => {
+    registerDraftBridge?.({
+      persist: () => {
+        if (dirty) {
+          writeStoredDraft(principalKey, item.itemId, {
+            version: 3, principalKey, itemId: item.itemId, draft, notice: message, savedAt: Date.now(),
+          });
+        }
+        if (pendingRequest) {
+          writeStoredPendingRequest(principalKey, item.itemId, {
+            version: 3, principalKey, itemId: item.itemId, pendingRequest, savedAt: Date.now(),
+          });
+        }
+      },
+      clearDraft: () => writeStoredDraft(principalKey, item.itemId, null),
+      clearAll: () => {
+        writeStoredDraft(principalKey, item.itemId, null);
+        writeStoredPendingRequest(principalKey, item.itemId, null);
+      },
+    });
+  }, [registerDraftBridge, principalKey, draft, message, pendingRequest, dirty, item.itemId]);
 
   async function submitOriginal(request: PendingRequest) {
     setPendingRequest(request);
-    setMessage('正在核对原请求，请勿开始另一项操作。');
+    setMessage('正在提交原请求，请勿开始另一项操作。');
     try {
       const result = request.kind === 'initial_code'
         ? await assignInitialCodeAction(request.input) : await appendNonPriceRevisionAction(request.input);
       if (result.outcome === 'unknown') {
+        /* 结果未知 ≠ 未保存：保留原 requestId 与原意图，不自动用新 ID 重发。 */
         setMessage(result.error ?? '提交结果暂未确认，请核对原请求。');
         return;
       }
       setPendingRequest(null);
       if (result.success) {
-        codeForm.current?.reset();
-        revisionForm.current?.reset();
+        setDraft(EMPTY_DRAFT);
+        writeStoredDraft(principalKey, item.itemId, null);
+        writeStoredPendingRequest(principalKey, item.itemId, null);
         const savedIntent = request.kind === 'initial_code' ? `首次补码已保存：${request.input.code}`
           : '资料修订已保存；旧版本和采用价格保持';
         setMessage(savedIntent);
-        onRevisionSaved?.();
+        onSaved?.();
+        router.refresh();
       } else setMessage(result.error ?? '原请求未保存。');
-      router.refresh();
     } catch {
-      setMessage('提交结果暂未确认。请使用“核对/重试原请求”，不要创建另一项操作。');
+      setMessage('提交结果暂未确认。请使用“核对原请求”，不要创建另一项操作。');
     }
   }
-  const auditRequestSeq = useRef(0);
-  const auditInFlightRef = useRef(false);
-  const auditAttemptedRef = useRef(false);
-  const auditAliveRef = useRef(true);
-
-  useEffect(() => {
-    auditAliveRef.current = true;
-    return () => { auditAliveRef.current = false; };
-  }, []);
 
   /**
-   * One bounded automatic prefetch per mounted item. `auditAttemptedRef` is set before the request so a
-   * failure cannot re-trigger the effect (the callback identity no longer depends on the loading state);
-   * retries are explicit only. Late responses after unmount/item switch are dropped.
+   * V3-04.5：只读核对回执，绝不重发。找不到回执只说明“暂无回执”，不代表未提交；
+   * 只有用户显式点击“重试原请求”才以同 requestId/参数/expectedRevision 调用既有幂等操作。
    */
-  const loadAudit = useCallback(async (force = false) => {
-    if (auditInFlightRef.current) return;
-    if (!force && auditAttemptedRef.current) return;
-    auditAttemptedRef.current = true;
-    auditInFlightRef.current = true;
-    const seq = ++auditRequestSeq.current;
-    setAuditLoading(true);
-    setAuditError(null);
+  async function checkOriginal(request: PendingRequest) {
+    setMessage('正在只读核对原请求回执…');
     try {
-      const result = await fetchCatalogDetailAuditAction(item.itemId);
-      if (!auditAliveRef.current || seq !== auditRequestSeq.current) return;
-      if (!result.success || !result.data) {
-        setAuditError(result.error ?? '审计区读取失败');
+      const result = await checkCatalogRequestOutcomeAction({
+        ...request.input,
+        kind: request.kind,
+      });
+      if (!result.success) {
+        setMessage(`核对未完成：${result.error ?? '回执读取失败'}。原请求保留，可稍后重试。`);
         return;
       }
-      setAudit(result.data);
-      const empty = result.data.candidates.bigseller.length === 0 && result.data.candidates.jushuitan.length === 0;
-      if (empty) setAuditEmptyConfirmed(true);
+      if (!result.data) {
+        setMessage('当前账号暂无权核对原请求回执；原请求保留，权限恢复后可继续核对。');
+        return;
+      }
+      const outcome = result.data;
+      if (outcome.status === 'applied') {
+        setPendingRequest(null);
+        setDraft(EMPTY_DRAFT);
+        writeStoredDraft(principalKey, item.itemId, null);
+        writeStoredPendingRequest(principalKey, item.itemId, null);
+        setMessage(`已核实原请求已保存（${outcome.actionLabel ?? '资料变更'}，资料版本 ${outcome.revision ?? '—'}）。`);
+        onSaved?.();
+        router.refresh();
+        return;
+      }
+      if (outcome.status === 'no_receipt') {
+        setMessage('未找到原请求回执；这不等于尚未提交。可稍后重新核对，确认后再显式重试原请求。');
+        return;
+      }
+      if (outcome.status === 'scope_mismatch') {
+        setMessage('回执与当前商品、版本或原始意图不一致，未认领；请人工核对后再处理。');
+        return;
+      }
+      setMessage('当前账号暂无权核对原请求回执；原请求保留，权限恢复后可继续核对。');
     } catch {
-      if (!auditAliveRef.current || seq !== auditRequestSeq.current) return;
-      setAuditError('审计区读取失败，请重试。');
-    } finally {
-      auditInFlightRef.current = false;
-      if (auditAliveRef.current && seq === auditRequestSeq.current) setAuditLoading(false);
+      setMessage('核对失败（网络或传输异常）；原请求保留，可重试。');
     }
-  }, [item.itemId]);
+  }
+
+  return (
+    <section aria-label="补充资料" className={styles.formStack}>
+      {restored && (
+        <p className={styles.formMessage} role="status" data-testid="catalog-edit-restored">
+          已恢复上次未保存的输入或未核对的原始请求；核对完成前不会另发请求。
+        </p>
+      )}
+      {!item.iceCode && (
+        <form
+          className={styles.form}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (pendingRequest) return;
+            startTransition(async () => {
+              await submitOriginal({
+                kind: 'initial_code',
+                input: {
+                  itemId: item.itemId,
+                  expectedRevision: item.revision,
+                  requestId: crypto.randomUUID(),
+                  code: draft.code,
+                  reason: draft.codeReason,
+                },
+              });
+            });
+          }}
+        >
+          <h3 className={styles.formTitle}>首次补码（本品还没有 ICE 货号）</h3>
+          <div className={styles.currentValue}>当前值：待补货号（尚未分配 ICE 货号）</div>
+          <fieldset className={styles.formStack} disabled={busy || pendingRequest !== null} style={{ border: 0, padding: 0, margin: 0 }}>
+            <label className={styles.field}>
+              首次ICE货号
+              <Input name="code" required maxLength={50} value={draft.code} onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))} />
+            </label>
+            <label className={styles.field}>
+              补码依据
+              <Input name="reason" required maxLength={1000} value={draft.codeReason} onChange={(event) => setDraft((prev) => ({ ...prev, codeReason: event.target.value }))} />
+              <span className={styles.fieldHint}>依据会写入修订审计；不改变已有货号，也不重新分配。</span>
+            </label>
+            <div className={styles.formActions}>
+              <Button type="submit">保存首次货号</Button>
+            </div>
+          </fieldset>
+        </form>
+      )}
+
+      <form
+        className={styles.form}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (pendingRequest) return;
+          const raw = draft.fieldValue;
+          if (raw === '' && !draft.confirmEmpty) {
+            setMessage('尚未输入采用值：请输入明确采用值，或勾选“确认明确清空（空串）”。');
+            return;
+          }
+          const value: FieldObservation = raw === ''
+            ? { state: 'observed', meaning: 'explicit_empty', raw: '', evidenceRef: draft.evidenceRef }
+            : { state: 'observed', meaning: 'value', raw, evidenceRef: draft.evidenceRef };
+          const request: PendingRequest = {
+            kind: 'nonprice_revision',
+            input: {
+              itemId: item.itemId,
+              expectedRevision: item.revision,
+              requestId: crypto.randomUUID(),
+              reason: draft.reason,
+              fields: { [draft.field]: value },
+            },
+          };
+          startTransition(async () => { await submitOriginal(request); });
+        }}
+      >
+        <h3 className={styles.formTitle}>非价格资料修订</h3>
+        <fieldset className={styles.formStack} disabled={busy || pendingRequest !== null} style={{ border: 0, padding: 0, margin: 0 }}>
+          <div className={styles.formRow}>
+            <label className={styles.field}>
+              修订字段
+              <select
+                name="field"
+                aria-label="修订字段"
+                className={styles.select}
+                value={draft.field}
+                onChange={(event) => setDraft((prev) => ({ ...prev, field: event.target.value }))}
+              >
+                {REVISION_FIELDS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <div className={styles.field}>
+              当前值
+              <span className={styles.currentValue} data-testid="catalog-edit-current-value">
+                {fieldBusinessValue(draft.field === 'specification' ? specField : item.fields[draft.field])}
+                <span className={styles.fieldHint}>当前记录值：{fieldAuditValue(draft.field === 'specification' ? specField : item.fields[draft.field])}</span>
+              </span>
+            </div>
+          </div>
+          <label className={styles.field}>
+            明确采用值（留空表示明确空串）
+            <Input
+              name="fieldValue"
+              maxLength={2000}
+              value={draft.fieldValue}
+              onChange={(event) => setDraft((prev) => ({ ...prev, fieldValue: event.target.value }))}
+            />
+            <span className={styles.fieldHint}>拟采用值即上方输入内容；留空时须勾选下方“确认明确清空”，否则视为尚未输入，不提交。</span>
+          </label>
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              name="confirmEmpty"
+              checked={draft.confirmEmpty}
+              onChange={(event) => setDraft((prev) => ({ ...prev, confirmEmpty: event.target.checked }))}
+            />
+            确认明确清空（空串，不是“尚未输入”）
+          </label>
+          <div className={styles.formRow}>
+            <label className={styles.field}>
+              证据引用
+              <Input name="evidenceRef" required maxLength={500} value={draft.evidenceRef} onChange={(event) => setDraft((prev) => ({ ...prev, evidenceRef: event.target.value }))} />
+            </label>
+            <label className={styles.field}>
+              修订理由
+              <Input name="revisionReason" required maxLength={1000} value={draft.reason} onChange={(event) => setDraft((prev) => ({ ...prev, reason: event.target.value }))} />
+            </label>
+          </div>
+          <div className={styles.formActions}>
+            <Button type="submit">保存非价格修订</Button>
+          </div>
+        </fieldset>
+      </form>
+
+      <p role="status" aria-live="polite" className={styles.formMessage}>{message}</p>
+      {legacyQuarantined && (
+        <p className={styles.formMessage} role="status" data-testid="catalog-edit-legacy-quarantined">
+          发现未绑定账户的旧草稿，已隔离保留，未载入；确认归属前不会用它提交。
+        </p>
+      )}
+      {pendingRequest && (
+        <section aria-label="待核对原请求" data-testid="pending-original-request" className={styles.pendingBox}>
+          <strong>原请求结果待核对</strong>
+          <span>保留原请求编号与原始意图；不会自动用新请求编号重发。</span>
+          <p data-testid="pending-original-input" className={styles.fieldHint}>
+            原请求：{pendingRequest.kind === 'initial_code' ? '首次补码' : '非价格资料修订'} · 资料版本 {pendingRequest.input.expectedRevision}
+            {' '}· 原字段、理由与请求编号已保留，未自动改写。
+          </p>
+          <div className={styles.formActions}>
+            <Button type="button" variant="outline" disabled={busy} data-testid="catalog-check-original" onClick={() => startTransition(() => checkOriginal(pendingRequest))}>
+              只读核对原请求
+            </Button>
+            <Button type="button" variant="outline" disabled={busy} data-testid="catalog-retry-original" onClick={() => startTransition(() => submitOriginal(pendingRequest))}>
+              重试原请求（同一编号）
+            </Button>
+          </div>
+          <p className={styles.fieldHint}>核对不会写入；“重试原请求”才会以同一请求编号与原参数重投。</p>
+        </section>
+      )}
+    </section>
+  );
+}
+
+export function CatalogDetail({
+  core,
+  principalKey,
+  bsSample = null,
+  bsSampleError = null,
+  warehouseFilter,
+  embedded = false,
+  onRevisionSaved,
+  editing: editingProp,
+  onEditingChange,
+  onDirtyChange,
+  onRetry,
+  warehouseOptions,
+  onWarehouseChange,
+  attachmentInitial = null,
+  attachmentLoad,
+  returnHref,
+  listHref,
+  currentHref,
+  defaultSection = 'material',
+  bodyRef,
+  notices,
+  onSectionChange,
+  onSelectRevision,
+  onBackToCurrent,
+  onOpenEvidence,
+}: {
+  core: CatalogDetailCoreView;
+  /** V3-04：草稿/待核请求必须绑定当前登录主体。 */
+  principalKey: string;
+  bsSample?: BsSampleDetail | null;
+  bsSampleError?: { code: string; message: string } | null;
+  warehouseFilter?: string;
+  embedded?: boolean;
+  onRevisionSaved?: () => void;
+  /** 弹窗由标题区控制编辑入口；直链页自己渲染入口。 */
+  editing?: boolean;
+  onEditingChange?: (editing: boolean) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onRetry?: () => void;
+  warehouseOptions?: string[];
+  onWarehouseChange?: (warehouse: string) => void;
+  attachmentInitial?: DetailAttachmentsModel | null;
+  attachmentLoad?: () => Promise<DetailAttachmentsModel | null>;
+  /** 返回壳（保留搜索、仓库与分页；仅旧入口兜底使用）。 */
+  returnHref?: string;
+  /** 列表级来源（用于处理/附件返回上下文，不含嵌套 from）。 */
+  listHref?: string;
+  currentHref?: string;
+  defaultSection?: CatalogDetailSection;
+  /** 弹窗把自己的滚动体 ref 交给详情：同一滚动体，分区切换才不改变外框。 */
+  bodyRef?: React.RefObject<HTMLDivElement | null>;
+  /** 弹窗状态行（列表摘要 / 过期 / 失败 / 同步中）在滚动体内呈现，不挤压固定外壳。 */
+  notices?: React.ReactNode;
+  onSectionChange?: (section: CatalogDetailSection) => void;
+  /** V3-01：在同一个弹窗内切换历史版本；不新开页面、不叠加第二个弹窗。 */
+  onSelectRevision?: (revision: number) => void;
+  /** V3-01：历史版本内原位返回当前资料。 */
+  onBackToCurrent?: () => void;
+  /** V3-01：在弹窗内容区打开“来源与证据”子视图（授权后按需读取）。 */
+  onOpenEvidence?: (revision?: number) => void;
+}) {
+  const { item, flags, writeAccess, historical } = core;
+  const router = useRouter();
+  const [history, setHistory] = useState<CatalogRevisionHistoryDto[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyEmptyConfirmed, setHistoryEmptyConfirmed] = useState(false);
+  const [dirtyState, setDirtyState] = useState(false);
+  const [section, setSection] = useState<CatalogDetailSection>(defaultSection);
+  const sectionRef = useRef<CatalogDetailSection>(defaultSection);
+  const scrollPositions = useRef<Record<CatalogDetailSection, number>>({ material: 0, inventory: 0, history: 0 });
+  const localBodyRef = useRef<HTMLDivElement | null>(null);
+  const activeBodyRef = bodyRef ?? localBodyRef;
+  const dirtyBridge = useRef<{ persist: () => void; clearDraft: () => void; clearAll: () => void } | null>(null);
+  const pendingHref = useRef<string | null>(null);
+
+  /* 编辑入口：弹窗由标题区（loader）控制，直链页自己控制。 */
+  const [internalEditing, setInternalEditing] = useState(false);
+  const [editingConfirm, setEditingConfirm] = useState(false);
+  const [leavePrompt, setLeavePrompt] = useState<null | { kind: 'section'; next: CatalogDetailSection } | { kind: 'href'; href: string } | { kind: 'back' }>(null);
+  const editing = editingProp ?? internalEditing;
+  const applyEditing = useCallback((next: boolean) => {
+    if (onEditingChange) onEditingChange(next);
+    else setInternalEditing(next);
+  }, [onEditingChange]);
+
+  const barcodeBusiness = fieldBusinessValue(item.fields.barcode) !== '待补'
+    ? fieldBusinessValue(item.fields.barcode)
+    : fieldBusinessValue(item.barcodeRefs[0]);
+  const adopted = bsSample?.status === 'loaded' ? adoptedUnitCostFromFinancial(bsSample.adoptedUnitCost) : null;
+  const resolvedWarehouse = warehouseFilter ?? undefined;
+  /**
+   * V4-01：选项顺序只由“完整仓库清单/已读到的仓库集合”决定，绝不按当前选中仓排序。
+   * 完整选项与备用路径都做同一稳定排序；切仓、加载、缓存命中、后台校验或局部失败都不改变顺序。
+   */
+  const sampleWarehouseChoices = useMemo(() => (
+    bsSample?.status === 'loaded'
+      ? Array.from(new Set((bsSample.rows as Array<Record<string, unknown>>).map((row) => String(row.warehouse ?? '')).filter(Boolean)))
+      : []
+  ), [bsSample]);
+  const [seenWarehouses, setSeenWarehouses] = useState<string[]>([]);
+  /**
+   * 完整选项缺失时，已见过的仓库也保留在集合里；当前选中仓只加入集合，不排到第一位。
+   * 顺序只按稳定排序，不依赖当前选中仓。
+   */
+  const warehouseChoices = useMemo(() => {
+    const source = warehouseOptions && warehouseOptions.length > 0
+      ? warehouseOptions
+      : [...seenWarehouses, ...sampleWarehouseChoices];
+    const unique = new Set<string>();
+    for (const entry of source) if (entry && entry !== 'all') unique.add(entry);
+    if (resolvedWarehouse && resolvedWarehouse !== 'all') unique.add(resolvedWarehouse);
+    return [...unique].sort();
+  }, [warehouseOptions, seenWarehouses, sampleWarehouseChoices, resolvedWarehouse]);
+
+  const dirty = editing && dirtyState;
+
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+
+  /* 未保存草稿的站内链接离开保护（R4）：直链页与弹窗共用。 */
+  useUnsavedLeaveGuard({
+    active: dirty,
+    onBlocked: (href) => { dirtyBridge.current?.persist(); pendingHref.current = href; setLeavePrompt({ kind: 'href', href }); },
+  });
 
   useEffect(() => {
-    if (historical) return;
-    startTransition(() => {
-      void loadAudit();
-    });
-  }, [historical, loadAudit, startTransition]);
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
 
-  function retryAudit() {
-    if (auditInFlightRef.current) return;
-    auditAttemptedRef.current = false;
-    setAudit(null);
-    setAuditEmptyConfirmed(false);
-    void loadAudit(true);
-  }
-
-  async function loadArtifacts(force = false) {
-    if (!force && (artifacts || artifactsLoading || artifactsEmptyConfirmed)) return;
-    setArtifactsLoading(true);
-    setArtifactsError(null);
-    try {
-      const result = await fetchCatalogDetailArtifactsAction();
-      if (!result.success || !result.data) {
-        setArtifactsError(result.error ?? '证据清单读取失败');
-        return;
-      }
-      setArtifacts(result.data);
-      if (result.data.length === 0) setArtifactsEmptyConfirmed(true);
-    } catch {
-      setArtifactsError('证据清单读取失败，请重试。');
-    } finally {
-      setArtifactsLoading(false);
-    }
-  }
-
-  function retryArtifacts() {
-    setArtifacts(null);
-    setArtifactsEmptyConfirmed(false);
-    void loadArtifacts(true);
-  }
-
-  async function loadHistory() {
-    if (history.length > 0 || historyLoading || historyEmptyConfirmed) return;
+  const asyncHistoryRef = useRef(false);
+  const [historyRetryToken, setHistoryRetryToken] = useState(0);
+  const loadHistory = useCallback(async (force = false) => {
+    if (asyncHistoryRef.current) return;
+    if (!force && (history.length > 0 || historyEmptyConfirmed)) return;
+    asyncHistoryRef.current = true;
     setHistoryLoading(true);
     setHistoryError(null);
     try {
       const result = await fetchCatalogDetailHistoryAction(item.itemId);
       if (!result.success) {
-        setHistoryError(result.error ?? '历史版本读取失败');
+        setHistoryError(result.error ?? '变更记录读取失败');
         return;
       }
       const rows = result.data ?? [];
       setHistory(rows);
       if (rows.length === 0) setHistoryEmptyConfirmed(true);
     } catch {
-      setHistoryError('历史版本读取失败，请重试。');
+      setHistoryError('变更记录读取失败，请重试。');
     } finally {
+      asyncHistoryRef.current = false;
       setHistoryLoading(false);
     }
-  }
+  }, [history.length, historyEmptyConfirmed, item.itemId]);
 
-  async function reconcileOriginal(request: PendingRequest) {
-    if (!writeAccess.isScoped) return submitOriginal(request);
+  useEffect(() => {
+    if (defaultSection !== 'history') return;
+    const frame = window.requestAnimationFrame(() => { void loadHistory(); });
+    return () => window.cancelAnimationFrame(frame);
+  }, [defaultSection, loadHistory, historyRetryToken]);
+
+  /* V4-01：切仓不重挂载组件，也不清空三分区滚动记录或强制回顶。
+     新仓内容更短时由浏览器在渲染后做最小收敛（必要时自动 clamp），不额外指定 scrollTop。 */
+
+  /* ---- 附件（F07：与直链同一展示组件；只在确有处理事项时出现） ---- */
+  const [attachments, setAttachments] = useState<DetailAttachmentsModel | null>(attachmentInitial);
+  const [attachmentsState, setAttachmentsState] = useState<'idle' | 'loading' | 'ready' | 'error'>(attachmentInitial ? 'ready' : 'idle');
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
+  const attachmentsAttempted = useRef(false);
+
+  const loadAttachments = useCallback(async (force = false) => {
+    if (!attachmentLoad) return;
+    if (!force && attachmentsAttempted.current) return;
+    attachmentsAttempted.current = true;
+    setAttachmentsState('loading');
+    setAttachmentsError(null);
     try {
-      const result = await recoverCatalogNewItemRequestAction(request);
-      if (!result.success) { setMessage('原请求尚无法核对，仍保留未知状态与原意图。'); return; }
-      if (!result.data) return submitOriginal(request);
-      setPendingRequest(null); setMessage(`已只读核实原请求 ${request.input.requestId}，资料版本 ${result.data.revision}。`); router.refresh();
-    } catch { setMessage('原请求尚无法核对，仍保留未知状态与原意图。'); }
+      const result = await attachmentLoad();
+      if (!result) {
+        setAttachmentsState('error');
+        setAttachmentsError('相关处理入口读取失败（不等于已处理完成或模块未启用），可重试。');
+        return;
+      }
+      setAttachments(result);
+      setAttachmentsState('ready');
+    } catch {
+      setAttachmentsState('error');
+      setAttachmentsError('相关处理入口读取失败，请重试。');
+    }
+  }, [attachmentLoad]);
+
+  /* ---- 返回壳与历史链接 ---- */
+  const historyFrom = listHref;
+  const returnTarget = returnHref ?? listHref ?? '/dashboard/catalog';
+  const attachmentFromHref = embedded ? (listHref ?? returnTarget) : (currentHref ?? listHref ?? returnTarget);
+  const showWarehouseSwitcher = !historical && (Boolean(onWarehouseChange) || (!embedded && warehouseChoices.length > 0));
+
+  function switchWarehouse(next: string) {
+    setSeenWarehouses((prev) => {
+      const union = new Set(prev);
+      for (const entry of warehouseChoices) if (entry && entry !== 'all') union.add(entry);
+      if (next && next !== 'all') union.add(next);
+      return union.size === prev.length ? prev : [...union];
+    });
+    if (onWarehouseChange) { onWarehouseChange(next); return; }
+    const params = new URLSearchParams();
+    if (next && next !== 'all') params.set('warehouse', next);
+    if (historyFrom) params.set('from', historyFrom);
+    const qs = params.toString();
+    router.replace(qs ? `/dashboard/catalog/${item.itemId}?${qs}` : `/dashboard/catalog/${item.itemId}`, { scroll: false });
   }
+
+  /* V4-03：版本切换不清空三分区滚动记录，也不无条件回顶。
+     从历史来源返回时由弹窗在目标版本就绪后恢复原滚动位置；普通版本切换保持在当前阅读位置。 */
+
+  const canEdit = !historical && writeAccess.canWrite;
   const brushPending = flags.brushPending;
+  const hasProcessingIssue = brushPending || (item.newProductConfirmed && !item.iceCode);
 
-  return <div className={demoStyles.detailOnly}>
-    {!auditLoading && (audit || auditError) ? (
-      <span data-testid="catalog-audit-ready" aria-hidden="true" className="sr-only" />
-    ) : null}
-    {!embedded && <Link className={demoStyles.textLink} href="/dashboard/catalog">返回商品资料</Link>}
-    <section className={demoStyles.panel}>
-      {!embedded && (
-      <div className={demoStyles.detailHeader}>
-        <div>
-          <p className={demoStyles.eyebrow}>PRODUCT / TRACEABILITY</p>
-          <h1 style={{ fontSize: 22, margin: 0 }}>{item.iceCode ?? '待补货号'} · {item.nameCn}</h1>
-          <p className={demoStyles.subtle}>真实商品档案 · 身份、来源与样表库存</p>
-        </div>
-      </div>
-      )}
-      <div className={demoStyles.identityHero}>
-        <span className={`${demoStyles.productArt} ${demoStyles.productArtLarge}`} aria-label="暂无商品图片"><Package size={32} strokeWidth={1.3} /><small>暂无商品图片</small></span>
-        <div>
-          <Pill tone="blue">人工维护货号</Pill>
-          <h3 style={{ margin: '8px 0 4px' }}>{item.nameCn}</h3>
-          <p>资料版本 <span data-testid="item-revision">{item.revision}</span> · ICE货号 <strong data-testid="item-code">{item.iceCode ?? '待补货号'}</strong></p>
-          <Pill tone={item.newProductConfirmed && !item.iceCode ? 'amber' : historical ? 'neutral' : 'green'}>{item.newProductConfirmed && !item.iceCode ? '新品，待补货号' : historical ? '历史资料版本' : '当前采用资料'}</Pill>
-          {brushPending && <Pill tone="amber">刷子待确认，分列保留</Pill>}
-        </div>
-      </div>
-      <p className={demoStyles.detailHint}>人工决定：JST {item.humanChoices.jushuitan}条，BS {item.humanChoices.bigseller}条 · <Link className={demoStyles.inlineLink} href="/dashboard/catalog/sources">逐来源核实附注</Link></p>
-      {historical && <p className={demoStyles.detailHint}>正在查看当时版本。<Link className={demoStyles.inlineLink} href={`/dashboard/catalog/${item.itemId}`}>查看当前资料</Link></p>}
-      {!embedded && (
-        <Link className={demoStyles.inlineLink} target="_blank" rel="noreferrer" href={`/dashboard/catalog/${item.itemId}${warehouseFilter ? `?warehouse=${encodeURIComponent(warehouseFilter)}` : ''}`}>在新标签打开可分享地址</Link>
-      )}
-    </section>
+  const editingRequested = (next: boolean) => {
+    /* 直链页自己处理未保存修改的收起确认；弹窗交给标题区的离开提示。 */
+    if (!next && !onEditingChange && dirty) { setEditingConfirm(true); return; }
+    setEditingConfirm(false);
+    if (!next) setDirtyState(false);
+    applyEditing(next);
+  };
 
-    <section aria-label="基础资料" className={demoStyles.panel}>
-      <h2 className="font-semibold mb-3">基础资料</h2>
-      <dl className={demoStyles.identityGrid}>
-        <div><dt>公司货号（ICE）</dt><dd data-testid="item-code-inline">{item.iceCode ?? '待补货号'}</dd></div>
-        <div><dt>中文产品名称</dt><dd>{item.nameCn}</dd></div>
-        <div><dt>69编码（字符串）</dt><dd className={demoStyles.codeCell}>{barcodeBusiness}</dd></div>
-        <div><dt>英文名称</dt><dd>{fieldBusinessValue(item.fields.englishName)}</dd></div>
-        <div><dt>规格 / 单位</dt><dd>{specBusiness} / {fieldBusinessValue(item.fields.unit)}</dd></div>
-        <div><dt>商品分类</dt><dd>{fieldBusinessValue(item.fields.category)}</dd></div>
-        <div><dt>生产工厂</dt><dd>{fieldBusinessValue(item.fields.factory)}</dd></div>
-        <div><dt>包装</dt><dd>{fieldBusinessValue(item.fields.packaging)}</dd></div>
-        <div><dt>装箱数量</dt><dd>{fieldBusinessValue(item.fields.cartonQuantity)}</dd></div>
+  const persistScroll = () => {
+    const body = activeBodyRef.current;
+    if (embedded) scrollPositions.current[sectionRef.current] = body?.scrollTop ?? 0;
+    else scrollPositions.current[sectionRef.current] = window.scrollY;
+  };
+
+  const restoreScroll = (next: CatalogDetailSection) => {
+    window.requestAnimationFrame(() => {
+      if (embedded) {
+        const body = activeBodyRef.current;
+        if (body) body.scrollTop = scrollPositions.current[next];
+      } else {
+        window.scrollTo({ top: scrollPositions.current[next], left: 0 });
+      }
+    });
+  };
+
+  const applySection = (next: CatalogDetailSection) => {
+    persistScroll();
+    sectionRef.current = next;
+    setSection(next);
+    onSectionChange?.(next);
+    if (next === 'history') void loadHistory();
+    restoreScroll(next);
+  };
+
+  const changeSection = (next: CatalogDetailSection) => {
+    if (next === section) return;
+    /* 在商品资料分区编辑时切换到其它分区会卸载编辑器：先共用草稿保护（R4）。 */
+    if (editing && dirty) {
+      dirtyBridge.current?.persist();
+      setLeavePrompt({ kind: 'section', next });
+      return;
+    }
+    if (editing) applyEditing(false);
+    applySection(next);
+  };
+
+  const resolveLeave = () => {
+    /* V3-04：放弃普通草稿只清草稿；待核请求（原 requestId 与依据）必须保留。 */
+    dirtyBridge.current?.clearDraft();
+    setLeavePrompt(null);
+    setDirtyState(false);
+    setEditingConfirm(false);
+    applyEditing(false);
+  };
+
+  const overviewInventory = overseasInventoryFact({ historical, bsSample, bsSampleError, bsNotCreated: flags.bsNotCreated });
+  const overviewValue = valuatedFact({ historical, bsSample, bsSampleError });
+  const overviewUnitCost = unitCostFact({ historical, adopted, bsSampleError });
+
+  const domesticFact: Fact = { value: '未接入', hint: null };
+  const transitFact: Fact = { value: '未接入', hint: null };
+
+  const overview = (
+    <section className={styles.overview} aria-label="库存与货值概览" data-testid="catalog-detail-overview">
+      <div className={styles.overviewHead}>
+        <div className={styles.overviewIdentity}>
+          <Pill tone={item.newProductConfirmed && !item.iceCode ? 'amber' : historical ? 'neutral' : 'green'}>
+            {item.newProductConfirmed && !item.iceCode ? '新品，待补货号' : historical ? '历史资料版本' : '当前采用资料'}
+          </Pill>
+          {brushPending && <Pill tone="amber">刷子待确认</Pill>}
+        </div>
+        <p className={styles.overviewMeta}>
+          仓库范围 <strong data-testid="catalog-overview-warehouse">{warehouseLabelOf(resolvedWarehouse)}</strong>
+          {' · '}
+          <span data-testid="catalog-overview-sample">
+            {(() => {
+              const label = bsSample?.status === 'loaded' && typeof bsSample.exportLabel === 'string' ? bsSample.exportLabel : '';
+              const day = label.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+              return day ? `样表 · ${day}` : '样表';
+            })()}
+          </span>
+        </p>
+      </div>
+      <dl className={styles.overviewGrid}>
+        <OverviewCard label="国内库存" fact={domesticFact} testId="catalog-overview-domestic" />
+        <OverviewCard
+          label="海外库存"
+          fact={overviewInventory}
+          testId="catalog-overview-overseas"
+          extra={(
+            <span className={styles.overviewSub}>
+              <span className={styles.overviewSubLabel}>同范围货值</span>
+              <span data-testid="catalog-overview-overseas-value">{overviewValue.value}</span>
+            </span>
+          )}
+        />
+        <OverviewCard label="在途库存" fact={transitFact} testId="catalog-overview-transit" />
+        <OverviewCard label="已估值货值" fact={overviewValue} testId="catalog-overview-valuated" />
       </dl>
-      <details className="mt-4"><summary className={demoStyles.subtle}>展开审计字段与内部键名</summary>
-        <dl className="grid gap-2 sm:grid-cols-2 mt-2 text-sm">
-          <div><dt>商品 UUID</dt><dd data-testid="item-uuid" className="break-all">{item.itemId}</dd></div>
-          {PRIMARY_FIELD_KEYS.map((key) => {
-            const field = key === 'specification' ? specField : item.fields[key];
-            if (!field && key !== 'nameCn') return null;
-            return <div key={key}><dt>{CATALOG_FIELD_LABELS[key] ?? key}</dt><dd>{field ? fieldAuditValue(field) : '—'}</dd></div>;
-          })}
-        </dl>
-      </details>
     </section>
+  );
 
-    {!historical && <BsSampleBusinessBlock itemId={item.itemId} bsSample={bsSample} bsSampleError={bsSampleError ?? null} warehouse={warehouseFilter} />}
-
-    {!historical && writeAccess.canWrite && <details className={demoStyles.panel} open={editOpen} onToggle={(e) => setEditOpen((e.target as HTMLDetailsElement).open)}>
-      <summary className="font-semibold cursor-pointer">编辑资料（点击展开）</summary>
-      <div className="space-y-4 mt-3" aria-label="补充资料">
-      {!item.iceCode && <form ref={codeForm} className="space-y-2 max-w-xl" action={(data) => startTransition(async () => {
-        if (pendingRequest) return;
-        await submitOriginal({ kind: 'initial_code', input: { itemId: item.itemId, expectedRevision: item.revision,
-          requestId: crypto.randomUUID(), code: String(data.get('code') ?? ''), reason: String(data.get('reason') ?? '') } });
-      })}>
-        <fieldset className="space-y-2" disabled={busy || pendingRequest !== null}>
-        <label className="block text-sm">首次ICE货号<Input name="code" required maxLength={50} /></label>
-        <label className="block text-sm">补码依据<Input name="reason" required maxLength={1000} /></label>
-        <Button type="submit">保存首次货号</Button>
-        </fieldset>
-      </form>}
-      <form ref={revisionForm} className="space-y-2 max-w-xl" action={(data) => startTransition(async () => {
-        if (pendingRequest) return;
-        const reason = String(data.get('revisionReason') ?? '');
-        const raw = String(data.get('fieldValue') ?? '');
-        const field = String(data.get('field') ?? '');
-        const evidenceRef = String(data.get('evidenceRef') ?? '');
-        const value: FieldObservation = raw === '' ? { state: 'observed', meaning: 'explicit_empty', raw: '', evidenceRef } : { state: 'observed', meaning: 'value', raw, evidenceRef };
-        await submitOriginal({ kind: 'nonprice_revision', input: { itemId: item.itemId, expectedRevision: item.revision,
-          requestId: crypto.randomUUID(), reason, fields: { [field]: value } } });
-      })}>
-        <fieldset className="space-y-2" disabled={busy || pendingRequest !== null}>
-        <label className="block text-sm">修订字段<select className="block rounded border p-2" name="field" aria-label="修订字段" defaultValue="factory"><option value="factory">工厂</option><option value="specification">规格</option><option value="nameCn">中文名称</option><option value="barcode">辅助条码</option><option value="packaging">包装</option><option value="cartonQuantity">装箱数量</option><option value="englishName">英文名称</option><option value="imageRef">图片引用</option></select></label>
-        <label className="block text-sm">明确采用值（留空表示明确空串）<Input name="fieldValue" maxLength={2000} /></label>
-        <label className="block text-sm">证据引用<Input name="evidenceRef" required maxLength={500} /></label>
-        <label className="block text-sm">修订理由<Input name="revisionReason" required maxLength={1000} /></label>
-        <Button type="submit">保存非价格修订</Button>
-        </fieldset>
-      </form>
-      <p role="status" aria-live="polite">{message}</p>
-      {pendingRequest && <section aria-label="待核对原请求" data-testid="pending-original-request" className="space-y-2 border rounded p-3">
-        <Button type="button" variant="outline" disabled={busy} onClick={() => startTransition(() => reconcileOriginal(pendingRequest))}>核对/重试原请求</Button>
-      </section>}
+  const pageHeader = !embedded ? (
+    <header className={styles.pageHeader}>
+      <nav className={styles.returnBar} aria-label="返回">
+        <Link
+          className={styles.returnLink}
+          href={returnTarget}
+          onClick={(event) => {
+            if (!dirty) return;
+            event.preventDefault();
+            dirtyBridge.current?.persist();
+            setLeavePrompt({ kind: 'href', href: returnTarget });
+          }}
+        >
+          ← 返回商品库（保留搜索与仓库）
+        </Link>
+        {historical && onBackToCurrent && (
+          <button type="button" className={styles.returnLink} data-testid="catalog-detail-back-current" onClick={onBackToCurrent}>
+            返回当前资料
+          </button>
+        )}
+      </nav>
+      <div className={styles.pageTitleRow}>
+        <div>
+          <h1 className={styles.pageTitle} data-testid="catalog-detail-title">
+            {item.iceCode ?? '待补货号'} · {item.nameCn}
+          </h1>
+          <p className={styles.pageMeta}>
+            <SpecLine item={item} />
+            {' · '}
+            资料版本 <span data-testid="catalog-detail-version">{item.revision}</span>
+            {' · '}
+            当前仓 {warehouseLabelOf(resolvedWarehouse)}
+            {historical ? ' · 历史版本（只读）' : ''}
+          </p>
+        </div>
+        {canEdit && (
+          <button
+            type="button"
+            className={styles.headerButton}
+            aria-pressed={editing}
+            onClick={() => editingRequested(!editing)}
+          >
+            {editing ? '收起编辑' : '编辑资料'}
+          </button>
+        )}
       </div>
-    </details>}
-    {!historical && !writeAccess.canWrite && <p data-testid="catalog-write-denied">当前账号仅可查看已采用资料；补码和修订需要创建来源范围的当前发布权限。</p>}
-
-    <details className={demoStyles.panel} onToggle={(event) => {
-      if ((event.target as HTMLDetailsElement).open) void loadAudit();
-    }}><summary className="font-semibold cursor-pointer">JST 与 BS 来源候选（按需审计）</summary>
-      {auditLoading && <p className={demoStyles.subtle} role="status">加载来源候选…</p>}
-      {auditError && <p role="alert" data-testid="catalog-audit-error">{auditError} <button type="button" className={demoStyles.textLink} onClick={retryAudit}>重试</button></p>}
-      {!auditLoading && auditEmptyConfirmed && audit && audit.candidates.bigseller.length === 0 && audit.candidates.jushuitan.length === 0 && (
-        <p className={demoStyles.subtle} data-testid="catalog-candidates-empty">已确认：当前资料下 JST 与 BS 均无候选观测（不是读取失败）。</p>
+      {historical && (
+        <p className={styles.sectionNote}>
+          只读历史版本：不显示当前库存、当前价格与编辑入口。
+        </p>
       )}
-      {audit && <div className="space-y-4 mt-3">
-        {(['jushuitan', 'bigseller'] as const).map((source) => <div key={source}><h3 className="font-semibold">{source === 'jushuitan' ? 'JST' : 'BS'}</h3>
-          <Table><TableHeader><TableRow><TableHead>SKU / 名称</TableHead><TableHead>依据</TableHead><TableHead>冲突提示</TableHead></TableRow></TableHeader><TableBody>
-            {audit.candidates[source].map((c) => <TableRow key={c.observationId} data-testid={`catalog-candidate-${c.observationId}`}><TableCell>{c.sku ?? '未提供SKU'}<p>{c.name}</p></TableCell><TableCell>{c.basis.join('、')}</TableCell><TableCell>{c.conflicts.join('；') || '—'}</TableCell></TableRow>)}
-          </TableBody></Table>
-        </div>)}
-      </div>}
-    </details>
+    </header>
+  ) : null;
 
-    <details className={demoStyles.panel} onToggle={(event) => {
-      if ((event.target as HTMLDetailsElement).open) void loadHistory();
-    }}><summary className="font-semibold cursor-pointer">资料历史（按需审计）</summary>
-      {historyLoading && <p className={demoStyles.subtle}>加载历史版本…</p>}
-      {historyError && <p role="alert">{historyError} <button type="button" className={demoStyles.textLink} onClick={() => { setHistoryEmptyConfirmed(false); setHistory([]); void loadHistory(); }}>重试</button></p>}
-      {!historyLoading && historyEmptyConfirmed && history.length === 0 && <p className={demoStyles.subtle} data-testid="catalog-history-empty">暂无历史版本记录。</p>}
-      <ul className="space-y-2 mt-2">{history.map((h) => <li key={h.revision} data-testid={`revision-history-${h.revision}`}>
-        <Link className="underline" href={`/dashboard/catalog/${item.itemId}?revision=${h.revision}`}>版本 {h.revision} · {h.iceCode ?? '待补货号'} · {h.nameCn}</Link>
-        <p className="text-sm break-all" data-testid="revision-reason">{h.revisionAudit.reason}</p>
-      </li>)}</ul>
-    </details>
+  const tabBar = (
+    <div className={styles.tabBar} role="tablist" aria-label="商品详情分区" data-testid="catalog-detail-tabs">
+      {SECTIONS.map((entry) => {
+        const selected = entry.key === section;
+        return (
+          <button
+            key={entry.key}
+            type="button"
+            role="tab"
+            id={`catalog-tab-${entry.key}`}
+            aria-selected={selected}
+            aria-controls={`catalog-panel-${entry.key}`}
+            tabIndex={selected ? 0 : -1}
+            className={selected ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+            data-testid={`catalog-tab-${entry.key}`}
+            onClick={() => changeSection(entry.key)}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+              event.preventDefault();
+              const index = SECTIONS.findIndex((option) => option.key === entry.key);
+              const delta = event.key === 'ArrowRight' ? 1 : -1;
+              const next = SECTIONS[(index + delta + SECTIONS.length) % SECTIONS.length];
+              changeSection(next.key);
+              window.requestAnimationFrame(() => document.getElementById(`catalog-tab-${next.key}`)?.focus());
+            }}
+          >
+            {entry.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 
-    <details className={demoStyles.panel} onToggle={(event) => {
-      if ((event.target as HTMLDetailsElement).open) void loadAudit();
-    }}><summary className="font-semibold cursor-pointer">来源差异与原始观测 JSON（按需审计）</summary>
-      {auditLoading && <p className={demoStyles.subtle} role="status">加载审计 JSON…</p>}
-      {auditError && !audit && <p role="alert" data-testid="catalog-audit-json-error">{auditError} <button type="button" className={demoStyles.textLink} onClick={retryAudit}>重试</button></p>}
-      {audit && <pre className="text-xs whitespace-pre-wrap break-all mt-2 max-h-[420px] overflow-auto" data-testid="catalog-audit-json">{JSON.stringify({ differences: audit.differences, decisions: audit.decisions, observations: audit.observations }, null, 2)}</pre>}
-    </details>
+  const leavePromptNode = leavePrompt ? (
+    <div className={styles.leaveNotice} role="alert" data-testid="catalog-edit-leave-notice">
+      <span>
+        {leavePrompt.kind === 'section'
+          ? '有尚未保存的资料修改；切换到其它分区会离开编辑。'
+          : leavePrompt.kind === 'back'
+            ? '浏览器后退被取消：有尚未保存的资料修改。'
+            : '有尚未保存的资料修改，离开后输入会暂存，可再次进入编辑继续。'}
+      </span>
+      <button type="button" className={styles.headerButton} onClick={() => { setLeavePrompt(null); pendingHref.current = null; }}>继续编辑</button>
+      <button
+        type="button"
+        className={styles.headerButton}
+        onClick={() => {
+          const prompt = leavePrompt;
+          resolveLeave();
+          if (prompt.kind === 'section') applySection(prompt.next);
+          else if (prompt.kind === 'href') router.push(prompt.href);
+        }}
+      >
+        {leavePrompt.kind === 'section' ? '放弃修改并切换' : '放弃修改并离开'}
+      </button>
+    </div>
+  ) : null;
 
-    <section className={`${demoStyles.panel} space-y-3`} aria-label="受限证据">
-      <h2 className="font-semibold">金额与原始证据（按需）</h2>
-      {bsSample?.status === 'loaded' && (
-        <details className={demoStyles.subtle}>
-          <summary>技术说明：估值口径指纹</summary>
-          <p data-testid="bs-basis-sha">SHA256：{bsSample.basisDocumentSha256 ?? '—'}</p>
-        </details>
+  const editingLeaveConfirm = editingConfirm ? (
+    <div className={styles.leaveNotice} role="alert" style={{ padding: '10px 12px' }}>
+      <span>有尚未保存的资料修改，收起后输入会暂存；再次进入编辑可继续。</span>
+      <button type="button" className={styles.headerButton} onClick={() => setEditingConfirm(false)}>继续编辑</button>
+      <button
+        type="button"
+        className={styles.headerButton}
+        onClick={() => { setEditingConfirm(false); setDirtyState(false); applyEditing(false); }}
+      >
+        放弃修改并收起
+      </button>
+    </div>
+  ) : null;
+
+  const extraLegacyFields = ([
+    { key: 'packaging', label: CATALOG_FIELD_LABELS.packaging, value: legacyFieldValue(item.fields.packaging) },
+    { key: 'depth', label: CATALOG_FIELD_LABELS.depth, value: legacyFieldValue(item.fields.depth) },
+    { key: 'weight', label: CATALOG_FIELD_LABELS.weight, value: legacyFieldValue(item.fields.weight) },
+  ] as const).filter((entry) => entry.value !== null);
+
+  const materialPanel = (
+    <div role="tabpanel" id="catalog-panel-material" aria-labelledby="catalog-tab-material" className={styles.sectionStack} data-testid="catalog-tabpanel-material">
+      {editing && canEdit && (
+        <section className={styles.section} aria-label="编辑资料" data-testid="catalog-detail-edit">
+          <div className={styles.sectionHead}>
+            <div>
+              <h2 className={styles.sectionTitle}>编辑资料</h2>
+              <p className={styles.sectionNote}>只允许既有首次补码与非价格修订；显示当前值、拟采用值与依据，保存后旧版本保持。</p>
+            </div>
+          </div>
+          {editingLeaveConfirm}
+          <div style={{ marginTop: 12 }}>
+            <DetailEditPanel
+              core={core}
+              principalKey={principalKey}
+              onDirtyChange={setDirtyState}
+              onSaved={() => {
+                onRevisionSaved?.();
+                setHistory([]);
+                setHistoryEmptyConfirmed(false);
+                /* V3-04.8：保存前已经打开的历史必须更新，不能继续显示旧记录。 */
+                if (sectionRef.current === 'history') void loadHistory(true);
+              }}
+              registerDraftBridge={(bridge) => { dirtyBridge.current = bridge; }}
+            />
+          </div>
+        </section>
       )}
-      <Button variant="outline" disabled={busy || amountsLoading} data-testid="load-restricted-amounts" onClick={() => startTransition(async () => {
-        setAmountsLoading(true);
-        setAmountsError(null);
-        setAmounts(null);
-        try {
-          const result = await getCatalogAmountsAction(item.itemId);
-          if (result.success) setAmounts(result.data);
-          else {
-            setAmounts(null);
-            setAmountsError(result.error ?? '金额读取失败');
-          }
-        } catch {
-          setAmounts(null);
-          setAmountsError('金额读取失败（网络或传输异常），无效数值已清除。');
-        } finally {
-          setAmountsLoading(false);
-        }
-      })}>{amountsLoading ? '读取中…' : '读取受限金额'}</Button>
-      {amountsError && <p role="alert" data-testid="restricted-amounts-error">{amountsError}</p>}
-      {amounts !== null && <pre data-testid="restricted-amounts" className="text-xs whitespace-pre-wrap break-all">{JSON.stringify(amounts, null, 2)}</pre>}
-      <details onToggle={(event) => { if ((event.target as HTMLDetailsElement).open) void loadArtifacts(); }}>
-        <summary>完整原始证据下载（含价格，受限）</summary>
-        {artifactsLoading && <p className={demoStyles.subtle} role="status">加载证据清单…</p>}
-        {artifactsError && <p role="alert" data-testid="catalog-artifacts-error">{artifactsError} <button type="button" className={demoStyles.textLink} onClick={retryArtifacts}>重试</button></p>}
-        {artifacts && artifacts.length === 0 && !artifactsLoading && !artifactsError && <p className={demoStyles.subtle} data-testid="catalog-artifacts-empty">已确认：当前无可用原始证据下载项。</p>}
-        {artifacts && artifacts.length > 0 && <ul className="text-sm space-y-1">{artifacts.map((a) => <li key={a.artifactId}><a className="underline" href={`/api/catalog/evidence/${a.artifactId}?projection=raw`}>{a.logicalName}</a></li>)}</ul>}
-      </details>
+
+      <section className={styles.section} aria-label="商品资料">
+        <div className={styles.sectionHead}>
+          <div>
+            <h2 className={styles.sectionTitle}>商品资料</h2>
+          </div>
+        </div>
+        <div className={styles.sectionBody}>
+          {!historical && !writeAccess.canWrite && (
+            <p data-testid="catalog-write-denied" className={styles.deniedNote}>
+              当前账号仅可查看，不能编辑资料。
+            </p>
+          )}
+          <div className={styles.hero}>
+            <span className={`${demoStyles.productArt} ${demoStyles.productArtLarge}`} aria-label="商品图片占位">
+              <Package size={32} strokeWidth={1.3} />
+              <small>占位</small>
+            </span>
+            <div className={styles.heroText}>
+              {optionalFieldRow(item.fields.englishName).show && (
+                <p className={styles.heroMeta}>{optionalFieldRow(item.fields.englishName).value}</p>
+              )}
+              <p className={styles.heroCaption}>{imageCaption(item)}</p>
+            </div>
+          </div>
+          <dl className={styles.identityGrid} data-testid="catalog-material-details">
+            <MaterialRow label="中文产品名称" testId="catalog-material-name">{item.nameCn}</MaterialRow>
+            <MaterialRow label="公司货号（ICE）" testId="catalog-material-ice-code">{item.iceCode ?? '待补货号'}</MaterialRow>
+            <MaterialRow label="69编码（字符串）" testId="catalog-material-barcode"><span className={styles.codeCell}>{barcodeBusiness}</span></MaterialRow>
+            {optionalFieldRow(item.fields.englishName).show && (
+              <MaterialRow label="英文名称" testId="catalog-material-english-name">{optionalFieldRow(item.fields.englishName).value}</MaterialRow>
+            )}
+            <MaterialRow label="规格 / 单位" testId="catalog-material-spec">
+              {catalogSpecFact(item).value}
+              {catalogSpecFact(item).hint ? <span className={styles.fieldHint}>{catalogSpecFact(item).hint}</span> : null}
+            </MaterialRow>
+            {optionalFieldRow(item.fields.category).show && (
+              <MaterialRow label="商品分类" testId="catalog-material-category">{optionalFieldRow(item.fields.category).value}</MaterialRow>
+            )}
+            {optionalFieldRow(item.fields.factory).show && (
+              <MaterialRow label="生产工厂" testId="catalog-material-factory">{optionalFieldRow(item.fields.factory).value}</MaterialRow>
+            )}
+            {dimensionLine(item, SINGLE_SIZE_KEYS) && (
+              <MaterialRow label="单产品尺寸" testId="catalog-material-single-size">{dimensionLine(item, SINGLE_SIZE_KEYS)}</MaterialRow>
+            )}
+            {optionalFieldRow(item.fields.unitWeight).show && (
+              <MaterialRow label="单产品重量" testId="catalog-material-single-weight">
+                {`${optionalFieldRow(item.fields.unitWeight).value} kg`}
+              </MaterialRow>
+            )}
+            {optionalFieldRow(item.fields.cartonQuantity).show && (
+              <MaterialRow label="装箱数量" testId="catalog-material-carton-quantity">{optionalFieldRow(item.fields.cartonQuantity).value}</MaterialRow>
+            )}
+            {dimensionLine(item, CARTON_SIZE_KEYS) && (
+              <MaterialRow label="外箱尺寸" testId="catalog-material-carton-size">{dimensionLine(item, CARTON_SIZE_KEYS)}</MaterialRow>
+            )}
+            {optionalFieldRow(item.fields.cartonWeight).show && (
+              <MaterialRow label="外箱重量" testId="catalog-material-carton-weight">
+                {formatMeasureValue(optionalFieldRow(item.fields.cartonWeight).value)}
+              </MaterialRow>
+            )}
+            {optionalFieldRow(item.fields.cartonVolume).show && (
+              <MaterialRow label="单箱体积" testId="catalog-material-carton-volume">
+                {formatMeasureValue(optionalFieldRow(item.fields.cartonVolume).value)}
+              </MaterialRow>
+            )}
+            {optionalFieldRow(item.fields.unitVolume).show && (
+              <MaterialRow label="单瓶体积" testId="catalog-material-unit-volume">
+                {formatMeasureValue(optionalFieldRow(item.fields.unitVolume).value)}
+              </MaterialRow>
+            )}
+            <MaterialRow label="图片引用" testId="catalog-material-image">{imageCaption(item)}</MaterialRow>
+            <MaterialRow label="采用进货价" testId="catalog-material-unit-cost">
+              <span data-testid="catalog-material-unit-cost-value">{overviewUnitCost.value}</span>
+              <span className={styles.fieldHint}>{overviewUnitCost.hint ?? '人民币 / 单品 · 不含运费不含税'}</span>
+            </MaterialRow>
+          </dl>
+          {onOpenEvidence && (
+            <p className={styles.sectionNote} data-testid="catalog-material-source-link">
+              资料来源：本批采用资料、真实修订与来源对应。
+              {' '}
+              <button type="button" className={demoStyles.textLink} onClick={() => onOpenEvidence()}>查看数据来源</button>
+            </p>
+          )}
+          {extraLegacyFields.length > 0 && (
+            <details className={styles.subDetails} data-testid="catalog-material-extra">
+              <summary>附加字段</summary>
+              <div className={styles.subDetailsBody}>
+                <dl className={styles.auditGrid}>
+                  {extraLegacyFields.map((entry) => (
+                    <div key={entry.key}>
+                      <dt>{entry.label}</dt>
+                      <dd data-testid={entry.key === 'packaging' ? 'catalog-material-packaging-legacy' : undefined}>{entry.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </details>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+
+  const inventoryPanel = (
+    <div role="tabpanel" id="catalog-panel-inventory" aria-labelledby="catalog-tab-inventory" className={styles.sectionStack} data-testid="catalog-tabpanel-inventory">
+      <section className={styles.section} aria-label="库存明细">
+        <div className={styles.sectionHead}>
+          <div>
+            <h2 className={styles.sectionTitle}>库存明细</h2>
+            <p className={styles.sectionNote}>BS 样表（海外）；锁定与在途不计入估值。</p>
+          </div>
+        </div>
+        <div className={styles.sectionBody}>
+          {showWarehouseSwitcher && (
+            <div className={styles.controls} role="group" aria-label="仓库范围" data-testid="catalog-inventory-warehouse">
+              <span className={styles.controlsLabel}>仓库范围</span>
+              {[{ value: 'all', label: '全部仓库' }, ...warehouseChoices.filter((w) => w !== 'all').map((w) => ({ value: w, label: w }))].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={styles.chip}
+                  data-warehouse-option={option.value}
+                  aria-pressed={(resolvedWarehouse ?? 'all') === option.value}
+                  disabled={dirty}
+                  onClick={() => switchWarehouse(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+              {dirty && <span className={styles.fieldHint}>有未保存修改：保存或放弃后才能切换仓库。</span>}
+            </div>
+          )}
+          {!historical && (
+            <BsSampleBusinessBlock
+              itemId={item.itemId}
+              sample={bsSample}
+              sampleError={bsSampleError ?? null}
+              warehouse={resolvedWarehouse}
+              onRetry={onRetry}
+              onOpenEvidence={onOpenEvidence ? () => onOpenEvidence() : undefined}
+              onShowAllWarehouses={showWarehouseSwitcher ? () => switchWarehouse('all') : undefined}
+            />
+          )}
+          {historical && (
+            <p className={styles.sectionNote} data-testid="catalog-inventory-historical">
+              历史版本不显示当前库存、当前价格与估算货值。
+              {onBackToCurrent ? (
+                <> {' '}
+                  <button type="button" className={demoStyles.textLink} onClick={onBackToCurrent}>返回当前资料</button>
+                </>
+              ) : null}
+            </p>
+          )}
+
+          {hasProcessingIssue && !historical && (attachmentInitial || attachmentLoad) && (
+            <section className={styles.processing} aria-label="相关处理入口" data-testid="catalog-processing-entry">
+              <h3 className={styles.sectionTitle}>相关处理</h3>
+              <p className={styles.sectionNote}>
+                该商品有{brushPending ? '来源待确认' : ''}{brushPending && item.newProductConfirmed && !item.iceCode ? '、' : ''}
+                {item.newProductConfirmed && !item.iceCode ? '新品待补货号' : ''}事项。
+              </p>
+              {attachmentInitial
+                ? <DetailAttachments {...attachmentInitial} itemId={item.itemId} fromHref={attachmentFromHref} />
+                : (
+                  <details className={styles.subDetails} onToggle={(event) => {
+                    if ((event.target as HTMLDetailsElement).open) void loadAttachments();
+                  }}>
+                    <summary>打开处理入口</summary>
+                    <div className={styles.subDetailsBody}>
+                      {attachmentsState === 'loading' && <p className={styles.sectionNote} role="status">正在读取处理入口…</p>}
+                      {attachmentsState === 'error' && (
+                        <p role="alert">
+                          {attachmentsError ?? '处理入口读取失败。'}
+                          {' '}
+                          <button type="button" className={demoStyles.textLink} onClick={() => void loadAttachments(true)}>重试</button>
+                        </p>
+                      )}
+                      {attachmentsState === 'ready' && attachments && (
+                        <DetailAttachments {...attachments} itemId={item.itemId} fromHref={attachmentFromHref} />
+                      )}
+                    </div>
+                  </details>
+                )}
+            </section>
+          )}
+          {onOpenEvidence && (
+            <p className={styles.sectionNote} data-testid="catalog-inventory-source-link">
+              库存来源：BigSeller（BS）样表与仓库范围。
+              {' '}
+              <button type="button" className={demoStyles.textLink} onClick={() => onOpenEvidence()}>查看数据来源</button>
+            </p>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+
+  const historyPanel = (
+    <div role="tabpanel" id="catalog-panel-history" aria-labelledby="catalog-tab-history" className={styles.sectionStack} data-testid="catalog-tabpanel-history">
+      <section className={styles.section} aria-label="变更记录">
+        <div className={styles.sectionHead}>
+          <div>
+            <h2 className={styles.sectionTitle}>资料修改</h2>
+          </div>
+          {historical && onBackToCurrent && (
+            <button type="button" className={styles.returnLink} data-testid="catalog-history-back-current" onClick={onBackToCurrent}>
+              返回当前资料
+            </button>
+          )}
+        </div>
+        <div className={styles.sectionBody}>
+          <p className={styles.sectionNote}>
+            当前查看：资料版本 <strong>{item.revision}</strong>{historical ? '（历史只读）' : '（当前）'}
+          </p>
+          {historyLoading && <p className={styles.sectionNote} role="status">加载变更记录…</p>}
+          {historyError && (
+            <p role="alert">
+              {historyError}{' '}
+              <button type="button" className={demoStyles.textLink} onClick={() => { setHistory([]); setHistoryEmptyConfirmed(false); setHistoryRetryToken((n) => n + 1); void loadHistory(true); }}>重试</button>
+            </p>
+          )}
+          {!historyLoading && historyEmptyConfirmed && history.length === 0 && (
+            <p className={styles.sectionNote} data-testid="catalog-history-empty">暂无历史版本记录。</p>
+          )}
+          <ul className={styles.historyList} data-testid="catalog-history-list">
+            {history.map((entry) => {
+              const display = entry.display;
+              return (
+                <li
+                  key={entry.revision}
+                  data-testid={`revision-history-${entry.revision}`}
+                  data-current={display.isCurrent ? 'true' : 'false'}
+                  className={styles.historyItem}
+                >
+                  <div className={styles.historyRow}>
+                    <strong className={styles.historyVersion}>版本 {entry.revision}</strong>
+                    {display.isCurrent ? (
+                      <span className={styles.historyCurrentBadge} data-testid="revision-current-badge">当前</span>
+                    ) : onSelectRevision ? (
+                      <button
+                        type="button"
+                        className={demoStyles.textLink}
+                        data-testid={`revision-switch-${entry.revision}`}
+                        onClick={() => onSelectRevision(entry.revision)}
+                      >
+                        查看此版本
+                      </button>
+                    ) : null}
+                  </div>
+                  <p className={styles.historyMeta} data-testid="revision-summary">
+                    {entry.iceCode ?? '待补货号'} · {entry.nameCn} · {display.kind === 'initial' ? '初始资料' : '人工修订'}
+                  </p>
+                  <p className={styles.historyMeta} data-testid="revision-reason">{display.reasonLabel}</p>
+                  {display.changedFields.length > 0 && (
+                    <ul className={styles.historyChanges} data-testid="revision-changed-fields">
+                      {display.changedFields.map((change) => (
+                        <li key={change.key}>{change.label}：{change.before || '（空）'} → {change.after || '（空）'}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className={styles.historyMeta}>
+                    记录时间 <span data-testid="revision-recorded-at">{display.recordedAtDisplay}</span>
+                    {display.actorLabel ? (
+                      <> {' · '}操作者 <span data-testid="revision-actor">{display.actorLabel}</span></>
+                    ) : null}
+                    {onOpenEvidence ? (
+                      <> {' · '}
+                        <button
+                          type="button"
+                          className={demoStyles.textLink}
+                          data-testid="revision-evidence-open"
+                          data-evidence-revision={entry.revision}
+                          onClick={() => onOpenEvidence(entry.revision)}
+                        >
+                          查看数据来源
+                        </button>
+                      </>
+                    ) : null}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
+      <section className={styles.section} aria-label="库存变化">
+        <div className={styles.sectionHead}>
+          <div>
+            <h2 className={styles.sectionTitle}>库存变化</h2>
+          </div>
+        </div>
+        <div className={styles.sectionBody}>
+          <p className={styles.sectionNote} data-testid="catalog-history-stock-note">暂无库存变化记录。</p>
+        </div>
+      </section>
+    </div>
+  );
+
+  return (
+    <div className={embedded ? styles.dialogFrame : styles.pageRoot}>
+      {pageHeader}
+      {tabBar}
+      <div
+        ref={activeBodyRef}
+        className={styles.detailBody}
+        data-detail-container={embedded ? 'dialog' : 'page'}
+        data-testid="catalog-detail-body"
+        role={embedded ? 'region' : undefined}
+        aria-label={embedded ? '商品详情内容' : undefined}
+        tabIndex={embedded ? 0 : undefined}
+      >
+        {notices}
+        {leavePromptNode}
+        {/* V4-03：概览只在商品资料首屏出现；库存/历史分区优先露出该分区实际业务内容。 */}
+        {!historical && section === 'material' && overview}
+        {section === 'material' && materialPanel}
+        {section === 'inventory' && inventoryPanel}
+        {section === 'history' && historyPanel}
+      </div>
+    </div>
+  );
+}
+
+/** 库存明细：BS 样表（海外）现有/锁定/可用/预留/在途；技术说明与原始证据已移出日常详情。 */
+function BsSampleBusinessBlock({
+  itemId,
+  sample,
+  sampleError,
+  warehouse,
+  onRetry,
+  onOpenEvidence,
+  onShowAllWarehouses,
+}: {
+  itemId: string;
+  sample: BsSampleDetail | null;
+  sampleError: { code: string; message: string } | null;
+  warehouse?: string;
+  onRetry?: () => void;
+  onOpenEvidence?: () => void;
+  onShowAllWarehouses?: () => void;
+}) {
+  if (sampleError) {
+    return (
+      <section className={styles.statusLine} role="alert" data-testid="catalog-bs-sample-error">
+        <span>
+          <strong>BS 样表库存读取失败：</strong>
+          {sampleError.message}
+          <span className={styles.overviewHint}>
+            {sampleError.code === 'forbidden' ? '权限不足，不是「尚未导入」，也不当作 0。' : '请重试；失败期间不以 0 或旧仓数据代替。'}
+          </span>
+        </span>
+        {/* R6：弹窗用内存重试（onRetry）；直链没有弹窗 loader，用整页刷新重试，避免失败后无就地恢复入口。 */}
+        {onRetry
+          ? <Button type="button" variant="outline" onClick={onRetry}>重试</Button>
+          : <DetailRetryButton label="重试库存读取" />}
+      </section>
+    );
+  }
+  if (sample?.status === 'not_imported') {
+    return <p className={styles.sectionNote} data-testid="catalog-bs-sample-not-imported">尚未载入 BS 样表库存数据；不当作 0。</p>;
+  }
+  if (sample?.status !== 'loaded') return null;
+  const exportLabel = typeof sample.exportLabel === 'string' ? sample.exportLabel : 'BS 样表';
+  const valuation = sample.valuation;
+  const rows = sample.rows as Array<Record<string, unknown>>;
+  const filtered = warehouse ? rows.filter((r) => r.warehouse === warehouse) : rows;
+  const confirmedRows = filtered.filter((r) => r.selectionState === 'confirmed');
+  const hasConfirmed = confirmedRows.length > 0;
+  const confirmedIsZero = hasConfirmed && valuation.confirmedOnHandTotal === '0';
+  const confirmedValue = !hasConfirmed
+    ? valuation.valuationReason?.includes('尚未建档')
+      ? 'BS 尚未建档（不是库存 0）'
+      : '没有已确认库存（不是 0）'
+    : valuation.confirmedOnHandTotal === '0'
+      ? '0 件（已确认为零）'
+      : valuation.confirmedOnHandTotal !== null
+        ? `${valuation.confirmedOnHandTotal} 件`
+        : (valuation.valuationReason ?? '库存不可确认');
+  return (
+    <section className={styles.sectionBody} aria-label="BS样表库存" data-testid="catalog-bs-sample-panel" data-warehouse-scope={warehouse ?? 'all'}>
+      <div className={styles.sectionHead} style={{ marginBottom: 0 }}>
+        <div>
+          <h3 className={styles.sectionTitle}>BS 样表库存（海外）</h3>
+          <p className={styles.sectionNote}>
+            样表日期：{exportLabel}
+          </p>
+        </div>
+        <p className={styles.sectionNote}>
+          当前仓库：<strong>{warehouse ?? '全部仓库'}</strong>
+          {warehouse && onShowAllWarehouses && (
+            <>
+              {' · '}
+              <button type="button" className={demoStyles.textLink} onClick={onShowAllWarehouses}>查看全部仓库</button>
+            </>
+          )}
+        </p>
+      </div>
+      {/* V4-03：库存分区先露实际明细行，再给汇总说明；短屏首屏不再只看到大卡片与说明。 */}
+      {!filtered.length && (
+        <p className={styles.sectionNote} data-testid="catalog-inventory-empty-reason">
+          {warehouse
+            ? '本仓没有 BS 样表行。这只表示本仓没有已确认记录，不表示仓库没有货，也不当作库存 0。'
+            : '暂无已确认 BS 样表行；不当作库存 0。'}
+        </p>
+      )}
+      {filtered.length > 0 && !hasConfirmed && (
+        <p className={styles.sectionNote} data-testid="catalog-inventory-empty-reason">
+          本仓有 BS 样表行，但没有已确认记录；未选择或未采用的行不计入库存。
+        </p>
+      )}
+      {confirmedIsZero && (
+        <p className={styles.sectionNote} data-testid="catalog-inventory-zero">
+          本仓已确认库存为 0 件（样表行明确记录 0）。
+        </p>
+      )}
+      {filtered.length > 0 && (
+        <div className={demoStyles.tableScroll}>
+          <table className={demoStyles.table} data-testid="catalog-bs-sample-inventory-table">
+            <thead><tr>
+              <th>仓库</th><th>来源 SKU</th><th>选择</th><th>现有</th><th>订单已锁</th><th>整仓可用</th><th>活动预留</th><th>在途</th>
+            </tr></thead>
+            <tbody>{filtered.map((r) => (
+              <tr key={`${String(r.excelRow)}-${String(r.warehouse)}`} data-testid={`bs-row-${String(r.warehouse)}-${String(r.sku)}`}>
+                <td>{String(r.warehouse)}</td><td>{String(r.sku)}</td><td>{bsSelectionLabel(String(r.selectionState))}</td>
+                <td data-testid="bs-on-hand">{qtyCell(r.onHand)}</td>
+                <td data-testid="bs-order-locked">{qtyCell(r.orderLocked)}</td>
+                <td data-testid="bs-warehouse-available">{qtyCell(r.warehouseAvailable)}</td>
+                <td data-testid="bs-activity-reserved">{qtyCell(r.activityReserved)}</td>
+                <td data-testid="bs-in-transit">{qtyCell(r.inTransit)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+      {!hasConfirmed && warehouse && (
+        <InventorySourceHint
+          itemId={itemId}
+          warehouse={warehouse}
+          onOpenEvidence={onOpenEvidence}
+        />
+      )}
+      <dl className={styles.facts}>
+        <div>
+          <dt>已确认样表行</dt>
+          <dd>{confirmedRows.length} 行</dd>
+        </div>
+        <div>
+          <dt>本范围已确认库存</dt>
+          <dd>{confirmedValue}</dd>
+        </div>
+        <div>
+          <dt>本范围已估值货值</dt>
+          <dd>
+            {!hasConfirmed
+              ? '不可估值（没有已确认库存）'
+              : valuation.valuationState === 'valued' && valuation.estimatedValueCny !== null
+                ? <strong data-testid="bs-estimated-value">{formatCnyValue(valuation.estimatedValueCny) ?? `¥${valuation.estimatedValueCny}`}</strong>
+                : (valuation.valuationReason ?? '不可估值（不当作 0）')}
+          </dd>
+        </div>
+      </dl>
+      <p className={styles.sectionNote} data-testid="catalog-inventory-transit-note">
+        在途为 BS 来源观测值，不是业务在途。
+      </p>
     </section>
-  </div>;
+  );
 }

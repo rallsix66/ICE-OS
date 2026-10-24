@@ -128,8 +128,8 @@ function buildRow(
 
 function classifyReadError(error: unknown): CatalogDisplayReadError {
   const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: string }).code) : '';
-  if (code === '42501') return new CatalogDisplayReadError('forbidden', '应用身份无权读取 BS 样表库存投影', error);
-  return new CatalogDisplayReadError('read_failed', 'BS 样表库存投影读取失败', error);
+  if (code === '42501') return new CatalogDisplayReadError('forbidden', '应用身份无权读取 BS 样表库存', error);
+  return new CatalogDisplayReadError('read_failed', 'BS 样表库存读取失败', error);
 }
 
 type DisplayPreload = {

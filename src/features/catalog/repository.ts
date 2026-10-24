@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { withAppDb, type DbIdentity } from '@/lib/database/app-db';
 import { normalizeName, scopeObservationsForItemAudit, wouldMatchItemCandidate } from './candidate-service';
+import type { CatalogRequestReceipt } from './reconcile';
 import type { CatalogItemDto, CatalogItemRevisionDto, FieldObservation, PreparedBaseline, PreparedFrozenObservations, PreparedFinancial, SourceSystem } from './types';
 
 export interface CatalogRelease {
@@ -67,6 +68,15 @@ const itemSelect = `SELECT i.id AS item_id,r.revision,r.ice_code_snapshot,i.new_
  coalesce(choice_counts.jushuitan, 0)::text AS jushuitan
  FROM catalog.catalog_item i
  JOIN catalog.item_current c ON c.item_id = i.id
+ JOIN catalog.item_revision r ON r.item_id = i.id
+ ${choiceCountsJoin}`;
+
+/** 全部版本行（含历史审计原值）；只由服务端使用，日常投影另经 history-display 收敛。 */
+const revisionHistorySelect = `SELECT i.id AS item_id,r.revision,r.ice_code_snapshot,i.new_product_confirmed,r.name_cn,r.fields,r.evidence_ref,
+ r.reason,r.actor_id,r.recorded_at,
+ coalesce(choice_counts.bigseller, 0)::text AS bigseller,
+ coalesce(choice_counts.jushuitan, 0)::text AS jushuitan
+ FROM catalog.catalog_item i
  JOIN catalog.item_revision r ON r.item_id = i.id
  ${choiceCountsJoin}`;
 
@@ -291,15 +301,38 @@ export const catalogRepository = {
   async history(identity: DbIdentity, itemId: string): Promise<CatalogItemRevisionDto[]> {
     return withAppDb(identity, async (c) => {
       await c.query('SELECT catalog.require_admin()');
-      const historySelect = `SELECT i.id AS item_id,r.revision,r.ice_code_snapshot,i.new_product_confirmed,r.name_cn,r.fields,r.evidence_ref,
- r.reason,r.actor_id,r.recorded_at,
- coalesce(choice_counts.bigseller, 0)::text AS bigseller,
- coalesce(choice_counts.jushuitan, 0)::text AS jushuitan
- FROM catalog.catalog_item i
- JOIN catalog.item_revision r ON r.item_id = i.id
- ${choiceCountsJoin}`;
-      const result = await c.query<RevisionRow>(`${historySelect} WHERE i.id=$1 ORDER BY r.revision DESC`, [itemId]);
+      const result = await c.query<RevisionRow>(`${revisionHistorySelect} WHERE i.id=$1 ORDER BY r.revision DESC`, [itemId]);
       return result.rows.map(revisionDto);
+    });
+  },
+  async historyRevision(identity: DbIdentity, itemId: string, revision: number): Promise<CatalogItemRevisionDto | null> {
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const result = await c.query<RevisionRow>(`${revisionHistorySelect} WHERE i.id=$1 AND r.revision=$2`, [itemId, revision]);
+      return result.rows[0] ? revisionDto(result.rows[0]) : null;
+    });
+  },
+  /** 当前版本号（item_current），用于判定历史行是否“当前”；不存在返回 null。 */
+  async currentRevision(identity: DbIdentity, itemId: string): Promise<number | null> {
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const { rows } = await c.query<{ revision: number }>('SELECT revision FROM catalog.item_current WHERE item_id=$1', [itemId]);
+      return rows[0] ? rows[0].revision : null;
+    });
+  },
+  /**
+   * 操作者显示名：只读 public.profiles（真实用户表，item_revision.actor_id 有 FK 约束）。
+   * 返回不到的 id 不在结果里；调用方据此输出 null，绝不回传 UUID。
+   */
+  async profileDisplayNames(identity: DbIdentity, actorIds: string[]): Promise<Map<string, string>> {
+    const ids = [...new Set(actorIds.filter((id) => /^[a-f\d-]{36}$/i.test(id)))];
+    if (!ids.length) return new Map();
+    return withAppDb(identity, async (c) => {
+      await c.query('SELECT catalog.require_admin()');
+      const { rows } = await c.query<{ id: string; display_name: string | null }>(
+        'SELECT id, display_name FROM public.profiles WHERE id = ANY($1::uuid[])', [ids]);
+      return new Map(rows.filter((row) => typeof row.display_name === 'string' && row.display_name.trim())
+        .map((row) => [row.id, row.display_name as string]));
     });
   },
   async bsNotCreatedItemIds(identity: DbIdentity): Promise<Set<string>> {
@@ -509,10 +542,19 @@ export const catalogRepository = {
   async evidence(identity: DbIdentity, artifactId: string): Promise<EvidenceArtifact | null> {
     return withAppDb(identity, (c) => rpc(c, 'read_artifact', [artifactId]));
   },
-  async request(identity: DbIdentity, requestId: string): Promise<{ action: string; result: unknown } | null> {
+  /**
+   * 只读回执查询：request_id + actor_id（不跨用户枚举）。itemId 用于调用方核对请求范围。
+   * 只 SELECT，不写 audit_event、不重放原请求。
+   */
+  async request(identity: DbIdentity, requestId: string): Promise<CatalogRequestReceipt | null> {
     return withAppDb(identity, async (c) => {
       await c.query('SELECT catalog.require_admin()');
-      return (await c.query('SELECT action,result FROM catalog.audit_event WHERE request_id=$1 AND actor_id=$2', [requestId, identity.profileUserId])).rows[0] ?? null;
+      const { rows } = await c.query<{ action: string; item_id: string | null; intent_sha256: string | null; result: unknown }>(
+        'SELECT action,item_id,intent_sha256,result FROM catalog.audit_event WHERE request_id=$1 AND actor_id=$2',
+        [requestId, identity.profileUserId],
+      );
+      const row = rows[0];
+      return row ? { action: row.action, itemId: row.item_id, intentSha256: row.intent_sha256, result: row.result } : null;
     });
   },
   async importBsSampleInventory(identity: DbIdentity, requestId: string, prepared: Record<string, unknown>): Promise<{ exportId: string; rowCount: number; confirmedRows: number; unselectedRows: number }> {

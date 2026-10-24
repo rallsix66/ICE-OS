@@ -50,6 +50,21 @@ export function warehouseScopeView(
   if (notCreatedBs) {
     return { confirmedOnHandTotal: null, estimatedValueCny: null, valuationState: 'not_applicable', valuationReason: 'BS尚未建档（本批用户确认），不显示为库存0', confirmedLineCount };
   }
+  /*
+   * V5-01/V5-02：没有已确认行不是“已确认库存 0”。
+   * 真实零库存要求至少一条 confirmed 行且数量明确为 0；未选择/未采用的样表行只保留记录，不计入库存。
+   */
+  if (confirmedLineCount === 0) {
+    return {
+      confirmedOnHandTotal: null,
+      estimatedValueCny: null,
+      valuationState: 'no_inventory',
+      valuationReason: anyLine
+        ? '本范围有 BS 样表行，但无已确认记录（不当作 0）'
+        : '无已确认 BS 样表记录（不当作 0）',
+      confirmedLineCount: 0,
+    };
+  }
   if (!amountAllowed) {
     return { confirmedOnHandTotal: onHandTotal === null ? null : formatQuantity(onHandTotal), estimatedValueCny: null, valuationState: 'not_applicable', valuationReason: '当前会话无金额读取权限', confirmedLineCount };
   }
