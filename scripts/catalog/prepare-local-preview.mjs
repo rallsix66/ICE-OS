@@ -13,6 +13,7 @@ const LOCAL_SQL = [
   'db/catalog/011_local_display_read_rpc.sql',
   'db/catalog/012_local_display_table_rls.sql',
   'db/catalog/013_baseline_amounts_batch.sql',
+  'db/catalog/015_product_source_sync.sql',
 ];
 
 async function applyCatalogSql(run) {

@@ -37,6 +37,10 @@ export const CATALOG_FIELD_LABELS: Record<string, string> = {
   shelfLifeDays: '有效期（天）',
   factoryLeadDays: '工厂生产货期（天）',
   shippingDays: '运输时间（海运预估）',
+  /** 飞书商品来源快照的静态资料列（只展示原文，不作版本/修改时间，也不换算单位）。 */
+  iceCode: '聚水潭内部货号',
+  sourceDate: '来源日期',
+  sourceNote: '来源备注',
   /** 旧字段名：本批冻结输入没有这些列。保留独立标签，不与 length / unitWeight 混用。 */
   depth: '深度（旧字段，未映射）',
   weight: '重量（旧字段，未映射）',

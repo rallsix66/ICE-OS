@@ -1,0 +1,102 @@
+{
+  "contract": "ice-product-source-snapshot-v1",
+  "profileKey": "feishu.ice-product-library.sheet1",
+  "document": {
+    "title": "ICE产品库 - 飞书云文档",
+    "wikiNodeKey": "TC2AwLgRniqWKhkg9D2cEx79n0b",
+    "spreadsheetToken": "EMZGs2eIhh0YQ1tPIqMcR8SPnQh",
+    "sheetId": "33bab4",
+    "worksheetTitle": "Sheet1",
+    "sourceUrl": "https://ygr1tb7cyf.feishu.cn/wiki/TC2AwLgRniqWKhkg9D2cEx79n0b",
+    "documentModifiedLabel": "最新修改时间为10月20日",
+    "readOnlyLabel": "只能阅读",
+    "note": "wiki 节点与 spreadsheet_token/sheet_id 为用户确认事实；匿名读取只能看到 Sheet1 与表头，本轮未由 API 复核 token。"
+  },
+  "capture": {
+    "method": "web_clipboard_copy",
+    "requestedRange": "A1:AE404",
+    "observedRange": "A1:AE404",
+    "startedAt": "2026-10-25T03:58:00.546Z",
+    "endedAt": "2026-10-25T03:58:26.232Z",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/134.0.6998.35 Safari/537.36",
+    "rawCaptureSha256": "89e265f549ecc4f6badcf8b2f6d6e05956ecfe701dc4141771f5416dc2e63b6f",
+    "rawCaptureBytes": 34749,
+    "consoleErrorCount": 20
+  },
+  "grid": {
+    "gridRows": 404,
+    "gridColumns": 31,
+    "headerRow": 1,
+    "dataRowCount": 403,
+    "storedRowCount": 403,
+    "businessRowCount": 131,
+    "emptyRowCount": 272,
+    "uniqueCodeCount": 125,
+    "duplicateCodes": [
+      "WM0069",
+      "WM0070",
+      "WM0071",
+      "WM0072",
+      "WM0073"
+    ],
+    "rowsWithoutCode": [
+      122
+    ],
+    "headers": {
+      "A": "日期",
+      "B": "中文产品名称",
+      "C": "规格",
+      "D": "英文名称",
+      "E": "生产工厂",
+      "F": "产品图片",
+      "G": "聚水潭内部货号",
+      "H": "69商品编码",
+      "I": "成本价格",
+      "J": "运营价格",
+      "K": "备注",
+      "L": "长(单产品/cm）",
+      "M": "宽(单产品/cm）",
+      "N": "高(单产品/cm）",
+      "O": "单个产品重量(kg）",
+      "P": "装箱数量",
+      "Q": "装箱长",
+      "R": "装箱宽",
+      "S": "装箱高",
+      "T": "单箱重量",
+      "U": "是否液体",
+      "V": "有效期（天数)",
+      "W": "单箱立方",
+      "X": "单瓶立方",
+      "Y": "单品运费（自由计算列）",
+      "Z": "工厂生产货期(天）",
+      "AA": "运输时间（海运预估）",
+      "AB": "",
+      "AC": "",
+      "AD": "",
+      "AE": ""
+    }
+  },
+  "files": {
+    "rawCaptureTsv": "snapshot-001-real.capture.tsv",
+    "rawCaptureMetadata": "snapshot-001-real.capture-metadata.json",
+    "fullSnapshot": "snapshot-001-real.json",
+    "redactedFixtureInOutDir": "fixture-snapshot-001-redacted.json",
+    "redactedFixtureInRepo": "snapshot-001-redacted.json"
+  },
+  "hashes": {
+    "fullSnapshotSha256": "4687a86497d2d05cc509257cd8109be3c2e7440e9240f136615a4beb14705c62",
+    "redactedSnapshotSha256": "f0ab3cbafd1d04cf116bd5dedbeab292f5228e091ff911c78d0f478094b57c16",
+    "rawCaptureSha256": "89e265f549ecc4f6badcf8b2f6d6e05956ecfe701dc4141771f5416dc2e63b6f"
+  },
+  "restricted": {
+    "columns": [
+      "I",
+      "J",
+      "Y"
+    ],
+    "note": "成本价格/运营价格/单品运费只保存在 .local 的完整快照 cells 中；仓库 fixture 已置空并标记 redaction。价格不进入商品字段、差异计划、待核对明细或页面。"
+  },
+  "fixtures": {
+    "testSnapshot": "tests/catalog/fixtures/product-source/snapshot-001-redacted.json"
+  }
+}

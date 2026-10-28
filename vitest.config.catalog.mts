@@ -19,6 +19,7 @@ export default defineConfig({
       'tests/catalog/warehouse-valuation.test.ts',
       'tests/catalog/candidate-pool-equivalence.postgres.test.ts',
       'tests/catalog/perf-fixture-enrichment.postgres.test.ts',
+      'tests/catalog/product-source-db.postgres.test.ts',
     ],
     fileParallelism: false,
     testTimeout: 120_000,

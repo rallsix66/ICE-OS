@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { getSourceIdentityWorkspace } from '@/features/catalog/source-identity/service';
 import { SourceIdentityWorkspace } from '@/features/catalog/components/source-identity-panel';
+import { ProductSourcePanel, ProductSourcePanelFallback } from '@/features/catalog/components/product-source-panel';
+import type { ProductSourcePanelDto } from '@/features/catalog/product-source/panel-types';
+import { getProductSourcePanel } from '@/features/catalog/product-source/service';
+import panelStyles from '@/features/catalog/components/product-source-panel.module.css';
 import { LegacyEntryGuidance, type LegacyEntryState } from '@/features/catalog/issues/legacy-entry-guidance';
 import { getCatalogItemLabel, getLegacyEntryItemContext } from '@/features/catalog/issues/service';
 import { classifyCatalogReadFailure } from '@/features/catalog/issues/entry-state';
@@ -10,6 +14,22 @@ import { isIssuesReturnHref, safeInternalReturnHref } from '@/features/catalog/i
 // 未启用 / 无权限 / 读取失败时给中文安全引导，不 404、不删能力、不把未启用写成“0 项”。
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+/**
+ * 飞书商品来源（本地模拟）面板：独立于旧“来源核实”模块的启用状态挂载在本页下方。
+ * 读取失败/无权限时给中文降级说明（不显示数量、不当作 0 条），不伪造空批次。
+ */
+async function FeishuProductSourceSection() {
+  let dto: ProductSourcePanelDto | null = null;
+  let reason: 'forbidden' | 'read_failed' = 'read_failed';
+  try {
+    dto = await getProductSourcePanel();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    reason = /无权|权限|停用|登录|FORBIDDEN|DENIED|42501/i.test(message) ? 'forbidden' : 'read_failed';
+  }
+  return dto ? <ProductSourcePanel dto={dto} /> : <ProductSourcePanelFallback reason={reason} />;
+}
 
 const UUID = /^[a-f\d-]{36}$/i;
 
@@ -89,19 +109,25 @@ export default async function SourceIdentityPage({
           itemId={itemId}
           focusRecordId={recordId && (locatedRecord || locatedLink) ? recordId : undefined}
         />
+        <FeishuProductSourceSection />
       </main>
     );
   }
   const itemContext = state === 'disabled' && itemId ? await getLegacyEntryItemContext(itemId) : null;
   return (
-    <LegacyEntryGuidance
-      moduleKey="source_identity"
-      title="来源核实"
-      lede="来源身份与观测核实的旧链接仍然可用：模块启用且已授权时这里是原处理页，否则本页给出安全引导并保留原有处理能力；相关事项集中到商品库「待处理」索引。"
-      state={state}
-      itemId={itemId}
-      itemContext={itemContext}
-      returnHref={returnHref}
-    />
+    <>
+      <LegacyEntryGuidance
+        moduleKey="source_identity"
+        title="来源核实"
+        lede="来源身份与观测核实的旧链接仍然可用：模块启用且已授权时这里是原处理页，否则本页给出安全引导并保留原有处理能力；相关事项集中到商品库「待处理」索引。"
+        state={state}
+        itemId={itemId}
+        itemContext={itemContext}
+        returnHref={returnHref}
+      />
+      <div className={panelStyles.pageMount}>
+        <FeishuProductSourceSection />
+      </div>
+    </>
   );
 }
