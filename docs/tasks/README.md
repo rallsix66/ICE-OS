@@ -1,6 +1,8 @@
-# DIS 任务执行体系
+# ICEOS 任务执行体系
 
-本目录用于把项目拆成适合 AI 单次会话执行的小任务，避免一次处理整个模块造成上下文过载、范围漂移和遗漏。
+本目录按可独立验收的业务结果组织任务，控制范围、依赖和交付标准。完整任务可分内部步骤、跨会话接续完成，不因会话结束或内部步骤完成而重复要求批准。
+
+当前入口为[current-task.md](./current-task.md)。当前 **INVENTORY_SYNC_UI_V1_LOCAL_PASS**（2026-10-28主审独立复审通过）；[独立报告](../../.local/inventory-sync-ui-tail-independent-20261028/independent-review.md)、[尾项验收说明](./inventory-sync-ui-v1-tail-repair-acceptance.md)。T1–T3已关闭，无剩余功能修复包；历史任务、数据和证据保留。
 
 ## 文档层级
 
@@ -8,8 +10,10 @@
 mvp-roadmap.md          长期 Phase 与依赖
 tasks/phase-*.md        每个业务模块的任务顺序
 tasks/current-task.md   当前唯一允许执行的 Task Packet
-tasks/p0-02/2026-10-15-delivery-rework.md  P0-02 审查返工正式包（现役）
-tasks/system-optimization-roadmap-2026-07-17.md  当前工程治理路线与安全边界
+tasks/inventory-sync-ui-v1.md  当前库存双视图与同步界面任务
+tasks/inventory-sync-v1.md  早期库存与自动同步任务记录
+tasks/p0-02/2026-10-15-delivery-rework.md  P0-02 历史返工包
+tasks/system-optimization-roadmap-2026-07-17.md  历史工程治理记录
 current-state.md        当前真实状态与当前 Task ID
 ```
 
@@ -41,9 +45,9 @@ Claude 每次会话只执行 `current-task.md` 中的一个 Task Packet。
 - **验证命令**：至少包括相关检查，必要时运行 lint/build
 - **停止条件**：完成后停止，不自动进入下一任务
 
-任务包应控制在一次 Claude 会话可以完成并总结的范围内。若预计涉及多个页面、数据库变更和复杂交互，必须继续拆分。
+任务包应围绕一个可使用的业务结果控制范围；涉及页面、数据库与后台时可拆成内部步骤，保留接续记录，完整交付后集中独立审查，不把只有页面、脚手架或文档当作业务完成。
 
-## 模块任务树
+## 历史模块任务树
 
 | 模块 | 文件 | 状态 |
 |---|---|---|
