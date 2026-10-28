@@ -1,6 +1,6 @@
 # 商品库存与 BigSeller 自动同步 v1（实现与运行说明）
 
-更新：2026-10-28。当前状态：**`INVENTORY_SYNC_UI_V1_LOCAL_PASS`**（2026-10-28 主审独立复审通过）；读取速度 `INVENTORY_RESPONSE_SPEED_V1_LOCAL_PASS` 与 BigSeller 本机接入 `BS_LIVE_INTAKE_V1_LOCAL_PASS` 已收尾。日常运行、恢复与输入依赖见 §0.11。
+更新：2026-10-28。当前状态：功能验收 **`INVENTORY_SYNC_UI_V1_LOCAL_PASS`**（2026-10-28 主审独立复审通过），文档与 Git 收尾同日完成（**`INVENTORY_SYNC_UI_V1_DOCS_GIT_CLOSED`**）；读取速度 `INVENTORY_RESPONSE_SPEED_V1_LOCAL_PASS` 与 BigSeller 本机接入 `BS_LIVE_INTAKE_V1_LOCAL_PASS` 已收尾。日常运行、恢复与输入依赖见 §0.11。
 
 ## 0.11 2026-10-28 收尾交接：职责、日常入口、恢复与输入依赖
 
@@ -27,6 +27,7 @@
 - 构建链：`scripts/catalog/build-preview-workspace.mjs` → `scripts/catalog/promote-preview-build.mjs` → 启动上一条命令；就绪与 PID 记录在实例 `instance/preview-build-ready.json`、`instance/preview-server.json`。
 - 恢复材料：[尾轮回退说明](../../.local/inventory-sync-ui-tail-repair-20261028/RESTORE-NOTE.md)（网页回退到 `next-build-6f89fe4d79f3f950`、016 回退脚本 `rollback/rollback-sql.mjs` dry-run 已验）、[保护说明](../../.local/inventory-sync-ui-tail-repair-20261028/PROTECTION.md)、[上一轮恢复说明](../../.local/inventory-sync-ui-v1-20261027/RESTORE-NOTE.md)。21 个 `next-build-*`、3042 旧预览（pid 14028）和全部历史证据保留，未清场。
 - 不要为恢复重启 worker 或改 60 分钟计划、7 仓范围、430 条正式对应与库存事实；本轮修复没有动这些。
+- Git：2026-10-28 已把自 `1bd0cb8` 以来未提交的已验收实现按依赖顺序提交并普通推送 `origin/codex/ice-v4-planning`（含本收尾文档提交；本地与远端一致，未 force/合并/部署/清场）。`.local`、私有输入、数据库与构建产物未入库；工作区仅剩未跟踪的 `.local`。完整提交号与推送核验见 `.local/inventory-sync-ui-git-closeout-20261028/closeout-record.md`（本地证据不入库）。
 
 ### 国内快照的本地输入依赖（私有，不入库）
 

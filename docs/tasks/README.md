@@ -2,7 +2,7 @@
 
 本目录按可独立验收的业务结果组织任务，控制范围、依赖和交付标准。完整任务可分内部步骤、跨会话接续完成，不因会话结束或内部步骤完成而重复要求批准。
 
-当前入口为[current-task.md](./current-task.md)。当前 **INVENTORY_SYNC_UI_V1_LOCAL_PASS**（2026-10-28主审独立复审通过）；[独立报告](../../.local/inventory-sync-ui-tail-independent-20261028/independent-review.md)、[尾项验收说明](./inventory-sync-ui-v1-tail-repair-acceptance.md)。T1–T3已关闭，无剩余功能修复包；历史任务、数据和证据保留。
+当前入口为[current-task.md](./current-task.md)。当前 **INVENTORY_SYNC_UI_V1_DOCS_GIT_CLOSED**（功能验收 **INVENTORY_SYNC_UI_V1_LOCAL_PASS**，2026-10-28主审独立复审通过；文档与 Git 收尾同日完成）；[独立报告](../../.local/inventory-sync-ui-tail-independent-20261028/independent-review.md)、[尾项验收说明](./inventory-sync-ui-v1-tail-repair-acceptance.md)、[运行与交接 §0.11](../inventory/inventory-sync-v1.md)。T1–T3已关闭，无剩余功能修复包；历史任务、数据和证据保留，`.local` 与私有输入未入库。
 
 ## 文档层级
 

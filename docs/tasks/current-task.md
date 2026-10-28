@@ -1,14 +1,16 @@
 # Current Task Packet
 
-## 当前任务：商品库存与同步 UI v1 已本地通过
+## 当前任务：商品库存与同步 UI v1 已本地通过，文档与 Git 已收尾
 
-2026-10-28 主审独立复审通过：**`INVENTORY_SYNC_UI_V1_LOCAL_PASS`**。T1–T3 全部关闭，本包不再新增功能返工；已通过布局、分页、采用身份、PH 双码提示和草稿语义沿用。 [独立报告](../../.local/inventory-sync-ui-tail-independent-20261028/independent-review.md)、[尾项验收说明](inventory-sync-ui-v1-tail-repair-acceptance.md)。
+2026-10-28 主审独立复审通过：**`INVENTORY_SYNC_UI_V1_LOCAL_PASS`**（收尾状态 **`INVENTORY_SYNC_UI_V1_DOCS_GIT_CLOSED`**）。T1–T3 全部关闭，本包不再新增功能返工；已通过布局、分页、采用身份、PH 双码提示和草稿语义沿用。 [独立报告](../../.local/inventory-sync-ui-tail-independent-20261028/independent-review.md)、[尾项验收说明](inventory-sync-ui-v1-tail-repair-acceptance.md)。
 
 主审真实点击确认：未知市场/指定海外仓详情不混国内；仅国内 WM0026 仍为 5,100（文件 2026-10-15），全部无筛选仍分区。旧量 247 与旧 16:22 时间通过独立单个只读受控链（非正式库自然缺行）。同步任务点击/刷新/切换后标题均位于 720px 视口顶部约 13.2px，计划时间正确随所选任务变化，手动收起正常。
 
 现役 3011 BUILD **`ElaITcTkEMZyYxyRD1CaS`**，源码/编译快照 `6f0faba622bd53ae…`、417 产物独立一致、无漂移；现役 read_inventory_item 与当前 016 一致（定义 `8e78ba3b…`，文件 `55922bc9…`）。原全表/映射/性能等可信证据沿用，未重复全套。
 
-通过仅限批准的本机库存双视图与同步 UI，不是公网发布、全 ICEOS 验收、未来员工权限或新 API 接入完成。审查未改业务/SQL/worker/计划/正式对应/库存事实，未保存设置或手动同步。保留所有数据、原表、旧构建、隔离库、脏文件和历史证据；未提交/推送/合并/部署/清场/写长期记忆。
+通过仅限批准的本机库存双视图与同步 UI，不是公网发布、全 ICEOS 验收、未来员工权限或新 API 接入完成。审查未改业务/SQL/worker/计划/正式对应/库存事实，未保存设置或手动同步。保留所有数据、原表、旧构建、隔离库、脏文件和历史证据。
+
+文档与 Git 收尾（2026-10-28）：已按依赖顺序提交并普通推送 `origin/codex/ice-v4-planning`（本地与远端一致，未 force/合并/部署/清场）；`.local`、私有输入、数据库与构建产物未入库。提交范围、日常入口、构建/启动/恢复材料与国内快照输入依赖见[库存与自动同步实现/运行说明 §0.11](../inventory/inventory-sync-v1.md)。
 
 **当前无剩余执行包。** 原 T1–T3 清单为已关闭历史；继续日常使用与人工体验，新需求另定范围，不自动新增功能或发布。
 
