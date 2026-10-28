@@ -10,9 +10,7 @@ import type { CatalogListClientPayload, CatalogListClientRow } from '../local-di
 import type { useCatalogUrlState } from '../shell/use-catalog-url-state';
 import { buildCatalogListPath } from '../shell/catalog-url-params';
 import {
-  allWarehouseAuthorityMatches,
   authoritativeExpectedFromList,
-  deriveWarehouseView,
   detailScopeFromView,
   expectedScopeFromListRow,
   listAuthorityMatchesLoadedScope,
@@ -346,16 +344,6 @@ function CatalogDetailLoader({
       onWarehouseChange(next);
       return;
     }
-    const allEntry = readDetailCache({ itemId: detailId, warehouse: 'all' }, cacheContext);
-    if (allEntry && allWarehouseAuthorityMatches(allEntry.view, listRow, cacheContext)) {
-      const derived = deriveWarehouseView({ view: allEntry.view, target: nextNorm, listRow, context: cacheContext });
-      if (derived) {
-        applyCached(writeDetailCache(derived, nextNorm, cacheContext));
-        skipNextWarehouseEffect.current = true;
-        onWarehouseChange(next);
-        return;
-      }
-    }
     onWarehouseChange(next);
   };
 
@@ -418,22 +406,12 @@ function CatalogDetailLoader({
         requestSeq.current += 1;
       };
     }
-    /* V3-03：已取得全仓明细时，本地筛仓并使用同版本对应汇总，不重取整份商品资料。 */
-    const allEntry = readDetailCache({ itemId: detailId, warehouse: 'all' }, cacheContext);
-    if (allEntry && allWarehouseAuthorityMatches(allEntry.view, listRow, cacheContext)) {
-      const derived = deriveWarehouseView({ view: allEntry.view, target: warehouseNorm, listRow, context: cacheContext });
-      if (derived) {
-        const entry = writeDetailCache(derived, warehouseNorm, cacheContext);
-        queueMicrotask(() => { if (seq === requestSeq.current) applyCached(entry); });
-        return () => { requestSeq.current += 1; };
-      }
-    }
     runFetch(warehouseFilter, Boolean(viewRef.current), seq);
     return () => {
       requestSeq.current += 1;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch keyed by detailId + revision + warehouseNorm + cacheContext + list projection
-  }, [detailId, revision, revisionAttempt, revisionInvalid, isHistorical, warehouseNorm, warehouseFilter, listRow?.itemRevision, listRow?.bsSample.confirmedOnHandTotal, listRow?.bsSample.estimatedValueCny, listRow?.inventoryProjectionByWarehouse, cacheContext.principalKey, cacheContext.amountAllowed, cacheContext.displayBasisSha256]);
+  }, [detailId, revision, revisionAttempt, revisionInvalid, isHistorical, warehouseNorm, warehouseFilter, listRow?.itemRevision, listRow?.inventory.knownSubtotal, listRow?.inventory.hasPendingTotal, listRow?.inventoryProjectionByWarehouse, cacheContext.principalKey, cacheContext.amountAllowed, cacheContext.displayBasisSha256]);
 
   /* ---- 来源与证据：同一弹窗内容区子视图（授权后按需读取） ---- */
   const savedScrollRef = useRef(0);

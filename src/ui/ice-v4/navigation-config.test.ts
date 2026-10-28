@@ -24,9 +24,12 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
   const sourcesSrc = fs.readFileSync(SOURCES_PAGE, 'utf8');
   const intakeSrc = fs.readFileSync(INTAKE_PAGE, 'utf8');
 
-  it('一级常驻导航只有 ICE 商品库', () => {
-    expect(ICE_V4_ACTIVE_NAV_HREFS).toEqual(['/dashboard/catalog']);
-    expect(navBlock).toContain("href: '/dashboard/catalog'");
+  it('一级常驻导航登记商品库与两个库存业务入口', () => {
+    // INV_SYNC_V1：/dashboard/sync 与 /dashboard/inventory 由本包重新实现为常驻入口。
+    expect(ICE_V4_ACTIVE_NAV_HREFS).toEqual(['/dashboard/catalog', '/dashboard/inventory', '/dashboard/sync']);
+    for (const href of ICE_V4_ACTIVE_NAV_HREFS) {
+      expect(navBlock).toContain(`href: '${href}'`);
+    }
     for (const href of [
       '/dashboard/catalog/admin',
       '/dashboard/catalog/issues',
@@ -116,15 +119,24 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
     expect(fs.readFileSync(ISSUES_PAGE, 'utf8')).toContain('getCatalogIssueIndex');
   });
 
-  it('workspace-shell 侧栏不含封存经营模块入口', () => {
-    expect(shellSrc).not.toContain("href: '/dashboard/sync'");
+  it('workspace-shell 侧栏不含仍未开放的封存经营模块入口', () => {
     expect(shellSrc).not.toContain("href: '/dashboard/shipments'");
     expect(shellSrc).not.toContain('HideDashboardChrome');
     expect(shellSrc).not.toContain("href: '/dashboard/users'");
+    // 本包新增的两个入口必须在侧栏里（不是“只有页面可达”）。
+    expect(navBlock).toContain("href: '/dashboard/inventory'");
+    expect(navBlock).toContain("href: '/dashboard/sync'");
   });
 
-  it('登记 legacy 入口处置表', () => {
+  it('登记 legacy 入口处置表（含本包三段旧库存地址的安全引导）', () => {
     expect(LEGACY_ROUTE_DISPOSITION['/dashboard'].target).toBe('/dashboard/catalog');
     expect(LEGACY_PRODUCTS_LIST_HREF).toBe('/dashboard/products');
+    for (const href of ['/dashboard/inventory/domestic', '/dashboard/inventory/overseas', '/dashboard/inventory/in-transit']) {
+      const disposition = LEGACY_ROUTE_DISPOSITION[href as keyof typeof LEGACY_ROUTE_DISPOSITION] as { action: string; target?: string };
+      expect(disposition.action).toBe('guidance');
+      expect(disposition.target).toBe('/dashboard/inventory');
+    }
+    // /dashboard/sync 已重新实现为现役页面，不能再登记为封存旧入口。
+    expect(Object.keys(LEGACY_ROUTE_DISPOSITION)).not.toContain('/dashboard/sync');
   });
 });

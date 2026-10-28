@@ -4,7 +4,7 @@ import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: 'ICE 经营工作台',
-  description: 'ICE v4 本地独立平台 — 商品资料、样表库存与来源核实',
+  description: 'ICE v4 本地独立平台 — 商品资料、BigSeller 库存与来源核实',
 };
 
 export default function RootLayout({

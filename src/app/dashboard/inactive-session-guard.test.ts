@@ -142,20 +142,23 @@ describe('InactiveAccountPage 组件', () => {
   });
 });
 
-// ─── 现役导航 — 旧 sync 写入口已随 legacy 封存 ─────────────────────
+// ─── 现役导航 — 本包新增商品库存/数据同步入口，其余经营模块仍封存 ─────
 
-describe('现役导航配置 — 不含封存经营模块', () => {
+describe('现役导航配置 — 仅开放本包两个库存入口', () => {
   const navSrc = readFile(NAV_CONFIG_PATH);
   const shellSrc = readFile(path.resolve(ROOT, 'src/ui/ice-v4/workspace-shell.tsx'));
 
-  it('ICE_V4_ACTIVE_NAV_HREFS 仅登记商品库模块', () => {
+  it('ICE_V4_ACTIVE_NAV_HREFS 登记商品库与商品库存/数据同步', () => {
     const activeBlock = navSrc.match(/ICE_V4_ACTIVE_NAV_HREFS\s*=\s*\[([\s\S]*?)\]\s*as const/)?.[1] ?? '';
     expect(activeBlock).toContain('/dashboard/catalog');
-    expect(activeBlock).not.toContain('/dashboard/sync');
+    expect(activeBlock).toContain('/dashboard/inventory');
+    expect(activeBlock).toContain('/dashboard/sync');
+    expect(activeBlock).not.toContain('/dashboard/shipments');
   });
 
-  it('workspace-shell 侧栏不含封存 href', () => {
-    expect(shellSrc).not.toContain("href: '/dashboard/sync'");
+  it('workspace-shell 侧栏不加载其它封存经营模块', () => {
+    expect(shellSrc).toContain("href: '/dashboard/sync'");
+    expect(shellSrc).toContain("href: '/dashboard/inventory'");
     expect(shellSrc).not.toContain("href: '/dashboard/shipments'");
   });
 });

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronRight, ChevronDown, Package } from 'lucide-react';
+import { ChevronRight, ChevronDown, Package, Boxes, RefreshCw } from 'lucide-react';
 import { LogoutButton } from '@/app/dashboard/_components/logout-button';
 import { ICE_V4_DATA_MAINTENANCE_HREF } from './navigation-config';
 import styles from './ice-v4.module.css';
@@ -17,7 +17,7 @@ type NavItem = {
 };
 
 /**
- * 一级常驻导航：只保留「ICE 商品库」。
+ * 一级常驻导航：ICE 商品库 + 本包新增的「商品库存」「数据同步」两个业务入口。
  * 数据维护（基线/冻结观测/人工决定/原始证据）按既有管理员权限收进账户菜单；
  * 新品/来源旧 URL 保留安全引导与后端能力，但不再常驻侧栏。
  */
@@ -25,12 +25,25 @@ const NAV: NavItem[] = [
   {
     href: '/dashboard/catalog',
     label: 'ICE 商品库',
-    caption: '真实主资料与样表库存',
+    caption: '真实主资料与 BigSeller 库存',
     icon: Package,
     match: (pathname) =>
       pathname === '/dashboard/catalog'
       || /^\/dashboard\/catalog\/[0-9a-f-]{36}$/i.test(pathname)
+      || pathname.startsWith('/dashboard/catalog/mappings')
       || pathname.startsWith('/dashboard/catalog/issues'),
+  },
+  {
+    href: '/dashboard/inventory',
+    label: '商品库存',
+    caption: 'BigSeller 各仓数量与来源时间',
+    icon: Boxes,
+  },
+  {
+    href: '/dashboard/sync',
+    label: '数据同步',
+    caption: '自动读取、频率与失败排查',
+    icon: RefreshCw,
   },
 ];
 
@@ -55,6 +68,9 @@ function resolveActive(pathname: string, items: NavItem[]) {
 
 /** 面包屑文案：子页面不改一级导航归属，只改当前页标签。 */
 function pageLabel(pathname: string, fallback: string): string {
+  if (pathname.startsWith('/dashboard/sync')) return '数据同步';
+  if (pathname.startsWith('/dashboard/inventory')) return '商品库存';
+  if (pathname.startsWith('/dashboard/catalog/mappings')) return '来源 SKU 对应';
   if (pathname.startsWith('/dashboard/catalog/issues')) return '待处理';
   if (pathname.startsWith('/dashboard/catalog/intake')) return '持续新品（旧入口）';
   if (pathname.startsWith('/dashboard/catalog/sources')) return '来源核实（旧入口）';
@@ -113,7 +129,7 @@ export function IceV4WorkspaceShell({
         </nav>
         <div className={styles.sidebarBottom}>
           <strong>本地独立资料环境</strong>
-          <p>商品库使用本地样表资料；演示数据见 /demo/ice-v4。</p>
+          <p>商品库使用本地真实主资料与 BigSeller 库存；演示数据见 /demo/ice-v4。</p>
         </div>
       </aside>
       <div className={styles.workspace}>
@@ -171,7 +187,7 @@ export function IceV4WorkspaceShell({
           {children}
           <footer className={styles.footer}>
             <span>ICE v4 · 本地经营工作台</span>
-            <span>样表库存非实时 · 估值不含运费 · 演示见 /demo/ice-v4</span>
+            <span>库存按 BigSeller 定时同步更新 · 当前货值暂未计算 · 演示见 /demo/ice-v4</span>
           </footer>
         </main>
       </div>

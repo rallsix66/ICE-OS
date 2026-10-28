@@ -4,6 +4,82 @@
  * 不改 workspace-visual.module.css，避免影响 Demo 消费者。
  */
 
+/* ---------- 页头（UI-01：资料优先 + 唯一来源 SKU 对应入口） ---------- */
+
+.pageIntro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 18px;
+  margin-bottom: 14px;
+}
+
+.introText {
+  min-width: 0;
+  flex: 1 1 360px;
+}
+
+.introTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.introLead {
+  margin: 3px 0 0;
+  color: #7c8798;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.introLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.entryLink {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid #c9d3f5;
+  border-radius: 7px;
+  background: #eef1ff;
+  color: #4057c0;
+  font-size: 12px;
+  font-weight: 550;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.entryLink:hover {
+  border-color: #aebcf0;
+  background: #e7ebff;
+}
+
+.quietLink {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 7px 11px;
+  color: #7485ae;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.quietLink:hover {
+  color: #5266d7;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* ---------- 工具栏 / 控件 ---------- */
 
 .toolbar {
@@ -328,27 +404,27 @@
 }
 
 .colIdentity {
-  width: 32%;
+  width: 33%;
 }
 
-.colStock {
-  width: 11%;
-}
-
-.colPrice {
-  width: 13%;
-}
-
-.colValue {
-  width: 15%;
+.colSpec {
+  width: 12%;
 }
 
 .colStatus {
-  width: 14%;
+  width: 13%;
+}
+
+.colPrice {
+  width: 11%;
+}
+
+.colStock {
+  width: 17%;
 }
 
 .colActions {
-  width: 15%;
+  width: 14%;
 }
 
 .numericHead {
@@ -377,20 +453,72 @@
   white-space: nowrap;
 }
 
-/* 库存单元格含“无已确认库存/本仓无对应”等文字状态：允许换行，避免窄列溢出。 */
-.metricValueInventory {
-  white-space: normal;
+/* 价格降级为次要资料：小一号、低对比，不与商品名称抢视觉。 */
+.priceValue {
+  display: block;
+  color: #5f6b7d;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.priceNote {
+  display: block;
+  margin-top: 1px;
+  color: #9aa3b0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* 规格 / 单位：名称之外的次级资料列。 */
+.specText {
+  display: block;
+  color: #4c586a;
+  font-size: 12px;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
-/* 估算货值不是金额时（缺价/未建档/无权限等原因文案）允许换行，金额本身保持不折行。 */
-.metricValueText {
-  color: #6b7686;
-  font-size: 13px;
-  font-weight: 550;
-  white-space: normal;
+.specUnit {
+  display: block;
+  margin-top: 2px;
+  color: #96a1b0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 库存与货值：不再占据主表中心，只给一句状态 + 定位到商品库存页。 */
+.stockHint {
+  display: block;
+  color: #5f6b7d;
+  font-size: 12px;
+  line-height: 1.55;
   overflow-wrap: anywhere;
 }
+
+.stockLink {
+  display: inline-block;
+  margin-top: 3px;
+  color: #5266d7;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.stockLink:hover {
+  color: #4057c0;
+}
+
+.valueHint {
+  display: block;
+  margin-top: 2px;
+  color: #9aa3b0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 
 /* ---------- 商品身份 ---------- */
 
@@ -417,11 +545,31 @@
 }
 
 .identityCode {
-  display: block;
+  display: inline;
   color: #7485ae;
   font-size: 11px;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.2px;
   line-height: 1.5;
+}
+
+.identityMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  margin-top: 2px;
+  color: #8a95a4;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.identityBarcode {
+  color: #8a95a4;
+  overflow-wrap: anywhere;
+}
+
+.identityDivider {
+  color: #c2c9d4;
 }
 
 .nameButton {
@@ -431,8 +579,8 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #3f4d61;
-  font-size: 13px;
+  color: #2f3c50;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.45;
   text-align: left;
@@ -492,6 +640,12 @@
   border-color: #f0e7d6;
   background: #fbf5e9;
   color: #a37e45;
+}
+
+.toneQuiet {
+  border-color: #e8ebf0;
+  background: #f6f7fa;
+  color: #7c8798;
 }
 
 .actionGroup {
@@ -786,7 +940,7 @@
 
   .colStock,
   .colPrice,
-  .colValue {
+  .colSpec {
     grid-column: span 1;
     width: auto;
   }
@@ -820,17 +974,7 @@
     line-height: 1.4;
   }
 
-  .metricValue {
-    font-size: 15px;
-    font-weight: 600;
-  }
-
-  .metricValueStrong {
-    font-size: 16px;
-    font-weight: 650;
-  }
-
-  .metricValueText {
+  .priceValue {
     font-size: 14px;
     font-weight: 550;
   }

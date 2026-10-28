@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
-import { withAppDb, type DbIdentity } from '@/lib/database/app-db';
+import { withAppDb, withReadOnlyAppDb, type DbIdentity } from '@/lib/database/app-db';
 import { normalizeName, scopeObservationsForItemAudit, wouldMatchItemCandidate } from './candidate-service';
 import type { CatalogRequestReceipt } from './reconcile';
 import type { CatalogItemDto, CatalogItemRevisionDto, FieldObservation, PreparedBaseline, PreparedFrozenObservations, PreparedFinancial, SourceSystem } from './types';
@@ -590,6 +590,42 @@ export const catalogRepository = {
         observationId: String(r.observationId),
         formulaOk: r.formulaOk == null ? null : Boolean(r.formulaOk),
       };
+    });
+  },
+  /** 统一库存数据源（BigSeller 正式接入）：列表一次读，服务端聚合；只读事务。 */
+  async inventoryCatalogSources(identity: DbIdentity): Promise<unknown | null> {
+    return withReadOnlyAppDb(identity, async (c) => {
+      const { rows } = await c.query<{ result: unknown }>('SELECT catalog.read_inventory_catalog_sources() AS result');
+      return rows[0]?.result ?? null;
+    });
+  },
+  /** 仓库 id/名称（用于把列表 URL 的仓库名解析成库存模块的仓 id）。 */
+  async inventoryWarehouses(identity: DbIdentity): Promise<Array<{ warehouseId: string; externalId: string; name: string; market: string | null; status: string }>> {
+    const raw = await withReadOnlyAppDb(identity, async (c) => {
+      const { rows } = await c.query<{ result: unknown }>('SELECT catalog.read_inventory_sync_overview() AS result');
+      return rows[0]?.result ?? null;
+    });
+    const warehouses = (raw as { warehouses?: unknown } | null)?.warehouses;
+    if (!Array.isArray(warehouses)) return [];
+    return warehouses.map((entry) => {
+      const record = (entry ?? {}) as Record<string, unknown>;
+      return {
+        warehouseId: String(record.id ?? ''),
+        externalId: String(record.externalId ?? ''),
+        name: String(record.name ?? ''),
+        market: record.market == null ? null : String(record.market),
+        status: String(record.status ?? ''),
+      };
+    }).filter((warehouse) => warehouse.warehouseId && warehouse.name);
+  },
+  /** 商品库存详情（同一 effective-row 读模型，与库存页一致）。 */
+  async inventoryItemDetail(identity: DbIdentity, itemId: string, warehouseId: string | null, allWarehouses = false): Promise<unknown | null> {
+    return withReadOnlyAppDb(identity, async (c) => {
+      const { rows } = await c.query<{ result: unknown }>(
+        'SELECT catalog.read_inventory_item($1,$2,$3,$4) AS result',
+        [itemId, warehouseId, null, allWarehouses],
+      );
+      return rows[0]?.result ?? null;
     });
   },
 };

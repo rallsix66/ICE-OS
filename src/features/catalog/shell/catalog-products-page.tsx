@@ -3,15 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Package, Search } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Package, Search } from 'lucide-react';
 import { EmptyState } from '@/ui/ice-v4/primitives';
 import type { CatalogListClientPayload, CatalogListClientRow } from '../local-display/list-client-types';
 import { clientRowAsDisplayRow } from '../local-display/list-client-types';
 import { applyWarehouseScopeToDisplayRow } from '../local-display/client-scope';
 import {
+  buildListContextHref,
   formatAdoptedUnitCostCell,
-  formatEstimatedValueCell,
-  formatInventoryCell,
   formatSampleLabel,
   pageEntries,
 } from '../local-display/list-row-display';
@@ -24,16 +23,47 @@ const PAGE_SIZE = 20;
 type UrlApi = ReturnType<typeof useCatalogUrlState>;
 type DisplayStatus = 'loaded' | 'not_imported' | 'read_failed' | 'forbidden';
 
-
 function fieldOrPending(value: string | null | undefined, pendingLabel = '待补') {
   const trimmed = value?.trim();
   return trimmed ? trimmed : pendingLabel;
 }
 
-function statusChip(row: CatalogListClientRow) {
+/**
+ * UI-01：主表以商品资料为主（名称、身份、规格、资料状态），
+ * 价格按现有金额权限保留但退居次要；库存与货值只保留一句提示 + 定位到库存页。
+ */
+function materialStatusChip(row: CatalogListClientRow) {
   if (row.materialStatus.includes('待补货号')) return <span className={`${styles.statusChip} ${styles.toneAmber}`}>新品，待补货号</span>;
-  if (row.materialStatus.includes('尚未建档')) return <span className={`${styles.statusChip} ${styles.toneAmber}`}>BS尚未建档</span>;
+  if (row.materialStatus.includes('尚未建档')) return <span className={`${styles.statusChip} ${styles.toneAmber}`}>BigSeller 尚未建档</span>;
+  if (!row.barcodeText) return <span className={`${styles.statusChip} ${styles.toneQuiet}`}>待补 69 编码</span>;
+  if (!row.unitText) return <span className={`${styles.statusChip} ${styles.toneQuiet}`}>单位待确认</span>;
   return <span className={`${styles.statusChip} ${styles.toneGreen}`}>资料已承接</span>;
+}
+
+function inventoryHint(row: CatalogListClientRow, warehouse: string, displayStatus: DisplayStatus): string {
+  if (displayStatus === 'not_imported') return '库存未接入';
+  if (displayStatus === 'read_failed') return '库存读取失败';
+  if (displayStatus === 'forbidden') return '库存无权限';
+  const inventory = row.inventory;
+  if (warehouse !== 'all') {
+    const scope = inventory.warehouseScopes?.[warehouse];
+    if (scope?.inventoryState === 'failed') return '本仓同步失败，沿用上次成功值';
+    if (inventory.hasPendingTotal) return '本仓多编码合计待核对';
+    if (scope?.inventoryState === 'unmapped_source') return '本仓来源待对应';
+    if (scope?.inventoryState === 'unseen') return '本仓对应待下一批采用';
+    if (scope?.inventoryState === 'no_source' || scope?.inventoryState === 'no_data') return '本仓暂无来源记录';
+    if (scope?.confirmedLineCount && scope.confirmedLineCount > 0) return '本仓有已确认库存';
+    if (inventory.hasCurrentData) return '本仓有当前库存';
+    return '本仓暂无当前库存';
+  }
+  if (inventory.hasPendingTotal) return '部分仓合计待核对';
+  if (!inventory.hasCurrentData) return '暂无当前库存（不是 0）';
+  return `${inventory.coveredWarehouseCount} / ${inventory.scopeWarehouseCount} 仓有当前库存`;
+}
+
+function inventoryHrefFor(row: CatalogListClientRow): string {
+  const query = (row.iceCode ?? row.nameCn).trim();
+  return `/dashboard/inventory?q=${encodeURIComponent(query)}`;
 }
 
 /** 工具栏固定“待处理”入口：有真实问题才显示计数；读取失败可重试；无权不显示计数、不制造警报。 */
@@ -103,32 +133,16 @@ export function CatalogProductsPage({
     startRetry(() => router.refresh());
   }, [retrying, startRetry, router]);
 
-  const displayOverview = useMemo(() => {
-    if (!payload) return null;
-    return {
-      ...payload,
-      rows: payload.rows.map((r) => clientRowAsDisplayRow(r)),
-    };
-  }, [payload]);
-
   const viewRows = useMemo(() => {
     const rows = payload?.rows ?? [];
-    if (!displayOverview || warehouse === 'all') return rows;
+    if (warehouse === 'all') return rows;
     return rows.map((row) => {
       const scoped = applyWarehouseScopeToDisplayRow(clientRowAsDisplayRow(row), warehouse);
-      return {
-        ...row,
-        bsSample: {
-          ...row.bsSample,
-          confirmedOnHandTotal: scoped.bsSample.confirmedOnHandTotal,
-          confirmedLineCount: scoped.bsSample.confirmedLineCount,
-          estimatedValueCny: scoped.bsSample.estimatedValueCny,
-          valuationState: scoped.bsSample.valuationState,
-          valuationReason: scoped.bsSample.valuationReason,
-        },
-      };
+      const clientInventory: Record<string, unknown> = { ...scoped.inventory };
+      delete clientInventory.lines;
+      return { ...row, inventory: clientInventory as typeof row.inventory };
     });
-  }, [payload, warehouse, displayOverview]);
+  }, [payload, warehouse]);
 
   const filtered = useMemo(() => viewRows.filter((row) => {
     const tokens = row.sourceSearchTokens?.join(' ') ?? '';
@@ -224,14 +238,38 @@ export function CatalogProductsPage({
     resetFilters();
   }, [capturePaginationAnchor, resetFilters]);
 
-  const exportLabel = payload?.exportLabel ?? null;
-  const sampleLabel = formatSampleLabel(exportLabel);
-  const projectionUnavailable = displayStatus === 'loaded' ? undefined : displayStatus;
+  const sampleLabel = formatSampleLabel(payload?.observationAt ?? null);
   const isFiltering = query.trim().length > 0;
   const moreId = (itemId: string) => `catalog-row-more-${itemId}`;
+  // 带上当前列表筛选/页码作为返回上下文：处理完对应后能回到原来的搜索与位置。
+  const mappingsEntryHref = `/dashboard/catalog/mappings?from=catalog&back=${encodeURIComponent(buildListContextHref(query, warehouse, currentPage))}`;
 
   return (
     <>
+      <header className={styles.pageIntro} data-testid="catalog-page-intro">
+        <div className={styles.introText}>
+          <h2 className={styles.introTitle}>商品资料</h2>
+          <p className={styles.introLead}>
+            以商品名称和身份资料为主；数量与货值请到「商品库存」查看。
+            正式来源 SKU 对应（确认 / 重核 / 停用 / 换绑）只在「来源 SKU 对应」维护——库存页只保留定位链接，不提供第二套编辑器。
+          </p>
+        </div>
+        <div className={styles.introLinks}>
+          <Link
+            className={styles.entryLink}
+            href={mappingsEntryHref}
+            data-testid="catalog-mappings-entry"
+            title="前往唯一的来源 SKU 对应维护页：确认 / 重核 / 停用 / 换绑 BigSeller 正式库存来源 SKU 与标准商品的对应"
+          >
+            来源 SKU 对应
+            <ExternalLink size={13} strokeWidth={1.8} aria-hidden />
+          </Link>
+          <Link className={styles.quietLink} href="/dashboard/inventory">
+            商品库存
+          </Link>
+        </div>
+      </header>
+
       <div className={styles.toolbar}>
         <label className={styles.searchField}>
           <Search size={16} aria-hidden />
@@ -254,7 +292,8 @@ export function CatalogProductsPage({
           type="button"
           className={styles.toolbarButton}
           data-testid="catalog-list-refresh"
-          aria-label="刷新列表"
+          aria-label="刷新列表（重新读取系统已保存的库存，不会重新导出 BigSeller）"
+          title="刷新只重新读取系统已保存的数据；重新导出 BigSeller 请到“数据同步”页点“立即同步”"
           disabled={retrying}
           onClick={retry}
         >
@@ -273,8 +312,8 @@ export function CatalogProductsPage({
       {displayStatus === 'read_failed' && (
         <div className={`${styles.notice} ${styles.noticeAlert}`} role="alert">
           <div className={styles.noticeText}>
-            <strong>库存数据读取失败（网络或传输异常）</strong>
-            <p>商品主资料仍可浏览；库存、进货价与货值暂不可用。{displayError ? <span className={styles.noticeDetail}>（{displayError}）</span> : null}</p>
+            <strong>库存与价格资料读取失败（网络或传输异常）</strong>
+            <p>商品主资料仍可浏览；库存与采用进货价暂不可用，不回退旧样表。{displayError ? <span className={styles.noticeDetail}>（{displayError}）</span> : null}</p>
           </div>
           <button type="button" className={styles.retryButton} onClick={retry} disabled={retrying}>
             {retrying ? '正在重新读取…' : '重试'}
@@ -286,7 +325,7 @@ export function CatalogProductsPage({
         <div className={`${styles.notice} ${styles.noticeWarn}`} role="status">
           <div className={styles.noticeText}>
             <strong>无权读取库存数据</strong>
-            <p>当前账号无权读取 BS 样表库存；主商品资料仍可浏览，库存与金额不显示。</p>
+            <p>当前账号无权读取 BigSeller 库存；主商品资料仍可浏览，库存与金额不显示。</p>
           </div>
         </div>
       )}
@@ -294,13 +333,13 @@ export function CatalogProductsPage({
       {displayStatus === 'not_imported' && (
         <div className={`${styles.notice} ${styles.noticeWarn}`} role="status">
           <div className={styles.noticeText}>
-            <strong>库存数据当前未启用 / 未覆盖</strong>
-            <p>尚未载入 BS 样表库存；库存与估值列显示“样表未导入”，不当作 0。</p>
+            <strong>库存模块当前未接入 / 未覆盖</strong>
+            <p>{displayError ?? '尚未读取到 BigSeller 库存；库存显示“未接入”，不当作 0，也不回退旧样表。'}</p>
           </div>
         </div>
       )}
 
-      {displayStatus === 'loaded' && payload?.exportLabel && (
+      {displayStatus === 'loaded' && (
         <p className={styles.sampleDate} data-testid="catalog-sample-date">{sampleLabel}</p>
       )}
 
@@ -328,11 +367,11 @@ export function CatalogProductsPage({
                 <table className={styles.table} aria-label="商品资料列表">
                   <thead>
                     <tr>
-                      <th scope="col" className={styles.colIdentity}>商品身份（货号 / 名称 / 规格）</th>
-                      <th scope="col" className={`${styles.colStock} ${styles.numericHead}`}>当前仓已确认库存</th>
-                      <th scope="col" className={`${styles.colPrice} ${styles.numericHead}`}>采用进货价（人民币/单品）</th>
-                      <th scope="col" className={`${styles.colValue} ${styles.numericHead}`}>估算货值（人民币）</th>
-                      <th scope="col" className={styles.colStatus}>资料 / 问题</th>
+                      <th scope="col" className={styles.colIdentity}>商品资料（图片 / 名称 / ICE 货号 / 69 编码）</th>
+                      <th scope="col" className={styles.colSpec}>规格 / 单位</th>
+                      <th scope="col" className={styles.colStatus}>资料状态</th>
+                      <th scope="col" className={`${styles.colPrice} ${styles.numericHead}`}>采用进货价</th>
+                      <th scope="col" className={styles.colStock}>库存与货值</th>
                       <th scope="col" className={styles.colActions}>操作</th>
                     </tr>
                   </thead>
@@ -340,8 +379,6 @@ export function CatalogProductsPage({
                     {pageRows.map((row) => {
                       const expanded = expandedItemId === row.itemId;
                       const unitCostLabel = formatAdoptedUnitCostCell(row.adoptedUnitCost);
-                      const inventoryLabel = formatInventoryCell(row, warehouse, projectionUnavailable);
-                      const estimatedLabel = formatEstimatedValueCell(row, warehouse, projectionUnavailable);
                       const choices = row.humanChoices.bigseller + row.humanChoices.jushuitan;
                       return [
                         <tr
@@ -350,17 +387,19 @@ export function CatalogProductsPage({
                           data-testid={row.iceCode ? `catalog-row-${row.iceCode}` : undefined}
                           data-expanded={expanded ? 'true' : 'false'}
                         >
-                          <td className={`${styles.cell} ${styles.colIdentity}`} data-label="商品">
+                          <td className={`${styles.cell} ${styles.colIdentity}`} data-label="商品资料">
                             <div className={styles.identity}>
-                              <span className={styles.art} aria-hidden><Package size={18} strokeWidth={1.4} /></span>
+                              <span className={styles.art} aria-label="图片占位" title="图片占位（本页暂不展示商品图）">
+                                <Package size={18} strokeWidth={1.4} />
+                              </span>
                               <div className={styles.identityText}>
-                                <span className={styles.identityCode}>{fieldOrPending(row.iceCode, '待补货号')}</span>
                                 <button type="button" className={styles.nameButton} onClick={() => openDetail(row.itemId)}>
                                   {row.nameCn}
                                 </button>
-                                <span className={styles.identitySpec}>
-                                  {fieldOrPending(row.specificationText, '规格待补')}
-                                  {row.unitText ? ` · ${row.unitText}` : ''}
+                                <span className={styles.identityMeta}>
+                                  <span className={styles.identityCode}>ICE 货号：{fieldOrPending(row.iceCode, '待补货号')}</span>
+                                  <span className={styles.identityDivider} aria-hidden>·</span>
+                                  <span className={styles.identityBarcode}>69 编码：{fieldOrPending(row.barcodeText, '待补')}</span>
                                 </span>
                                 <button
                                   type="button"
@@ -374,22 +413,30 @@ export function CatalogProductsPage({
                               </div>
                             </div>
                           </td>
-                          <td className={`${styles.cell} ${styles.colStock} ${styles.metricCell}`} data-label="当前仓已确认库存">
-                            <span className={`${styles.metricValue} ${styles.metricValueInventory}`} data-testid="catalog-bs-inventory">{inventoryLabel}</span>
+                          <td className={`${styles.cell} ${styles.colSpec}`} data-label="规格 / 单位">
+                            <span className={styles.specText}>{fieldOrPending(row.specificationText, '规格待补')}</span>
+                            <span className={styles.specUnit}>{row.unitText ? `单位：${row.unitText}` : '单位待确认'}</span>
+                          </td>
+                          <td className={`${styles.cell} ${styles.colStatus}`} data-label="资料状态">
+                            {materialStatusChip(row)}
                           </td>
                           <td className={`${styles.cell} ${styles.colPrice} ${styles.metricCell}`} data-label="采用进货价">
-                            <span className={styles.metricValue} data-testid="catalog-unit-cost">{unitCostLabel}</span>
+                            <span className={styles.priceValue} data-testid="catalog-unit-cost">{unitCostLabel}</span>
+                            <span className={styles.priceNote}>人民币 / 单品</span>
                           </td>
-                          <td className={`${styles.cell} ${styles.colValue} ${styles.metricCell}`} data-label="估算货值（人民币）">
-                            <span
-                              className={`${styles.metricValueStrong} ${estimatedLabel.startsWith('¥') ? '' : styles.metricValueText}`}
-                              data-testid="catalog-estimated-value"
-                            >
-                              {estimatedLabel}
+                          <td className={`${styles.cell} ${styles.colStock}`} data-label="库存与货值">
+                            <span className={styles.stockHint} data-testid="catalog-bs-inventory">
+                              {inventoryHint(row, warehouse, displayStatus)}
                             </span>
-                          </td>
-                          <td className={`${styles.cell} ${styles.colStatus}`} data-label="资料 / 问题">
-                            {statusChip(row)}
+                            <Link
+                              className={styles.stockLink}
+                              href={inventoryHrefFor(row)}
+                              data-testid="catalog-inventory-link"
+                              title="到「商品库存」查看该商品各仓数量、来源时间与批次"
+                            >
+                              查看库存
+                            </Link>
+                            <span className={styles.valueHint} data-testid="catalog-estimated-value">货值暂未计算</span>
                           </td>
                           <td className={`${styles.cell} ${styles.colActions}`} data-label="操作">
                             <div className={styles.actionGroup}>
@@ -410,13 +457,25 @@ export function CatalogProductsPage({
                               <div className={styles.moreItem}><dt>分类</dt><dd>{fieldOrPending(row.categoryText)}</dd></div>
                               <div className={styles.moreItem}><dt>单位</dt><dd>{fieldOrPending(row.unitText, '—')}</dd></div>
                               <div className={styles.moreItem}><dt>来源对应</dt><dd>{choices} 条本批已确认</dd></div>
+                              <div className={styles.moreItem}><dt>库存覆盖</dt><dd>{row.inventory.coveredWarehouseCount} / {row.inventory.scopeWarehouseCount} 仓有当前库存</dd></div>
+                              <div className={styles.moreItem}><dt>最近来源</dt><dd>{row.inventory.lastObservedAt ? new Date(row.inventory.lastObservedAt).toLocaleString('zh-CN', { hour12: false }) : '未读取到'}</dd></div>
+                              {row.inventory.hasPendingTotal && (
+                                <div className={styles.moreItem}>
+                                  <dt>合计待核对</dt>
+                                  <dd>{row.inventory.pendingTotalWarehouses.map((group) => `${group.name}：${group.rows.map((line) => `${line.externalSku}=${line.onHand ?? '未知'}`).join('、')}`).join('；')}（逐行显示，未相加）</dd>
+                                </div>
+                              )}
                               <div className={styles.moreItem}>
                                 <dt>采用进货价原值</dt>
                                 <dd>{row.adoptedUnitCost?.state === 'priced' ? row.adoptedUnitCost.amountCny : '无'}</dd>
                               </div>
                               <div className={styles.moreItem}>
-                                <dt>估算货值原值</dt>
-                                <dd>{row.bsSample.estimatedValueCny ?? '无'}</dd>
+                                <dt>当前货值</dt>
+                                <dd>暂未计算（本包不新做估值）</dd>
+                              </div>
+                              <div className={styles.moreItem}>
+                                <dt>库存与来源</dt>
+                                <dd><Link href={inventoryHrefFor(row)}>到「商品库存」查看</Link></dd>
                               </div>
                             </dl>
                           </td>

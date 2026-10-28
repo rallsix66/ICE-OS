@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import { Pill } from '@/ui/ice-v4/primitives';
 import { adoptedUnitCostFromFinancial, type AdoptedUnitCost } from '../local-display/adopted-price';
-import { formatCnyPrice, formatCnyValue } from '../local-display/money-display';
+import { formatCnyPrice } from '../local-display/money-display';
 import {
   CATALOG_FIELD_LABELS,
   fieldAuditValue,
@@ -24,7 +24,6 @@ import {
 } from '../actions';
 import { DetailAttachments, type DetailAttachmentsModel } from './detail-attachments';
 import { DetailRetryButton } from './detail-retry-button';
-import { InventorySourceHint } from './inventory-source-hint';
 import { useUnsavedLeaveGuard } from './use-unsaved-leave-guard';
 import styles from './catalog-detail.module.css';
 import type { getCatalogDetailCore, getCatalogItemBsSample } from '../service';
@@ -66,12 +65,6 @@ const SECTIONS = [
 export type CatalogDetailSection = (typeof SECTIONS)[number]['key'];
 
 type Fact = { value: string; hint?: string | null; warn?: boolean };
-
-function bsSelectionLabel(state: string) {
-  if (state === 'confirmed') return '已确认';
-  if (state === 'unselected') return '未选择';
-  return state;
-}
 
 function qtyCell(value: unknown) {
   return value == null ? '—' : String(value);
@@ -152,42 +145,35 @@ function overseasInventoryFact(params: {
     };
   }
   const sample = params.bsSample;
-  if (!sample || sample.status !== 'loaded') return { value: '—', hint: '样表未导入', warn: true };
+  if (!sample || sample.status !== 'loaded') return { value: '—', hint: '库存未接入（不是 0）', warn: true };
   if (params.bsNotCreated) return { value: '—', hint: 'BS 未建档', warn: true };
   const scope = sample.valuation;
+  if (scope.pendingTotal) return { value: '合计待核对', hint: '同仓多个来源编码逐行显示；未确认合计口径前不擅自相加', warn: true };
+  if (scope.inventoryState === 'failed') return { value: '本仓同步失败', hint: '现值保留上次成功批次，不用 0 代替', warn: true };
   if (scope.confirmedOnHandTotal !== null) {
     const isZero = scope.confirmedOnHandTotal === '0';
     return {
-      value: isZero ? '0 件（已确认为零）' : `${scope.confirmedOnHandTotal} 件`,
-      hint: `${scope.confirmedLineCount} 行已确认`,
+      value: isZero ? '0 个（来源明确为 0）' : `${scope.confirmedOnHandTotal} 个`,
+      hint: `${scope.confirmedLineCount} 行已采用 · 单个商品计数`,
     };
   }
-  if (scope.valuationState === 'no_warehouse_line') return { value: '—', hint: scope.valuationReason ?? '本仓无样表行', warn: true };
-  if (scope.valuationState === 'no_inventory') return { value: '—', hint: scope.valuationReason ?? '无已确认库存', warn: true };
+  if (scope.inventoryState === 'unmapped_source') return { value: '—', hint: '本仓有来源行但未确认对应（不是 0）', warn: true };
+  if (scope.inventoryState === 'unseen') return { value: '—', hint: '对应已确认，等待下一次完整同步采用（不是 0）', warn: true };
+  if (scope.inventoryState === 'no_source' || scope.inventoryState === 'no_data') return { value: '—', hint: scope.valuationReason ?? '本仓没有该商品的来源记录（不是 0）', warn: true };
   return { value: '—', hint: scope.valuationReason ?? '库存不可确认', warn: true };
 }
 
-/** 已估值货值：只表示当前可估值范围（海外已确认库存），不冒充国内＋海外＋在途总货值。 */
+/** 当前货值：本包不新做估值；旧样表价格不能乘新库存冒充当前货值。 */
 function valuatedFact(params: {
   historical: boolean;
   bsSample: BsSampleDetail | null;
   bsSampleError: { code: string; message: string } | null;
 }): Fact {
-  if (params.historical) return { value: '—', hint: '历史版本不显示估算货值' };
+  if (params.historical) return { value: '—', hint: '历史版本只保留当时口径的估值记录，不重算' };
   if (params.bsSampleError) {
-    return {
-      value: params.bsSampleError.code === 'forbidden' ? '不可见' : '读取失败',
-      hint: params.bsSampleError.code === 'forbidden' ? '账号没有金额读取权限，金额限制在服务端生效' : params.bsSampleError.message,
-      warn: true,
-    };
+    return { value: '暂未计算', hint: '库存读取失败时不估值，也不沿用旧金额', warn: true };
   }
-  const sample = params.bsSample;
-  if (!sample || sample.status !== 'loaded') return { value: '—', hint: '样表未导入', warn: true };
-  const scope = sample.valuation;
-  if (scope.valuationState === 'valued' && scope.estimatedValueCny !== null) {
-    return { value: formatCnyValue(scope.estimatedValueCny) ?? `¥${scope.estimatedValueCny}`, hint: '当前仓已确认 × 进货价' };
-  }
-  return { value: '不可估值', hint: scope.valuationReason ?? '当前口径无法估算货值', warn: true };
+  return { value: '暂未计算', hint: '本包不新做估值：旧样表价格不能乘新库存当作当前货值' };
 }
 
 function unitCostFact(params: { historical: boolean; adopted: AdoptedUnitCost | null; bsSampleError: { code: string; message: string } | null }): Fact {
@@ -727,7 +713,7 @@ export function CatalogDetail({
    */
   const sampleWarehouseChoices = useMemo(() => (
     bsSample?.status === 'loaded'
-      ? Array.from(new Set((bsSample.rows as Array<Record<string, unknown>>).map((row) => String(row.warehouse ?? '')).filter(Boolean)))
+      ? Array.from(new Set((bsSample.rows as unknown as Array<Record<string, unknown>>).map((row) => String(row.warehouse ?? '')).filter(Boolean)))
       : []
   ), [bsSample]);
   const [seenWarehouses, setSeenWarehouses] = useState<string[]>([]);
@@ -930,28 +916,17 @@ export function CatalogDetail({
           {' · '}
           <span data-testid="catalog-overview-sample">
             {(() => {
-              const label = bsSample?.status === 'loaded' && typeof bsSample.exportLabel === 'string' ? bsSample.exportLabel : '';
-              const day = label.match(/\d{4}-\d{2}-\d{2}/)?.[0];
-              return day ? `样表 · ${day}` : '样表';
+              const observationAt = bsSample?.status === 'loaded' ? bsSample.observationAt : null;
+              return observationAt ? `BigSeller · 最近来源 ${new Date(observationAt).toLocaleString('zh-CN', { hour12: false })}` : 'BigSeller 库存';
             })()}
           </span>
         </p>
       </div>
       <dl className={styles.overviewGrid}>
         <OverviewCard label="国内库存" fact={domesticFact} testId="catalog-overview-domestic" />
-        <OverviewCard
-          label="海外库存"
-          fact={overviewInventory}
-          testId="catalog-overview-overseas"
-          extra={(
-            <span className={styles.overviewSub}>
-              <span className={styles.overviewSubLabel}>同范围货值</span>
-              <span data-testid="catalog-overview-overseas-value">{overviewValue.value}</span>
-            </span>
-          )}
-        />
+        <OverviewCard label="BigSeller 库存" fact={overviewInventory} testId="catalog-overview-overseas" />
         <OverviewCard label="在途库存" fact={transitFact} testId="catalog-overview-transit" />
-        <OverviewCard label="已估值货值" fact={overviewValue} testId="catalog-overview-valuated" />
+        <OverviewCard label="当前货值" fact={overviewValue} testId="catalog-overview-valuated" />
       </dl>
     </section>
   );
@@ -1226,7 +1201,7 @@ export function CatalogDetail({
         <div className={styles.sectionHead}>
           <div>
             <h2 className={styles.sectionTitle}>库存明细</h2>
-            <p className={styles.sectionNote}>BS 样表（海外）；锁定与在途不计入估值。</p>
+            <p className={styles.sectionNote}>BigSeller 库存（海外）；数量按单个商品计数，锁定与在途不计入当前货值。</p>
           </div>
         </div>
         <div className={styles.sectionBody}>
@@ -1251,7 +1226,6 @@ export function CatalogDetail({
           )}
           {!historical && (
             <BsSampleBusinessBlock
-              itemId={item.itemId}
               sample={bsSample}
               sampleError={bsSampleError ?? null}
               warehouse={resolvedWarehouse}
@@ -1304,7 +1278,7 @@ export function CatalogDetail({
           )}
           {onOpenEvidence && (
             <p className={styles.sectionNote} data-testid="catalog-inventory-source-link">
-              库存来源：BigSeller（BS）样表与仓库范围。
+              库存来源：BigSeller 自动导出（账号/仓库/来源编码）与当前参与仓库范围。
               {' '}
               <button type="button" className={demoStyles.textLink} onClick={() => onOpenEvidence()}>查看数据来源</button>
             </p>
@@ -1441,9 +1415,8 @@ export function CatalogDetail({
   );
 }
 
-/** 库存明细：BS 样表（海外）现有/锁定/可用/预留/在途；技术说明与原始证据已移出日常详情。 */
+/** 库存明细：BigSeller（海外）逐仓 × 来源编码；数量原值、同仓多编码逐行、合计未定不擅自相加。 */
 function BsSampleBusinessBlock({
-  itemId,
   sample,
   sampleError,
   warehouse,
@@ -1451,7 +1424,6 @@ function BsSampleBusinessBlock({
   onOpenEvidence,
   onShowAllWarehouses,
 }: {
-  itemId: string;
   sample: BsSampleDetail | null;
   sampleError: { code: string; message: string } | null;
   warehouse?: string;
@@ -1463,46 +1435,73 @@ function BsSampleBusinessBlock({
     return (
       <section className={styles.statusLine} role="alert" data-testid="catalog-bs-sample-error">
         <span>
-          <strong>BS 样表库存读取失败：</strong>
+          <strong>BigSeller 库存读取失败：</strong>
           {sampleError.message}
           <span className={styles.overviewHint}>
-            {sampleError.code === 'forbidden' ? '权限不足，不是「尚未导入」，也不当作 0。' : '请重试；失败期间不以 0 或旧仓数据代替。'}
+            {sampleError.code === 'forbidden' ? '权限不足，不是「库存为 0」，也不回退旧样表。' : '请重试；失败期间不以 0 或旧仓数据代替，也不回退旧样表。'}
           </span>
         </span>
-        {/* R6：弹窗用内存重试（onRetry）；直链没有弹窗 loader，用整页刷新重试，避免失败后无就地恢复入口。 */}
         {onRetry
           ? <Button type="button" variant="outline" onClick={onRetry}>重试</Button>
           : <DetailRetryButton label="重试库存读取" />}
       </section>
     );
   }
-  if (sample?.status === 'not_imported') {
-    return <p className={styles.sectionNote} data-testid="catalog-bs-sample-not-imported">尚未载入 BS 样表库存数据；不当作 0。</p>;
+  if (!sample) return null;
+  if (sample.status === 'not_available') {
+    return <p className={styles.sectionNote} data-testid="catalog-bs-sample-not-imported">库存模块当前未接入：{sample.message}；不当作 0。</p>;
   }
-  if (sample?.status !== 'loaded') return null;
-  const exportLabel = typeof sample.exportLabel === 'string' ? sample.exportLabel : 'BS 样表';
+  if (sample.status !== 'loaded') return null;
+  const sourceLabel = sample.sourceLabel ?? 'BigSeller 自动导出';
+  const observationText = sample.observationAt
+    ? new Date(sample.observationAt).toLocaleString('zh-CN', { hour12: false })
+    : '未读取到';
   const valuation = sample.valuation;
-  const rows = sample.rows as Array<Record<string, unknown>>;
-  const filtered = warehouse ? rows.filter((r) => r.warehouse === warehouse) : rows;
-  const confirmedRows = filtered.filter((r) => r.selectionState === 'confirmed');
-  const hasConfirmed = confirmedRows.length > 0;
-  const confirmedIsZero = hasConfirmed && valuation.confirmedOnHandTotal === '0';
-  const confirmedValue = !hasConfirmed
-    ? valuation.valuationReason?.includes('尚未建档')
-      ? 'BS 尚未建档（不是库存 0）'
-      : '没有已确认库存（不是 0）'
+  const rows = sample.rows;
+  const filtered = warehouse ? rows.filter((row) => row.warehouse === warehouse) : rows;
+  const hasRows = filtered.length > 0;
+  const pendingGroups = sample.totals.pendingTotalWarehouses.filter((group) => !warehouse || group.name === warehouse);
+  const pendingTotal = pendingGroups.length > 0 || Boolean(valuation.pendingTotal);
+  const knownTotalText = pendingTotal
+    ? '合计待核对（逐行显示，未相加）'
     : valuation.confirmedOnHandTotal === '0'
-      ? '0 件（已确认为零）'
+      ? '0 个（来源明确为 0）'
       : valuation.confirmedOnHandTotal !== null
-        ? `${valuation.confirmedOnHandTotal} 件`
+        ? `${valuation.confirmedOnHandTotal} 个${valuation.knownSubtotalComplete ? '' : '（不完整）'}`
         : (valuation.valuationReason ?? '库存不可确认');
+  const scopedWarehouses = warehouse
+    ? sample.warehouses.filter((entry) => entry.name === warehouse)
+    : sample.warehouses;
+  const pendingSources = scopedWarehouses.flatMap((entry) =>
+    entry.pendingSourceRows.filter((row) => !row.mapped).map((row) => ({ ...row, warehouseName: entry.name })));
+  const scopeReason = (() => {
+    if (!warehouse) {
+      if (sample.totals.hasCurrentData) return null;
+      return '当前范围暂无已采用的 BigSeller 库存行；不当作库存 0，也不回退旧样表。';
+    }
+    const entry = scopedWarehouses[0];
+    if (!entry) return '该仓库不在本次参与范围。';
+    if (entry.status === 'failed') {
+      return `本仓最近一次同步失败${entry.lastErrorCode ? `（${entry.lastErrorCode}）` : ''}；当前值保留上次成功时间${entry.lastSuccessAt ? ` ${new Date(entry.lastSuccessAt).toLocaleString('zh-CN', { hour12: false })}` : '（暂无成功批次）'}，不用 0 代替。`;
+    }
+    if (entry.status === 'unseen') return '本仓对应已确认，但当前完整批次还没有该商品的采用行；等待下一次完整同步，不是 0。';
+    if (entry.status === 'not_mapped' && entry.reason === 'unmapped_source') return '本仓有该商品的已知来源行，但尚未确认对应；未计入合计，不是 0。';
+    if (entry.status === 'not_mapped' && entry.reason === 'no_source') return '本仓没有该商品的来源记录；不当作库存 0。';
+    /* 正常有已采用行（含多码待合计/同仓待核）不显示“暂无采用”空态；待合计与待核由各自区块说明。 */
+    if (entry.status === 'current' && entry.rows.length > 0) return null;
+    return '本仓暂无已采用的 BigSeller 库存行；不当作库存 0，也不回退旧样表。';
+  })();
+  const coverage = sample.totals.coverage;
+  const coverageText = coverage
+    ? `${coverage.coveredWarehouses} / ${coverage.scopeWarehouses} 仓有当前库存`
+    : '覆盖未读取（不是 0/0）';
   return (
-    <section className={styles.sectionBody} aria-label="BS样表库存" data-testid="catalog-bs-sample-panel" data-warehouse-scope={warehouse ?? 'all'}>
+    <section className={styles.sectionBody} aria-label="BigSeller库存" data-testid="catalog-bs-sample-panel" data-warehouse-scope={warehouse ?? 'all'}>
       <div className={styles.sectionHead} style={{ marginBottom: 0 }}>
         <div>
-          <h3 className={styles.sectionTitle}>BS 样表库存（海外）</h3>
+          <h3 className={styles.sectionTitle}>BigSeller 库存（海外）</h3>
           <p className={styles.sectionNote}>
-            样表日期：{exportLabel}
+            {sourceLabel} · 最近来源：{observationText}
           </p>
         </div>
         <p className={styles.sectionNote}>
@@ -1515,73 +1514,89 @@ function BsSampleBusinessBlock({
           )}
         </p>
       </div>
-      {/* V4-03：库存分区先露实际明细行，再给汇总说明；短屏首屏不再只看到大卡片与说明。 */}
-      {!filtered.length && (
-        <p className={styles.sectionNote} data-testid="catalog-inventory-empty-reason">
-          {warehouse
-            ? '本仓没有 BS 样表行。这只表示本仓没有已确认记录，不表示仓库没有货，也不当作库存 0。'
-            : '暂无已确认 BS 样表行；不当作库存 0。'}
-        </p>
+      {scopeReason && (
+        <p className={styles.sectionNote} data-testid="catalog-inventory-empty-reason">{scopeReason}</p>
       )}
-      {filtered.length > 0 && !hasConfirmed && (
-        <p className={styles.sectionNote} data-testid="catalog-inventory-empty-reason">
-          本仓有 BS 样表行，但没有已确认记录；未选择或未采用的行不计入库存。
-        </p>
-      )}
-      {confirmedIsZero && (
-        <p className={styles.sectionNote} data-testid="catalog-inventory-zero">
-          本仓已确认库存为 0 件（样表行明确记录 0）。
-        </p>
-      )}
-      {filtered.length > 0 && (
+      {hasRows && (
         <div className={demoStyles.tableScroll}>
           <table className={demoStyles.table} data-testid="catalog-bs-sample-inventory-table">
             <thead><tr>
-              <th>仓库</th><th>来源 SKU</th><th>选择</th><th>现有</th><th>订单已锁</th><th>整仓可用</th><th>活动预留</th><th>在途</th>
+              <th>仓库</th><th>来源编码</th><th>单位</th><th>现有</th><th>订单已锁</th><th>整仓可用</th><th>活动预留</th><th>在途</th><th>来源时间</th><th>状态</th>
             </tr></thead>
             <tbody>{filtered.map((r) => (
-              <tr key={`${String(r.excelRow)}-${String(r.warehouse)}`} data-testid={`bs-row-${String(r.warehouse)}-${String(r.sku)}`}>
-                <td>{String(r.warehouse)}</td><td>{String(r.sku)}</td><td>{bsSelectionLabel(String(r.selectionState))}</td>
-                <td data-testid="bs-on-hand">{qtyCell(r.onHand)}</td>
+              <tr key={`${r.warehouseExternalId}-${r.externalSku}`} data-testid={`bs-row-${r.warehouse}-${r.externalSku}`}>
+                <td>{r.warehouse}</td><td>{r.externalSku}</td><td>{r.unit ?? '—'}</td><td data-testid="bs-on-hand">{qtyCell(r.onHand)}</td>
                 <td data-testid="bs-order-locked">{qtyCell(r.orderLocked)}</td>
                 <td data-testid="bs-warehouse-available">{qtyCell(r.warehouseAvailable)}</td>
                 <td data-testid="bs-activity-reserved">{qtyCell(r.activityReserved)}</td>
                 <td data-testid="bs-in-transit">{qtyCell(r.inTransit)}</td>
+                <td>{r.observedAt ? new Date(r.observedAt).toLocaleString('zh-CN', { hour12: false }) : '—'}</td>
+                <td>已采用</td>
               </tr>
             ))}</tbody>
           </table>
         </div>
       )}
-      {!hasConfirmed && warehouse && (
-        <InventorySourceHint
-          itemId={itemId}
-          warehouse={warehouse}
-          onOpenEvidence={onOpenEvidence}
-        />
+      {pendingTotal && (
+        <p className={styles.sectionNote} data-testid="catalog-inventory-pending-total">
+          合计待核对：{pendingGroups.map((group) => `${group.name}${group.unit ? `（${group.unit}）` : ''}：${group.rows.map((line) => `${line.externalSku}=${line.onHand ?? '未知'}`).join('、')}`).join('；')}
+          {pendingGroups.length === 0 ? '同仓多个来源编码，逐行显示，未确认合计口径前不擅自相加。' : ' —— 逐行显示；未确认合计口径前不擅自相加，也不选一条充当完整库存。'}
+        </p>
+      )}
+      {pendingSources.length > 0 && (
+        <div data-testid="catalog-pending-sources">
+          <p className={styles.sectionNote}>
+            同仓待确认来源 {pendingSources.length} 行：未确认对应、未计入合计；来源数量 0 表示“来源为 0、待确认归属”，不是没有来源，也不自动绑定。
+          </p>
+          <div className={demoStyles.tableScroll}>
+            <table className={demoStyles.table} data-testid="catalog-pending-sources-table">
+              <thead><tr><th>仓库</th><th>来源编码</th><th>来源数量</th><th>原表行</th><th>状态</th></tr></thead>
+              <tbody>{pendingSources.map((row) => (
+                <tr key={`${row.warehouseName}-${row.externalSku}-${row.excelRow ?? ''}`} data-testid="catalog-pending-source-row">
+                  <td>{row.warehouseName}</td>
+                  <td data-testid="catalog-pending-source-sku">{row.externalSku}</td>
+                  <td data-testid="catalog-pending-source-qty">{qtyCell(row.onHand === null ? null : String(row.onHand))}</td>
+                  <td data-testid="catalog-pending-source-row-number">{row.excelRow ?? '—'}</td>
+                  <td>待确认归属 · 未计入合计</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </div>
       )}
       <dl className={styles.facts}>
         <div>
-          <dt>已确认样表行</dt>
-          <dd>{confirmedRows.length} 行</dd>
+          <dt>已采用来源行</dt>
+          <dd>{filtered.length} 行</dd>
         </div>
         <div>
-          <dt>本范围已确认库存</dt>
-          <dd>{confirmedValue}</dd>
+          <dt>本范围已知库存</dt>
+          <dd data-testid="bs-known-total">{knownTotalText}</dd>
         </div>
         <div>
-          <dt>本范围已估值货值</dt>
-          <dd>
-            {!hasConfirmed
-              ? '不可估值（没有已确认库存）'
-              : valuation.valuationState === 'valued' && valuation.estimatedValueCny !== null
-                ? <strong data-testid="bs-estimated-value">{formatCnyValue(valuation.estimatedValueCny) ?? `¥${valuation.estimatedValueCny}`}</strong>
-                : (valuation.valuationReason ?? '不可估值（不当作 0）')}
-          </dd>
+          <dt>当前货值</dt>
+          <dd>暂未计算（本包不新做估值：旧样表价格不能乘新库存冒充当前货值）</dd>
+        </div>
+        <div>
+          <dt>覆盖</dt>
+          <dd data-testid="catalog-inventory-coverage">{coverageText}</dd>
         </div>
       </dl>
       <p className={styles.sectionNote} data-testid="catalog-inventory-transit-note">
-        在途为 BS 来源观测值，不是业务在途。
+        数量按单个商品计数、原值保存，不乘除装箱数；同仓多编码逐行保留（0 库存也显示）；在途为来源观测值，不是业务在途；旧来源证据不用于判断当前来源。
       </p>
+      {onOpenEvidence && (
+        <p className={styles.sectionNote} data-testid="catalog-inventory-source-link">
+          旧来源证据仅作历史记录，不用于判断当前库存。
+          {' '}
+          <button type="button" className={demoStyles.textLink} onClick={() => onOpenEvidence()}>查看数据来源</button>
+        </p>
+      )}
+      {sample.warnings.length > 0 && (
+        <ul className={styles.sectionNote} data-testid="catalog-inventory-warnings">
+          {sample.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+        </ul>
+      )}
     </section>
   );
 }

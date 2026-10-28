@@ -1,0 +1,916 @@
+/*
+ * 数据同步页（R6 紧凑来源总览）本地样式。
+ * 只用于 sync-view.tsx / sync-controls.tsx；不改 inventory.module.css。
+ * 结构：页头 → 来源列表（每个来源一行）→ 按需展开的详情/设置面板。
+ * 视觉沿用商品库的浅底白面板、靛蓝交互色与克制的状态色；字号按正常阅读大小，不靠缩小文字容纳内容。
+ */
+
+.page {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  color: #273244;
+}
+
+/* ---------- 页头：只留标题与两个导航入口 ---------- */
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  min-width: 0;
+}
+
+.headerText {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  color: #273244;
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.headerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerLink {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 6px 11px;
+  border: 1px solid #dde3ee;
+  border-radius: 7px;
+  background: #fff;
+  color: #5b6b86;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.headerLink:hover {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+  color: #5266d7;
+}
+
+/* ---------- 来源列表 ---------- */
+
+.sourceList {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sourceListHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+
+.sourceListHead h2 {
+  margin: 0;
+  color: #344154;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.sourceListHead p {
+  margin: 0;
+  color: #8a94a1;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 一来源一行：身份 / 状态 / 最后成功数据 / 下次计划 / 待处理 / 操作。 */
+.sourceRow {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1.35fr)
+    minmax(86px, 0.8fr)
+    minmax(150px, 1.1fr)
+    minmax(116px, 0.95fr)
+    minmax(128px, 1fr)
+    auto;
+  align-items: start;
+  gap: 8px 14px;
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid #e6e8ec;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.sourceRow:hover {
+  border-color: #dfe3ec;
+}
+
+.sourceIdentity {
+  min-width: 0;
+}
+
+.sourceIdentity h2 {
+  margin: 0;
+  color: #273244;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.sourceIdentity p {
+  margin: 2px 0 0;
+  color: #8a94a1;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.sourceCell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sourceLabel {
+  color: #8a94a1;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.sourceValue {
+  color: #344154;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.sourceMapping {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sourceCell small {
+  color: #8a94a1;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.sourceActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.actionWrap {
+  display: inline-flex;
+}
+
+.inlineLink {
+  color: #5266d7;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.inlineLink:hover {
+  text-decoration: underline;
+}
+
+.sourceReason {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #7c8798;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.sourceLink {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid #dde3ee;
+  border-radius: 7px;
+  background: #fff;
+  color: #5b6b86;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sourceLink:hover {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+  color: #5266d7;
+}
+
+.futureSources {
+  margin: 0;
+  padding: 2px 2px 0;
+  color: #98a2b1;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---------- 按钮 ---------- */
+
+.primaryButton {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 14px;
+  border: 1px solid #5266d7;
+  border-radius: 7px;
+  background: #5266d7;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.primaryButton:hover:not(:disabled) {
+  border-color: #4057c0;
+  background: #4057c0;
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.secondaryButton {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border: 1px solid #dde3ee;
+  border-radius: 7px;
+  background: #fff;
+  color: #5b6b86;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+  color: #5266d7;
+}
+
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.headerLink:focus-visible,
+.sourceLink:focus-visible,
+.inlineLink:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+}
+
+/* ---------- 来源行下方的短提示（只在真实异常时出现） ---------- */
+
+.controls {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inlineNotice {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #f8f9fc;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.blockedNote {
+  margin: 0;
+  color: #8d3a35;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.writeLocked {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #ecd9b4;
+  border-radius: 8px;
+  background: #fdf7ec;
+  color: #7a5a1b;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.statusMessage {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #f8f9fc;
+  color: #667184;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.statusMessage[data-tone='warn'] {
+  border-color: #ecd9b4;
+  background: #fdf7ec;
+  color: #7a5a1b;
+}
+
+.statusMessage[data-tone='error'] {
+  border-color: #efd9d6;
+  background: #fdf6f5;
+  color: #8d3a35;
+}
+
+/* ---------- 按需展开的面板（详情 / 设置） ---------- */
+
+.sourcePanel,
+.settingsPanel {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e6e8ec;
+  border-radius: 11px;
+  background: #fbfcfe;
+}
+
+.panelInner {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.settingsIntro {
+  margin: 0;
+  color: #7c8798;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.savedSummary {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.savedSummary strong {
+  color: #344154;
+  font-weight: 600;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px 20px;
+  min-width: 0;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #3c4859;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.field > span {
+  font-weight: 550;
+}
+
+.intervalRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.field input[type='text'],
+.field input[type='search'],
+.field input:not([type]),
+.intervalRow input,
+.intervalRow select {
+  min-height: 34px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 7px;
+  background: #fff;
+  color: #273244;
+  font: inherit;
+  font-size: 13px;
+}
+
+.intervalRow input {
+  width: 6.5rem;
+}
+
+.checkLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #3c4859;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.checkLine input {
+  width: 15px;
+  height: 15px;
+  accent-color: #5266d7;
+}
+
+.fieldHint {
+  margin: 0;
+  color: #8a94a1;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.fieldHint[data-tone='error'] {
+  color: #a2493f;
+}
+
+.warehouseGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.warehouseGrid .checkLine {
+  align-items: flex-start;
+}
+
+.warehouseGrid small {
+  display: block;
+  color: #8a94a1;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+.draftNotice {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid #ecd9b4;
+  border-left: 3px solid #c99a45;
+  border-radius: 8px;
+  background: #fdf7ec;
+  color: #7a5a1b;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+/* ---------- 异常提示（详情面板内） ---------- */
+
+.alertList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alertItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 14px;
+  padding: 10px 12px;
+  border: 1px solid #ecd9b4;
+  border-left: 3px solid #c99a45;
+  border-radius: 8px;
+  background: #fdf7ec;
+}
+
+.alertItem[data-tone='red'] {
+  border-color: #efd9d6;
+  border-left-color: #c0554f;
+  background: #fdf6f5;
+}
+
+.alertText {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.alertText strong {
+  display: block;
+  color: #7a5a1b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.alertItem[data-tone='red'] .alertText strong {
+  color: #8d3a35;
+}
+
+.alertText p {
+  margin: 2px 0 0;
+  color: #7c8798;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.alertLink {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid #d9d0be;
+  border-radius: 6px;
+  background: #fff;
+  color: #7c6a49;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.alertLink:hover {
+  border-color: #c6b895;
+  background: #fffdf7;
+}
+
+.statusOkLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #5f8a70;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---------- 详情面板内的分区与表格 ---------- */
+
+.detailSection {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  border: 1px solid #e6e8ec;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 13px 16px 8px;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  color: #344154;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.sectionHeader p {
+  margin: 0;
+  flex: 1 1 320px;
+  color: #7c8798;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.sectionBody {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 2px 16px 16px;
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.tableWrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid #eef0f3;
+  border-radius: 9px;
+  scrollbar-width: thin;
+  scrollbar-color: #cfd5df #f7f8fa;
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th {
+  padding: 9px 12px;
+  border-bottom: 1px solid #e9ecf1;
+  background: #f9fafc;
+  color: #8a94a1;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f2f3f6;
+  color: #4d5a6b;
+  font-size: 13px;
+  line-height: 1.65;
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+  background: #fafbfe;
+}
+
+.numCell {
+  text-align: right;
+}
+
+.wrapCell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.rowSub {
+  display: block;
+  margin-top: 2px;
+  color: #8a94a1;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.rowSubAlert {
+  color: #a2493f;
+}
+
+/* 逐仓：文件保存成功 ≠ SKU 全部已对应。 */
+.pendingNote {
+  display: block;
+  margin-top: 2px;
+  color: #a37e45;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.inlineError {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid #efd9d6;
+  border-left: 3px solid #c0554f;
+  border-radius: 8px;
+  background: #fdf6f5;
+  color: #8d3a35;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.mappingNote {
+  margin: 0;
+  color: #8a94a1;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* ---------- 面板内按需展开（任务历史 / 诊断） ---------- */
+
+.collapsible {
+  min-width: 0;
+  border: 1px solid #e6e8ec;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.collapsible > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: #344154;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  list-style: none;
+}
+
+.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 1em;
+  color: #8a94a1;
+  font-size: 11px;
+  transition: none;
+}
+
+.collapsible[open] > summary::before {
+  content: '▾';
+}
+
+.collapsible > summary:hover {
+  background: #fafbfe;
+}
+
+.summaryHint {
+  flex: 1 1 320px;
+  color: #8a94a1;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.collapsibleBody {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 0 16px 16px;
+}
+
+.subGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px 16px;
+  min-width: 0;
+}
+
+.subPanel {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #eef0f3;
+  border-radius: 9px;
+  background: #fbfcfe;
+}
+
+.subPanel h4 {
+  margin: 0 0 8px;
+  color: #344154;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.subPanelTitle {
+  margin: 4px 0 0;
+  color: #344154;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.factList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.factList > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.factList dt {
+  margin: 0;
+  color: #8a94a1;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.factList dd {
+  margin: 0;
+  color: #4c586a;
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.factList dd small {
+  display: block;
+  margin-top: 2px;
+  color: #8a94a1;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.hintList {
+  margin: 0;
+  padding-left: 18px;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---------- 窄屏：来源行改为分块排列，操作独占一行（不影响 1280 默认首屏） ---------- */
+
+@media (max-width: 1160px) {
+  .sourceRow {
+    grid-template-columns: minmax(150px, 1fr) repeat(2, minmax(120px, 1fr));
+    gap: 10px 16px;
+  }
+
+  .sourceIdentity,
+  .sourceActions,
+  .sourceReason {
+    grid-column: 1 / -1;
+  }
+
+  .sourceActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .sourceRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sourceIdentity {
+    grid-column: 1 / -1;
+  }
+
+  .sectionHeader {
+    padding: 12px 13px 7px;
+  }
+
+  .sectionBody,
+  .collapsibleBody {
+    padding: 2px 13px 13px;
+  }
+
+  .sourcePanel,
+  .settingsPanel {
+    padding: 12px 12px;
+  }
+}

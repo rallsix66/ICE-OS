@@ -1,28 +1,24 @@
 import type { CatalogListClientRow } from './list-client-types';
-import { clientRowAsDisplayRow } from './list-client-types';
 import { applyWarehouseScopeToDisplayRow } from './client-scope';
-import { formatCnyPrice, formatCnyValue } from './money-display';
+import { clientRowAsDisplayRow } from './list-client-types';
+import { formatCnyPrice } from './money-display';
 import type { AdoptedUnitCost } from './adopted-price';
 
 export type DisplayAvailability = 'not_imported' | 'read_failed' | 'forbidden';
 
-/** 从导出来源标签里取样表日期（YYYY-MM-DD）；取不到返回 null，不编造日期。 */
-export function sampleDateFromLabel(exportLabel: string | null | undefined): string | null {
-  const raw = exportLabel?.trim();
-  if (!raw) return null;
-  const match = raw.match(/\d{4}-\d{2}-\d{2}/);
-  return match ? match[0] : null;
+function pad2(value: number) {
+  return String(value).padStart(2, '0');
 }
 
 /**
- * 列表上唯一一处紧凑样表标识：`样表 · 2026-10-15`。
- * 日期取自 exportLabel；解析不到时原样回退 exportLabel 文本，绝不编造日期。
+ * 列表上唯一的库存来源标识：`BigSeller 库存 · 最近来源 2026-10-26 21:11`。
+ * 时间来自本次导出完成时间；取不到时只显示来源名，不编造日期。
  */
-export function formatSampleLabel(exportLabel: string | null | undefined): string {
-  const raw = exportLabel?.trim();
-  if (!raw) return '样表';
-  const date = sampleDateFromLabel(raw);
-  return date ? `样表 · ${date}` : `样表 · ${raw}`;
+export function formatSampleLabel(observationAt: string | null | undefined): string {
+  if (!observationAt) return 'BigSeller 库存';
+  const date = new Date(observationAt);
+  if (Number.isNaN(date.getTime())) return 'BigSeller 库存';
+  return `BigSeller 库存 · 最近来源 ${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
 
 /** 列表当前上下文 URL（q / warehouse / page 的规范形式）；用于新标签页的 from 回跳。 */
@@ -63,17 +59,36 @@ export function pageEntries(current: number, total: number): PageEntry[] {
   return entries;
 }
 
+/**
+ * 当前仓库库存单元格：
+ * - 已采用的单码行显示已知小计；不完整时明确标“（不完整）”；
+ * - 同仓多编码显示“合计待核对”，不擅自相加，也不选一条充当完整库存；
+ * - 本仓无当前行时按库存模块的缺口原因显示，不当作 0。
+ */
 export function formatInventoryCell(row: CatalogListClientRow, warehouse: string, displayUnavailable?: DisplayAvailability) {
-  if (displayUnavailable === 'not_imported') return '样表未导入';
-  if (displayUnavailable === 'read_failed') return '样表读取失败';
-  if (displayUnavailable === 'forbidden') return '样表无权限';
+  if (displayUnavailable === 'not_imported') return '库存未接入';
+  if (displayUnavailable === 'read_failed') return '库存读取失败';
+  if (displayUnavailable === 'forbidden') return '库存无权限';
   const display = clientRowAsDisplayRow(row);
   const scoped = warehouse === 'all' ? display : applyWarehouseScopeToDisplayRow(display, warehouse);
-  const sample = scoped.bsSample;
-  if (sample.valuationState === 'no_warehouse_line') return '本仓无对应';
-  if (sample.confirmedOnHandTotal !== null) return sample.confirmedOnHandTotal;
-  if (sample.valuationReason?.includes('尚未建档')) return '未建档';
-  if (sample.valuationState === 'no_inventory' && sample.confirmedLineCount === 0) return '无已确认库存';
+  const view = scoped.inventory;
+  const warehouseScope = warehouse !== 'all' ? view.warehouseScopes[warehouse] : undefined;
+  if (warehouseScope?.inventoryState === 'failed' && warehouseScope.confirmedLineCount === 0) return '本仓同步失败';
+  if (view.unitConflict) return '多单位待核对';
+  if (view.hasPendingTotal) return '合计待核对';
+  if (warehouseScope && warehouseScope.confirmedOnHandTotal !== null) {
+    return warehouseScope.knownSubtotalComplete ? warehouseScope.confirmedOnHandTotal : `${warehouseScope.confirmedOnHandTotal}（不完整）`;
+  }
+  if (view.knownSubtotal !== null) {
+    return view.knownSubtotalComplete ? view.knownSubtotal : `${view.knownSubtotal}（不完整）`;
+  }
+  if (!view.hasCurrentData) {
+    if (warehouseScope?.inventoryState === 'unmapped_source') return '来源待核对';
+    if (warehouseScope?.inventoryState === 'unseen') return '本次未见';
+    if (warehouseScope?.inventoryState === 'no_source') return '无来源记录';
+    if (warehouseScope?.inventoryState === 'no_data') return '本仓尚未同步';
+    return '暂无库存记录';
+  }
   return '—';
 }
 
@@ -87,20 +102,14 @@ export function formatAdoptedUnitCostCell(adopted: AdoptedUnitCost | null) {
   return formatCnyPrice(adopted.amountCny) ?? `¥${adopted.amountCny}`;
 }
 
-export function formatEstimatedValueCell(row: CatalogListClientRow, warehouse: string, displayUnavailable?: DisplayAvailability) {
-  if (displayUnavailable === 'not_imported') return '样表未导入';
-  if (displayUnavailable === 'read_failed') return '样表读取失败';
-  if (displayUnavailable === 'forbidden') return '样表无权限';
-  const display = clientRowAsDisplayRow(row);
-  const scoped = warehouse === 'all' ? display : applyWarehouseScopeToDisplayRow(display, warehouse);
-  const sample = scoped.bsSample;
-  if (sample.valuationState === 'valued' && sample.estimatedValueCny !== null) {
-    return formatCnyValue(sample.estimatedValueCny) ?? `¥${sample.estimatedValueCny}`;
-  }
-  if (sample.valuationState === 'no_warehouse_line') return '本仓无对应';
-  if (sample.valuationReason?.includes('尚未建档')) return '未建档';
-  if (sample.valuationState === 'no_price') return sample.valuationReason ?? '缺价';
-  if (sample.valuationState === 'not_applicable' && sample.valuationReason?.includes('金额')) return '无金额权限';
-  if (sample.valuationState === 'no_inventory' && sample.confirmedOnHandTotal === '0') return '¥0.00';
-  return sample.valuationReason ?? '—';
+/**
+ * 当前货值：本包不新做估值。旧样表价格不得乘新库存冒充当前货值；
+ * 没有适用成本口径时明确显示“暂未计算”，不写 0、不沿用旧金额。
+ */
+export function formatEstimatedValueCell(_row?: CatalogListClientRow, _warehouse?: string, displayUnavailable?: DisplayAvailability) {
+  if (displayUnavailable === 'not_imported') return '—';
+  if (displayUnavailable === 'read_failed' || displayUnavailable === 'forbidden') return '—';
+  return '暂未计算';
 }
+
+export { formatSampleLabel as formatInventorySourceLabel };

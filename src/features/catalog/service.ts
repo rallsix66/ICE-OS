@@ -8,9 +8,8 @@ import { buildCandidates, buildDifferences } from './candidate-service';
 import { appendNonPriceRevisionSchema, assignInitialCodeSchema, importFrozenObservationsSchema, publishBaselineSchema } from './schema';
 import { assignNewItemCode, appendNewItemRevision, getNewItemWriteContext, recoverNewItemRequest } from './new-item/service';
 import { newItemIntent, newItemRepository } from './new-item/repository';
-import { basisDocumentSha256, buildCatalogDisplayOverview, buildCatalogListFallbackFromItems, CatalogDisplayReadError, prepareBsSampleImportPayload } from './local-display/service';
+import { buildCatalogDisplayOverview, buildCatalogListFallbackFromItems, CatalogDisplayReadError, getCatalogItemInventory, prepareBsSampleImportPayload } from './local-display/service';
 import { toCatalogListClientPayload } from './local-display/list-client-types';
-import { warehouseScopeView } from './local-display/warehouse-valuation';
 import { buildRevisionHistoryDisplay } from './history-display';
 import { parseRequestOutcomeInput, resolveCatalogRequestOutcome, REQUEST_ACTION_BY_KIND } from './reconcile';
 import type { CatalogDetailRevisionView, CatalogRequestOutcome, CatalogRevisionEvidenceDto, CatalogRevisionHistoryDto } from './types';
@@ -36,11 +35,11 @@ export async function getCatalogOverview() {
         displayStatus = display ? 'loaded' : 'not_imported';
       } catch (error) {
         if (error instanceof CatalogDisplayReadError) {
-          displayStatus = error.code === 'forbidden' ? 'forbidden' : 'read_failed';
+          displayStatus = error.code === 'forbidden' ? 'forbidden' : error.code === 'not_available' ? 'not_imported' : 'read_failed';
           displayError = error.message;
         } else {
           displayStatus = 'read_failed';
-          displayError = 'BS 样表库存读取失败';
+          displayError = 'BigSeller 库存读取失败';
         }
       }
       return { display, displayStatus, displayError };
@@ -113,11 +112,11 @@ export async function getCatalogListPage() {
     displayStatus = display ? 'loaded' : 'not_imported';
   } catch (error) {
     if (error instanceof CatalogDisplayReadError) {
-      displayStatus = error.code === 'forbidden' ? 'forbidden' : 'read_failed';
+      displayStatus = error.code === 'forbidden' ? 'forbidden' : error.code === 'not_available' ? 'not_imported' : 'read_failed';
       displayError = error.message;
     } else {
       displayStatus = 'read_failed';
-      displayError = 'BS 样表库存读取失败';
+      displayError = 'BigSeller 库存读取失败';
     }
   }
   const payload = display
@@ -145,49 +144,8 @@ export async function importCatalogBsSampleInventory(input: unknown) {
 }
 
 export async function getCatalogItemBsSample(itemId: string, warehouse?: string) {
-  const identity = await requireCatalogAdmin();
-  const amountAllowed = await requireCatalogAdmin('amount:read').then(() => true).catch(() => false);
   if (!/^[a-f\d-]{36}$/i.test(itemId)) throw new Error('CATALOG_INVALID_INPUT');
-  let allRows;
-  let meta;
-  try {
-    [allRows, meta] = await Promise.all([
-      /* V5-02：列表按完整库存行计算“本仓无对应”等状态；详情若先按当前仓筛选，
-         同一空仓会被算成两种状态并触发假同步提示。统一先读完整行，展示时再筛当前仓。 */
-      catalogRepository.itemBsSampleRows(identity, itemId, null),
-      catalogRepository.bsSampleMeta(identity),
-    ]);
-  } catch (error) {
-    if (error instanceof CatalogDisplayReadError) throw error;
-    const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: string }).code) : '';
-    if (code === '42501') throw new CatalogDisplayReadError('forbidden', '应用身份无权读取 BS 样表库存', error);
-    throw new CatalogDisplayReadError('read_failed', 'BS 样表库存读取失败', error);
-  }
-  if (!meta) return { status: 'not_imported' as const, exportLabel: null, rows: [], adoptedUnitCost: null, valuation: null, basisDocumentSha256: null };
-  const [financial, flags] = await Promise.all([
-    amountAllowed ? catalogRepository.amounts(identity, itemId) : Promise.resolve(null),
-    catalogRepository.itemStatusFlags(identity, itemId),
-  ]);
-  const notCreatedBs = flags.bsNotCreated;
-  const inventorySlices = (allRows as Array<Record<string, unknown>>).map((r) => ({
-    itemId,
-    warehouse: String(r.warehouse),
-    onHand: r.onHand == null ? null : String(r.onHand),
-    selectionState: String(r.selectionState),
-  }));
-  const scope = warehouseScopeView(inventorySlices, itemId, warehouse, financial, amountAllowed, notCreatedBs);
-  const rows = warehouse
-    ? (allRows as Array<Record<string, unknown>>).filter((r) => String(r.warehouse) === warehouse)
-    : allRows;
-  const basisHash = await basisDocumentSha256().catch(() => null);
-  return {
-    status: 'loaded' as const,
-    exportLabel: meta.exportLabel ?? null,
-    rows,
-    adoptedUnitCost: financial,
-    basisDocumentSha256: basisHash ?? (typeof meta.basisDocumentSha256 === 'string' ? meta.basisDocumentSha256 : null),
-    valuation: scope,
-  };
+  return getCatalogItemInventory(itemId, warehouse);
 }
 
 export async function getCatalogDetailCore(itemId: string, options: { revision?: number } = {}) {
@@ -368,7 +326,7 @@ export async function getCatalogDetailView(itemId: string, warehouse?: string) {
     } catch (error) {
       bsSampleError = error instanceof CatalogDisplayReadError
         ? error
-        : new CatalogDisplayReadError('read_failed', 'BS 样表库存读取失败', error);
+        : new CatalogDisplayReadError('read_failed', 'BigSeller 库存读取失败', error);
     }
   }
   return {

@@ -1,0 +1,1675 @@
+/* 商品库存 / BigSeller 自动同步页的补充样式（复用 workspace-visual.module.css 的设计语言） */
+.page {
+  --inv-line: #e6e8ec;
+  --inv-indigo: #5266d7;
+  --inv-text: #273244;
+  --inv-muted: #79828f;
+  display: grid;
+  gap: 18px;
+  color: var(--inv-text);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 20px;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  color: #233044;
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.pageHeader p {
+  margin: 6px 0 0;
+  max-width: 62rem;
+  color: var(--inv-muted);
+  font-size: 12px;
+}
+
+.headerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.headerLink {
+  color: #5266d7;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.headerLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cardWide {
+  grid-column: 1 / -1;
+}
+
+.card {
+  min-width: 0;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--inv-line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.card h2 {
+  margin: 0 0 12px;
+  color: #344154;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.card h2 small {
+  margin-left: 8px;
+  color: #98a2b2;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.cardLead {
+  margin: 0 0 12px;
+  color: var(--inv-muted);
+  font-size: 12px;
+  line-height: 1.85;
+}
+
+.cardLead strong {
+  color: #445064;
+  font-weight: 600;
+}
+
+.factList {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.factList > div {
+  display: grid;
+  grid-template-columns: minmax(84px, 0.6fr) minmax(0, 1.6fr);
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.factList > div:last-child {
+  border-bottom: 0;
+}
+
+.factList dt {
+  color: #8d98a8;
+  font-size: 12px;
+}
+
+.factList dd {
+  margin: 0;
+  color: #46536a;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.factList dd small {
+  display: block;
+  margin-top: 2px;
+  color: #98a2b2;
+  font-size: 11px;
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.noteList {
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: #6b7688;
+  font-size: 12px;
+  line-height: 1.9;
+}
+
+.noteList li {
+  margin-bottom: 2px;
+}
+
+.inlineNotice {
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid #e9e3d6;
+  border-radius: 8px;
+  background: #fbf8f0;
+  color: #8b7953;
+  font-size: 12px;
+  line-height: 1.85;
+}
+
+.inlineError {
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid #f2e2df;
+  border-radius: 8px;
+  background: #fcf1ed;
+  color: #a4625b;
+  font-size: 12px;
+  line-height: 1.85;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px 20px;
+  align-items: start;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field > span {
+  color: #6f7b8d;
+  font-size: 12px;
+}
+
+.fieldHint {
+  color: #98a2b2;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.checkLine {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 32px;
+  color: #46536a;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.checkLine input {
+  width: 16px;
+  height: 16px;
+  accent-color: #5266d7;
+}
+
+.intervalRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.intervalRow input {
+  width: 7.5rem;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #273244;
+  font: inherit;
+}
+
+.intervalRow select {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #273244;
+  font: inherit;
+}
+
+.warehouseGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 4px 16px;
+  max-height: 15rem;
+  overflow: auto;
+  padding: 6px 2px;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 15px;
+  border: 1px solid #4057c0;
+  border-radius: 6px;
+  background: #5266d7;
+  color: #fff;
+  font-size: 12px;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: #4057c0;
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.statusMessage {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #e2e7f4;
+  border-radius: 8px;
+  background: #f5f7fd;
+  color: #4c5b78;
+  font-size: 12px;
+  line-height: 1.85;
+}
+
+.statusMessage[data-tone='error'] {
+  border-color: #f2e2df;
+  background: #fcf1ed;
+  color: #a4625b;
+}
+
+.statusMessage[data-tone='warn'] {
+  border-color: #f0e7d6;
+  background: #fbf5e9;
+  color: #8b7445;
+}
+
+.section {
+  min-width: 0;
+  border: 1px solid var(--inv-line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 16px 20px 10px;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  color: #344154;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sectionHeader p {
+  margin: 0;
+  color: #8d98a8;
+  font-size: 11px;
+}
+
+.sectionBody {
+  padding: 0 20px 16px;
+}
+
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.table th {
+  padding: 9px 12px;
+  border-top: 1px solid #eef0f3;
+  border-bottom: 1px solid #e9ecf1;
+  background: #f9fafc;
+  color: #8a94a1;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f1f4;
+  color: #5e6a7a;
+  font-size: 12px;
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+  background-color: #fafbfe;
+}
+
+.table .wrapCell {
+  min-width: 15rem;
+  max-width: 34rem;
+  white-space: normal;
+  line-height: 1.8;
+}
+
+.table .numCell {
+  text-align: right;
+}
+
+.rowTitle {
+  color: #46536a;
+  font-weight: 600;
+}
+
+.rowSub {
+  display: block;
+  margin-top: 2px;
+  color: #98a2b2;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.detailCell {
+  background: #fafbff;
+}
+
+.detailInner {
+  padding: 4px 2px 14px;
+}
+
+.detailHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.detailHeader h3 {
+  margin: 0;
+  color: #3d4b60;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.detailHeader h3 small {
+  margin-left: 8px;
+  color: #98a2b2;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.subGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.subPanel {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e8ecf3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.subPanel h4 {
+  margin: 0 0 8px;
+  color: #4e5b70;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.subPanel p {
+  margin: 0 0 6px;
+  color: #6f7b8d;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.totalsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  padding: 10px 14px;
+  border: 1px solid #e2e7f4;
+  border-radius: 8px;
+  background: #f7f9fe;
+  color: #53617a;
+  font-size: 12px;
+}
+
+.totalsRow strong {
+  color: #33415a;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gapText {
+  color: #8b7445;
+}
+
+.quantityZero {
+  color: #667184;
+}
+
+.quantityUnknown {
+  color: #a4625b;
+}
+
+.mappedTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #667184;
+  font-size: 11px;
+}
+
+.queueList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.queueItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  align-items: start;
+  padding: 11px 13px;
+  border: 1px solid #e8ecf3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.queueItem[data-confirmable='false'] {
+  background: #fbfbfc;
+}
+
+.queueMain {
+  min-width: 0;
+}
+
+.queueMain strong {
+  display: block;
+  color: #46536a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.queueMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 3px;
+  color: #8d98a8;
+  font-size: 11px;
+}
+
+.queueSuggestion {
+  min-width: 0;
+  text-align: right;
+  color: #53617a;
+  font-size: 12px;
+}
+
+.queueSuggestion small {
+  display: block;
+  margin-top: 2px;
+  color: #98a2b2;
+  font-size: 11px;
+}
+
+.mappingTableActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mappingNote {
+  margin: 10px 0 0;
+  color: #8d98a8;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.filterForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  padding: 14px 18px 4px;
+}
+
+.filterForm label {
+  display: grid;
+  gap: 4px;
+  color: #6f7b8d;
+  font-size: 12px;
+}
+
+.filterForm input,
+.filterForm select {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #273244;
+  font: inherit;
+  font-size: 12px;
+}
+
+.filterSearch {
+  min-width: 15rem;
+  flex: 1 1 20rem;
+}
+
+.filterActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid #eef0f4;
+  color: #8d98a8;
+  font-size: 11px;
+}
+
+.paginationLinks {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.paginationLinks a,
+.paginationLinks span {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid #dee4ef;
+  border-radius: 5px;
+  color: #6277c8;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.paginationLinks a:hover {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+}
+
+.paginationLinks span[aria-disabled='true'] {
+  color: #b4bcc8;
+  border-color: #eef0f4;
+}
+
+.legacyPanel {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 26px 28px;
+}
+
+.legacyPanel h1 {
+  margin: 0 0 10px;
+  color: #233044;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.legacyPanel h2 {
+  margin: 0 0 8px;
+  color: #344154;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.legacyPanel p {
+  margin: 0 0 10px;
+  color: #667184;
+  font-size: 12px;
+  line-height: 1.9;
+}
+
+.legacyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.notConnectedList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notConnectedItem {
+  padding: 12px 14px;
+  border: 1px dashed #dfe4ee;
+  border-radius: 8px;
+  background: #fafbfd;
+}
+
+.notConnectedItem strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #5e6a7a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notConnectedItem p {
+  margin: 6px 0 0;
+  color: #8d98a8;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.hintList {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #8d98a8;
+  font-size: 11px;
+  line-height: 1.9;
+}
+
+@media (max-width: 900px) {
+  .cardGrid,
+  .formGrid,
+  .subGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pageHeader h1 {
+    font-size: 20px;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * 修改 v2 新增（R1/R2/R5/R7）
+ * ------------------------------------------------------------------ */
+
+.detailHeaderLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+
+.subTitle {
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3a465a;
+  letter-spacing: 0.02em;
+}
+
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wrapCell {
+  white-space: normal;
+  line-height: 1.55;
+  min-width: 12rem;
+}
+
+.emptyState {
+  margin: 0 20px 18px;
+  padding: 18px 20px;
+  border: 1px dashed #c9d1dd;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #4a5668;
+}
+
+.emptyState strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #2f3b4e;
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.mappingEditor {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #dfe5ee;
+  border-radius: 10px;
+  background: #fbfcfe;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mappingEditor .field > span {
+  font-size: 11px;
+  color: #5a677b;
+}
+
+.searchResultList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.searchResultButton {
+  border: 1px solid #c8d4e4;
+  border-radius: 999px;
+  background: #fff;
+  color: #2d4a72;
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.searchResultButton:hover:not(:disabled) {
+  border-color: #7ea3ce;
+  background: #f2f7fd;
+}
+
+.searchResultButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------------ *
+ * 双视图 v1：仓库明细 / 商品汇总 / 国内表格快照
+ * ------------------------------------------------------------------ */
+
+.viewTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 20px;
+  margin: 4px 0 12px;
+}
+
+.viewTab {
+  border: 1px solid #c8d4e4;
+  border-radius: 999px;
+  background: #fff;
+  color: #2d4a72;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.5;
+}
+
+.viewTab:hover {
+  border-color: #7ea3ce;
+  background: #f2f7fd;
+}
+
+.viewTabActive,
+.viewTabActive:hover {
+  border-color: #2d4a72;
+  background: #2d4a72;
+  color: #fff;
+}
+
+.viewTabNote {
+  color: #6b7a90;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c8d4e4;
+  border-radius: 8px;
+  background: #fff;
+  color: #2d4a72;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.secondaryButton:hover {
+  border-color: #7ea3ce;
+  background: #f2f7fd;
+}
+
+.numericHead {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.numCellMuted {
+  text-align: right;
+  color: #9aa7b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.cellLink {
+  color: #1f5f9e;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(31, 95, 158, 0.45);
+}
+
+.cellLink:hover {
+  border-bottom-style: solid;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.focusRow td {
+  background: #fff8e6;
+}
+
+.focusNotice {
+  margin: 0 20px 10px;
+  padding: 8px 12px;
+  border: 1px solid #f0d99b;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #7a5a13;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.matrixTable th,
+.matrixTable td {
+  white-space: nowrap;
+}
+
+.matrixTable td:first-child {
+  white-space: normal;
+  min-width: 240px;
+}
+
+.rowExpanded {
+  margin: 14px 20px 6px;
+  padding: 14px 16px;
+  border: 1px solid #d9e2ee;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.rowDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 18px;
+  margin: 10px 0 8px;
+}
+
+.rowDetailGrid > div {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.rowDetailGrid dt {
+  color: #6b7a90;
+  min-width: 68px;
+}
+
+.rowDetailGrid dd {
+  margin: 0;
+  color: #233044;
+  word-break: break-all;
+}
+
+/* ------------------------------------------------------------------ *
+ * 修复包 R1–R6：紧凑首屏 / 固定表头与商品列 / 固定分页 / 单一详情抽屉
+ * ------------------------------------------------------------------ */
+
+.page {
+  font-size: 13px;
+  line-height: 1.6;
+  gap: 12px;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+}
+
+.pageHeader {
+  display: block;
+}
+
+.viewTabs {
+  padding: 0;
+  margin: 10px 0 0;
+}
+
+.toolbar {
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--inv-line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.toolbarForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+
+.toolbarSearch {
+  flex: 1 1 22rem;
+  min-width: 14rem;
+}
+
+.toolbarField {
+  display: grid;
+  gap: 3px;
+  color: #6f7b8d;
+  font-size: 12px;
+}
+
+.toolbarSearch input,
+.toolbarField select {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #273244;
+  font: inherit;
+  font-size: 13px;
+}
+
+.toolbarSearch input {
+  min-width: 0;
+}
+
+.clearLink {
+  align-self: center;
+  color: #5266d7;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.clearLink:hover {
+  text-decoration: underline;
+}
+
+.toolbarNote {
+  margin: 0;
+  color: #8d98a8;
+  font-size: 12px;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid #cfd9ea;
+  border-radius: 999px;
+  background: #f5f7fd;
+  color: #3d4b60;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.chip:hover {
+  border-color: #9fb0d6;
+}
+
+.pageStatus {
+  margin: 0;
+  color: #64718a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.statusSep {
+  margin: 0 6px;
+  color: #b4bcc8;
+}
+
+.statusWarn {
+  color: #a4625b;
+}
+
+.panel {
+  min-width: 0;
+  border: 1px solid var(--inv-line);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.panelBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 9px 14px;
+  border-bottom: 1px solid #eef0f4;
+  background: #fbfcfe;
+}
+
+.panelSummary {
+  margin: 0;
+  color: #53617a;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.panelNote {
+  margin: 0;
+  padding: 6px 14px;
+  color: #8d98a8;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.focusTag {
+  color: #7a5a13;
+  font-size: 12px;
+}
+
+.tableScroll {
+  max-height: min(60vh, 620px);
+  overflow: auto;
+  outline: none;
+}
+
+.fixedTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f7f9fc;
+  border-bottom: 1px solid #e2e7ef;
+}
+
+.fixedTable td,
+.fixedTable th {
+  font-size: 13px;
+}
+
+.fixedTable .stickyCol {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 1px 0 0 #eef0f4;
+}
+
+.fixedTable thead .stickyCol {
+  z-index: 4;
+  background: #f7f9fc;
+}
+
+.fixedTable tbody tr:hover td {
+  background-color: #fafbfe;
+}
+
+.fixedTable tbody tr[data-focus='true'] td,
+.fixedTable tbody tr[data-focus='true'] td.stickyCol {
+  background: #fff8e6;
+}
+
+.fixedTable td {
+  padding: 8px 12px;
+}
+
+.fixedTable th {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.rowTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rowSub {
+  font-size: 12px;
+}
+
+.rowNameButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2f3f57;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowNameButton:hover {
+  color: #2d4a72;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rowDetailButton {
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid #c8d4e4;
+  border-radius: 7px;
+  background: #fff;
+  color: #2d4a72;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rowDetailButton:hover {
+  border-color: #7ea3ce;
+  background: #f2f7fd;
+}
+
+.actionHead,
+.actionCell {
+  width: 72px;
+  text-align: center;
+}
+
+.statusLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #3f4d63;
+  font-size: 13px;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #98a2b2;
+}
+
+.statusDot[data-tone='green'] { background: #3f9d6b; }
+.statusDot[data-tone='amber'] { background: #cf9a2f; }
+.statusDot[data-tone='red'] { background: #c0564c; }
+.statusDot[data-tone='blue'] { background: #4d7fca; }
+
+.tableFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 8px 14px;
+  border-top: 1px solid #eef0f4;
+  background: #fbfcfe;
+}
+
+.pageSummary {
+  color: #7a8799;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pageLinks {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pageLink,
+.pageLinkDisabled,
+.pageLinkCurrent,
+.pageGap {
+  display: inline-flex;
+  min-width: 30px;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border: 1px solid #dee4ef;
+  border-radius: 6px;
+  color: #4b5f8f;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.pageLink:hover {
+  border-color: #b8c3e8;
+  background: #f4f6ff;
+}
+
+.pageLinkDisabled {
+  color: #b4bcc8;
+  border-color: #eef0f4;
+}
+
+.pageLinkCurrent {
+  border-color: #2d4a72;
+  background: #2d4a72;
+  color: #fff;
+  font-weight: 600;
+}
+
+.pageGap {
+  border: 0;
+  color: #9aa7b8;
+}
+
+.pageJump {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pageJump input {
+  width: 4.6rem;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid #dce1e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #273244;
+  font: inherit;
+  font-size: 12px;
+}
+
+.pageJumpButton {
+  min-height: 28px;
+  padding: 3px 12px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+  background: #fff;
+  color: #2d4a72;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pageJumpButton:hover {
+  border-color: #7ea3ce;
+  background: #f2f7fd;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.footNote {
+  margin: 0;
+  color: #9aa7b8;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.detailBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(23, 33, 48, 0.34);
+}
+
+.detailDrawer {
+  display: flex;
+  width: min(560px, 94vw);
+  height: 100%;
+  flex-direction: column;
+  background: #fff;
+  box-shadow: -18px 0 46px rgba(24, 36, 54, 0.22);
+  outline: none;
+}
+
+.detailDrawerHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.detailDrawerHead h2 {
+  margin: 0;
+  color: #26364c;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.detailDrawerHead p {
+  margin: 3px 0 0;
+  color: #8d98a8;
+  font-size: 12px;
+}
+
+.detailClose {
+  flex: none;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid #d7dfea;
+  border-radius: 7px;
+  background: #fff;
+  color: #46536a;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.detailClose:hover {
+  border-color: #9fb0d6;
+  background: #f4f6ff;
+}
+
+.detailDrawerBody {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 14px 18px;
+}
+
+.detailDrawerFoot {
+  padding: 8px 18px;
+  border-top: 1px solid #eef0f4;
+  color: #9aa7b8;
+  font-size: 11px;
+}
+
+.detailLead {
+  margin: 0;
+  color: #5b687c;
+  font-size: 12px;
+}
+
+.detailSub {
+  display: block;
+  margin-top: 2px;
+  color: #8d98a8;
+  font-size: 12px;
+}
+
+.detailStatusLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 10px 0 4px;
+  color: #6f7b8d;
+  font-size: 12px;
+}
+
+.factGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 12px 0 0;
+}
+
+.factGrid > div {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.factGrid dt {
+  flex: none;
+  color: #7a8799;
+  font-size: 12px;
+}
+
+.factGrid dd {
+  margin: 0;
+  color: #26364c;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.detailNote {
+  margin: 10px 0 0;
+  color: #7a8799;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.detailMore {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.detailMore summary {
+  color: #46536a;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.detailMore .factGrid {
+  margin-top: 8px;
+}
+
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.detailTotals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid #e2e7f4;
+  border-radius: 8px;
+  background: #f7f9fe;
+  color: #53617a;
+  font-size: 12px;
+}
+
+.detailTotals strong {
+  color: #26364c;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.detailLoading {
+  margin: 12px 0 0;
+  padding: 12px;
+  border: 1px dashed #d7dfea;
+  border-radius: 8px;
+  background: #fafbfd;
+  color: #7a8799;
+  font-size: 12px;
+}
+
+.detailTableWrap {
+  margin-top: 12px;
+  overflow: auto;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+}
+
+.detailTableWrap .table th,
+.detailTableWrap .table td {
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.detailHistory {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #6f7b8d;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.panelSection {
+  min-width: 0;
+}
+
+/* 修复轮 2：表格面板在视口内固定高度，分页底栏始终可见（不遮内容）。 */
+.panel:has(.tableScroll) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.panel:has(.tableScroll) .tableScroll {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: none;
+}
+
+.panel:has(.tableScroll) .tableFooter {
+  flex: none;
+}
+
+.panel:has(.tableScroll) .panelNote {
+  flex: none;
+}
+
+.toolbar {
+  padding: 8px 12px;
+}
+
+.toolbarField span {
+  font-size: 11px;
+}
+/* 修复轮 2b：flex 子链允许收缩，表格在面板内滚动，分页底栏不被内容顶出视口。 */
+.panel:has(.tableScroll) .panelSection {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.panel:has(.tableScroll) .panelSection > .panelBar,
+.panel:has(.tableScroll) .panelSection > .panelNote {
+  flex: none;
+}
+/* 修复轮 3：页面占满视口高度（标题/工具栏/状态在顶部，表格面板占剩余高度）。 */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 96px);
+  min-height: 560px;
+  gap: 10px;
+}
+
+.page > .pageHeader,
+.page > .toolbar,
+.page > .pageStatus,
+.page > .footNote,
+.page > .inlineError {
+  flex: none;
+}
+
+.panel:has(.tableScroll) .tableScroll {
+  min-height: 120px;
+}
+/* 修复轮 4：商品列限宽换行，长名称不把行操作挤出表格可视区。 */
+.fixedTable .stickyCol {
+  min-width: 260px;
+  max-width: 380px;
+  white-space: normal;
+}
+
+.fixedTable .rowNameButton,
+.fixedTable .rowTitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 340px;
+}

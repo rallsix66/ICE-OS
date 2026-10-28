@@ -1,6 +1,6 @@
 import type { FieldObservation } from '../types';
 import type { AdoptedUnitCost } from './adopted-price';
-import type { CatalogDisplayOverview, CatalogDisplayRow, WarehouseScopeView } from './display-types';
+import type { CatalogDisplayOverview, CatalogDisplayRow, CatalogInventoryItemView, WarehouseScopeView } from './display-types';
 
 function observedText(field: FieldObservation | undefined): string | null {
   if (!field || field.state !== 'observed') return null;
@@ -8,6 +8,9 @@ function observedText(field: FieldObservation | undefined): string | null {
   if (field.meaning === 'value') return field.raw;
   return null;
 }
+
+/** Client-safe inventory view: no line-level rows (detail fetches its own). */
+export type CatalogInventoryListView = Omit<CatalogInventoryItemView, 'lines'>;
 
 /** Client-safe list row: no full catalog field map or audit payloads. */
 export type CatalogListClientRow = {
@@ -26,25 +29,27 @@ export type CatalogListClientRow = {
   sourceSearchTokens: string[];
   adoptedUnitCost: AdoptedUnitCost | null;
   materialStatus: string;
-  bsSample: {
-    confirmedOnHandTotal: string | null;
-    confirmedLineCount: number;
-    warehouseScopes: Record<string, WarehouseScopeView>;
-    estimatedValueCny: string | null;
-    valuationState: CatalogDisplayRow['bsSample']['valuationState'];
-    valuationReason: string | null;
-  };
+  /** 统一库存视图（与商品库存页同一 effective-row 口径）。 */
+  inventory: CatalogInventoryListView;
+  /** 列表/详情漂移指纹（含全仓）。 */
   inventoryProjectionByWarehouse: Record<string, string>;
 };
 
 export type CatalogListClientPayload = {
   basisDocumentSha256: string;
   exportLabel: string | null;
+  observationAt: string | null;
   warehouseOptions: string[];
   coverage: CatalogDisplayOverview['coverage'];
   warehouseCoverage: CatalogDisplayOverview['warehouseCoverage'];
   rows: CatalogListClientRow[];
 };
+
+function toListView(view: CatalogInventoryItemView): CatalogInventoryListView {
+  const clientView: Record<string, unknown> = { ...view };
+  delete clientView.lines;
+  return clientView as unknown as CatalogInventoryListView;
+}
 
 export function toCatalogListClientPayload(
   display: CatalogDisplayOverview,
@@ -53,6 +58,7 @@ export function toCatalogListClientPayload(
   return {
     basisDocumentSha256: display.basisDocumentSha256,
     exportLabel: display.exportLabel,
+    observationAt: display.rows.find((row) => row.inventory.lastObservedAt)?.inventory.lastObservedAt ?? null,
     warehouseOptions: display.warehouseOptions,
     coverage: display.coverage,
     warehouseCoverage: display.warehouseCoverage,
@@ -71,20 +77,25 @@ export function toCatalogListClientPayload(
       sourceSearchTokens: sourceSearchTokens.get(row.item.itemId) ?? [],
       adoptedUnitCost: row.adoptedUnitCost,
       materialStatus: row.materialStatus,
-      bsSample: {
-        confirmedOnHandTotal: row.bsSample.confirmedOnHandTotal,
-        confirmedLineCount: row.bsSample.confirmedLineCount,
-        warehouseScopes: row.bsSample.warehouseScopes,
-        estimatedValueCny: row.bsSample.estimatedValueCny,
-        valuationState: row.bsSample.valuationState,
-        valuationReason: row.bsSample.valuationReason,
-      },
+      inventory: toListView(row.inventory),
       inventoryProjectionByWarehouse: row.bsSample.inventoryProjectionByWarehouse,
     })),
   };
 }
 
 export function clientRowAsDisplayRow(row: CatalogListClientRow): CatalogDisplayRow {
+  const view: CatalogInventoryItemView = { ...row.inventory, lines: [] };
+  const allScope: WarehouseScopeView = {
+    confirmedOnHandTotal: view.knownSubtotal,
+    estimatedValueCny: null,
+    valuationState: 'not_computed',
+    valuationReason: '当前货值暂未计算（本包不新做估值）',
+    confirmedLineCount: 0,
+    inventoryState: view.hasPendingTotal ? 'pending_total' : view.hasCurrentData ? 'current' : 'no_source',
+    pendingTotal: view.hasPendingTotal,
+    pendingSourceRowCount: 0,
+    lastObservedAt: view.lastObservedAt,
+  };
   return {
     item: {
       itemId: row.itemId,
@@ -105,16 +116,24 @@ export function clientRowAsDisplayRow(row: CatalogListClientRow): CatalogDisplay
     specificationText: row.specificationText,
     adoptedUnitCost: row.adoptedUnitCost,
     materialStatus: row.materialStatus,
+    inventory: view,
     bsSample: {
       exportLabel: null,
-      confirmedOnHandTotal: row.bsSample.confirmedOnHandTotal,
-      confirmedLineCount: row.bsSample.confirmedLineCount,
+      lastObservedAt: view.lastObservedAt,
+      confirmedOnHandTotal: view.knownSubtotal,
+      confirmedLineCount: 0,
       warehouseOnHand: {},
-      warehouseScopes: row.bsSample.warehouseScopes,
+      warehouseScopes: { ...view.warehouseScopes, all: allScope },
       inventoryProjectionByWarehouse: row.inventoryProjectionByWarehouse,
-      estimatedValueCny: row.bsSample.estimatedValueCny,
-      valuationState: row.bsSample.valuationState,
-      valuationReason: row.bsSample.valuationReason,
+      estimatedValueCny: null,
+      valuationState: 'not_computed',
+      valuationReason: '当前货值暂未计算（本包不新做估值）',
+      hasCurrentData: view.hasCurrentData,
+      hasPendingTotal: view.hasPendingTotal,
+      knownSubtotalComplete: view.knownSubtotalComplete,
+      pendingTotalWarehouses: view.pendingTotalWarehouses,
+      coveredWarehouseCount: view.coveredWarehouseCount,
+      scopeWarehouseCount: view.scopeWarehouseCount,
     },
   };
 }

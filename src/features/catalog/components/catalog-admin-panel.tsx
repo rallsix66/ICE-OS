@@ -100,11 +100,11 @@ function observedRaw(fields: Record<string, unknown>, key: string): string | nul
 function displayStatusLabel(status: Overview['displayStatus']): { text: string; detail: string } {
   switch (status) {
     case 'loaded':
-      return { text: '已读取（本页只显示状态，不展开明细）', detail: '样表库存可读；明细在商品库列表与详情。' };
+      return { text: '已读取（本页只显示状态，不展开明细）', detail: 'BigSeller 库存可读；明细在商品库列表与详情。' };
     case 'not_imported':
-      return { text: '尚未导入（不是 0 条）', detail: '当前没有承接的样表库存，未读不等于 0。' };
+      return { text: '尚未接入（不是 0 条）', detail: '当前没有承接的 BigSeller 库存；未读不等于 0，旧样表只作历史证据。' };
     case 'read_failed':
-      return { text: '读取失败（不代表 0 条）', detail: '样表库存读取失败；请保留本页并稍后重试，不要据此判断无库存。' };
+      return { text: '读取失败（不代表 0 条）', detail: 'BigSeller 库存读取失败；请保留本页并稍后重试，不要据此判断无库存。' };
     case 'forbidden':
       return { text: '当前账号无权读取', detail: '权限由系统校验；隐藏按钮不代表已授权。' };
     default:
@@ -359,7 +359,7 @@ export function CatalogAdminPanel({ overview }: { overview: Overview }) {
             <dd>{overview.release ? `${overview.release.selectedCount} 条` : '未发布'}</dd>
           </div>
           <div>
-            <dt>样表库存</dt>
+            <dt>BigSeller 库存</dt>
             <dd className={overview.displayStatus === 'loaded' ? styles.positive : styles.notEnabled}>{display.text}</dd>
           </div>
           <div>
@@ -370,7 +370,7 @@ export function CatalogAdminPanel({ overview }: { overview: Overview }) {
         <p className={styles.muted}>{display.detail}</p>
         <p className={styles.tableNote}>
           {overview.release ? `已载入基线：${overview.release.itemCount} 款商品、${overview.release.observationCount} 条来源记录。` : '尚未载入可读基线。'}
-          {' '}样表明细与金额不在本页展开。
+          {' '}库存明细与金额不在本页展开；旧 BS 样表只作历史证据。
         </p>
       </div>
     </section>

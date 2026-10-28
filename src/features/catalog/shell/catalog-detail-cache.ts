@@ -54,6 +54,7 @@ export function buildDetailAuthToken(context: CatalogDetailCacheContext): string
 type BsInventoryRow = {
   warehouse?: unknown;
   sku?: unknown;
+  externalSku?: unknown;
   onHand?: unknown;
   orderLocked?: unknown;
   warehouseAvailable?: unknown;
@@ -62,31 +63,37 @@ type BsInventoryRow = {
 };
 
 function warehouseScopeForList(
-  row: Pick<CatalogListClientRow, 'bsSample'>,
+  row: Pick<CatalogListClientRow, 'inventory'>,
   warehouse: string,
 ): WarehouseScopeView & { confirmedOnHandTotal: string | null } {
   const wh = normalizeDetailWarehouse(warehouse);
   if (wh === 'all') {
     return {
-      confirmedOnHandTotal: row.bsSample.confirmedOnHandTotal,
-      estimatedValueCny: row.bsSample.estimatedValueCny,
-      valuationState: row.bsSample.valuationState,
-      valuationReason: row.bsSample.valuationReason,
-      confirmedLineCount: row.bsSample.confirmedLineCount,
+      confirmedOnHandTotal: row.inventory.knownSubtotal,
+      estimatedValueCny: null,
+      valuationState: 'not_computed',
+      valuationReason: null,
+      confirmedLineCount: 0,
+      inventoryState: row.inventory.hasPendingTotal ? 'pending_total' : row.inventory.hasCurrentData ? 'current' : 'no_source',
+      pendingTotal: row.inventory.hasPendingTotal,
+      lastObservedAt: row.inventory.lastObservedAt,
     };
   }
-  const scoped = row.bsSample.warehouseScopes[wh];
+  const scoped = row.inventory.warehouseScopes[wh];
   return scoped ?? {
     confirmedOnHandTotal: null,
     estimatedValueCny: null,
-    valuationState: 'no_warehouse_line',
+    valuationState: 'not_computed',
     valuationReason: null,
     confirmedLineCount: 0,
+    inventoryState: 'no_source',
+    pendingTotal: false,
+    lastObservedAt: null,
   };
 }
 
-function valuationScopeToken(scope: Pick<WarehouseScopeView, 'valuationState' | 'estimatedValueCny' | 'confirmedOnHandTotal' | 'confirmedLineCount'>): string {
-  return `${scope.valuationState}\0${scope.estimatedValueCny ?? ''}\0${scope.confirmedOnHandTotal ?? ''}\0${scope.confirmedLineCount}`;
+function inventoryScopeToken(scope: Pick<WarehouseScopeView, 'inventoryState' | 'pendingTotal' | 'confirmedOnHandTotal' | 'lastObservedAt'>): string {
+  return `${scope.inventoryState ?? ''}\0${scope.pendingTotal ? '1' : '0'}\0${scope.confirmedOnHandTotal ?? ''}\0${scope.lastObservedAt ?? ''}`;
 }
 
 function inventoryLinesToken(rows: BsInventoryRow[], warehouse: string): string {
@@ -98,7 +105,7 @@ function inventoryLinesToken(rows: BsInventoryRow[], warehouse: string): string 
   return filtered
     .map((row) => [
       String(row.warehouse ?? ''),
-      String(row.sku ?? ''),
+      String(row.sku ?? row.externalSku ?? ''),
       row.onHand == null ? '' : String(row.onHand),
       row.orderLocked == null ? '' : String(row.orderLocked),
       row.warehouseAvailable == null ? '' : String(row.warehouseAvailable),
@@ -111,13 +118,13 @@ function inventoryLinesToken(rows: BsInventoryRow[], warehouse: string): string 
 
 /** Aggregate list projection — must match server list payload for the same warehouse. */
 export function buildListProjectionToken(
-  row: Pick<CatalogListClientRow, 'bsSample'>,
+  row: Pick<CatalogListClientRow, 'inventory'>,
   warehouse: string | undefined,
   amountAllowed: boolean,
 ): string {
   const wh = normalizeDetailWarehouse(warehouse);
   const scope = warehouseScopeForList(row, wh);
-  return `${wh}\0${amountAllowed ? '1' : '0'}\0${valuationScopeToken(scope)}`;
+  return `${wh}\0${amountAllowed ? '1' : '0'}\0${inventoryScopeToken(scope)}`;
 }
 
 export function buildListProjectionTokenFromView(
@@ -130,11 +137,11 @@ export function buildListProjectionTokenFromView(
   const sample = view.bsSample;
   if (!sample || sample.status !== 'loaded') return `${wh}\0${amountAllowed ? '1' : '0'}\0sample:${sample?.status ?? 'null'}`;
   const v = sample.valuation;
-  return `${wh}\0${amountAllowed ? '1' : '0'}\0${valuationScopeToken({
-    valuationState: v.valuationState,
-    estimatedValueCny: v.estimatedValueCny,
+  return `${wh}\0${amountAllowed ? '1' : '0'}\0${inventoryScopeToken({
+    inventoryState: v.inventoryState,
+    pendingTotal: v.pendingTotal,
     confirmedOnHandTotal: v.confirmedOnHandTotal,
-    confirmedLineCount: v.confirmedLineCount,
+    lastObservedAt: v.lastObservedAt,
   })}`;
 }
 
@@ -200,7 +207,7 @@ export function listAuthorityMatchesLoadedScope(
 export function expectedScopeFromListRow(
   detailId: string,
   warehouse: string | undefined,
-  listRow: Pick<CatalogListClientRow, 'itemId' | 'itemRevision' | 'bsSample' | 'inventoryProjectionByWarehouse'> | undefined,
+  listRow: Pick<CatalogListClientRow, 'itemId' | 'itemRevision' | 'inventory' | 'inventoryProjectionByWarehouse'> | undefined,
   context: CatalogDetailCacheContext,
 ): Pick<CatalogDetailScope, 'itemRevision' | 'listProjectionToken' | 'detailProjectionToken' | 'displayBasisSha256'> | null {
   if (!listRow || listRow.itemId !== detailId) return null;
@@ -275,67 +282,11 @@ export function scopesMatch(
   return true;
 }
 
-/**
- * V3-03：已取得“全部仓库”明细时，同一商品版本/权限/口径下的单仓视图可本地派生：
- * 明细按仓筛选，汇总取列表同版本对应仓投影（服务端已按同一精确规则计算）。
- * 单仓响应不能推断其他仓；数据不完整时返回 null，由调用方局部读取。
+/*
+ * 切仓不再由客户端从“全仓详情”派生单仓视图：派生的覆盖、待合计组、待核来源和警告容易只换数量
+ * 而残留全仓范围信息。切仓统一复用库存模块已有的单仓读取（服务端按 p_warehouse 返回 scoped 结果），
+ * 数量、覆盖、状态、警告与库存页同源。
  */
-export function allWarehouseAuthorityMatches(
-  view: CatalogDetailView,
-  listRow: Pick<CatalogListClientRow, 'itemId' | 'itemRevision' | 'bsSample' | 'inventoryProjectionByWarehouse'> | undefined,
-  context: CatalogDetailCacheContext,
-): boolean {
-  if (!listRow || listRow.itemId !== view.item.itemId) return false;
-  if (listRow.itemRevision !== view.item.revision) return false;
-  const sample = view.bsSample;
-  if (!sample || sample.status !== 'loaded') return false;
-  /* V4-05：全仓总数相同不能证明分仓/锁定/在途明细未变；必须核完整的全仓明细投影。 */
-  const serverAll = listRow.inventoryProjectionByWarehouse?.all;
-  if (!serverAll) return false;
-  const viewAll = buildDetailInventoryProjectionTokenFromRows(
-    (sample.rows ?? []) as InventoryProjectionRow[],
-    'all',
-  );
-  if (viewAll !== serverAll) return false;
-  const viewToken = buildListProjectionTokenFromView(view, 'all', context.amountAllowed);
-  const listToken = buildListProjectionToken(listRow, 'all', context.amountAllowed);
-  if (viewToken !== listToken) return false;
-  const responseBasis = responseDisplayBasisSha256(view);
-  return !responseBasis || responseBasis === context.displayBasisSha256;
-}
-
-export function deriveWarehouseView(params: {
-  view: CatalogDetailView;
-  target: string;
-  listRow: Pick<CatalogListClientRow, 'itemId' | 'itemRevision' | 'bsSample' | 'inventoryProjectionByWarehouse'> | undefined;
-  context: CatalogDetailCacheContext;
-}): CatalogDetailView | null {
-  const { view, listRow } = params;
-  const wh = normalizeDetailWarehouse(params.target);
-  if (wh === 'all') return null;
-  if (view.historical) return null;
-  if (view.bsSampleError) return null;
-  const sample = view.bsSample;
-  if (!sample || sample.status !== 'loaded') return null;
-  if (!listRow || listRow.itemId !== view.item.itemId || listRow.itemRevision !== view.item.revision) return null;
-  const scoped = listRow.bsSample.warehouseScopes?.[wh];
-  if (!scoped) return null;
-  const rows = (sample.rows ?? []) as BsInventoryRow[];
-  /* 派生结果必须再次核对目标仓的完整明细投影；不能用全仓合计掩盖分仓行变化。 */
-  const targetRows = rows.filter((row) => String(row.warehouse ?? '') === wh);
-  const serverTarget = listRow.inventoryProjectionByWarehouse?.[wh];
-  if (!serverTarget) return null;
-  if (buildDetailInventoryProjectionTokenFromRows(targetRows as InventoryProjectionRow[], wh) !== serverTarget) return null;
-  /* 目标仓汇总显示有已确认行，但全仓明细里拿不到该仓行：数据不完整，必须局部读取。 */
-  if (scoped.confirmedLineCount > 0 && targetRows.length === 0) return null;
-  /* 全仓明细必须确实包含多个仓（单仓响应不能冒充全仓）。 */
-  const warehouses = new Set(rows.map((row) => String(row.warehouse ?? '')).filter(Boolean));
-  if (warehouses.size < 2) return null;
-  return {
-    ...view,
-    bsSample: { ...sample, rows: targetRows, valuation: scoped },
-  } as CatalogDetailView;
-}
 
 export type CacheEntry = {
   view: CatalogDetailView;
