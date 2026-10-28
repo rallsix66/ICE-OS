@@ -1,0 +1,2004 @@
+{
+  "source": "real isolated instance run-20261026T013000Z-b4d7f2e1 app RPC JSON (trimmed)",
+  "capturedAt": "2026-10-26T10:09+08:00",
+  "overview": {
+    "runs": [
+      {
+        "id": "9a90ef9b-ac0c-4b69-9aef-986645784a25",
+        "status": "publishing",
+        "errorCode": null,
+        "startedAt": "2026-10-26T10:08:57.096486+08:00",
+        "finishedAt": null,
+        "plannedFor": "2026-10-26T10:08:56.706608+08:00",
+        "triggerKind": "manual",
+        "observationAt": "2026-10-26T10:09:09.298503+08:00",
+        "fileValidation": {
+          "reason": "",
+          "status": "ok",
+          "blocked": false,
+          "comboRowCount": 0,
+          "missingColumns": [],
+          "quantityHeader": {
+            "on_hand": "现有库存",
+            "in_transit": "在途中",
+            "order_locked": "订单已锁",
+            "warehouse_available": "整仓可用"
+          },
+          "ambiguousColumns": [],
+          "duplicateColumns": [],
+          "unattributableRowCount": 0
+        },
+        "exportStartedAt": "2026-10-26T10:09:04.447997+08:00",
+        "exportFinishedAt": "2026-10-26T10:09:09.298503+08:00",
+        "warehouseSummary": {
+          "failed": 0,
+          "noRows": 0,
+          "blocked": 0,
+          "published": 1
+        },
+        "accountIdentityLabel": "laiguoyong@KNZX019402",
+        "accountIdentityStatus": "verified",
+        "fileValidationBlocked": false
+      },
+      {
+        "id": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "status": "success",
+        "errorCode": null,
+        "startedAt": "2026-10-26T10:04:11.573483+08:00",
+        "finishedAt": "2026-10-26T10:08:30.882399+08:00",
+        "plannedFor": "2026-10-26T10:04:11.063733+08:00",
+        "triggerKind": "manual",
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "fileValidation": {
+          "reason": "",
+          "status": "ok",
+          "blocked": false,
+          "comboRowCount": 0,
+          "missingColumns": [],
+          "quantityHeader": {
+            "on_hand": "现有库存",
+            "in_transit": "在途中",
+            "order_locked": "订单已锁",
+            "warehouse_available": "整仓可用"
+          },
+          "ambiguousColumns": [],
+          "duplicateColumns": [],
+          "unattributableRowCount": 0
+        },
+        "exportStartedAt": "2026-10-26T10:04:18.780569+08:00",
+        "exportFinishedAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseSummary": {
+          "failed": 0,
+          "noRows": 0,
+          "blocked": 0,
+          "published": 7
+        },
+        "accountIdentityLabel": "laiguoyong@KNZX019402",
+        "accountIdentityStatus": "verified",
+        "fileValidationBlocked": false
+      }
+    ],
+    "scope": {
+      "id": "28e852cb-ce5b-4f39-b269-c3d15ddd3ea8",
+      "empty": false,
+      "labels": [
+        "越南青林湾仓库",
+        "DEE泰国海外仓(曼谷仓）",
+        "印尼-DEE仓库",
+        "PH-彩妆日均万单简简单单仓",
+        "喜运达MY仓",
+        "菲律宾-新创启辰自建仓",
+        "DEE-龙仔厝（ICE专属）"
+      ],
+      "version": 7,
+      "warehouses": [
+        {
+          "id": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+          "name": "越南青林湾仓库",
+          "market": "VN",
+          "status": "confirmed",
+          "externalId": "50455"
+        },
+        {
+          "id": "582f3a9f-8042-419e-be24-2d0d33690f01",
+          "name": "DEE泰国海外仓(曼谷仓）",
+          "market": "TH",
+          "status": "confirmed",
+          "externalId": "52074"
+        },
+        {
+          "id": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+          "name": "印尼-DEE仓库",
+          "market": "ID",
+          "status": "confirmed",
+          "externalId": "53252"
+        },
+        {
+          "id": "3093fbdc-4cd9-4493-96c1-0ea32f9cd811",
+          "name": "PH-彩妆日均万单简简单单仓",
+          "market": "PH",
+          "status": "confirmed",
+          "externalId": "54409"
+        },
+        {
+          "id": "47ccc294-2069-4577-aa40-733411ef7cff",
+          "name": "喜运达MY仓",
+          "market": "MY",
+          "status": "confirmed",
+          "externalId": "54886"
+        },
+        {
+          "id": "9de23322-1000-4a29-b929-cd994927cc85",
+          "name": "菲律宾-新创启辰自建仓",
+          "market": "PH",
+          "status": "confirmed",
+          "externalId": "56519"
+        },
+        {
+          "id": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+          "name": "DEE-龙仔厝（ICE专属）",
+          "market": null,
+          "status": "confirmed",
+          "externalId": "56673"
+        }
+      ],
+      "warehouseIds": [
+        "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "3093fbdc-4cd9-4493-96c1-0ea32f9cd811",
+        "47ccc294-2069-4577-aa40-733411ef7cff",
+        "582f3a9f-8042-419e-be24-2d0d33690f01",
+        "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "9de23322-1000-4a29-b929-cd994927cc85",
+        "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8"
+      ],
+      "warehouseCount": 7,
+      "lastAllSuccessAt": "2026-10-26T10:04:23.316058+08:00"
+    },
+    "worker": {
+      "pid": 79528,
+      "host": "PC-20260315ZBQL",
+      "online": true,
+      "version": "inv-sync-v2",
+      "workerId": "inv-worker-59532",
+      "lastSeenAt": "2026-10-26T10:10:41.258714+08:00"
+    },
+    "account": {
+      "label": "laiguoyong@KNZX019402",
+      "status": "active",
+      "accountKey": "bigseller-primary",
+      "lastLoginOkAt": "2026-10-26T09:55:48.539757+08:00",
+      "externalAccountCode": "KNZX019402"
+    },
+    "lastRun": {
+      "id": "9a90ef9b-ac0c-4b69-9aef-986645784a25",
+      "status": "publishing",
+      "errorCode": null,
+      "startedAt": "2026-10-26T10:08:57.096486+08:00",
+      "finishedAt": null,
+      "plannedFor": "2026-10-26T10:08:56.706608+08:00",
+      "triggerKind": "manual",
+      "exportFinishedAt": "2026-10-26T10:09:09.298503+08:00",
+      "accountIdentityStatus": "verified"
+    },
+    "mappings": {
+      "recheck": 0,
+      "disabled": 0,
+      "confirmed": 27,
+      "accountLevelIgnored": 0
+    },
+    "settings": {
+      "enabled": false,
+      "scopeId": "28e852cb-ce5b-4f39-b269-c3d15ddd3ea8",
+      "nextRunAt": null,
+      "planAnchorAt": null,
+      "configVersion": 7,
+      "intervalMinutes": 60
+    },
+    "candidates": {
+      "pending": 403
+    },
+    "warehouses": [
+      {
+        "id": "5041b8fd-0fef-4151-89d2-6028366e272a",
+        "name": "昕兰PH自建仓(弃用）",
+        "market": "PH",
+        "status": "excluded",
+        "externalId": "48787"
+      },
+      {
+        "id": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "name": "越南青林湾仓库",
+        "market": "VN",
+        "status": "confirmed",
+        "externalId": "50455"
+      },
+      {
+        "id": "582f3a9f-8042-419e-be24-2d0d33690f01",
+        "name": "DEE泰国海外仓(曼谷仓）",
+        "market": "TH",
+        "status": "confirmed",
+        "externalId": "52074"
+      },
+      {
+        "id": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "name": "印尼-DEE仓库",
+        "market": "ID",
+        "status": "confirmed",
+        "externalId": "53252"
+      },
+      {
+        "id": "3093fbdc-4cd9-4493-96c1-0ea32f9cd811",
+        "name": "PH-彩妆日均万单简简单单仓",
+        "market": "PH",
+        "status": "confirmed",
+        "externalId": "54409"
+      },
+      {
+        "id": "47ccc294-2069-4577-aa40-733411ef7cff",
+        "name": "喜运达MY仓",
+        "market": "MY",
+        "status": "confirmed",
+        "externalId": "54886"
+      },
+      {
+        "id": "9de23322-1000-4a29-b929-cd994927cc85",
+        "name": "菲律宾-新创启辰自建仓",
+        "market": "PH",
+        "status": "confirmed",
+        "externalId": "56519"
+      },
+      {
+        "id": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+        "name": "DEE-龙仔厝（ICE专属）",
+        "market": null,
+        "status": "confirmed",
+        "externalId": "56673"
+      }
+    ],
+    "marketOptions": [
+      {
+        "market": "ID",
+        "warehouses": [
+          {
+            "id": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+            "name": "印尼-DEE仓库",
+            "externalId": "53252"
+          }
+        ],
+        "warehouseCount": 1
+      },
+      {
+        "market": "MY",
+        "warehouses": [
+          {
+            "id": "47ccc294-2069-4577-aa40-733411ef7cff",
+            "name": "喜运达MY仓",
+            "externalId": "54886"
+          }
+        ],
+        "warehouseCount": 1
+      },
+      {
+        "market": "PH",
+        "warehouses": [
+          {
+            "id": "3093fbdc-4cd9-4493-96c1-0ea32f9cd811",
+            "name": "PH-彩妆日均万单简简单单仓",
+            "externalId": "54409"
+          },
+          {
+            "id": "9de23322-1000-4a29-b929-cd994927cc85",
+            "name": "菲律宾-新创启辰自建仓",
+            "externalId": "56519"
+          }
+        ],
+        "warehouseCount": 2
+      },
+      {
+        "market": "TH",
+        "warehouses": [
+          {
+            "id": "582f3a9f-8042-419e-be24-2d0d33690f01",
+            "name": "DEE泰国海外仓(曼谷仓）",
+            "externalId": "52074"
+          }
+        ],
+        "warehouseCount": 1
+      },
+      {
+        "market": "VN",
+        "warehouses": [
+          {
+            "id": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+            "name": "越南青林湾仓库",
+            "externalId": "50455"
+          }
+        ],
+        "warehouseCount": 1
+      }
+    ],
+    "pendingAction": null,
+    "unmappedCount": 701,
+    "warehouseState": [
+      {
+        "name": "越南青林湾仓库",
+        "stale": false,
+        "failed": false,
+        "market": "VN",
+        "externalId": "50455",
+        "lastBatchId": "ed637f8f-cf47-460d-8d55-c20190c4629f",
+        "latestRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "lastErrorCode": null,
+        "lastPublishAt": "2026-10-26T10:10:41.262438+08:00",
+        "lastSuccessAt": "2026-10-26T10:09:09.298503+08:00",
+        "latestRunStatus": "success",
+        "warehouseStatus": "confirmed",
+        "lastSuccessRunId": "9a90ef9b-ac0c-4b69-9aef-986645784a25",
+        "lastObservationAt": "2026-10-26T10:09:09.298503+08:00",
+        "latestRunFinishedAt": "2026-10-26T10:08:30.882399+08:00"
+      },
+      {
+        "name": "DEE泰国海外仓(曼谷仓）",
+        "stale": false,
+        "failed": false,
+        "market": "TH",
+        "externalId": "52074",
+        "lastBatchId": "612885da-2284-4b20-98b1-9ff837ef37f7",
+        "latestRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "warehouseId": "582f3a9f-8042-419e-be24-2d0d33690f01",
+        "lastErrorCode": null,
+        "lastPublishAt": "2026-10-26T10:08:30.647902+08:00",
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunStatus": "success",
+        "warehouseStatus": "confirmed",
+        "lastSuccessRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunFinishedAt": "2026-10-26T10:08:30.882399+08:00"
+      },
+      {
+        "name": "印尼-DEE仓库",
+        "stale": false,
+        "failed": false,
+        "market": "ID",
+        "externalId": "53252",
+        "lastBatchId": "e780ad1b-6086-4c79-b246-281115caa517",
+        "latestRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "lastErrorCode": null,
+        "lastPublishAt": "2026-10-26T10:08:30.706136+08:00",
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunStatus": "success",
+        "warehouseStatus": "confirmed",
+        "lastSuccessRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunFinishedAt": "2026-10-26T10:08:30.882399+08:00"
+      },
+      {
+        "name": "PH-彩妆日均万单简简单单仓",
+        "stale": false,
+        "failed": false,
+        "market": "PH",
+        "externalId": "54409",
+        "lastBatchId": "fa577352-fba9-4408-a455-050da092c16c",
+        "latestRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "warehouseId": "3093fbdc-4cd9-4493-96c1-0ea32f9cd811",
+        "lastErrorCode": null,
+        "lastPublishAt": "2026-10-26T10:08:30.750141+08:00",
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunStatus": "success",
+        "warehouseStatus": "confirmed",
+        "lastSuccessRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunFinishedAt": "2026-10-26T10:08:30.882399+08:00"
+      },
+      {
+        "name": "喜运达MY仓",
+        "stale": false,
+        "failed": false,
+        "market": "MY",
+        "externalId": "54886",
+        "lastBatchId": "e199d06b-7ad1-45d4-a11f-4ecaac1f5925",
+        "latestRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff",
+        "lastErrorCode": null,
+        "lastPublishAt": "2026-10-26T10:08:30.760478+08:00",
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunStatus": "success",
+        "warehouseStatus": "confirmed",
+        "lastSuccessRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunFinishedAt": "2026-10-26T10:08:30.882399+08:00"
+      },
+      {
+        "name": "菲律宾-新创启辰自建仓",
+        "stale": false,
+        "failed": false,
+        "market": "PH",
+        "externalId": "56519",
+        "lastBatchId": "28f00a15-3d0c-4739-806d-18b0e88e4d70",
+        "latestRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "warehouseId": "9de23322-1000-4a29-b929-cd994927cc85",
+        "lastErrorCode": null,
+        "lastPublishAt": "2026-10-26T10:08:30.782413+08:00",
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunStatus": "success",
+        "warehouseStatus": "confirmed",
+        "lastSuccessRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunFinishedAt": "2026-10-26T10:08:30.882399+08:00"
+      },
+      {
+        "name": "DEE-龙仔厝（ICE专属）",
+        "stale": false,
+        "failed": false,
+        "market": null,
+        "externalId": "56673",
+        "lastBatchId": "854aa4d4-41bd-4fd8-8307-902e4e2bb5f4",
+        "latestRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "warehouseId": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+        "lastErrorCode": null,
+        "lastPublishAt": "2026-10-26T10:08:30.826038+08:00",
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunStatus": "success",
+        "warehouseStatus": "confirmed",
+        "lastSuccessRunId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00",
+        "latestRunFinishedAt": "2026-10-26T10:08:30.882399+08:00"
+      }
+    ],
+    "lastSuccessfulRunAt": "2026-10-26T10:04:23.316058+08:00",
+    "scopeLastAllSuccessAt": "2026-10-26T10:04:23.316058+08:00"
+  },
+  "list": {
+    "items": [
+      {
+        "gtin": "6974674957325",
+        "itemId": "b55a8708-3d61-4543-b691-8466913c9a16",
+        "mapped": true,
+        "market": null,
+        "nameCn": "ICE LERSKIN海茴香焕肤水",
+        "iceCode": "LS101295",
+        "unitCount": 1,
+        "unitGroups": [
+          {
+            "unit": "件",
+            "rowCount": 5,
+            "subtotal": 1028,
+            "knownOnHand": 5,
+            "warehouseCount": 5,
+            "hasUnknownQuantity": false
+          }
+        ],
+        "unitConflict": false,
+        "knownSubtotal": 1028,
+        "hasCurrentData": true,
+        "lastObservedAt": "2026-10-26T10:09:09.298503+08:00",
+        "warehouseCount": 5,
+        "failedWarehouses": [],
+        "unseenWarehouses": [],
+        "notMappedWarehouses": []
+      },
+      {
+        "gtin": "6973517482611",
+        "itemId": "727bbaad-147f-4b35-b378-ddfa2435d766",
+        "mapped": true,
+        "market": null,
+        "nameCn": "ICE LERSKIN防晒喷雾 150ML",
+        "iceCode": "LS101302",
+        "unitCount": 1,
+        "unitGroups": [
+          {
+            "unit": "件",
+            "rowCount": 5,
+            "subtotal": 247,
+            "knownOnHand": 5,
+            "warehouseCount": 5,
+            "hasUnknownQuantity": false
+          }
+        ],
+        "unitConflict": false,
+        "knownSubtotal": 247,
+        "hasCurrentData": true,
+        "lastObservedAt": "2026-10-26T10:09:09.298503+08:00",
+        "warehouseCount": 5,
+        "failedWarehouses": [],
+        "unseenWarehouses": [],
+        "notMappedWarehouses": []
+      },
+      {
+        "gtin": null,
+        "itemId": "fe23bcf1-c563-4131-901b-3dd142a5cfb7",
+        "mapped": true,
+        "market": null,
+        "nameCn": "ICE LERSKIN防晒喷雾 50ML",
+        "iceCode": "WM0011",
+        "unitCount": 1,
+        "unitGroups": [
+          {
+            "unit": "件",
+            "rowCount": 5,
+            "subtotal": 23,
+            "knownOnHand": 5,
+            "warehouseCount": 5,
+            "hasUnknownQuantity": false
+          }
+        ],
+        "unitConflict": false,
+        "knownSubtotal": 23,
+        "hasCurrentData": true,
+        "lastObservedAt": "2026-10-26T10:09:09.298503+08:00",
+        "warehouseCount": 5,
+        "failedWarehouses": [],
+        "unseenWarehouses": [],
+        "notMappedWarehouses": []
+      },
+      {
+        "gtin": "757577983013",
+        "itemId": "956a925a-8029-4c22-b236-ad06c2a2f7fb",
+        "mapped": true,
+        "market": null,
+        "nameCn": "ICE LERSKIN双色泥膜",
+        "iceCode": "WM0026",
+        "unitCount": 1,
+        "unitGroups": [
+          {
+            "unit": "件",
+            "rowCount": 6,
+            "subtotal": 13068,
+            "knownOnHand": 6,
+            "warehouseCount": 5,
+            "hasUnknownQuantity": false
+          }
+        ],
+        "unitConflict": false,
+        "knownSubtotal": 13068,
+        "hasCurrentData": true,
+        "lastObservedAt": "2026-10-26T10:09:09.298503+08:00",
+        "warehouseCount": 5,
+        "failedWarehouses": [],
+        "unseenWarehouses": [],
+        "notMappedWarehouses": []
+      },
+      {
+        "gtin": null,
+        "itemId": "08c88bbe-270a-4a10-af85-8848944f1680",
+        "mapped": true,
+        "market": null,
+        "nameCn": "ICE LERSKIN 防晒喷雾升级版150ml",
+        "iceCode": "WM0049",
+        "unitCount": 1,
+        "unitGroups": [
+          {
+            "unit": "件",
+            "rowCount": 6,
+            "subtotal": 122162,
+            "knownOnHand": 6,
+            "warehouseCount": 5,
+            "hasUnknownQuantity": false
+          }
+        ],
+        "unitConflict": false,
+        "knownSubtotal": 122162,
+        "hasCurrentData": true,
+        "lastObservedAt": "2026-10-26T10:09:09.298503+08:00",
+        "warehouseCount": 5,
+        "failedWarehouses": [],
+        "unseenWarehouses": [],
+        "notMappedWarehouses": []
+      },
+      {
+        "gtin": null,
+        "itemId": "d50b5eaf-7acc-4740-85f1-8a0b0edd3c53",
+        "mapped": false,
+        "market": null,
+        "nameCn": "ICE LERSKIN 7% 乙醇酸爽肤水",
+        "iceCode": "LS101274",
+        "unitCount": 0,
+        "unitGroups": [],
+        "unitConflict": false,
+        "knownSubtotal": null,
+        "hasCurrentData": false,
+        "lastObservedAt": null,
+        "warehouseCount": 0,
+        "failedWarehouses": [],
+        "unseenWarehouses": [],
+        "notMappedWarehouses": []
+      },
+      {
+        "gtin": null,
+        "itemId": "094c2b38-54cf-406f-bd36-e4023d521cf5",
+        "mapped": false,
+        "market": null,
+        "nameCn": "ICE LERSKIN洁面幕斯",
+        "iceCode": "LS101276",
+        "unitCount": 0,
+        "unitGroups": [],
+        "unitConflict": false,
+        "knownSubtotal": null,
+        "hasCurrentData": false,
+        "lastObservedAt": null,
+        "warehouseCount": 0,
+        "failedWarehouses": [],
+        "unseenWarehouses": [],
+        "notMappedWarehouses": []
+      }
+    ],
+    "limit": 50,
+    "scope": {
+      "id": "28e852cb-ce5b-4f39-b269-c3d15ddd3ea8",
+      "empty": false,
+      "version": 7,
+      "marketFilter": null,
+      "warehouseCount": 7,
+      "warehouseFilter": null,
+      "lastAllSuccessAt": "2026-10-26T10:04:23.316058+08:00"
+    },
+    "total": 116,
+    "offset": 0,
+    "domestic": "not_connected",
+    "inTransit": "not_connected",
+    "marketOptions": [
+      {
+        "market": "ID",
+        "warehouses": [
+          {
+            "id": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+            "name": "印尼-DEE仓库",
+            "externalId": "53252"
+          }
+        ],
+        "warehouseCount": 1
+      },
+      {
+        "market": "MY",
+        "warehouses": [
+          {
+            "id": "47ccc294-2069-4577-aa40-733411ef7cff",
+            "name": "喜运达MY仓",
+            "externalId": "54886"
+          }
+        ],
+        "warehouseCount": 1
+      },
+      {
+        "market": "PH",
+        "warehouses": [
+          {
+            "id": "3093fbdc-4cd9-4493-96c1-0ea32f9cd811",
+            "name": "PH-彩妆日均万单简简单单仓",
+            "externalId": "54409"
+          },
+          {
+            "id": "9de23322-1000-4a29-b929-cd994927cc85",
+            "name": "菲律宾-新创启辰自建仓",
+            "externalId": "56519"
+          }
+        ],
+        "warehouseCount": 2
+      },
+      {
+        "market": "TH",
+        "warehouses": [
+          {
+            "id": "582f3a9f-8042-419e-be24-2d0d33690f01",
+            "name": "DEE泰国海外仓(曼谷仓）",
+            "externalId": "52074"
+          }
+        ],
+        "warehouseCount": 1
+      },
+      {
+        "market": "VN",
+        "warehouses": [
+          {
+            "id": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+            "name": "越南青林湾仓库",
+            "externalId": "50455"
+          }
+        ],
+        "warehouseCount": 1
+      }
+    ]
+  },
+  "detail": {
+    "gtin": "6974674957325",
+    "item": {
+      "itemId": "b55a8708-3d61-4543-b691-8466913c9a16",
+      "nameCn": "ICE LERSKIN海茴香焕肤水",
+      "iceCode": "LS101295"
+    },
+    "scope": {
+      "id": "28e852cb-ce5b-4f39-b269-c3d15ddd3ea8",
+      "empty": false,
+      "version": 7,
+      "marketFilter": null,
+      "allWarehouses": false,
+      "warehouseCount": 7,
+      "warehouseFilter": null
+    },
+    "totals": {
+      "byUnit": [
+        {
+          "unit": "件",
+          "rowCount": 5,
+          "subtotal": 1028,
+          "knownOnHand": 5,
+          "warehouseCount": 5,
+          "hasUnknownQuantity": false
+        }
+      ],
+      "unitConflict": false,
+      "knownSubtotal": 1028,
+      "lastObservedAt": "2026-10-26T10:09:09.298503+08:00",
+      "warehouseCount": 5
+    },
+    "history": [
+      {
+        "unit": "件",
+        "runId": "9a90ef9b-ac0c-4b69-9aef-986645784a25",
+        "onHand": 899,
+        "batchId": "ed637f8f-cf47-460d-8d55-c20190c4629f",
+        "excelRow": 711,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:10:41.262438+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:09:09.298503+08:00",
+        "warehouseName": "越南青林湾仓库",
+        "previousOnHand": 899
+      },
+      {
+        "unit": "件",
+        "runId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "onHand": 0,
+        "batchId": "854aa4d4-41bd-4fd8-8307-902e4e2bb5f4",
+        "excelRow": 50,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:08:30.826038+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseName": "DEE-龙仔厝（ICE专属）",
+        "previousOnHand": 0
+      },
+      {
+        "unit": "件",
+        "runId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "onHand": 129,
+        "batchId": "28f00a15-3d0c-4739-806d-18b0e88e4d70",
+        "excelRow": 468,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:08:30.782413+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseName": "菲律宾-新创启辰自建仓",
+        "previousOnHand": 129
+      },
+      {
+        "unit": "件",
+        "runId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "onHand": 0,
+        "batchId": "e199d06b-7ad1-45d4-a11f-4ecaac1f5925",
+        "excelRow": 571,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:08:30.760478+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseName": "喜运达MY仓",
+        "previousOnHand": 0
+      },
+      {
+        "unit": "件",
+        "runId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "onHand": 0,
+        "batchId": "e780ad1b-6086-4c79-b246-281115caa517",
+        "excelRow": 673,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:08:30.706136+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseName": "印尼-DEE仓库",
+        "previousOnHand": 0
+      }
+    ],
+    "mapping": [
+      {
+        "id": "fc538723-702f-46aa-b055-cad535a22ddb",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "accountLevel": false,
+        "warehouseName": "印尼-DEE仓库",
+        "warehouseExternalId": "53252"
+      },
+      {
+        "id": "b356f786-a071-4b9a-8334-0c638292a7d9",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff",
+        "accountLevel": false,
+        "warehouseName": "喜运达MY仓",
+        "warehouseExternalId": "54886"
+      },
+      {
+        "id": "a60f8683-fbe0-43c2-afc4-12aeb486c30f",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "accountLevel": false,
+        "warehouseName": "越南青林湾仓库",
+        "warehouseExternalId": "50455"
+      },
+      {
+        "id": "54dcde40-f2c2-49dd-a360-c841eefdc356",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "9de23322-1000-4a29-b929-cd994927cc85",
+        "accountLevel": false,
+        "warehouseName": "菲律宾-新创启辰自建仓",
+        "warehouseExternalId": "56519"
+      },
+      {
+        "id": "6fa675b1-96b8-4e31-b154-d2cfbdc0c5bd",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+        "accountLevel": false,
+        "warehouseName": "DEE-龙仔厝（ICE专属）",
+        "warehouseExternalId": "56673"
+      }
+    ],
+    "candidates": [
+      {
+        "status": "confirmed",
+        "evidence": {
+          "note": "旧BS样表人工决定，仅作有出处候选；需管理员核实账号/仓库/商品/单位后明确确认",
+          "source": "bs_sample_export",
+          "excelRow": 525,
+          "exportLabel": "2026-10-15导出样表",
+          "legacySelectionState": "confirmed"
+        },
+        "createdAt": "2026-10-26T09:44:06.791143+08:00",
+        "candidateId": "d197835a-9201-4f7e-b7e3-e4d5a2be48e1",
+        "externalSku": "6974674957325",
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc"
+      },
+      {
+        "status": "confirmed",
+        "evidence": {
+          "note": "旧BS样表人工决定，仅作有出处候选；需管理员核实账号/仓库/商品/单位后明确确认",
+          "source": "bs_sample_export",
+          "excelRow": 506,
+          "exportLabel": "2026-10-15导出样表",
+          "legacySelectionState": "confirmed"
+        },
+        "createdAt": "2026-10-26T09:44:06.791143+08:00",
+        "candidateId": "166f44ca-3e45-411e-8c25-07c586a84075",
+        "externalSku": "6974674957325",
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751"
+      },
+      {
+        "status": "confirmed",
+        "evidence": {
+          "note": "旧BS样表人工决定，仅作有出处候选；需管理员核实账号/仓库/商品/单位后明确确认",
+          "source": "bs_sample_export",
+          "excelRow": 438,
+          "exportLabel": "2026-10-15导出样表",
+          "legacySelectionState": "confirmed"
+        },
+        "createdAt": "2026-10-26T09:44:06.791143+08:00",
+        "candidateId": "f95b01fa-e6bb-4cd3-b11a-87ee78621a8c",
+        "externalSku": "6974674957325",
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff"
+      }
+    ],
+    "warehouses": [
+      {
+        "name": "越南青林湾仓库",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 899,
+            "batchId": "ed637f8f-cf47-460d-8d55-c20190c4629f",
+            "excelRow": 711,
+            "inTransit": 0,
+            "mappingId": "a60f8683-fbe0-43c2-afc4-12aeb486c30f",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:09:09.298503+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 0,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 899
+          }
+        ],
+        "stale": false,
+        "market": "VN",
+        "status": "current",
+        "externalId": "50455",
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "lastKnownQty": 899,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:09:09.298503+08:00",
+        "lastObservationAt": "2026-10-26T10:09:09.298503+08:00"
+      },
+      {
+        "name": "印尼-DEE仓库",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 0,
+            "batchId": "e780ad1b-6086-4c79-b246-281115caa517",
+            "excelRow": 673,
+            "inTransit": 0,
+            "mappingId": "fc538723-702f-46aa-b055-cad535a22ddb",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:04:23.316058+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 0,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 0
+          }
+        ],
+        "stale": false,
+        "market": "ID",
+        "status": "current",
+        "externalId": "53252",
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "lastKnownQty": 0,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00"
+      },
+      {
+        "name": "喜运达MY仓",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 0,
+            "batchId": "e199d06b-7ad1-45d4-a11f-4ecaac1f5925",
+            "excelRow": 571,
+            "inTransit": 0,
+            "mappingId": "b356f786-a071-4b9a-8334-0c638292a7d9",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:04:23.316058+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 0,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 0
+          }
+        ],
+        "stale": false,
+        "market": "MY",
+        "status": "current",
+        "externalId": "54886",
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff",
+        "lastKnownQty": 0,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00"
+      },
+      {
+        "name": "菲律宾-新创启辰自建仓",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 129,
+            "batchId": "28f00a15-3d0c-4739-806d-18b0e88e4d70",
+            "excelRow": 468,
+            "inTransit": 0,
+            "mappingId": "54dcde40-f2c2-49dd-a360-c841eefdc356",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:04:23.316058+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 11,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 118
+          }
+        ],
+        "stale": false,
+        "market": "PH",
+        "status": "current",
+        "externalId": "56519",
+        "warehouseId": "9de23322-1000-4a29-b929-cd994927cc85",
+        "lastKnownQty": 129,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00"
+      },
+      {
+        "name": "DEE-龙仔厝（ICE专属）",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 0,
+            "batchId": "854aa4d4-41bd-4fd8-8307-902e4e2bb5f4",
+            "excelRow": 50,
+            "inTransit": 0,
+            "mappingId": "6fa675b1-96b8-4e31-b154-d2cfbdc0c5bd",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:04:23.316058+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 0,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 0
+          }
+        ],
+        "stale": false,
+        "market": null,
+        "status": "current",
+        "externalId": "56673",
+        "warehouseId": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+        "lastKnownQty": 0,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00"
+      }
+    ],
+    "scopedWarnings": []
+  },
+  "detailAll": {
+    "gtin": "6974674957325",
+    "item": {
+      "itemId": "b55a8708-3d61-4543-b691-8466913c9a16",
+      "nameCn": "ICE LERSKIN海茴香焕肤水",
+      "iceCode": "LS101295"
+    },
+    "scope": {
+      "id": "28e852cb-ce5b-4f39-b269-c3d15ddd3ea8",
+      "empty": false,
+      "version": 7,
+      "marketFilter": null,
+      "allWarehouses": true,
+      "warehouseCount": 8,
+      "warehouseFilter": null
+    },
+    "totals": {
+      "byUnit": [
+        {
+          "unit": "件",
+          "rowCount": 5,
+          "subtotal": 1028,
+          "knownOnHand": 5,
+          "warehouseCount": 5,
+          "hasUnknownQuantity": false
+        }
+      ],
+      "unitConflict": false,
+      "knownSubtotal": 1028,
+      "lastObservedAt": "2026-10-26T10:09:09.298503+08:00",
+      "warehouseCount": 5
+    },
+    "history": [
+      {
+        "unit": "件",
+        "runId": "9a90ef9b-ac0c-4b69-9aef-986645784a25",
+        "onHand": 899,
+        "batchId": "ed637f8f-cf47-460d-8d55-c20190c4629f",
+        "excelRow": 711,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:10:41.262438+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:09:09.298503+08:00",
+        "warehouseName": "越南青林湾仓库",
+        "previousOnHand": 899
+      },
+      {
+        "unit": "件",
+        "runId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "onHand": 0,
+        "batchId": "854aa4d4-41bd-4fd8-8307-902e4e2bb5f4",
+        "excelRow": 50,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:08:30.826038+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseName": "DEE-龙仔厝（ICE专属）",
+        "previousOnHand": 0
+      },
+      {
+        "unit": "件",
+        "runId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "onHand": 129,
+        "batchId": "28f00a15-3d0c-4739-806d-18b0e88e4d70",
+        "excelRow": 468,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:08:30.782413+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseName": "菲律宾-新创启辰自建仓",
+        "previousOnHand": 129
+      },
+      {
+        "unit": "件",
+        "runId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "onHand": 0,
+        "batchId": "e199d06b-7ad1-45d4-a11f-4ecaac1f5925",
+        "excelRow": 571,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:08:30.760478+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseName": "喜运达MY仓",
+        "previousOnHand": 0
+      },
+      {
+        "unit": "件",
+        "runId": "43b4dc8f-5eb7-463e-94b0-d58ebc851f28",
+        "onHand": 0,
+        "batchId": "e780ad1b-6086-4c79-b246-281115caa517",
+        "excelRow": 673,
+        "rowStatus": "adopted",
+        "externalSku": "6974674957325",
+        "publishedAt": "2026-10-26T10:08:30.706136+08:00",
+        "itemRevision": null,
+        "observationAt": "2026-10-26T10:04:23.316058+08:00",
+        "warehouseName": "印尼-DEE仓库",
+        "previousOnHand": 0
+      }
+    ],
+    "mapping": [
+      {
+        "id": "fc538723-702f-46aa-b055-cad535a22ddb",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "accountLevel": false,
+        "warehouseName": "印尼-DEE仓库",
+        "warehouseExternalId": "53252"
+      },
+      {
+        "id": "b356f786-a071-4b9a-8334-0c638292a7d9",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff",
+        "accountLevel": false,
+        "warehouseName": "喜运达MY仓",
+        "warehouseExternalId": "54886"
+      },
+      {
+        "id": "a60f8683-fbe0-43c2-afc4-12aeb486c30f",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "accountLevel": false,
+        "warehouseName": "越南青林湾仓库",
+        "warehouseExternalId": "50455"
+      },
+      {
+        "id": "54dcde40-f2c2-49dd-a360-c841eefdc356",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "9de23322-1000-4a29-b929-cd994927cc85",
+        "accountLevel": false,
+        "warehouseName": "菲律宾-新创启辰自建仓",
+        "warehouseExternalId": "56519"
+      },
+      {
+        "id": "6fa675b1-96b8-4e31-b154-d2cfbdc0c5bd",
+        "unit": "件",
+        "reason": "修复验证固定核对点：沿用 P0-03/BS 冻结样表已确认的商品归属，由管理员在修复实例显式确认；单位按“件”显式选择，业务包装单位仍待业务确认（本版不做单位换算）",
+        "status": "confirmed",
+        "actorId": "11111111-1111-4111-8111-111111111101",
+        "version": 1,
+        "createdAt": "2026-10-26T09:58:04.184954+08:00",
+        "externalSku": "6974674957325",
+        "warehouseId": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+        "accountLevel": false,
+        "warehouseName": "DEE-龙仔厝（ICE专属）",
+        "warehouseExternalId": "56673"
+      }
+    ],
+    "candidates": [
+      {
+        "status": "confirmed",
+        "evidence": {
+          "note": "旧BS样表人工决定，仅作有出处候选；需管理员核实账号/仓库/商品/单位后明确确认",
+          "source": "bs_sample_export",
+          "excelRow": 525,
+          "exportLabel": "2026-10-15导出样表",
+          "legacySelectionState": "confirmed"
+        },
+        "createdAt": "2026-10-26T09:44:06.791143+08:00",
+        "candidateId": "d197835a-9201-4f7e-b7e3-e4d5a2be48e1",
+        "externalSku": "6974674957325",
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc"
+      },
+      {
+        "status": "confirmed",
+        "evidence": {
+          "note": "旧BS样表人工决定，仅作有出处候选；需管理员核实账号/仓库/商品/单位后明确确认",
+          "source": "bs_sample_export",
+          "excelRow": 506,
+          "exportLabel": "2026-10-15导出样表",
+          "legacySelectionState": "confirmed"
+        },
+        "createdAt": "2026-10-26T09:44:06.791143+08:00",
+        "candidateId": "166f44ca-3e45-411e-8c25-07c586a84075",
+        "externalSku": "6974674957325",
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751"
+      },
+      {
+        "status": "confirmed",
+        "evidence": {
+          "note": "旧BS样表人工决定，仅作有出处候选；需管理员核实账号/仓库/商品/单位后明确确认",
+          "source": "bs_sample_export",
+          "excelRow": 438,
+          "exportLabel": "2026-10-15导出样表",
+          "legacySelectionState": "confirmed"
+        },
+        "createdAt": "2026-10-26T09:44:06.791143+08:00",
+        "candidateId": "f95b01fa-e6bb-4cd3-b11a-87ee78621a8c",
+        "externalSku": "6974674957325",
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff"
+      }
+    ],
+    "warehouses": [
+      {
+        "name": "越南青林湾仓库",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 899,
+            "batchId": "ed637f8f-cf47-460d-8d55-c20190c4629f",
+            "excelRow": 711,
+            "inTransit": 0,
+            "mappingId": "a60f8683-fbe0-43c2-afc4-12aeb486c30f",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:09:09.298503+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 0,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 899
+          }
+        ],
+        "stale": false,
+        "market": "VN",
+        "status": "current",
+        "externalId": "50455",
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "lastKnownQty": 899,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:09:09.298503+08:00",
+        "lastObservationAt": "2026-10-26T10:09:09.298503+08:00"
+      },
+      {
+        "name": "印尼-DEE仓库",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 0,
+            "batchId": "e780ad1b-6086-4c79-b246-281115caa517",
+            "excelRow": 673,
+            "inTransit": 0,
+            "mappingId": "fc538723-702f-46aa-b055-cad535a22ddb",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:04:23.316058+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 0,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 0
+          }
+        ],
+        "stale": false,
+        "market": "ID",
+        "status": "current",
+        "externalId": "53252",
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "lastKnownQty": 0,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00"
+      },
+      {
+        "name": "喜运达MY仓",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 0,
+            "batchId": "e199d06b-7ad1-45d4-a11f-4ecaac1f5925",
+            "excelRow": 571,
+            "inTransit": 0,
+            "mappingId": "b356f786-a071-4b9a-8334-0c638292a7d9",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:04:23.316058+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 0,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 0
+          }
+        ],
+        "stale": false,
+        "market": "MY",
+        "status": "current",
+        "externalId": "54886",
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff",
+        "lastKnownQty": 0,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00"
+      },
+      {
+        "name": "菲律宾-新创启辰自建仓",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 129,
+            "batchId": "28f00a15-3d0c-4739-806d-18b0e88e4d70",
+            "excelRow": 468,
+            "inTransit": 0,
+            "mappingId": "54dcde40-f2c2-49dd-a360-c841eefdc356",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:04:23.316058+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 11,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 118
+          }
+        ],
+        "stale": false,
+        "market": "PH",
+        "status": "current",
+        "externalId": "56519",
+        "warehouseId": "9de23322-1000-4a29-b929-cd994927cc85",
+        "lastKnownQty": 129,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00"
+      },
+      {
+        "name": "DEE-龙仔厝（ICE专属）",
+        "rows": [
+          {
+            "gtin": "6974674957325",
+            "unit": "件",
+            "onHand": 0,
+            "batchId": "854aa4d4-41bd-4fd8-8307-902e4e2bb5f4",
+            "excelRow": 50,
+            "inTransit": 0,
+            "mappingId": "6fa675b1-96b8-4e31-b154-d2cfbdc0c5bd",
+            "variantId": "b91526ec-b019-4e13-b634-0c4ab7696cf8",
+            "observedAt": "2026-10-26T10:04:23.316058+08:00",
+            "externalSku": "6974674957325",
+            "orderLocked": 0,
+            "itemRevision": null,
+            "mappingVersion": 1,
+            "activityReserved": 0,
+            "warehouseAvailable": 0
+          }
+        ],
+        "stale": false,
+        "market": null,
+        "status": "current",
+        "externalId": "56673",
+        "warehouseId": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+        "lastKnownQty": 0,
+        "lastErrorCode": null,
+        "lastSuccessAt": "2026-10-26T10:04:23.316058+08:00",
+        "lastObservationAt": "2026-10-26T10:04:23.316058+08:00"
+      }
+    ],
+    "scopedWarnings": []
+  },
+  "run": {
+    "id": "9a90ef9b-ac0c-4b69-9aef-986645784a25",
+    "file": {
+      "fileId": "d4af5eea-3d9f-46c3-9bc1-95329da20729",
+      "header": [
+        {
+          "name": "Image URL",
+          "index": 0
+        },
+        {
+          "name": "SKU编号",
+          "index": 1
+        },
+        {
+          "name": "名称",
+          "index": 2
+        },
+        {
+          "name": "GTIN",
+          "index": 3
+        },
+        {
+          "name": "重量(g)",
+          "index": 4
+        },
+        {
+          "name": "长(cm)",
+          "index": 5
+        },
+        {
+          "name": "宽(cm)",
+          "index": 6
+        },
+        {
+          "name": "高(cm)",
+          "index": 7
+        },
+        {
+          "name": "仓库",
+          "index": 8
+        },
+        {
+          "name": "库区",
+          "index": 9
+        },
+        {
+          "name": "货架位",
+          "index": 10
+        },
+        {
+          "name": "现有库存",
+          "index": 11
+        },
+        {
+          "name": "订单已锁",
+          "index": 12
+        },
+        {
+          "name": "整仓可用",
+          "index": 13
+        },
+        {
+          "name": "活动预留",
+          "index": 14
+        },
+        {
+          "name": "在途中",
+          "index": 15
+        },
+        {
+          "name": "在途总成本",
+          "index": 16
+        },
+        {
+          "name": "警戒库存",
+          "index": 17
+        },
+        {
+          "name": "预测日销量",
+          "index": 18
+        },
+        {
+          "name": "预计可售天数",
+          "index": 19
+        },
+        {
+          "name": "加权成本价",
+          "index": 20
+        },
+        {
+          "name": "总成本价",
+          "index": 21
+        },
+        {
+          "name": "销售状态",
+          "index": 22
+        },
+        {
+          "name": "一级分类",
+          "index": 23
+        },
+        {
+          "name": "二级分类",
+          "index": 24
+        },
+        {
+          "name": "三级分类",
+          "index": 25
+        },
+        {
+          "name": "SKU类型",
+          "index": 26
+        },
+        {
+          "name": "备注",
+          "index": 27
+        }
+      ],
+      "sha256": "dbbd60c50b8e",
+      "rowCount": 728,
+      "sheetName": "单个SKU",
+      "sizeBytes": 104553,
+      "sha256Full": "dbbd60c50b8ef376ee3556b20ae4d9e8cdfaaca726a8cdaf9eb87a13daa913d6",
+      "downloadedAt": "2026-10-26T10:09:11.022695+08:00",
+      "headerSha256": "a7df77a50dbce95bbb797947ad11772b3a748427e8f4c706599847a662871486",
+      "blankRowCount": 0,
+      "parserVersion": "bigseller-inventory-v1",
+      "storageRelpath": "exports/库存清单20261026020906155.xlsx"
+    },
+    "lease": {
+      "held": true,
+      "owner": "inv-worker-59532",
+      "attempt": 1,
+      "expiresAt": "2026-10-26T10:12:41.257387+08:00",
+      "heartbeatAt": "2026-10-26T10:10:41.257387+08:00"
+    },
+    "groups": [
+      {
+        "blocked": false,
+        "rowCount": 78,
+        "okRowCount": 78,
+        "warehouseId": "5041b8fd-0fef-4151-89d2-6028366e272a",
+        "blockedReason": null,
+        "warehouseName": "昕兰PH自建仓(弃用）",
+        "warehouseExternalId": "48787"
+      },
+      {
+        "blocked": false,
+        "rowCount": 88,
+        "okRowCount": 88,
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "blockedReason": null,
+        "warehouseName": "越南青林湾仓库",
+        "warehouseExternalId": "50455"
+      },
+      {
+        "blocked": false,
+        "rowCount": 114,
+        "okRowCount": 114,
+        "warehouseId": "582f3a9f-8042-419e-be24-2d0d33690f01",
+        "blockedReason": null,
+        "warehouseName": "DEE泰国海外仓(曼谷仓）",
+        "warehouseExternalId": "52074"
+      },
+      {
+        "blocked": false,
+        "rowCount": 112,
+        "okRowCount": 112,
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "blockedReason": null,
+        "warehouseName": "印尼-DEE仓库",
+        "warehouseExternalId": "53252"
+      },
+      {
+        "blocked": false,
+        "rowCount": 21,
+        "okRowCount": 21,
+        "warehouseId": "3093fbdc-4cd9-4493-96c1-0ea32f9cd811",
+        "blockedReason": null,
+        "warehouseName": "PH-彩妆日均万单简简单单仓",
+        "warehouseExternalId": "54409"
+      },
+      {
+        "blocked": false,
+        "rowCount": 56,
+        "okRowCount": 56,
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff",
+        "blockedReason": null,
+        "warehouseName": "喜运达MY仓",
+        "warehouseExternalId": "54886"
+      },
+      {
+        "blocked": false,
+        "rowCount": 116,
+        "okRowCount": 116,
+        "warehouseId": "9de23322-1000-4a29-b929-cd994927cc85",
+        "blockedReason": null,
+        "warehouseName": "菲律宾-新创启辰自建仓",
+        "warehouseExternalId": "56519"
+      },
+      {
+        "blocked": false,
+        "rowCount": 143,
+        "okRowCount": 143,
+        "warehouseId": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+        "blockedReason": null,
+        "warehouseName": "DEE-龙仔厝（ICE专属）",
+        "warehouseExternalId": "56673"
+      }
+    ],
+    "issues": [],
+    "status": "publishing",
+    "attempt": 1,
+    "scopeId": "28e852cb-ce5b-4f39-b269-c3d15ddd3ea8",
+    "summary": {
+      "phase": {
+        "at": "2026-10-26T10:10:41.257387+08:00",
+        "name": "publishing",
+        "detail": {
+          "heartbeat": true
+        }
+      }
+    },
+    "accountId": "c8b27f59-0ddf-4566-b1bd-de0e5640f710",
+    "createdAt": "2026-10-26T10:08:56.706608+08:00",
+    "errorCode": null,
+    "requestId": "7d681d04-18c1-4625-9bba-2e4593d437b1",
+    "startedAt": "2026-10-26T10:08:57.096486+08:00",
+    "updatedAt": "2026-10-26T10:10:41.257387+08:00",
+    "exportMark": "warehouse_list_export_9546_006.06.09.02.26",
+    "finishedAt": null,
+    "plannedFor": "2026-10-26T10:08:56.706608+08:00",
+    "warehouses": [
+      {
+        "name": "越南青林湾仓库",
+        "rows": 88,
+        "market": "VN",
+        "reason": null,
+        "status": "published",
+        "adopted": 5,
+        "batchId": "ed637f8f-cf47-460d-8d55-c20190c4629f",
+        "unmapped": 83,
+        "errorCode": null,
+        "externalId": "50455",
+        "invalidRows": 0,
+        "publishedAt": "2026-10-26T10:10:41.262438+08:00",
+        "warehouseId": "7d9a8126-f157-4331-ba14-3655fad3cbdc",
+        "observationAt": "2026-10-26T10:09:09.298503+08:00",
+        "sourceRowCount": 88,
+        "duplicateSkuRows": 0
+      },
+      {
+        "name": "DEE泰国海外仓(曼谷仓）",
+        "rows": null,
+        "market": "TH",
+        "reason": null,
+        "status": "pending",
+        "adopted": null,
+        "batchId": null,
+        "unmapped": null,
+        "errorCode": null,
+        "externalId": "52074",
+        "invalidRows": 0,
+        "publishedAt": null,
+        "warehouseId": "582f3a9f-8042-419e-be24-2d0d33690f01",
+        "observationAt": null,
+        "sourceRowCount": null,
+        "duplicateSkuRows": 0
+      },
+      {
+        "name": "印尼-DEE仓库",
+        "rows": null,
+        "market": "ID",
+        "reason": null,
+        "status": "pending",
+        "adopted": null,
+        "batchId": null,
+        "unmapped": null,
+        "errorCode": null,
+        "externalId": "53252",
+        "invalidRows": 0,
+        "publishedAt": null,
+        "warehouseId": "2fe98df2-acb7-4285-8ba2-3eccce014751",
+        "observationAt": null,
+        "sourceRowCount": null,
+        "duplicateSkuRows": 0
+      },
+      {
+        "name": "PH-彩妆日均万单简简单单仓",
+        "rows": null,
+        "market": "PH",
+        "reason": null,
+        "status": "pending",
+        "adopted": null,
+        "batchId": null,
+        "unmapped": null,
+        "errorCode": null,
+        "externalId": "54409",
+        "invalidRows": 0,
+        "publishedAt": null,
+        "warehouseId": "3093fbdc-4cd9-4493-96c1-0ea32f9cd811",
+        "observationAt": null,
+        "sourceRowCount": null,
+        "duplicateSkuRows": 0
+      },
+      {
+        "name": "喜运达MY仓",
+        "rows": null,
+        "market": "MY",
+        "reason": null,
+        "status": "pending",
+        "adopted": null,
+        "batchId": null,
+        "unmapped": null,
+        "errorCode": null,
+        "externalId": "54886",
+        "invalidRows": 0,
+        "publishedAt": null,
+        "warehouseId": "47ccc294-2069-4577-aa40-733411ef7cff",
+        "observationAt": null,
+        "sourceRowCount": null,
+        "duplicateSkuRows": 0
+      },
+      {
+        "name": "菲律宾-新创启辰自建仓",
+        "rows": null,
+        "market": "PH",
+        "reason": null,
+        "status": "pending",
+        "adopted": null,
+        "batchId": null,
+        "unmapped": null,
+        "errorCode": null,
+        "externalId": "56519",
+        "invalidRows": 0,
+        "publishedAt": null,
+        "warehouseId": "9de23322-1000-4a29-b929-cd994927cc85",
+        "observationAt": null,
+        "sourceRowCount": null,
+        "duplicateSkuRows": 0
+      },
+      {
+        "name": "DEE-龙仔厝（ICE专属）",
+        "rows": null,
+        "market": null,
+        "reason": null,
+        "status": "pending",
+        "adopted": null,
+        "batchId": null,
+        "unmapped": null,
+        "errorCode": null,
+        "externalId": "56673",
+        "invalidRows": 0,
+        "publishedAt": null,
+        "warehouseId": "abd9dd24-86b8-4fde-b5f7-ee1bb984dea8",
+        "observationAt": null,
+        "sourceRowCount": null,
+        "duplicateSkuRows": 0
+      }
+    ],
+    "errorDetail": null,
+    "exportBytes": 104553,
+    "triggerKind": "manual",
+    "coveredSlots": [],
+    "observationAt": "2026-10-26T10:09:09.298503+08:00",
+    "fileValidation": {
+      "reason": "",
+      "status": "ok",
+      "blocked": false,
+      "comboRowCount": 0,
+      "missingColumns": [],
+      "quantityHeader": {
+        "on_hand": "现有库存",
+        "in_transit": "在途中",
+        "order_locked": "订单已锁",
+        "warehouse_available": "整仓可用"
+      },
+      "ambiguousColumns": [],
+      "duplicateColumns": [],
+      "unattributableRowCount": 0
+    },
+    "sourceRowCount": 728,
+    "exportStartedAt": "2026-10-26T10:09:04.447997+08:00",
+    "exportFinishedAt": "2026-10-26T10:09:09.298503+08:00",
+    "warehouseDiscovery": [
+      {
+        "name": "DEE-龙仔厝（ICE专属）",
+        "externalId": "56673"
+      },
+      {
+        "name": "DEE泰国海外仓(曼谷仓）",
+        "externalId": "52074"
+      },
+      {
+        "name": "PH-彩妆日均万单简简单单仓",
+        "externalId": "54409"
+      },
+      {
+        "name": "印尼-DEE仓库",
+        "externalId": "53252"
+      },
+      {
+        "name": "喜运达MY仓",
+        "externalId": "54886"
+      },
+      {
+        "name": "昕兰PH自建仓(弃用）",
+        "externalId": "48787"
+      },
+      {
+        "name": "菲律宾-新创启辰自建仓",
+        "externalId": "56519"
+      },
+      {
+        "name": "越南青林湾仓库",
+        "externalId": "50455"
+      }
+    ],
+    "accountIdentityLabel": "laiguoyong@KNZX019402",
+    "accountIdentityStatus": "verified"
+  },
+  "queue": {
+    "items": [
+      {
+        "market": "PH",
+        "suggestion": null,
+        "candidateId": null,
+        "externalSku": "0000",
+        "latestRunAt": "2026-10-26T10:08:56.706608+08:00",
+        "occurrences": 1,
+        "warehouseId": "5041b8fd-0fef-4151-89d2-6028366e272a",
+        "mappingStatus": null,
+        "warehouseName": "昕兰PH自建仓(弃用）",
+        "candidateStatus": null,
+        "warehouseExternalId": "48787",
+        "latestWarehouseRunAt": "2026-10-26T10:08:56.706608+08:00"
+      },
+      {
+        "market": "PH",
+        "suggestion": {
+          "itemId": "727bbaad-147f-4b35-b378-ddfa2435d766",
+          "nameCn": "ICE LERSKIN防晒喷雾 150ML",
+          "source": "bs_sample_export",
+          "iceCode": "LS101302",
+          "evidence": "BS冻结样表已确认"
+        },
+        "candidateId": null,
+        "externalSku": "6973517482611",
+        "latestRunAt": "2026-10-26T10:08:56.706608+08:00",
+        "occurrences": 1,
+        "warehouseId": "5041b8fd-0fef-4151-89d2-6028366e272a",
+        "mappingStatus": null,
+        "warehouseName": "昕兰PH自建仓(弃用）",
+        "candidateStatus": null,
+        "warehouseExternalId": "48787",
+        "latestWarehouseRunAt": "2026-10-26T10:08:56.706608+08:00"
+      },
+      {
+        "market": "PH",
+        "suggestion": {
+          "itemId": "fe23bcf1-c563-4131-901b-3dd142a5cfb7",
+          "nameCn": "ICE LERSKIN防晒喷雾 50ML",
+          "source": "bs_sample_export",
+          "iceCode": "WM0011",
+          "evidence": "BS冻结样表已确认"
+        },
+        "candidateId": null,
+        "externalSku": "6973517484967",
+        "latestRunAt": "2026-10-26T10:08:56.706608+08:00",
+        "occurrences": 1,
+        "warehouseId": "5041b8fd-0fef-4151-89d2-6028366e272a",
+        "mappingStatus": null,
+        "warehouseName": "昕兰PH自建仓(弃用）",
+        "candidateStatus": null,
+        "warehouseExternalId": "48787",
+        "latestWarehouseRunAt": "2026-10-26T10:08:56.706608+08:00"
+      },
+      {
+        "market": "PH",
+        "suggestion": {
+          "itemId": "b55a8708-3d61-4543-b691-8466913c9a16",
+          "nameCn": "ICE LERSKIN海茴香焕肤水",
+          "source": "bs_sample_export",
+          "iceCode": "LS101295",
+          "evidence": "BS冻结样表已确认"
+        },
+        "candidateId": null,
+        "externalSku": "6974674957325",
+        "latestRunAt": "2026-10-26T10:08:56.706608+08:00",
+        "occurrences": 1,
+        "warehouseId": "5041b8fd-0fef-4151-89d2-6028366e272a",
+        "mappingStatus": null,
+        "warehouseName": "昕兰PH自建仓(弃用）",
+        "candidateStatus": null,
+        "warehouseExternalId": "48787",
+        "latestWarehouseRunAt": "2026-10-26T10:08:56.706608+08:00"
+      },
+      {
+        "market": "PH",
+        "suggestion": {
+          "itemId": "8c3e4aa7-917b-4454-9f62-0536845351ed",
+          "nameCn": "ICE LERSKIN 7% 乙醇酸爽肤水(泰国特供版)",
+          "source": "bs_sample_export",
+          "iceCode": "WM0094",
+          "evidence": "BS冻结样表已确认"
+        },
+        "candidateId": null,
+        "externalSku": "6974674957332",
+        "latestRunAt": "2026-10-26T10:08:56.706608+08:00",
+        "occurrences": 1,
+        "warehouseId": "5041b8fd-0fef-4151-89d2-6028366e272a",
+        "mappingStatus": null,
+        "warehouseName": "昕兰PH自建仓(弃用）",
+        "candidateStatus": null,
+        "warehouseExternalId": "48787",
+        "latestWarehouseRunAt": "2026-10-26T10:08:56.706608+08:00"
+      },
+      {
+        "market": "PH",
+        "suggestion": {
+          "itemId": "b743f21a-29d4-4082-adef-f1dffecbcd9b",
+          "nameCn": "ICE LERSKIN 冰川水精华洗面奶（泰文标签版）",
+          "source": "bs_sample_export",
+          "iceCode": "WM0128",
+          "evidence": "BS冻结样表已确认"
+        },
+        "candidateId": null,
+        "externalSku": "6974674957349",
+        "latestRunAt": "2026-10-26T10:08:56.706608+08:00",
+        "occurrences": 1,
+        "warehouseId": "5041b8fd-0fef-4151-89d2-6028366e272a",
+        "mappingStatus": null,
+        "warehouseName": "昕兰PH自建仓(弃用）",
+        "candidateStatus": null,
+        "warehouseExternalId": "48787",
+        "latestWarehouseRunAt": "2026-10-26T10:08:56.706608+08:00"
+      }
+    ],
+    "limit": 20,
+    "total": 701,
+    "offset": 0
+  }
+}
