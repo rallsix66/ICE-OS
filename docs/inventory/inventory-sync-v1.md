@@ -1,6 +1,6 @@
 # 商品库存与 BigSeller 自动同步 v1（实现与运行说明）
 
-更新：2026-10-28。当前状态：功能验收 **`INVENTORY_SYNC_UI_V1_LOCAL_PASS`**（2026-10-28 主审独立复审通过），文档与 Git 收尾同日完成（**`INVENTORY_SYNC_UI_V1_DOCS_GIT_CLOSED`**）；读取速度 `INVENTORY_RESPONSE_SPEED_V1_LOCAL_PASS` 与 BigSeller 本机接入 `BS_LIVE_INTAKE_V1_LOCAL_PASS` 已收尾。日常运行、恢复与输入依赖见 §0.11。
+更新：2026-10-29。当前状态：功能验收 **`INVENTORY_SYNC_UI_V1_LOCAL_PASS`**（2026-10-28 主审独立复审通过），文档与 Git 收尾同日完成（**`INVENTORY_SYNC_UI_V1_DOCS_GIT_CLOSED`**）；读取速度 `INVENTORY_RESPONSE_SPEED_V1_LOCAL_PASS` 与 BigSeller 本机接入 `BS_LIVE_INTAKE_V1_LOCAL_PASS` 已收尾。2026-10-29 后续包**CATALOG_BINDING_REVIEW_V1_LOCAL_PASS**（详情内绑定编辑）已通过，原独立映射维护页退役，现役入口见下方 §0.11 补充；日常运行、恢复与输入依赖仍见 §0.11。
 
 ## 0.11 2026-10-28 收尾交接：职责、日常入口、恢复与输入依赖
 
@@ -10,11 +10,22 @@
 
 | 页面 | 负责什么 | 日常入口 |
 |---|---|---|
-| 商品库 | 商品资料、修订与历史、价格权限；正式库存 SKU 对应的唯一维护入口；飞书商品资料来源的本地模拟更新面板 | `/dashboard/catalog`、`/dashboard/catalog/mappings`、`/dashboard/catalog/sources` |
+| 商品库 | 商品资料、修订与历史、价格权限；库存明细内按仓绑定/更换 BigSeller 来源 SKU（与商品库存详情共用写入口，见下方 2026-10-29 补充）；飞书商品资料来源的本地模拟更新面板 | `/dashboard/catalog`、`/dashboard/catalog/sources`（旧 `/dashboard/catalog/mappings` 仅按上下文重定向） |
 | 商品库存 | 默认「仓库明细」（来源账号×仓库×SKU 一行，含未对应、真实 0、未知市场、同仓双码）；可切「商品汇总」（标准商品×市场格，国内列只在有效范围包含国内时出现）；详情抽屉与列表同范围；国内数量只读冻结表格快照 | `/dashboard/inventory` |
-| 数据同步 | 来源状态、最后成功与下次计划、立即同步/设置（保存只在设置面板）、逐仓结果、任务历史详情（选中后详情进入视口）、待对应处理定位到商品库维护页 | `/dashboard/sync` |
+| 数据同步 | 来源状态、最后成功与下次计划、立即同步/设置（保存只在设置面板）、逐仓结果、任务历史详情（选中后详情进入视口）、待对应处理定位到库存详情内绑定 | `/dashboard/sync` |
 
 唯一日常入口是 **http://127.0.0.1:3011**（正式实例 `run-20261026T211500Z-11a22b33`、PG 59345、后台 `inv-worker-59345`；自动同步开启、60 分钟、7 个参与仓、configVersion 3）。设置未保存时不会生效；页面上的状态、批次、数量是当前快照，不写死为常量。
+
+### 2026-10-29 后续：详情内绑定编辑与复核采用（现役入口）
+
+2026-10-29 新任务**CATALOG_BINDING_REVIEW_V1_LOCAL_PASS**已独立复审通过，上表原“独立映射维护页”职责由详情内绑定编辑取代：
+
+- 商品库详情 →「库存明细」→ 仓库行：固定商品 A、仓库 W，搜索 W 内来源 SKU 并更换/新增绑定（同仓多 SKU 逐行保留）。
+- 商品库存「仓库明细」行详情：固定账号/仓/原 SKU，搜索商品库货号/品名/条码；「商品汇总」编辑按钮在具体仓库/SKU 行，不能整商品一次换走。
+- 旧 `/dashboard/catalog/mappings` 仅按商品/仓/SKU 上下文重定向到库存明细，导航与商品库入口已删除；两入口共用原登记/版本/审计/恢复机制，不另建写锁。
+- 2026-10-28 人工复核已实际采用 510 条（BS 387 = 保持 300/新建 82/换绑 5；JST 123 = 保持 118/追加决定 5），121 条“不显示”仅保存清单、未建绑定；映射 517（confirmed 512/disabled 5）、请求 104、国内决定 5、有效选择 123。
+- 当前 BUILD `3DRd1EmVjPgeWE7tIkKI_`、源码 `debe1eeb…`、620 源/415 产物一致、drift=false；证据与逐条回执在 `.local/catalog-binding-inline-edit-v1-20261028/`，最终独立报告 `.local/catalog-binding-r1-r4-independent-20261029/`；入口、提交号与未覆盖范围见[合同 §11](../tasks/catalog-binding-inline-edit-v1.md)。
+- 未覆盖：121 忽略页、200% 缩放、真实多账号/权限矩阵、真实断网/并发、新 API、公网部署；通过仅限本机本包。
 
 ### 本次通过范围与已知限制
 

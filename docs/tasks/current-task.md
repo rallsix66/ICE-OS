@@ -1,6 +1,18 @@
 # Current Task Packet
 
-## 当前任务：商品库存与同步 UI v1 已本地通过，文档与 Git 已收尾
+## 当前任务：详情内绑定编辑、界面减字与复核结果采用 v1
+
+状态：**CATALOG_BINDING_REVIEW_V1_LOCAL_PASS**（2026-10-29 原线程独立复审通过）。[原合同](catalog-binding-inline-edit-v1.md)、[最终独立报告](../../.local/catalog-binding-r1-r4-independent-20261029/independent-review.md)。R1–R4四项阻断已关闭，无剩余功能补修；已正确的510条匹配及当前库存保持，原三页签、减字和两方向逐来源编辑均保留。
+
+独立验证包含实际模块R1/R2共5例、正式/克隆库只读33项、3011真实页面与构建逐文件核验；执行方隔离写入/下一批fixture经审读并回读现存克隆库后沿用，未重跑无关旧套件。8组业务投影快照一致；具体证据覆盖及交付措辞更正见最终报告。
+
+当前BUILD **`3DRd1EmVjPgeWE7tIkKI_`**、源码`debe1eeb…`、620源/415产物、drift=false、login200；映射517（512/5）、请求104、国内决定5、国内有效选择123、商品126/修订128。独审未改正式关系/库存事实/worker/60分钟计划，未试绑正式数据或手动同步。通过不含121忽略页、200%、未来权限、新API、公网部署与旧延期项；2026-10-29 文档与 Git 收尾：实现与文档已按依赖顺序提交并普通推送 `origin/codex/ice-v4-planning`（本地与远端一致；未合并/部署/清场），原输入、备份、克隆库和证据全部保留。
+
+两个绑定入口（商品库详情→库存明细→仓库行；商品库存详情→具体仓库/SKU 行）、已采用 510 条复核结果、运行入口、证据位置与提交号见[合同 §11](catalog-binding-inline-edit-v1.md)。
+
+## 最近已验收：商品库存与同步 UI v1（文档与 Git 已收尾）
+
+2026-10-28 补充规则与离线复核：用户批准[菲律宾彩妆货号附带色号](../product-identity-standard-v1.md#ph-makeup-shade)，已登记并在本地 HTML 重新匹配。[验证记录](../../.local/three-table-view-20261028/verification-ph-color.md)。本轮只更新离线复核产物与规则文档，未改现役服务或正式绑定，不重开以下已验收包；正式系统应用待后续实施，规则文档已在 2026-10-29 收尾中提交并推送。
 
 2026-10-28 主审独立复审通过：**`INVENTORY_SYNC_UI_V1_LOCAL_PASS`**（收尾状态 **`INVENTORY_SYNC_UI_V1_DOCS_GIT_CLOSED`**）。T1–T3 全部关闭，本包不再新增功能返工；已通过布局、分页、采用身份、PH 双码提示和草稿语义沿用。 [独立报告](../../.local/inventory-sync-ui-tail-independent-20261028/independent-review.md)、[尾项验收说明](inventory-sync-ui-v1-tail-repair-acceptance.md)。
 
@@ -12,7 +24,7 @@
 
 文档与 Git 收尾（2026-10-28）：已按依赖顺序提交并普通推送 `origin/codex/ice-v4-planning`（本地与远端一致，未 force/合并/部署/清场）；`.local`、私有输入、数据库与构建产物未入库。提交范围、日常入口、构建/启动/恢复材料与国内快照输入依赖见[库存与自动同步实现/运行说明 §0.11](../inventory/inventory-sync-v1.md)。
 
-**当前无剩余执行包。** 原 T1–T3 清单为已关闭历史；继续日常使用与人工体验，新需求另定范围，不自动新增功能或发布。
+**旧包无剩余修复项。** 原 T1–T3 清单为已关闭历史；本次用户新增需求按顶部新合同执行，不改变旧包验收范围。
 
 ### 上一状态（历史）：`INVENTORY_SYNC_UI_V1_FINAL_REPAIR_NEEDS_FIX`
 
