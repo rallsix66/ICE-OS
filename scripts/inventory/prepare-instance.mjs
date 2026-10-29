@@ -106,9 +106,13 @@ async function ensureSchema(owner, evidence) {
   const v4FinalFile = V4_FINAL_UPGRADE_FILE;
   const v6File = V6_UPGRADE_FILE;
   // 商品库存双视图 v1：只读读模型增量（022）与国内冻结表格快照关联（023）。
-  // 两者都是幂等的 CREATE OR REPLACE 只读函数，不建表、不改 schema version。
+  // 详情内绑定编辑 v1：逐仓绑定读取/来源搜索/当前对应读取 + 单事务替换写函数（024）。
+  // 人工复核应用 v1：国内最新复核决定追加表/写入函数，并替换 023 的国内读函数（025）。
+  // 都是幂等的 CREATE OR REPLACE 函数/追加结构，不建通用平台。
   const dualViewFile = 'db/catalog/022_inventory_dual_view.sql';
   const domesticLinksFile = 'db/catalog/023_inventory_domestic.sql';
+  const bindingInlineEditFile = 'db/catalog/024_binding_inline_edit.sql';
+  const domesticReviewFile = 'db/catalog/025_domestic_review.sql';
   const applied = [];
   let sqlState;
   const version = Number(before.row?.version ?? 0);
@@ -144,6 +148,8 @@ async function ensureSchema(owner, evidence) {
   applied.push(await applySql(owner, functionsFile));
   applied.push(await applySql(owner, dualViewFile));
   applied.push(await applySql(owner, domesticLinksFile));
+  applied.push(await applySql(owner, bindingInlineEditFile));
+  applied.push(await applySql(owner, domesticReviewFile));
   const structureSha = hashFile(v6File);
   const functionsSha = hashFile(functionsFile);
   await owner.query(
