@@ -1555,6 +1555,7 @@ const PENDING_ACTION_LABELS: Record<string, string> = {
   update_inventory_sync_settings: '保存自动同步设置',
   request_inventory_manual_sync: '立即同步',
   confirm_inventory_mapping: '确认/换绑商品对应',
+  replace_inventory_mapping: '更换绑定（原 SKU 替换）',
   disable_inventory_mapping: '停用商品对应',
   recheck_inventory_mapping: '重核商品对应',
 };
@@ -2162,6 +2163,32 @@ export function intentForActionPayload(action: string, payload: Record<string, u
     if (mappings.length === 0) return null;
     return buildConfirmMappingsIntent(mappings);
   }
+  if (action === 'replace_inventory_mapping') {
+    const oldMappingId = typeof read('oldMappingId') === 'string' ? (read('oldMappingId') as string).trim() : '';
+    const expectedOldVersion = Number(read('expectedOldVersion'));
+    const itemId = typeof read('itemId') === 'string' ? (read('itemId') as string).trim() : '';
+    const newExternalSku = typeof read('newExternalSku') === 'string' ? (read('newExternalSku') as string).trim() : '';
+    const expectedNewVersionRaw = read('expectedNewVersion');
+    const expectedNewVersion = expectedNewVersionRaw === null || expectedNewVersionRaw === undefined
+      ? null
+      : Number(expectedNewVersionRaw);
+    const unit = typeof read('unit') === 'string' ? (read('unit') as string).trim() : '';
+    const reason = typeof read('reason') === 'string' ? (read('reason') as string).trim() : '';
+    const note = typeof read('note') === 'string' ? (read('note') as string).trim() : '';
+    if (!oldMappingId || !Number.isSafeInteger(expectedOldVersion) || expectedOldVersion < 1
+      || !itemId || !newExternalSku || !unit || !reason) return null;
+    if (expectedNewVersion !== null && (!Number.isSafeInteger(expectedNewVersion) || expectedNewVersion < 1)) return null;
+    return buildReplaceMappingIntent({
+      oldMappingId,
+      expectedOldVersion,
+      itemId,
+      newExternalSku,
+      expectedNewVersion,
+      unit,
+      reason,
+      note: note || null,
+    });
+  }
   if (action === 'recheck_inventory_mapping') {
     const mappingId = typeof read('mappingId') === 'string' ? read('mappingId') as string : '';
     const expectedVersion = Number(read('expectedVersion'));
@@ -2195,6 +2222,39 @@ export function buildDisableMappingIntent(input: DisableMappingInput): string {
 
 export function buildRecheckMappingIntent(input: RecheckMappingInput): string {
   return sha256Hex(recheckMappingIntentText(input));
+}
+
+/**
+ * 详情内“更换绑定”（UI-1）：固定商品 A、仓库 W、原 SKU S1，把目标 S2 绑定到 A 并退出 S1。
+ * 与 confirm 独立编码：这是两个关系的单事务替换，不是一次批量确认。
+ */
+export interface ReplaceMappingInput {
+  oldMappingId: string;
+  expectedOldVersion: number;
+  itemId: string;
+  newExternalSku: string;
+  /** 目标 SKU 当前映射版本（无映射为 null），用于旧版本防覆盖。 */
+  expectedNewVersion: number | null;
+  unit: string;
+  reason: string;
+  note?: string | null;
+}
+
+export function replaceMappingIntentText(input: ReplaceMappingInput): string {
+  return `inventory.replace_mapping.v1|${canonicalJson({
+    oldMappingId: input.oldMappingId.trim(),
+    expectedOldVersion: Math.trunc(input.expectedOldVersion),
+    itemId: input.itemId.trim(),
+    newExternalSku: input.newExternalSku.trim(),
+    expectedNewVersion: input.expectedNewVersion === null ? null : Math.trunc(input.expectedNewVersion),
+    unit: input.unit.trim(),
+    reason: input.reason.trim(),
+    note: (input.note ?? '').trim() || null,
+  })}`;
+}
+
+export function buildReplaceMappingIntent(input: ReplaceMappingInput): string {
+  return sha256Hex(replaceMappingIntentText(input));
 }
 
 /* ------------------------------------------------------------------ *

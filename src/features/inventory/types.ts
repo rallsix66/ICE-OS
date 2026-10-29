@@ -294,12 +294,16 @@ export interface InventoryMappingQueueDto {
   limit: number;
 }
 
-/** 手动选择目标商品时的搜索结果（来自 read_inventory_list，不新增 DB 函数）。 */
+/** 手动选择目标商品时的搜索结果（来自 024 的 search_inventory_items_v2，不新增表）。 */
 export interface InventoryTargetItemDto {
   itemId: string;
   iceCode: string | null;
   nameCn: string | null;
   gtin: string | null;
+  /** 商品资料「规格」原文（无则 null；不伪造色号）。 */
+  specification?: string | null;
+  /** 该商品已确认的默认单位（无对应时 null；绑定时直接沿用，避免个/件标签冲突）。 */
+  unit?: string | null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -614,6 +618,13 @@ export interface InventoryActionOutcome {
   errorCode: string | null;
   message: string;
   requestId?: string;
+  /**
+   * 结构化业务结果（R1）：本次实际采用/生效的条目数。
+   * confirm/replace 成功回执必须带它；页面不用中文文案判断成功，`ok:true && applied===0` 视为未生效。
+   */
+  applied?: number;
+  /** 结构化业务结果：被逐条跳过的条目（与服务端回执 skipped 同构）。 */
+  skipped?: Array<{ externalSku?: string | null; warehouseExternalId?: string | null; reason?: string | null }>;
   /** true = 提交结果暂未确认：服务端已登记 pending，必须先核对，不能当确定失败。 */
   outcomeUnknown?: boolean;
   /** 业务已生效但 pending 解除失败：原请求仍保留，不能提示已解锁。 */
@@ -856,6 +867,104 @@ export interface InventoryDomesticSnapshotDto {
   rows: InventoryDomesticRowDto[];
   /** true = 本进程内复用已校验的冻结快照（不是实时刷新）。 */
   cached: boolean;
+}
+
+/* ------------------------------------------------------------------ *
+ * 详情内绑定编辑 v1（UI-1 / UI-2）
+ *
+ * 合同：docs/tasks/catalog-binding-inline-edit-v1.md §3 UI-1/UI-2。
+ * 只承载页面渲染所需的最小投影；账号/仓库/SKU 身份固定，不暴露数据库行或连接信息。
+ * ------------------------------------------------------------------ */
+
+/** 当前登录管理员 + 绑定的来源账号（编辑动作登记原请求时由服务端提供，客户端不自报）。 */
+export interface InventoryBindingViewerDto {
+  actorId: string;
+  accountId: string | null;
+  /** 来源账号显示名（如 BigSeller 登录账号）；没有时为空。 */
+  accountLabel: string | null;
+}
+
+/** 商品库详情“仓库绑定”区的一行：某商品在某仓某来源 SKU 上的当前最新对应。 */
+export interface ItemBindingRowDto {
+  warehouseId: string;
+  warehouseExternalId: string;
+  warehouseName: string;
+  market: string | null;
+  externalSku: string;
+  /** BS 来源原品名（同批原表；缺失为 null，不用商品名冒充）。 */
+  sourceName: string | null;
+  gtin: string | null;
+  unit: string | null;
+  mappingId: string;
+  mappingVersion: number;
+  /** confirmed / recheck / disabled。 */
+  mappingStatus: string;
+  /** 本仓最后完整成功批次里该 SKU 的实物数量（缺失为 null）。 */
+  onHand: number | null;
+  observedAt: string | null;
+  /** adopted=已计入当前合计；pending_adoption=对应已确认等下一完整批次；inactive=已退出；unseen=本批无该 SKU。 */
+  adoption: 'adopted' | 'pending_adoption' | 'inactive' | 'unseen';
+}
+
+/** 商品库详情“仓库绑定”区的整块读取结果（固定商品）。 */
+export interface ItemBindingsDto {
+  item: InventoryItemIdentityDto;
+  /** 参与范围内仍为 confirmed 的仓库（含当前没有绑定的仓库，用于“绑定 BS 商品”）。 */
+  warehouses: InventoryMappingWarehouseOptionDto[];
+  /** 该商品当前最新的逐条对应（每仓每 SKU 一行）。 */
+  bindings: ItemBindingRowDto[];
+  viewer: InventoryBindingViewerDto;
+  /** 服务端存在未完成原请求时禁止发起新写。 */
+  pendingLocked: boolean;
+}
+
+/** 固定仓库内可选的 BS 来源单品（搜索/浏览结果）。 */
+export interface WarehouseSourceItemDto {
+  externalSku: string;
+  /** 来源原品名（同批原表；可能缺失）。 */
+  sourceName: string | null;
+  onHand: number | null;
+  unit: string | null;
+  gtin: string | null;
+  excelRow: number | null;
+  observedAt: string | null;
+  /** 该 SKU 当前最新映射；无映射为 null。 */
+  mappingId: string | null;
+  mappingVersion: number | null;
+  mappingStatus: string | null;
+  /** 当前绑定商品；未绑定时全为 null。 */
+  boundItemId: string | null;
+  boundIceCode: string | null;
+  boundNameCn: string | null;
+}
+
+/** 库存仓库行详情：固定来源（仓 + SKU）的当前对应与最新来源行。 */
+export interface SourceBindingDto {
+  warehouseId: string;
+  warehouseExternalId: string | null;
+  warehouseName: string;
+  market: string | null;
+  externalSku: string;
+  unit: string | null;
+  onHand: number | null;
+  gtin: string | null;
+  observedAt: string | null;
+  mapping: {
+    mappingId: string;
+    version: number;
+    status: string;
+    itemId: string;
+    iceCode: string | null;
+    nameCn: string | null;
+  } | null;
+  /**
+   * 该来源在当前仓最后完整成功批次里的采用事实（R4）：
+   * adopted=本批已计入；pending_adoption=对应确认但等下一完整批次；inactive=已退出当前汇总；unseen=本批未见。
+   * null=服务端未返回该字段（只显示版本，不臆断采用状态）。
+   */
+  adoption: 'adopted' | 'pending_adoption' | 'inactive' | 'unseen' | null;
+  viewer: InventoryBindingViewerDto;
+  pendingLocked: boolean;
 }
 
 

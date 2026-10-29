@@ -13,15 +13,20 @@ import {
   normalizeWarehouseRows,
   normalizeWarehouseStates,
   asArray,
+  pick,
   pickString,
   pickStringOrNull,
   asIntOrNull,
 } from '../normalize';
 import type { InventoryQueryState } from '../model';
+import { pendingBlocksWrites } from '../model';
 import type {
+  InventoryBindingViewerDto,
   InventoryItemDetailDto,
+  InventoryItemIdentityDto,
   InventoryListDto,
   InventoryMappingQueueDto,
+  InventoryMappingWarehouseOptionDto,
   InventoryOverviewDto,
   InventoryPendingActionDto,
   InventoryProductSummaryDto,
@@ -29,6 +34,10 @@ import type {
   InventoryTargetItemDto,
   InventoryWarehouseReadStateV2Dto,
   InventoryWarehouseRowsDto,
+  ItemBindingRowDto,
+  ItemBindingsDto,
+  SourceBindingDto,
+  WarehouseSourceItemDto,
 } from '../types';
 
 /**
@@ -148,25 +157,26 @@ export async function searchInventoryTargetItems(
   search: string,
   limit = 10,
 ): Promise<InventoryTargetItemDto[]> {
-  const raw = await callReadRpc<unknown>(identity, 'catalog.search_inventory_items', [
+  const raw = await callReadRpc<unknown>(identity, 'catalog.search_inventory_items_v2', [
     search || null,
     Math.max(1, Math.min(Math.trunc(limit), 20)),
   ]);
   const rows = Array.isArray(raw) ? raw : asArray((raw as Record<string, unknown> | null)?.items);
-  return rows
-    .map((entry) => {
-      const record = (entry ?? {}) as Record<string, unknown>;
-      const itemId = pickString(record, 'itemId', 'item_id', 'id');
-      if (!itemId) return null;
-      return {
-        itemId,
-        iceCode: pickStringOrNull(record, 'iceCode', 'ice_code'),
-        nameCn: pickStringOrNull(record, 'nameCn', 'name_cn', 'name'),
-        gtin: pickStringOrNull(record, 'gtin'),
-      };
-    })
-    .filter((entry): entry is InventoryTargetItemDto => Boolean(entry))
-    .slice(0, asIntOrNull(limit) ?? 10);
+  const items: InventoryTargetItemDto[] = [];
+  for (const entry of rows) {
+    const record = (entry ?? {}) as Record<string, unknown>;
+    const itemId = pickString(record, 'itemId', 'item_id', 'id');
+    if (!itemId) continue;
+    items.push({
+      itemId,
+      iceCode: pickStringOrNull(record, 'iceCode', 'ice_code'),
+      nameCn: pickStringOrNull(record, 'nameCn', 'name_cn', 'name'),
+      gtin: pickStringOrNull(record, 'gtin'),
+      specification: pickStringOrNull(record, 'specification', 'spec'),
+      unit: pickStringOrNull(record, 'unit'),
+    });
+  }
+  return items.slice(0, asIntOrNull(limit) ?? 10);
 }
 
 /* ------------------------------------------------------------------ *
@@ -233,3 +243,167 @@ export async function getInventoryProductSummary(
   return { ...dto, offset: dto.offset || offset, limit: dto.limit || limit };
 }
 
+/* ------------------------------------------------------------------ *
+ * 详情内绑定编辑 v1（UI-1 / UI-2）
+ *
+ * 读取只走 024 的只读函数；写动作仍走既有 confirm / replace RPC 与 pending 平台。
+ * 账号/仓库/SKU 身份由服务端给出，页面只做展示与选择。
+ * ------------------------------------------------------------------ */
+
+function bindingViewerOf(
+  identity: DbIdentity,
+  overview: InventoryOverviewDto,
+): InventoryBindingViewerDto {
+  return {
+    actorId: identity.profileUserId,
+    accountId: overview.account.accountId ?? null,
+    accountLabel: overview.account.label || null,
+  };
+}
+
+/** 商品库详情“仓库绑定”：固定商品，返回参与仓清单与当前逐条 BS 绑定。 */
+export async function getItemBindings(identity: DbIdentity, itemId: string): Promise<ItemBindingsDto> {
+  const [raw, overview] = await Promise.all([
+    callReadRpc<unknown>(identity, 'catalog.read_item_binding_rows', [itemId]),
+    getInventorySyncOverview(identity),
+  ]);
+  const root = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const itemRaw = (root.item ?? {}) as Record<string, unknown>;
+  const item: InventoryItemIdentityDto = {
+    id: pickString(itemRaw, 'itemId', 'id'),
+    iceCode: pickStringOrNull(itemRaw, 'iceCode', 'ice_code'),
+    nameCn: pickStringOrNull(itemRaw, 'nameCn', 'name_cn'),
+  };
+  const warehouses = asArray(root.warehouses)
+    .map((entry) => {
+      const record = (entry ?? {}) as Record<string, unknown>;
+      return {
+        warehouseId: pickString(record, 'warehouseId', 'warehouse_id', 'id'),
+        externalId: pickString(record, 'externalId', 'external_warehouse_id'),
+        name: pickString(record, 'name', 'external_name'),
+        market: pickStringOrNull(record, 'market'),
+        rowCount: asIntOrNull(record.rowCount) ?? 0,
+        lastSeenAt: pickStringOrNull(record, 'lastSeenAt', 'lastSuccessAt'),
+      } satisfies InventoryMappingWarehouseOptionDto;
+    })
+    .filter((warehouse) => Boolean(warehouse.warehouseId));
+  const bindings = asArray(root.bindings)
+    .map((entry) => {
+      const record = (entry ?? {}) as Record<string, unknown>;
+      const adoption = pickString(record, 'adoption');
+      const mappingId = pickString(record, 'mappingId', 'mapping_id');
+      const warehouseId = pickString(record, 'warehouseId', 'warehouse_id');
+      const externalSku = pickString(record, 'externalSku', 'external_sku');
+      if (!mappingId || !warehouseId || !externalSku) return null;
+      const row: ItemBindingRowDto = {
+        warehouseId,
+        warehouseExternalId: pickString(record, 'warehouseExternalId', 'external_warehouse_id'),
+        warehouseName: pickString(record, 'warehouseName', 'name', 'external_name'),
+        market: pickStringOrNull(record, 'market'),
+        externalSku,
+        sourceName: pickStringOrNull(record, 'sourceName', 'source_name'),
+        gtin: pickStringOrNull(record, 'gtin'),
+        unit: pickStringOrNull(record, 'unit'),
+        mappingId,
+        mappingVersion: asIntOrNull(pick(record, 'mappingVersion', 'mapping_version', 'version')) ?? 0,
+        mappingStatus: pickString(record, 'mappingStatus', 'mapping_status') || 'confirmed',
+        onHand: asIntOrNull(pick(record, 'onHand', 'on_hand')),
+        observedAt: pickStringOrNull(record, 'observedAt', 'observed_at'),
+        adoption: adoption === 'adopted' || adoption === 'pending_adoption'
+          || adoption === 'inactive' || adoption === 'unseen' ? adoption : 'unseen',
+      };
+      return row;
+    })
+    .filter((row): row is ItemBindingRowDto => row !== null);
+  return {
+    item,
+    warehouses,
+    bindings,
+    viewer: bindingViewerOf(identity, overview),
+    pendingLocked: pendingBlocksWrites(overview.pendingAction),
+  };
+}
+
+/** 指定仓内可选的 BS 来源单品（空 search = 列出该仓最后完整成功批次的全部来源行）。 */
+export async function searchWarehouseSourceItems(
+  identity: DbIdentity,
+  warehouseId: string,
+  search: string,
+  limit = 50,
+): Promise<WarehouseSourceItemDto[]> {
+  const raw = await callReadRpc<unknown>(identity, 'catalog.search_inventory_source_items', [
+    warehouseId,
+    search || null,
+    Math.max(1, Math.min(Math.trunc(limit) || 20, 50)),
+  ]);
+  return asArray(raw)
+    .map((entry) => {
+      const record = (entry ?? {}) as Record<string, unknown>;
+      const externalSku = pickString(record, 'externalSku', 'external_sku');
+      if (!externalSku) return null;
+      return {
+        externalSku,
+        sourceName: pickStringOrNull(record, 'sourceName', 'source_name'),
+        onHand: asIntOrNull(pick(record, 'onHand', 'on_hand')),
+        unit: pickStringOrNull(record, 'unit'),
+        gtin: pickStringOrNull(record, 'gtin'),
+        excelRow: asIntOrNull(pick(record, 'excelRow', 'excel_row')),
+        observedAt: pickStringOrNull(record, 'observedAt', 'observed_at'),
+        mappingId: pickStringOrNull(record, 'mappingId', 'mapping_id'),
+        mappingVersion: asIntOrNull(pick(record, 'mappingVersion', 'mapping_version', 'version')),
+        mappingStatus: pickStringOrNull(record, 'mappingStatus', 'mapping_status'),
+        boundItemId: pickStringOrNull(record, 'boundItemId', 'bound_item_id'),
+        boundIceCode: pickStringOrNull(record, 'boundIceCode', 'bound_ice_code'),
+        boundNameCn: pickStringOrNull(record, 'boundNameCn', 'bound_name_cn'),
+      } satisfies WarehouseSourceItemDto;
+    })
+    .filter((item): item is WarehouseSourceItemDto => item !== null);
+}
+
+/** 固定来源（仓 + SKU）的当前对应与最新来源行。 */
+export async function getSourceBinding(
+  identity: DbIdentity,
+  warehouseId: string,
+  externalSku: string,
+): Promise<SourceBindingDto | null> {
+  const [raw, overview] = await Promise.all([
+    callReadRpc<unknown>(identity, 'catalog.read_inventory_source_binding', [warehouseId, externalSku]),
+    getInventorySyncOverview(identity),
+  ]);
+  if (!raw || typeof raw !== 'object') return null;
+  const record = raw as Record<string, unknown>;
+  const mappingRaw = record.mapping && typeof record.mapping === 'object'
+    ? record.mapping as Record<string, unknown>
+    : null;
+  const mapping = mappingRaw
+    ? {
+      mappingId: pickString(mappingRaw, 'mappingId', 'mapping_id', 'id'),
+      version: asIntOrNull(pick(mappingRaw, 'version', 'mappingVersion')) ?? 0,
+      status: pickString(mappingRaw, 'status') || 'confirmed',
+      itemId: pickString(mappingRaw, 'itemId', 'item_id'),
+      iceCode: pickStringOrNull(mappingRaw, 'iceCode', 'ice_code'),
+      nameCn: pickStringOrNull(mappingRaw, 'nameCn', 'name_cn'),
+    }
+    : null;
+  // R4：采用事实按服务端回执原样解释；缺失/未知值不臆断为 adopted。
+  const adoptionRaw = pickString(record, 'adoption').toLowerCase();
+  const adoption = adoptionRaw === 'adopted' || adoptionRaw === 'pending_adoption'
+    || adoptionRaw === 'inactive' || adoptionRaw === 'unseen'
+    ? adoptionRaw
+    : null;
+  return {
+    warehouseId: pickString(record, 'warehouseId', 'warehouse_id'),
+    warehouseExternalId: pickStringOrNull(record, 'warehouseExternalId', 'external_warehouse_id'),
+    warehouseName: pickString(record, 'warehouseName', 'name', 'external_name'),
+    market: pickStringOrNull(record, 'market'),
+    externalSku: pickString(record, 'externalSku', 'external_sku'),
+    unit: pickStringOrNull(record, 'unit'),
+    onHand: asIntOrNull(pick(record, 'onHand', 'on_hand')),
+    gtin: pickStringOrNull(record, 'gtin'),
+    observedAt: pickStringOrNull(record, 'observedAt', 'observed_at'),
+    mapping: mapping && mapping.mappingId && mapping.itemId ? mapping : null,
+    adoption,
+    viewer: bindingViewerOf(identity, overview),
+    pendingLocked: pendingBlocksWrites(overview.pendingAction),
+  };
+}

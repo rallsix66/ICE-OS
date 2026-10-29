@@ -9,6 +9,7 @@ import {
   buildDisableMappingIntent,
   buildManualSyncIntent,
   buildRecheckMappingIntent,
+  buildReplaceMappingIntent,
   buildSettingsIntent,
   classifyActionError,
   confirmOutcomeMessage,
@@ -22,12 +23,16 @@ import {
   unlockFailedMessage,
   type ConfirmMappingInput,
   type IntervalUnit,
+  type ReplaceMappingInput,
 } from '../model';
 import type {
   InventoryActionOutcome,
   InventoryReconcileOutcome,
   InventorySettlement,
   InventoryTargetItemDto,
+  ItemBindingsDto,
+  SourceBindingDto,
+  WarehouseSourceItemDto,
 } from '../types';
 import {
   mapSettleRpcResponse,
@@ -35,8 +40,11 @@ import {
 } from '../settlement';
 import {
   getInventoryPendingActions,
+  getItemBindings,
+  getSourceBinding,
   requireInventoryAdmin,
   searchInventoryTargetItems,
+  searchWarehouseSourceItems,
 } from './reads';
 
 /**
@@ -54,6 +62,7 @@ const ACTION = {
   settings: 'update_inventory_sync_settings',
   manual: 'request_inventory_manual_sync',
   confirm: 'confirm_inventory_mapping',
+  replace: 'replace_inventory_mapping',
   disable: 'disable_inventory_mapping',
   recheck: 'recheck_inventory_mapping',
 } as const;
@@ -655,6 +664,28 @@ interface ConfirmResponse {
   skipped?: unknown;
 }
 
+type MappingSkipRow = NonNullable<InventoryActionOutcome['skipped']>[number];
+
+/**
+ * confirm RPC 的 skipped 是数据库回执结构：在动作边界窄化一次，页面只按结构化字段判断，
+ * 不再解析中文文案。保留服务端的 SKU/仓库/原因值；只有 code 没有 reason 时把 code 用作原因。
+ */
+function mappingSkipRows(raw: unknown): MappingSkipRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((entry) => {
+    const record = (entry && typeof entry === 'object' && !Array.isArray(entry))
+      ? entry as Record<string, unknown>
+      : {};
+    return {
+      externalSku: typeof record.externalSku === 'string' ? record.externalSku : null,
+      warehouseExternalId: typeof record.warehouseExternalId === 'string' ? record.warehouseExternalId : null,
+      reason: typeof record.reason === 'string'
+        ? record.reason
+        : (typeof record.code === 'string' ? record.code : null),
+    };
+  });
+}
+
 function parseConfirmMappings(raw: unknown): { ok: true; mappings: ConfirmMappingInput[] } | { ok: false; message: string } {
   if (!Array.isArray(raw) || raw.length === 0) return { ok: false, message: '请先勾选并填写要确认的对应行（不会默认全选）。' };
   if (raw.length > 100) return { ok: false, message: '一次最多确认 100 条对应，请分批处理。' };
@@ -729,8 +760,8 @@ export async function confirmInventoryMappingsAction(input: {
       },
       onSuccess: (response) => {
         const applied = Number(response?.applied ?? 0) || 0;
-        const skipped = Array.isArray(response?.skipped) ? response.skipped : [];
-        return actionSuccess({ message: confirmOutcomeMessage(applied, skipped) });
+        const skipped = mappingSkipRows(response?.skipped);
+        return actionSuccess({ applied, skipped, message: confirmOutcomeMessage(applied, skipped) });
       },
     });
   } catch (error) {
@@ -876,6 +907,7 @@ function receiptSummary(action: string, response: unknown): string {
   }
   if (action === ACTION.recheck) return '原请求已生效：对应已进入待重核。';
   if (action === ACTION.disable) return '原请求已生效：对应已停用。';
+  if (action === ACTION.replace) return '原请求已生效：绑定已更换。';
   return '原请求已生效。';
 }
 
@@ -1312,9 +1344,11 @@ export async function retryInventoryPendingAction(input: {
             requestId,
           })
           : null),
-        onSuccess: (response) => actionSuccess({
-          message: confirmOutcomeMessage(Number(response?.applied ?? 0) || 0, Array.isArray(response?.skipped) ? response.skipped : []),
-        }),
+        onSuccess: (response) => {
+          const applied = Number(response?.applied ?? 0) || 0;
+          const skipped = mappingSkipRows(response?.skipped);
+          return actionSuccess({ applied, skipped, message: confirmOutcomeMessage(applied, skipped) });
+        },
       });
     }
 
@@ -1360,6 +1394,49 @@ export async function retryInventoryPendingAction(input: {
       });
     }
 
+    if (action === ACTION.replace) {
+      // 与 replaceInventoryMappingAction 同一原子 RPC、同一参数顺序；只复用持久原请求的 requestId/intent/payload。
+      const parsed = parseReplaceMappingInput(payload);
+      if (!parsed.ok) {
+        // 能按服务端保存的 action/intent/payload 证明是原请求才结案，避免留下等不到业务写入的假锁。
+        return invalidInputSettled(identity, { requestId, action, intent, payload }, parsed.message);
+      }
+      const replaceInput = parsed.input;
+      return executeRetry<ReplaceMappingResponse>({
+        identity,
+        requestId,
+        action,
+        intent,
+        payload,
+        execute: () => callAppRpc<ReplaceMappingResponse>(identity, 'catalog.replace_inventory_mapping', [
+          requestId,
+          intent,
+          replaceInput.oldMappingId,
+          replaceInput.expectedOldVersion,
+          replaceInput.itemId,
+          replaceInput.newExternalSku,
+          replaceInput.unit,
+          replaceInput.reason,
+          replaceInput.note ?? null,
+          replaceInput.expectedNewVersion,
+        ]),
+        onBusinessFailure: (response) => {
+          if (!response || response.ok !== false) return null;
+          return failureOutcome({
+            code: response.code ?? 'INVENTORY_MAPPING_REPLACE_REJECTED',
+            message: response.message ?? '服务端拒绝了本次更换绑定；原关系保持不变，请刷新核对后重试。',
+            requestId,
+          });
+        },
+        onSuccess: (response) => actionSuccess({
+          applied: 1,
+          message: response?.releasedOnly
+            ? '已解除原绑定；目标 SKU 仍绑定当前商品，库存待同步。'
+            : '已更换绑定，库存待同步。',
+        }),
+      });
+    }
+
     return invalidInput('不支持的待恢复操作类型；请刷新页面后重试。');
   } catch (error) {
     return actionFailure(error);
@@ -1392,6 +1469,199 @@ export async function searchMappingTargetItemsAction(input: { search?: unknown }
 }
 
 const MAX_SEARCH_INPUT = 120;
+
+/* ------------------------------------------------------------------ *
+ * 详情内绑定编辑 v1（UI-1 / UI-2）
+ *
+ * 读：固定商品逐仓绑定 / 指定仓来源搜索 / 固定来源当前对应；都走 024 只读函数。
+ * 写：新增/转移目标商品沿用 confirm_inventory_mapping（单条、expectedVersion 防覆盖）；
+ *     更换绑定（S1→S2 原子替换）走 replace_inventory_mapping；两者都复用 pending/审计/回执平台。
+ * ------------------------------------------------------------------ */
+
+export async function getItemBindingsAction(input: { itemId?: unknown }): Promise<{
+  ok: boolean;
+  data: ItemBindingsDto | null;
+  message: string | null;
+}> {
+  try {
+    const identity = await requireInventoryAdmin();
+    const itemId = readString(input?.itemId, 64);
+    if (!isUuid(itemId)) return { ok: false, data: null, message: '商品标识无效；请刷新商品详情后重试。' };
+    return { ok: true, data: await getItemBindings(identity, itemId), message: null };
+  } catch (error) {
+    const info = classifyActionError(error);
+    return { ok: false, data: null, message: info.message };
+  }
+}
+
+export async function getSourceBindingAction(input: {
+  warehouseId?: unknown;
+  externalSku?: unknown;
+}): Promise<{ ok: boolean; data: SourceBindingDto | null; message: string | null }> {
+  try {
+    const identity = await requireInventoryAdmin();
+    const warehouseId = readString(input?.warehouseId, 64);
+    const externalSku = readString(input?.externalSku, 200);
+    if (!isUuid(warehouseId) || !externalSku) {
+      return { ok: false, data: null, message: '来源身份不完整；请刷新库存详情后重试。' };
+    }
+    const data = await getSourceBinding(identity, warehouseId, externalSku);
+    return {
+      ok: true,
+      data,
+      message: data ? null : '没有读到该来源的当前对应（不等于没有绑定）；可刷新重试。',
+    };
+  } catch (error) {
+    const info = classifyActionError(error);
+    return { ok: false, data: null, message: info.message };
+  }
+}
+
+export async function searchWarehouseSourceItemsAction(input: {
+  warehouseId?: unknown;
+  search?: unknown;
+}): Promise<{ ok: boolean; items: WarehouseSourceItemDto[]; message: string | null }> {
+  try {
+    const identity = await requireInventoryAdmin();
+    const warehouseId = readString(input?.warehouseId, 64);
+    const search = readString(input?.search, MAX_SEARCH_INPUT);
+    if (!isUuid(warehouseId)) return { ok: false, items: [], message: '请先选择要搜索的仓库。' };
+    const items = await searchWarehouseSourceItems(identity, warehouseId, search, 50);
+    return {
+      ok: true,
+      items,
+      message: items.length > 0
+        ? `该仓可选来源 ${items.length} 条${search
+          ? `（匹配「${search}」）`
+          : '（最多 50 条；输入 SKU、原品名、货号或 69 编码可精确搜索）'}。`
+        : (search
+          ? '该仓没有匹配该关键词的来源；可换 SKU、原品名、货号或 69 编码再试。'
+          : '该仓暂无完整来源批次，暂不能选择 BS 商品；这不等于“没有商品”。'),
+    };
+  } catch (error) {
+    const info = classifyActionError(error);
+    return { ok: false, items: [], message: info.message };
+  }
+}
+
+interface ReplaceMappingResponse {
+  ok?: boolean;
+  code?: string | null;
+  message?: string | null;
+  releasedOnly?: boolean;
+  newVersion?: number | null;
+}
+
+function parseReplaceMappingInput(raw: unknown): { ok: true; input: ReplaceMappingInput } | { ok: false; message: string } {
+  const record = (raw ?? {}) as Record<string, unknown>;
+  const oldMappingId = readString(record.oldMappingId, 64);
+  const expectedOldVersion = Number(record.expectedOldVersion);
+  const itemId = readString(record.itemId, 64);
+  const newExternalSku = readString(record.newExternalSku, 200);
+  const rawNewVersion = record.expectedNewVersion;
+  const expectedNewVersion = rawNewVersion === null || rawNewVersion === undefined
+    ? null
+    : Number(rawNewVersion);
+  const unit = readString(record.unit, 20) || '件';
+  const reason = readString(record.reason, 500);
+  const note = readString(record.note, 500);
+  if (!isUuid(oldMappingId)) return { ok: false, message: '原绑定标识无效；请刷新后重试。' };
+  if (!Number.isSafeInteger(expectedOldVersion) || expectedOldVersion < 1) {
+    return { ok: false, message: '缺少原绑定的页面版本号；请刷新后重试，不能在旧版本上直接覆盖。' };
+  }
+  if (!isUuid(itemId)) return { ok: false, message: '商品标识无效；请刷新后重试。' };
+  if (!newExternalSku) return { ok: false, message: '请选择要绑定的 BS 商品。' };
+  if (expectedNewVersion !== null && (!Number.isSafeInteger(expectedNewVersion) || expectedNewVersion < 1)) {
+    return { ok: false, message: '目标 SKU 的页面版本号无效；请刷新后重试。' };
+  }
+  if (!reason) return { ok: false, message: '缺少这次更换的系统说明；请刷新后重试。' };
+  return {
+    ok: true,
+    input: {
+      oldMappingId,
+      expectedOldVersion,
+      itemId,
+      newExternalSku,
+      expectedNewVersion,
+      unit,
+      reason,
+      note: note || null,
+    },
+  };
+}
+
+/**
+ * 更换绑定（UI-1）：固定商品 A、仓库 W、原 SKU S1，把目标 S2 绑定到 A 并退出 S1。
+ * 写入在数据库单事务内完成；失败保留原关系，不产生半次替换。
+ */
+export async function replaceInventoryMappingAction(input: {
+  requestId?: unknown;
+  intent?: unknown;
+  oldMappingId?: unknown;
+  expectedOldVersion?: unknown;
+  itemId?: unknown;
+  newExternalSku?: unknown;
+  expectedNewVersion?: unknown;
+  unit?: unknown;
+  reason?: unknown;
+  note?: unknown;
+}): Promise<InventoryActionOutcome> {
+  try {
+    const identity = await requireInventoryAdmin();
+    const parsed = parseReplaceMappingInput(input);
+    if (!parsed.ok) {
+      return invalidInputSettled(identity, { requestId: input.requestId }, parsed.message);
+    }
+    const requestId = resolveRequestId(input.requestId);
+    const replaceInput = parsed.input;
+    const intent = buildReplaceMappingIntent(replaceInput);
+    const intentError = validateClientIntent(input.intent, intent);
+    const payload = { ...replaceInput };
+    if (intentError) {
+      return invalidInputSettled(identity, {
+        requestId,
+        action: ACTION.replace,
+        intent: input.intent,
+        payload,
+      }, intentError, 'INVENTORY_REQUEST_CONFLICT');
+    }
+    return executeWithPending<ReplaceMappingResponse>({
+      identity,
+      requestId,
+      action: ACTION.replace,
+      intent,
+      payload,
+      execute: () => callAppRpc<ReplaceMappingResponse>(identity, 'catalog.replace_inventory_mapping', [
+        requestId,
+        intent,
+        replaceInput.oldMappingId,
+        replaceInput.expectedOldVersion,
+        replaceInput.itemId,
+        replaceInput.newExternalSku,
+        replaceInput.unit,
+        replaceInput.reason,
+        replaceInput.note ?? null,
+        replaceInput.expectedNewVersion,
+      ]),
+      onBusinessFailure: (response) => {
+        if (!response || response.ok !== false) return null;
+        return failureOutcome({
+          code: response.code ?? 'INVENTORY_MAPPING_REPLACE_REJECTED',
+          message: response.message ?? '服务端拒绝了本次更换绑定；原关系保持不变，请刷新核对后重试。',
+          requestId,
+        });
+      },
+      onSuccess: (response) => actionSuccess({
+        applied: 1,
+        message: response?.releasedOnly
+          ? '已解除原绑定；目标 SKU 仍绑定当前商品，库存待同步。'
+          : '已更换绑定，库存待同步。',
+      }),
+    });
+  } catch (error) {
+    return actionFailure(error);
+  }
+}
 
 /* ------------------------------------------------------------------ *
  * 读取辅助：概览（供页面在动作后刷新；也导出给服务端页面复用）
