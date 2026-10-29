@@ -87,13 +87,6 @@
   line-height: 1.5;
 }
 
-.sourceListHead p {
-  margin: 0;
-  color: #8a94a1;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
 /* 一来源一行：身份 / 状态 / 最后成功数据 / 下次计划 / 待处理 / 操作。 */
 .sourceRow {
   display: grid;
@@ -130,13 +123,6 @@
   overflow-wrap: anywhere;
 }
 
-.sourceIdentity p {
-  margin: 2px 0 0;
-  color: #8a94a1;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
 .sourceCell {
   display: grid;
   gap: 2px;
@@ -159,13 +145,6 @@
   overflow-wrap: anywhere;
 }
 
-.sourceMapping {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-}
-
 .sourceCell small {
   color: #8a94a1;
   font-size: 12px;
@@ -182,18 +161,6 @@
 
 .actionWrap {
   display: inline-flex;
-}
-
-.inlineLink {
-  color: #5266d7;
-  font-size: 12px;
-  font-weight: 500;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.inlineLink:hover {
-  text-decoration: underline;
 }
 
 .sourceReason {
@@ -222,14 +189,6 @@
   border-color: #b8c3e8;
   background: #f4f6ff;
   color: #5266d7;
-}
-
-.futureSources {
-  margin: 0;
-  padding: 2px 2px 0;
-  color: #98a2b1;
-  font-size: 12px;
-  line-height: 1.7;
 }
 
 /* ---------- 按钮 ---------- */
@@ -289,8 +248,7 @@
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
 .headerLink:focus-visible,
-.sourceLink:focus-visible,
-.inlineLink:focus-visible {
+.sourceLink:focus-visible {
   outline: 2px solid #8495ed;
   outline-offset: 2px;
 }
@@ -372,13 +330,6 @@
   display: grid;
   gap: 12px;
   min-width: 0;
-}
-
-.settingsIntro {
-  margin: 0;
-  color: #7c8798;
-  font-size: 12px;
-  line-height: 1.7;
 }
 
 .savedSummary {

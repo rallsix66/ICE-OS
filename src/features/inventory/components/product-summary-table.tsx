@@ -5,12 +5,9 @@ import styles from './inventory.module.css';
 import {
   buildInventoryListHref,
   buildProductToWarehouseHref,
-  domesticCellMeta,
   domesticCellQuantity,
   marketCellQuantity,
-  marketsDisplay,
   productOverseasTotalText,
-  timestampOr,
   type InventoryQueryState,
   type Tone,
 } from '../model';
@@ -20,15 +17,15 @@ import { useInventoryDetail } from './detail-context';
 
 function statusText(row: InventoryProductSummaryRowDto, domesticOnlyScope: boolean): { text: string; tone: Tone } {
   if (domesticOnlyScope) {
-    if (!row.domestic) return { text: '无国内有效选择（不计入）', tone: 'neutral' };
-    if (row.domestic.hasQuantityAnomaly) return { text: '含未注明数量行，逐行保留', tone: 'amber' };
-    return { text: `已核对 ${row.domestic.rowCount} 条有效选择（计入国内）`, tone: 'green' };
+    if (!row.domestic) return { text: '无国内选择（不计入）', tone: 'neutral' };
+    if (row.domestic.hasQuantityAnomaly) return { text: '含未注明数量行', tone: 'amber' };
+    return { text: `已计入 ${row.domestic.rowCount} 条`, tone: 'green' };
   }
-  if (!row.hasCurrentData) return { text: '海外无当前库存行（不是 0）', tone: 'neutral' };
+  if (!row.hasCurrentData) return { text: '无当前库存（不是 0）', tone: 'neutral' };
   if (row.unitConflict) return { text: '多单位，不合计', tone: 'amber' };
-  if (row.hasPendingTotal) return { text: '同仓多编码合计待核对', tone: 'amber' };
-  if (row.hasPendingAdoptionWarehouses) return { text: '有对应待下一批次采用', tone: 'blue' };
-  if (row.mapped) return { text: '已计入海外合计', tone: 'green' };
+  if (row.hasPendingTotal) return { text: '合计待核对', tone: 'amber' };
+  if (row.hasPendingAdoptionWarehouses) return { text: '待下一批次采用', tone: 'blue' };
+  if (row.mapped) return { text: '已计入合计', tone: 'green' };
   return { text: '来源未对应（不计入）', tone: 'amber' };
 }
 
@@ -46,7 +43,10 @@ function ProductDetailButton({ row }: { row: InventoryProductSummaryRowDto }) {
   );
 }
 
-/** 商品汇总表：一行一个标准商品，按市场分格；来源范围决定列与合计口径。 */
+/**
+ * 商品汇总表：一行一个标准商品，按市场分格；来源范围决定列与合计口径。
+ * 主表只保留商品名称、各范围数量、短状态与详情；身份/来源编码/时间等证据进详情。
+ */
 export function ProductSummaryTable({
   query,
   merged,
@@ -61,14 +61,11 @@ export function ProductSummaryTable({
 
   return (
     <section className={styles.panelSection} data-testid="inventory-product-summary">
-      <div className={styles.panelBar}>
-        <p className={styles.panelSummary} data-testid="inventory-summary-counts">
-          {domesticOnlyScope
-            ? `国内表格快照：${merged.domesticItemCount} 个商品有国内记录 · 共 ${merged.total} 行`
-            : `海外商品 ${merged.overseasItemCount} 个${merged.domesticIncluded ? ` · 国内有记录商品 ${merged.domesticItemCount} 个` : ''} · 共 ${merged.total} 行`}
-        </p>
-        {focused ? <span className={styles.focusTag}>已定位 {focused.iceCode ?? focused.nameCn ?? '目标商品'}</span> : null}
-      </div>
+      {focused ? (
+        <div className={styles.panelBar}>
+          <span className={styles.focusTag}>已定位 {focused.iceCode ?? focused.nameCn ?? '目标商品'}</span>
+        </div>
+      ) : null}
 
       {!merged.domesticAvailable && query.source !== 'overseas' ? (
         <p className={styles.inlineError} data-testid="inventory-summary-domestic-unavailable">
@@ -81,12 +78,6 @@ export function ProductSummaryTable({
           <Link className={styles.headerLink} href={buildInventoryListHref({ ...query, view: 'warehouse', source: 'domestic' })}>
             到仓库明细查看
           </Link>
-        </p>
-      ) : null}
-      {!domesticOnlyScope && merged.unmappedOverseasRows > 0 ? (
-        <p className={styles.panelNote} data-testid="inventory-summary-unmapped-overseas">
-          当前筛选范围另有 {merged.unmappedOverseasRows} 条来源行未对应，不计入商品合计；
-          <Link className={styles.headerLink} href={buildInventoryListHref({ ...query, view: 'warehouse', source: 'overseas' })}>到仓库明细核对</Link>
         </p>
       ) : null}
 
@@ -102,7 +93,7 @@ export function ProductSummaryTable({
               <tr>
                 <th className={styles.stickyCol}>商品</th>
                 {merged.domesticIncluded ? (
-                  <th className={styles.numericHead}>国内（表格快照）</th>
+                  <th className={styles.numericHead}>国内（快照）</th>
                 ) : null}
                 {columns.map((column) => (
                   <th
@@ -132,19 +123,12 @@ export function ProductSummaryTable({
                   >
                     <td className={styles.stickyCol}>
                       <span className={styles.rowTitle}>{row.nameCn ?? row.iceCode ?? '未命名商品'}</span>
-                      <span className={styles.rowSub}>
-                        {row.iceCode ?? '未编号'}{row.gtin ? ` · 69 ${row.gtin}` : ''}
-                        {' · '}{domesticOnlyScope ? '国内表格快照 · 原表未注明仓库' : marketsDisplay(row.markets, row.hasUnknownMarket, query.market).text}
-                      </span>
                     </td>
                     {merged.domesticIncluded ? (
                       <td className={styles.numCell} data-testid="inventory-summary-domestic">
-                        {row.domestic ? (
-                          <>
-                            <strong>{domesticCellQuantity(row.domestic)}</strong>
-                            <span className={styles.rowSub}>{domesticCellMeta(row.domestic)}</span>
-                          </>
-                        ) : <span className={styles.rowSub}>无国内有效选择</span>}
+                        {row.domestic
+                          ? <strong>{domesticCellQuantity(row.domestic)}</strong>
+                          : <span className={styles.numCellMuted}>—</span>}
                       </td>
                     ) : null}
                     {columns.map((column) => {
@@ -169,16 +153,12 @@ export function ProductSummaryTable({
                           >
                             {marketCellQuantity(cell)}
                           </Link>
-                          <span className={styles.rowSub}>
-                            {cell.skuCount} 个来源编码{cell.hasPendingTotal ? ' · 合计待核对' : ''}
-                          </span>
                         </td>
                       );
                     })}
                     {!domesticOnlyScope ? (
                       <td className={styles.numCell}>
                         <strong>{productOverseasTotalText(row)}</strong>
-                        <span className={styles.rowSub}>{row.overseasSkuCount} 个来源编码 · {timestampOr(row.lastObservedAt, '尚无成功观测')}</span>
                       </td>
                     ) : null}
                     <td className={styles.wrapCell}>
@@ -200,11 +180,6 @@ export function ProductSummaryTable({
           </table>
         </div>
       )}
-      <p className={styles.panelNote}>
-        {domesticOnlyScope
-          ? '点「详情」看该商品的国内冻结记录（原数量 / 编码 / 文件日期）；不与海外合计。'
-          : '点数量格下钻到仓库明细；点「详情」看该商品在当前筛选范围的各仓库存。'}
-      </p>
     </section>
   );
 }

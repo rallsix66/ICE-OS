@@ -1153,3 +1153,172 @@
   display: none !important;
 }
 
+/* ---- UI-1：库存明细内“仓库绑定”（绑定表 + 同一区域编辑） ---- */
+
+.bindingRowOps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 仓库绑定表：四列各自独立换行，避免来源 SKU/单位/状态与数量挤在同一行相互覆盖。 */
+.bindingTable {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.bindingTable :is(th, td) {
+  padding: 8px 10px;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.bindingTable :is(th, td):nth-child(1) {
+  width: 22%;
+}
+
+.bindingTable :is(th, td):nth-child(2) {
+  width: 40%;
+}
+
+.bindingTable :is(th, td):nth-child(3) {
+  width: 20%;
+}
+
+.bindingTable :is(th, td):nth-child(4) {
+  width: 18%;
+}
+
+.bindingTable :is(td) > strong,
+.bindingTable :is(td) > span {
+  display: block;
+}
+
+.bindingTable :is(td) > span + span {
+  margin-top: 2px;
+}
+
+.bindingSearchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.bindingSearchRow > input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.bindingEditorMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  color: #5a687a;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.bindingEditorMeta strong {
+  color: #2d3f5a;
+}
+
+.bindingResultList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.bindingResultButton {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 9px 11px;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
+  background: #fff;
+  color: #33465f;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bindingResultButton:hover {
+  border-color: #c9d4ea;
+}
+
+.bindingResultButton[aria-pressed="true"] {
+  border-color: #8495ed;
+  background: #eef1ff;
+  box-shadow: inset 0 0 0 1px #8495ed;
+}
+
+.bindingResultButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.bindingResultName {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.bindingResultQty {
+  color: #445a78;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bindingResultMeta {
+  grid-column: 1 / -1;
+  color: #7b8ba4;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.bindingSelection {
+  padding: 9px 11px;
+  border: 1px dashed #c9d4ea;
+  border-radius: 8px;
+  background: #f7f9fd;
+  color: #4c607c;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.bindingSelectionWarn {
+  border-color: #e8cf9a;
+  background: #fdf8ec;
+  color: #8a6a1f;
+}
+
+.bindingFeedback {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.bindingFeedback[data-tone="ok"] {
+  color: #1f6b45;
+}
+
+.bindingFeedback[data-tone="warn"] {
+  color: #8a6a1f;
+}
+
+.bindingFeedback[data-tone="error"] {
+  color: #9d4f4d;
+}
+

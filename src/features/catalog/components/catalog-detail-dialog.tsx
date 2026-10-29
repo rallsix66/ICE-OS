@@ -769,6 +769,12 @@ function CatalogDetailLoader({
                   invalidateDetailCacheItem(detailId);
                   runFetch(warehouseFilter, false, ++requestSeq.current);
                 }}
+                /* UI-1：绑定写成功后立即失效当前 detail 缓存并重取详情；列表相关行由 router.refresh 更新。 */
+                onBindingsChanged={() => {
+                  invalidateDetailCacheItem(detailId);
+                  runFetch(warehouseFilter, false, ++requestSeq.current);
+                  router.refresh();
+                }}
               />
             </div>
             {evidenceOpen && (

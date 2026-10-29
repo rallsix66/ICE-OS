@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import styles from './sync-view.module.css';
 import { StatusPill } from './display';
@@ -59,7 +58,7 @@ export function SyncControls({
   viewer,
   selectedRunId,
   lastDataText,
-  lastDataNote,
+  lastDataAlert,
   pendingTotal,
   detailContent,
   diagnostics,
@@ -71,9 +70,9 @@ export function SyncControls({
   viewer: LocalViewerIdentity | null;
   /** 当前 URL 选中的任务 id（?run=）；有值时外层详情自动展开，选中任务详情随面板可见。 */
   selectedRunId: string;
-  /** 最后成功数据时间（服务端按逐仓观测时间计算）与口径说明。 */
+  /** 最后成功数据时间（服务端按逐仓观测时间计算）；读取失败时给一行短状态。 */
   lastDataText: string;
-  lastDataNote: string;
+  lastDataAlert: string | null;
   /** 待处理对应总数（来源 SKU × 仓库；未计入商品合计）。 */
   pendingTotal: number;
   /** 详情面板内容（服务端渲染；原请求核对/逐仓结果/任务历史）。 */
@@ -142,23 +141,22 @@ export function SyncControls({
   /* 来源行状态：真实同步状态优先，其次账号/后台这类会阻止同步的当前状态。 */
   let statusLabel = '未运行';
   let statusTone: Tone = 'neutral';
-  let statusReason: string;
+  let statusReason: string | null = null;
   if (overview.pendingAction) {
     statusLabel = '结果待核对';
     statusTone = 'amber';
-    statusReason = '上一次写操作的回执还没核对：先点「详情」核对原请求，再继续同步或改设置。';
+    statusReason = '先核对原请求，再同步或改设置。';
   } else if (activeRun) {
     statusLabel = activeRun.statusLabel;
     statusTone = 'blue';
-    statusReason = `同步执行中：${activeRun.statusLabel}；完成后本行自动更新，也可点右上角“刷新状态”。`;
   } else if (overview.account.status === 'needs_login') {
     statusLabel = '需要重新登录';
     statusTone = 'amber';
-    statusReason = 'BigSeller 登录已失效，自动同步已暂停；需要人工重新登录并复位账号。';
+    statusReason = '登录已失效，自动同步暂停。';
   } else if (overview.account.status === 'disabled') {
     statusLabel = '账号已停用';
     statusTone = 'neutral';
-    statusReason = 'BigSeller 账号已停用，自动同步不会执行。';
+    statusReason = '自动同步不会执行。';
   } else if (!overview.worker) {
     statusLabel = '后台未登记';
     statusTone = 'amber';
@@ -166,24 +164,20 @@ export function SyncControls({
   } else if (!overview.worker.online) {
     statusLabel = '后台离线';
     statusTone = 'amber';
-    statusReason = `后台最后心跳 ${timestampOr(overview.worker.lastSeenAt, '暂无记录')}；离线期间自动同步暂停，已有库存不清空。`;
+    statusReason = `后台离线（最后心跳 ${timestampOr(overview.worker.lastSeenAt, '暂无记录')}），自动同步暂停。`;
   } else if (latestDisplay) {
     statusLabel = latestDisplay.label;
     statusTone = latestDisplay.tone;
     if (latestRun?.status === 'outcome_unknown') {
-      statusReason = '保存结果暂未确认：后台按原请求核对回执，不要重复点同步。';
+      statusReason = '保存结果暂未确认，不要重复同步。';
     } else if (lastFailedRun) {
-      statusReason = `${errorCodeLabel(latestRun?.errorCode ?? null) ?? '本次同步未成功'}；上次成功数据仍保留。`;
-    } else {
-      statusReason = '最近任务已成功；待处理对应见本行。';
+      statusReason = `${errorCodeLabel(latestRun?.errorCode ?? null) ?? '本次同步未成功'}；保留上次成功数据。`;
     }
-  } else {
-    statusReason = '还没有同步任务：开启自动同步或点「立即同步」。';
   }
   if (scope.empty && !activeRun && !overview.pendingAction) {
     statusLabel = '未安排（空范围）';
     statusTone = 'amber';
-    statusReason = '参与仓库为空：已停止发布；打开「设置」重新选择参与仓库。';
+    statusReason = '参与仓库为空：已停止发布。';
   }
 
   const detailOpen = openPanel === 'detail'
@@ -382,7 +376,6 @@ export function SyncControls({
       <section className={styles.sourceRow} data-testid="sync-source-row-bigseller" aria-label="BigSeller 海外库存同步">
         <div className={styles.sourceIdentity}>
           <h2>BigSeller · 海外库存</h2>
-          <p>{scope.empty ? '参与仓库为空：已停止发布' : `自动计划读取 · ${scope.count} 个参与仓`}</p>
         </div>
 
         <div className={styles.sourceCell} data-testid="sync-source-status">
@@ -393,7 +386,7 @@ export function SyncControls({
         <div className={styles.sourceCell} data-testid="sync-source-last-data">
           <span className={styles.sourceLabel}>最后成功数据</span>
           <span className={styles.sourceValue}>{lastDataText}</span>
-          <small>{lastDataNote}</small>
+          {lastDataAlert ? <small>{lastDataAlert}</small> : null}
         </div>
 
         <div className={styles.sourceCell} data-testid="sync-source-next-plan">
@@ -402,14 +395,8 @@ export function SyncControls({
         </div>
 
         <div className={styles.sourceCell} data-testid="sync-source-pending">
-          <span className={styles.sourceLabel}>待处理对应</span>
-          <span className={styles.sourceMapping} data-testid="sync-mapping">
-            <span className={styles.sourceValue}>{formatQuantity(pendingTotal) || '0'}</span>
-            <Link className={styles.inlineLink} href="/dashboard/catalog/mappings?from=sync" data-testid="sync-mapping-entry-link">
-              去处理
-            </Link>
-          </span>
-          <small>未对应数量保留，未计入商品合计</small>
+          <span className={styles.sourceLabel}>待处理</span>
+          <span className={styles.sourceValue} data-testid="sync-mapping">{formatQuantity(pendingTotal) || '0'}</span>
         </div>
 
         <div className={styles.sourceActions}>
@@ -418,7 +405,7 @@ export function SyncControls({
             className={styles.primaryButton}
             onClick={requestManualSync}
             disabled={busy !== null || writeLocked || blockedReason !== null}
-            title={blockedReason ?? '立即同步使用已保存的自动同步范围；已有活动任务时返回同一个任务，不重复排队'}
+            title={blockedReason ?? '立即同步使用已保存的自动同步范围；已有活动任务时返回同一个任务'}
             data-testid="sync-manual-button"
           >
             {busy === 'manual' ? '正在提交…' : '立即同步'}
@@ -447,7 +434,7 @@ export function SyncControls({
           </span>
         </div>
 
-        <p className={styles.sourceReason} data-testid="sync-source-reason">{statusReason}</p>
+        {statusReason ? <p className={styles.sourceReason} data-testid="sync-source-reason">{statusReason}</p> : null}
       </section>
 
       {blockedReason ? <p className={styles.blockedNote} data-testid="sync-manual-blocked">{blockedReason}</p> : null}
@@ -456,17 +443,17 @@ export function SyncControls({
         <div className={styles.inlineNotice} data-testid="sync-scope-empty-notice">
           <strong>{scope.label}</strong>
           <br />
-          {scope.notice}
+          在「设置」重新勾选参与仓库并保存后恢复。
         </div>
       ) : null}
 
       {writeLocked ? (
         <p className={styles.writeLocked} data-testid="sync-write-locked">
-          原请求待核对期间，保存设置与立即同步已禁用（服务端同样会拒绝新写，避免覆盖原请求）。
+          原请求待核对：保存设置与立即同步暂不可用。
           {local
             ? localOwner.trusted
-              ? ' 本地还保留一条结果未知的原请求：先在「详情」核对，再恢复写操作。'
-              : ` 本地保留的原请求${localOwner.reason ? `：${localOwner.reason}` : '归属/身份不可信'}，因此保持锁定。`
+              ? ' 本地还保留一条结果未知的原请求，先在「详情」核对。'
+              : ` 本地保留的原请求${localOwner.reason ? `：${localOwner.reason}` : '归属/身份不可信'}，保持锁定。`
             : ''}
         </p>
       ) : null}
@@ -490,9 +477,6 @@ export function SyncControls({
           aria-label="自动同步设置"
         >
           <div data-testid="sync-source-settings-panel" className={styles.panelInner}>
-            <p className={styles.settingsIntro}>
-              保存后刷新及重启仍然保留；这里只改自动同步设置，不触发一次同步。范围为空会停止发布。
-            </p>
             <p className={styles.savedSummary} data-testid="sync-settings-summary">
               <strong>当前已保存：</strong>
               {savedSummaryText}
@@ -510,9 +494,6 @@ export function SyncControls({
                   />
                   开启自动同步
                 </label>
-                <p className={styles.fieldHint}>
-                  首次启用或改频率时，以保存时刻为基准重排下次执行；关闭只取消以后的自动触发，正在执行的任务继续，手动同步仍可用（空范围除外）。
-                </p>
               </div>
 
               <div className={styles.field}>
@@ -536,15 +517,15 @@ export function SyncControls({
                   </select>
                 </div>
                 <p className={styles.fieldHint} data-tone={intervalError ? 'error' : undefined}>
-                  {intervalError || '范围 5–1440 分钟（1–24 小时）；服务端统一按分钟保存。上限只是避免意外密集导出，不是 BigSeller 的平台限额。'}
+                  {intervalError || '范围 5–1440 分钟（1–24 小时）'}
                 </p>
               </div>
 
               <div className={styles.field}>
-                <span>参与仓库（允许全部取消 = 明确清空并停止发布）</span>
+                <span>参与仓库</span>
                 <div className={styles.warehouseGrid} data-testid="sync-warehouse-picker">
                   {selectableWarehouses.length === 0 ? (
-                    <p className={styles.fieldHint}>还没有读到该账号可见的仓库清单；未配置参与仓库时不会发布任何库存。</p>
+                    <p className={styles.fieldHint}>还没有读到该账号可见的仓库清单。</p>
                   ) : (
                     selectableWarehouses.map((warehouse) => (
                       <label key={warehouse.id} className={styles.checkLine} title={warehouse.externalId}>
@@ -570,9 +551,8 @@ export function SyncControls({
                   {scopeChange.kind === 'unchanged'
                     ? `参与仓库未修改（当前保存 ${selectedWarehouseIds.length} 个${scope.empty ? '，且为明确空范围' : ''}）。`
                     : scopeChange.kind === 'cleared'
-                      ? '将明确清空参与仓库：保存后停止发布，刷新/重启保持；立即同步会被拒绝并说明原因。'
+                      ? '将明确清空参与仓库：保存后停止发布；立即同步会被拒绝。'
                       : `将更新为 ${scopeChange.warehouseIds.length} 个参与仓库。`}
-                  仓库来自这个 BigSeller 账号可见清单；新增仓库先进入待确认，不会悄悄扩大范围。
                 </p>
               </div>
             </div>
@@ -580,7 +560,6 @@ export function SyncControls({
             {draftDirty ? (
               <p className={styles.draftNotice} data-testid="sync-draft-notice">
                 有未保存的设置草稿：<strong>立即同步仍使用已保存范围</strong>（{savedSummaryText.split(' · ').slice(1, 3).join(' · ')}）。
-                收起设置只是暂时隐藏，草稿仍保留；点“保存设置”后才生效。
               </p>
             ) : null}
 
@@ -598,9 +577,6 @@ export function SyncControls({
                     ? '确认清空并保存'
                     : '保存设置'}
               </button>
-              <span className={styles.fieldHint}>
-                保存只更新自动同步设置；「立即同步」不读取本面板草稿，始终按已保存范围执行。
-              </span>
             </div>
 
             {diagnostics}

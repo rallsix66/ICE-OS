@@ -8,7 +8,7 @@ import {
   isUuid,
   type InventoryQueryState,
 } from '../model';
-import type { InventoryDomesticRowDto, InventoryItemDetailDto, InventoryWarehouseRowDto } from '../types';
+import type { InventoryDomesticRowDto, InventoryItemDetailDto, InventoryWarehouseRowDto, SourceBindingDto } from '../types';
 import type { InventoryDetailTarget } from './detail-context';
 import { InventoryDetailContext } from './detail-context';
 import { InventoryDetailPanel } from './inventory-detail-panel';
@@ -43,6 +43,11 @@ export function InventoryDetailLayer({
   itemError,
   domesticRows,
   domesticIncluded,
+  sourceBinding,
+  sourceBindingError,
+  bindingReady,
+  viewer,
+  pendingLocked,
   children,
 }: {
   query: InventoryQueryState;
@@ -53,6 +58,15 @@ export function InventoryDetailLayer({
   domesticRows: InventoryDomesticRowDto[];
   /** 列表有效范围是否包含国内（与列/计数同一判断；失败仓/明确仓市场下钻不带国内）。 */
   domesticIncluded: boolean;
+  /** 当前打开仓库行的固定来源绑定（服务端读取；用于详情内直接绑定/更换商品）。 */
+  sourceBinding: SourceBindingDto | null;
+  sourceBindingError: string | null;
+  /** 服务端已针对当前行尝试读取绑定（false = 页面读取尚未返回）。 */
+  bindingReady: boolean;
+  /** 当前会话身份（绑定写入登记与本地恢复记录归属校验用）。 */
+  viewer: { actorId: string; accountId: string | null } | null;
+  /** 服务端存在未完成原请求时禁止发起新写。 */
+  pendingLocked: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -146,6 +160,11 @@ export function InventoryDetailLayer({
         itemError={itemError}
         domesticRows={domesticRows}
         domesticIncluded={domesticIncluded}
+        sourceBinding={sourceBinding}
+        sourceBindingError={sourceBindingError}
+        bindingReady={bindingReady}
+        viewer={viewer}
+        pendingLocked={pendingLocked}
         onClose={close}
       />
     </InventoryDetailContext.Provider>

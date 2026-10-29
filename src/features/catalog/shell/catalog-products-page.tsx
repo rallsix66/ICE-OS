@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ExternalLink, Package, Search } from 'lucide-react';
+import { AlertTriangle, Package, Search } from 'lucide-react';
 import { EmptyState } from '@/ui/ice-v4/primitives';
 import type { CatalogListClientPayload, CatalogListClientRow } from '../local-display/list-client-types';
 import { clientRowAsDisplayRow } from '../local-display/list-client-types';
 import { applyWarehouseScopeToDisplayRow } from '../local-display/client-scope';
 import {
-  buildListContextHref,
   formatAdoptedUnitCostCell,
   formatSampleLabel,
   pageEntries,
@@ -241,8 +240,6 @@ export function CatalogProductsPage({
   const sampleLabel = formatSampleLabel(payload?.observationAt ?? null);
   const isFiltering = query.trim().length > 0;
   const moreId = (itemId: string) => `catalog-row-more-${itemId}`;
-  // 带上当前列表筛选/页码作为返回上下文：处理完对应后能回到原来的搜索与位置。
-  const mappingsEntryHref = `/dashboard/catalog/mappings?from=catalog&back=${encodeURIComponent(buildListContextHref(query, warehouse, currentPage))}`;
 
   return (
     <>
@@ -251,19 +248,10 @@ export function CatalogProductsPage({
           <h2 className={styles.introTitle}>商品资料</h2>
           <p className={styles.introLead}>
             以商品名称和身份资料为主；数量与货值请到「商品库存」查看。
-            正式来源 SKU 对应（确认 / 重核 / 停用 / 换绑）只在「来源 SKU 对应」维护——库存页只保留定位链接，不提供第二套编辑器。
+            来源 SKU 的绑定与更换在商品库存详情的对应仓库行内完成，不再单独维护。
           </p>
         </div>
         <div className={styles.introLinks}>
-          <Link
-            className={styles.entryLink}
-            href={mappingsEntryHref}
-            data-testid="catalog-mappings-entry"
-            title="前往唯一的来源 SKU 对应维护页：确认 / 重核 / 停用 / 换绑 BigSeller 正式库存来源 SKU 与标准商品的对应"
-          >
-            来源 SKU 对应
-            <ExternalLink size={13} strokeWidth={1.8} aria-hidden />
-          </Link>
           <Link className={styles.quietLink} href="/dashboard/inventory">
             商品库存
           </Link>

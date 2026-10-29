@@ -1543,6 +1543,51 @@
   margin-top: 14px;
 }
 
+/* 详情内绑定区：固定来源 + 当前绑定 + 更换/绑定入口（UI-2） */
+.detailBinding {
+  margin-top: 14px;
+  padding: 10px 12px 12px;
+  border: 1px solid #e2e7f4;
+  border-radius: 8px;
+  background: #f7f9fe;
+}
+
+.detailBinding .subTitle {
+  margin-top: 0;
+}
+
+.detailBinding .detailActions {
+  margin-top: 10px;
+}
+
+.detailBinding .detailLead {
+  color: #26364c;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.detailBinding .inlineError .secondaryButton {
+  margin-left: 8px;
+}
+
+.bindingResultButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.bindingResultButton[data-selected='true'] {
+  border-color: #4d7fca;
+  background: #eef4ff;
+}
+
+.bindingResultButton[data-current='true'] {
+  cursor: default;
+}
+
 .detailTotals {
   display: flex;
   flex-wrap: wrap;

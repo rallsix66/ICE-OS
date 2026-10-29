@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Package } from 'lucide-react';
@@ -8,6 +8,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import { Pill } from '@/ui/ice-v4/primitives';
+import {
+  confirmInventoryMappingsAction,
+  getItemBindingsAction,
+  replaceInventoryMappingAction,
+  searchWarehouseSourceItemsAction,
+} from '@/features/inventory/server/actions';
+import type { ItemBindingsDto, WarehouseSourceItemDto } from '@/features/inventory/types';
+import { buildConfirmMappingsIntent, buildReplaceMappingIntent, currentMappingStatusLabel } from '@/features/inventory/model';
+import { executeBindingWrite } from '@/features/inventory/components/binding-write';
+import {
+  getLocalUnknownServerSnapshot,
+  getLocalUnknownSnapshot,
+  localUnknownOwnerCheck,
+  subscribeLocalUnknown,
+} from '@/features/inventory/client-pending';
+import { invalidateDetailCacheItem } from '../shell/catalog-detail-cache';
 import { adoptedUnitCostFromFinancial, type AdoptedUnitCost } from '../local-display/adopted-price';
 import { formatCnyPrice } from '../local-display/money-display';
 import {
@@ -623,6 +639,7 @@ export function CatalogDetail({
   warehouseFilter,
   embedded = false,
   onRevisionSaved,
+  onBindingsChanged,
   editing: editingProp,
   onEditingChange,
   onDirtyChange,
@@ -650,6 +667,11 @@ export function CatalogDetail({
   warehouseFilter?: string;
   embedded?: boolean;
   onRevisionSaved?: () => void;
+  /**
+   * UI-1：仓库绑定写成功后回调（弹窗内由 loader 失效当前 detail 缓存并重取详情 + router.refresh）。
+   * 未接线时组件自己 router.refresh()，保证列表相关行也会更新。
+   */
+  onBindingsChanged?: () => void;
   /** 弹窗由标题区控制编辑入口；直链页自己渲染入口。 */
   editing?: boolean;
   onEditingChange?: (editing: boolean) => void;
@@ -1285,6 +1307,16 @@ export function CatalogDetail({
           )}
         </div>
       </section>
+
+      {/* UI-1：仓库绑定就在“库存明细”内，不改原三页签，也不新增独立绑定管理页。 */}
+      {!historical && (
+        <WarehouseBindingsBlock
+          itemId={item.itemId}
+          itemLabel={`${item.iceCode ?? '待补货号'} · ${item.nameCn}`}
+          canWrite={writeAccess.canWrite}
+          onChanged={onBindingsChanged}
+        />
+      )}
     </div>
   );
 
@@ -1596,6 +1628,632 @@ function BsSampleBusinessBlock({
         <ul className={styles.sectionNote} data-testid="catalog-inventory-warnings">
           {sample.warnings.map((warning) => <li key={warning}>{warning}</li>)}
         </ul>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * UI-1：库存明细内的“仓库绑定”（合同 §3 UI-1）
+ *
+ * 固定当前商品 A：逐仓列出现有绑定，同仓多个 SKU 逐行保留（零库存照常显示）。
+ * 更换绑定固定仓库 W 与原 SKU S1，搜索 W 内完整 BS 来源（已绑定/未绑定/零库存），
+ * 选中 S2 后一次保存完成“S1 退出 + S2 绑定 A”；S2 已绑定商品 C 时在同一编辑区
+ * 明确显示“从 C 转到 A”。没有绑定的仓库可直接绑定或添加同仓另一条来源。
+ * 写动作复用库存模块既有登记/回执/恢复链（executeBindingWrite），
+ * 本组件不另建幂等、锁或第二套确认弹窗。
+ * ------------------------------------------------------------------ */
+
+type BindingsState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; data: ItemBindingsDto };
+
+type BindingLine = ItemBindingsDto['bindings'][number];
+
+type BindingGroup = {
+  warehouseId: string;
+  externalId: string | null;
+  name: string;
+  market: string | null;
+  rowCount: number | null;
+  bindings: BindingLine[];
+};
+
+type BindingEditorTarget = {
+  mode: 'replace' | 'bind' | 'add';
+  warehouseId: string;
+  warehouseExternalId: string | null;
+  warehouseName: string;
+  market: string | null;
+  oldBinding: BindingLine | null;
+};
+
+type BindingSearchState =
+  | { status: 'idle' }
+  | { status: 'searching' }
+  | { status: 'error'; message: string }
+  | { status: 'ok'; items: WarehouseSourceItemDto[]; message: string | null };
+
+type BindingFeedback = { tone: 'ok' | 'warn' | 'error'; message: string };
+
+const BINDING_REASON_LIMIT = 500;
+const BINDING_NOTE_LIMIT = 500;
+
+/** 数量缺失才显示“—”；真实 0 照常显示 0，不把未知写成 0。 */
+function bindingQtyText(value: unknown): string {
+  return value === null || value === undefined || value === '' ? '—' : String(value);
+}
+
+/** 采用口径沿用库存模块：绑定已确认与“已计入当前库存”分开，不先显示已计入。 */
+function bindingAdoptionText(adoption: string | null | undefined): string {
+  if (adoption === 'adopted') return '已计入当前库存';
+  if (adoption === 'pending_adoption') return '绑定已确认，库存待同步';
+  if (adoption === 'unseen') return '本批未见，库存待同步';
+  if (adoption === 'inactive') return '对应已退出，当前不计入';
+  return '采用状态未标注';
+}
+
+/** 搜索结果/绑定的“当前绑定商品”标签：不展示内部 UUID。 */
+function bindingSourceItemLabel(item: WarehouseSourceItemDto): string {
+  const code = (item.boundIceCode ?? '').trim();
+  const name = (item.boundNameCn ?? '').trim();
+  if (code && name) return `${code} · ${name}`;
+  return code || name || '其他商品';
+}
+
+function bindingSourceBoundText(item: WarehouseSourceItemDto, currentItemId: string): string {
+  if (!item.boundItemId) return '当前未绑定';
+  if (item.boundItemId === currentItemId) return `已绑定当前商品（${bindingSourceItemLabel(item)}）`;
+  return `当前绑定 ${bindingSourceItemLabel(item)}`;
+}
+
+/** 目标 S2 与当前商品 A / 原 SKU S1 的关系，决定编辑区文案与是否可保存。 */
+function bindingTargetRelation(
+  item: WarehouseSourceItemDto,
+  currentItemId: string,
+  oldBinding: BindingLine | null,
+): 'same_as_old' | 'unbound' | 'bound_to_current' | 'bound_to_other' {
+  if (oldBinding && item.externalSku === oldBinding.externalSku) return 'same_as_old';
+  if (!item.boundItemId) return 'unbound';
+  return item.boundItemId === currentItemId ? 'bound_to_current' : 'bound_to_other';
+}
+
+function WarehouseBindingsBlock({
+  itemId,
+  itemLabel,
+  canWrite,
+  onChanged,
+}: {
+  itemId: string;
+  itemLabel: string;
+  canWrite: boolean;
+  onChanged?: () => void;
+}) {
+  const router = useRouter();
+  const [state, setState] = useState<BindingsState>({ status: 'loading' });
+  const [editor, setEditor] = useState<BindingEditorTarget | null>(null);
+  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState<BindingSearchState>({ status: 'idle' });
+  const [selected, setSelected] = useState<WarehouseSourceItemDto | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<BindingFeedback | null>(null);
+  const localUnknown = useSyncExternalStore(subscribeLocalUnknown, getLocalUnknownSnapshot, getLocalUnknownServerSnapshot);
+
+  /** 读取仓库绑定：失败给明确错误与重试，不当作“没有绑定”。 */
+  const loadBindings = useCallback(async () => {
+    try {
+      const result = await getItemBindingsAction({ itemId });
+      if (!result.ok || !result.data) {
+        setState({ status: 'error', message: result.message ?? '仓库绑定读取失败，可重试；失败不代表没有绑定。' });
+        return;
+      }
+      setState({ status: 'ready', data: result.data });
+    } catch {
+      setState({ status: 'error', message: '仓库绑定读取失败（网络或传输异常），可重试；失败不代表没有绑定。' });
+    }
+  }, [itemId]);
+
+  useEffect(() => {
+    /* 与详情历史读取一致：首帧后再发起读取，effect 内不直接 setState。 */
+    const frame = window.requestAnimationFrame(() => { void loadBindings(); });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loadBindings]);
+
+  const data = state.status === 'ready' ? state.data : null;
+  const viewer = data?.viewer ?? null;
+  const localOwner = localUnknown
+    ? localUnknownOwnerCheck(localUnknown, viewer ? { actorId: viewer.actorId, accountId: viewer.accountId ?? '' } : null)
+    : { trusted: true, reason: null };
+  const writeLocked = Boolean(data?.pendingLocked) || Boolean(localUnknown);
+  const writeAllowed = canWrite && !writeLocked && !busy;
+  const accountLabel = data?.viewer?.accountLabel?.trim() || '当前账号自动带入';
+
+  const groups = useMemo<BindingGroup[]>(() => {
+    if (!data) return [];
+    const byId = new Map<string, BindingGroup>();
+    for (const warehouse of data.warehouses) {
+      byId.set(warehouse.warehouseId, {
+        warehouseId: warehouse.warehouseId,
+        externalId: warehouse.externalId ?? null,
+        name: warehouse.name,
+        market: warehouse.market ?? null,
+        rowCount: warehouse.rowCount ?? null,
+        bindings: [],
+      });
+    }
+    for (const binding of data.bindings) {
+      let group = byId.get(binding.warehouseId);
+      if (!group) {
+        group = {
+          warehouseId: binding.warehouseId,
+          externalId: binding.warehouseExternalId ?? null,
+          name: binding.warehouseName,
+          market: binding.market ?? null,
+          rowCount: null,
+          bindings: [],
+        };
+        byId.set(binding.warehouseId, group);
+      }
+      group.bindings.push(binding);
+    }
+    return [...byId.values()];
+  }, [data]);
+
+  const openEditor = (target: BindingEditorTarget) => {
+    if (!writeAllowed) return;
+    setEditor(target);
+    setQuery('');
+    setSearch({ status: 'idle' });
+    setSelected(null);
+    setNote('');
+    setFeedback(null);
+  };
+
+  const closeEditor = () => {
+    if (busy) return;
+    setEditor(null);
+    setQuery('');
+    setSearch({ status: 'idle' });
+    setSelected(null);
+    setNote('');
+  };
+
+  /** 搜索该仓完整可选来源：空关键词列出该仓最近完整批次全部来源（服务端有上限）。 */
+  async function runSearch() {
+    if (!editor || busy) return;
+    const target = editor;
+    const term = query.trim();
+    setSearch({ status: 'searching' });
+    setSelected(null);
+    try {
+      const result = await searchWarehouseSourceItemsAction({ warehouseId: target.warehouseId, search: term });
+      if (!result.ok) {
+        setSearch({ status: 'error', message: result.message ?? '搜索失败，可重试；读取失败不等于该仓没有可用单品。' });
+        return;
+      }
+      setSearch({ status: 'ok', items: result.items, message: result.message });
+    } catch {
+      setSearch({ status: 'error', message: '搜索失败（网络或传输异常），可重试；读取失败不等于该仓没有可用单品。' });
+    }
+  }
+
+  const relation = editor && selected ? bindingTargetRelation(selected, itemId, editor.oldBinding) : null;
+  const blockedReason = (() => {
+    if (!editor || !selected) return null;
+    if (relation === 'same_as_old') return '选择的仍是原 SKU：保存不会写入，请选择其他 BS 单品。';
+    if (editor.mode !== 'replace' && relation === 'bound_to_current') return '该来源已绑定当前商品，无需重复添加。';
+    if (editor.mode !== 'replace' && !editor.warehouseExternalId) return '该仓库缺少来源身份，暂不能新增绑定；请刷新后重试。';
+    if (editor.mode === 'replace' && !editor.oldBinding) return '缺少原绑定版本，请刷新后重试。';
+    return null;
+  })();
+
+  const selectionSummary = (() => {
+    if (!editor || !selected || !relation) return null;
+    const target = `${selected.sourceName?.trim() || '未提供品名'} · ${selected.externalSku}`;
+    if (relation === 'same_as_old' && editor.oldBinding) {
+      return { text: `目标仍是原 SKU（${editor.oldBinding.externalSku}）：保存不会产生新版本。`, warn: true };
+    }
+    if (editor.mode === 'replace' && editor.oldBinding) {
+      if (relation === 'bound_to_current') {
+        return { text: `目标 S2 ${target} 已绑定当前商品：保存后只退出原 SKU ${editor.oldBinding.externalSku}，不重复建立绑定。`, warn: false };
+      }
+      if (relation === 'bound_to_other') {
+        return { text: `从 ${bindingSourceItemLabel(selected)} 转到 ${itemLabel}：保存即完成这一次明确换绑（原 SKU ${editor.oldBinding.externalSku} 退出）。`, warn: true };
+      }
+      return { text: `目标 S2 ${target} 目前未绑定：保存后绑定到 ${itemLabel}，原 SKU ${editor.oldBinding.externalSku} 退出。`, warn: false };
+    }
+    if (relation === 'bound_to_current') {
+      return { text: `该来源已绑定当前商品 ${itemLabel}，无需重复添加。`, warn: true };
+    }
+    if (relation === 'bound_to_other') {
+      return { text: `从 ${bindingSourceItemLabel(selected)} 转到 ${itemLabel}：保存即把该来源从其他商品转给当前商品。`, warn: true };
+    }
+    return { text: `新增同仓来源：${target} → ${itemLabel}。`, warn: false };
+  })();
+
+  const applyOutcome = (outcome: { tone: 'ok' | 'warn' | 'error'; message: string; reload: boolean }, successMessage: string) => {
+    if (outcome.reload) {
+      /* 登记结果未知：保留本地记录后整页重载，由页面恢复入口核对同一 requestId。 */
+      window.location.reload();
+      return;
+    }
+    const serverMessage = outcome.message?.trim() ?? '';
+    /* 成功只由 executeBindingWrite 的结构化 tone 决定，文案不参与业务判定
+       （applied=0/被跳过/版本冲突由写入口返回非 ok；不再匹配中文“未绑定”子串）。 */
+    if (outcome.tone === 'ok') {
+      /* S2 已绑定当前商品时服务端只解除 S1：用它更准确的原话，不写成“已更换”。 */
+      setFeedback({
+        tone: 'ok',
+        message: serverMessage.startsWith('已解除原绑定') ? serverMessage : successMessage,
+      });
+      setEditor(null);
+      setQuery('');
+      setSearch({ status: 'idle' });
+      setSelected(null);
+      setNote('');
+      /* 绑定立即生效，库存等下一次完整同步采用：失效当前 detail 缓存并重取绑定/详情。 */
+      invalidateDetailCacheItem(itemId);
+      void loadBindings();
+      if (onChanged) onChanged();
+      else router.refresh();
+      return;
+    }
+    /* 非成功：保留编辑器、当前选择与搜索结果，只显示服务端具体原因，可修改后重新提交。 */
+    setFeedback({ tone: outcome.tone, message: serverMessage || '保存未完成；当前选择已保留，可修改后重试。' });
+  };
+
+  async function submitBinding() {
+    if (!editor || !selected || busy || !data) return;
+    if (blockedReason) {
+      setFeedback({ tone: 'warn', message: blockedReason });
+      return;
+    }
+    const target = editor;
+    const picked = selected;
+    // 本商品已确认的默认单位：新增/转移时优先沿用，避免与服务端单位约束冲突（不让用户反复填单位）。
+    const itemUnit = data.bindings.map((binding) => binding.unit?.trim()).find(Boolean) ?? null;
+    const requestId = crypto.randomUUID();
+    const noteText = note.trim().slice(0, BINDING_NOTE_LIMIT);
+    const itemLabelText = itemLabel.slice(0, 120);
+    setBusy(true);
+    setFeedback(null);
+    try {
+      if (target.mode === 'replace' && target.oldBinding) {
+        const old = target.oldBinding;
+        const unit = (old.unit ?? '').trim() || (itemUnit ?? '').trim() || (picked.unit ?? '').trim() || '件';
+        const relationNote = relation === 'bound_to_other'
+          ? `；S2 原绑定 ${bindingSourceItemLabel(picked)}`
+          : relation === 'bound_to_current'
+            ? '；S2 已绑定当前商品，本次只退出 S1'
+            : '';
+        const reason = `商品详情更换绑定：${target.warehouseName} ${old.externalSku}→${picked.externalSku}（固定商品 ${itemLabelText}${relationNote}）`.slice(0, BINDING_REASON_LIMIT);
+        const payload = {
+          oldMappingId: old.mappingId,
+          expectedOldVersion: old.mappingVersion,
+          itemId,
+          newExternalSku: picked.externalSku,
+          expectedNewVersion: picked.mappingId ? picked.mappingVersion : null,
+          unit,
+          reason,
+          note: noteText || null,
+        };
+        const intent = buildReplaceMappingIntent(payload);
+        const outcome = await executeBindingWrite({
+          requestId,
+          action: 'replace_inventory_mapping',
+          intent,
+          payload,
+          viewer: data.viewer,
+          execute: () => replaceInventoryMappingAction({ requestId, intent, ...payload }),
+        });
+        applyOutcome(outcome, '已更换绑定，库存待同步。');
+        return;
+      }
+      const unit = (itemUnit ?? '').trim() || (picked.unit ?? '').trim() || '件';
+      const reasonText = relation === 'bound_to_other'
+        ? `商品详情转移绑定：${target.warehouseName} ${picked.externalSku} 从 ${bindingSourceItemLabel(picked)} 转到 ${itemLabelText}`
+        : `商品详情新增绑定：${target.warehouseName} ${picked.externalSku}（固定商品 ${itemLabelText}）`;
+      const entry = {
+        externalSku: picked.externalSku,
+        warehouseExternalId: target.warehouseExternalId ?? '',
+        itemId,
+        unit,
+        reason: reasonText.slice(0, BINDING_REASON_LIMIT),
+        note: noteText || null,
+        expectedVersion: picked.mappingId ? picked.mappingVersion : null,
+        verification: false,
+      };
+      const intent = buildConfirmMappingsIntent([entry]);
+      const outcome = await executeBindingWrite({
+        requestId,
+        action: 'confirm_inventory_mapping',
+        intent,
+        payload: { mappings: [entry] },
+        viewer: data.viewer,
+        execute: () => confirmInventoryMappingsAction({ mappings: [entry], requestId, intent }),
+      });
+      applyOutcome(outcome, target.mode === 'add' ? '已添加绑定，库存待同步。' : '已绑定 BS 商品，库存待同步。');
+    } catch {
+      setFeedback({ tone: 'warn', message: '保存结果暂未确认；请刷新后在数据同步页核对原请求，不要重复提交。' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className={styles.section} aria-label="仓库绑定" data-testid="catalog-warehouse-bindings">
+      <div className={styles.sectionHead}>
+        <div>
+          <h2 className={styles.sectionTitle}>仓库绑定</h2>
+          <p className={styles.sectionNote}>固定本商品，按仓库更换或添加 BS 单品；绑定立即生效，库存等下一次完整同步采用。</p>
+        </div>
+        <button
+          type="button"
+          className={styles.headerButton}
+          data-testid="catalog-binding-refresh"
+          disabled={state.status === 'loading'}
+          onClick={() => {
+            if (state.status === 'error') setState({ status: 'loading' });
+            void loadBindings();
+          }}
+        >
+          {state.status === 'loading' ? '读取中…' : '刷新绑定'}
+        </button>
+      </div>
+      {state.status === 'loading' && <p className={styles.sectionNote} role="status">正在读取仓库绑定…</p>}
+      {state.status === 'error' && (
+        <p role="alert" className={styles.statusLine} data-testid="catalog-binding-load-error">
+          {state.message}
+          {' '}
+          <button
+            type="button"
+            className={demoStyles.textLink}
+            onClick={() => { setState({ status: 'loading' }); void loadBindings(); }}
+          >
+            重试
+          </button>
+        </p>
+      )}
+      {state.status === 'ready' && (
+        <>
+          {!canWrite && <p className={styles.deniedNote} data-testid="catalog-binding-readonly">当前账号仅可查看仓库绑定，不能更换。</p>}
+          {writeLocked && (
+            <p className={styles.pendingBox} data-testid="catalog-binding-locked">
+              {data?.pendingLocked
+                ? '有一笔未完成的原请求待核对：核对完成前不能再次更换绑定，服务端同样拒绝新写入。'
+                : '本地保留了一条结果未知的原请求：核对/恢复前保持锁定。'}
+              {localOwner.reason ? ` ${localOwner.reason}` : ''}
+              {' '}请到数据同步页的“原请求待核对”入口处理。
+            </p>
+          )}
+          {groups.length === 0 ? (
+            <p className={styles.sectionNote} data-testid="catalog-binding-empty">当前没有可用的 BS 来源仓库；未绑定不等于库存 0。</p>
+          ) : (
+            <div className={demoStyles.tableScroll}>
+              <table className={`${demoStyles.table} ${styles.bindingTable}`} data-testid="catalog-binding-table">
+                <thead><tr><th>仓库</th><th>BS 品名与 SKU</th><th>现有库存</th><th>操作</th></tr></thead>
+                <tbody>
+                  {groups.map((group) => (group.bindings.length === 0 ? (
+                    <tr key={group.warehouseId} data-testid="catalog-binding-row" data-warehouse={group.name} data-sku="">
+                      <td>
+                        <strong>{group.name}</strong>
+                        {group.market ? <span className={styles.fieldHint}>{group.market}</span> : null}
+                        {group.rowCount !== null ? <span className={styles.fieldHint}>该仓来源 {group.rowCount} 行</span> : null}
+                      </td>
+                      <td data-testid="catalog-binding-sku">未绑定 BS 单品</td>
+                      <td data-testid="catalog-binding-on-hand">未绑定</td>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.headerButton}
+                          data-testid="catalog-binding-bind"
+                          disabled={!writeAllowed}
+                          onClick={() => openEditor({
+                            mode: 'bind',
+                            warehouseId: group.warehouseId,
+                            warehouseExternalId: group.externalId,
+                            warehouseName: group.name,
+                            market: group.market,
+                            oldBinding: null,
+                          })}
+                        >
+                          绑定 BS 商品
+                        </button>
+                      </td>
+                    </tr>
+                  ) : group.bindings.map((binding, index) => (
+                    <tr key={binding.mappingId} data-testid="catalog-binding-row" data-warehouse={group.name} data-sku={binding.externalSku}>
+                      <td>
+                        <strong>{group.name}</strong>
+                        {group.market ? <span className={styles.fieldHint}>{group.market}</span> : null}
+                      </td>
+                      <td>
+                        <strong data-testid="catalog-binding-source-name">{binding.sourceName?.trim() || 'BS 单品'}</strong>
+                        <span className={styles.fieldHint} data-testid="catalog-binding-sku">
+                          SKU {binding.externalSku}
+                          {binding.unit ? ` · 单位 ${binding.unit}` : ''}
+                          {' · '}{currentMappingStatusLabel(binding.mappingStatus)}
+                          {' · '}{bindingAdoptionText(binding.adoption)}
+                        </span>
+                      </td>
+                      <td>
+                        <span data-testid="catalog-binding-on-hand">{bindingQtyText(binding.onHand)}</span>
+                        <span className={styles.fieldHint}>
+                          {binding.observedAt ? `来源时间 ${new Date(binding.observedAt).toLocaleString('zh-CN', { hour12: false })}` : '来源时间未记录'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className={styles.bindingRowOps}>
+                          {binding.mappingStatus === 'confirmed' ? (
+                            <button
+                              type="button"
+                              className={styles.headerButton}
+                              data-testid="catalog-binding-replace"
+                              disabled={!writeAllowed}
+                              onClick={() => openEditor({
+                                mode: 'replace',
+                                warehouseId: group.warehouseId,
+                                warehouseExternalId: group.externalId,
+                                warehouseName: group.name,
+                                market: group.market,
+                                oldBinding: binding,
+                              })}
+                            >
+                              更换绑定
+                            </button>
+                          ) : (
+                            <span className={styles.fieldHint}>非生效对应（{currentMappingStatusLabel(binding.mappingStatus)}），不可更换</span>
+                          )}
+                          {index === 0 && (
+                            <button
+                              type="button"
+                              className={styles.headerButton}
+                              data-testid="catalog-binding-add-source"
+                              disabled={!writeAllowed}
+                              onClick={() => openEditor({
+                                mode: 'add',
+                                warehouseId: group.warehouseId,
+                                warehouseExternalId: group.externalId,
+                                warehouseName: group.name,
+                                market: group.market,
+                                oldBinding: null,
+                              })}
+                            >
+                              添加同仓来源
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {editor && (
+            <div className={styles.form} aria-label="仓库绑定编辑" data-testid="catalog-binding-editor" data-mode={editor.mode}>
+              <div className={styles.bindingEditorMeta}>
+                <strong>{editor.mode === 'replace' ? '更换绑定' : editor.mode === 'add' ? '添加同仓来源' : '绑定 BS 商品'}</strong>
+                <span>商品 <strong>{itemLabel}</strong>（固定）</span>
+                <span>仓库 <strong>{editor.warehouseName}</strong>{editor.market ? `（${editor.market}）` : ''}</span>
+                {editor.oldBinding ? <span>原 SKU <strong>{editor.oldBinding.externalSku}</strong></span> : null}
+                <span>来源账号 <strong>{accountLabel}</strong></span>
+              </div>
+              <div className={styles.field}>
+                <span>搜索该仓 BS 单品</span>
+                <div className={styles.bindingSearchRow}>
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void runSearch();
+                      }
+                    }}
+                    placeholder="SKU / 原品名 / 69 编码"
+                    maxLength={120}
+                    aria-label="搜索该仓 BS 单品"
+                    data-testid="catalog-binding-search-input"
+                    disabled={busy || writeLocked}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void runSearch()}
+                    disabled={busy || writeLocked || search.status === 'searching'}
+                    data-testid="catalog-binding-search-submit"
+                  >
+                    {search.status === 'searching' ? '搜索中…' : '搜索'}
+                  </Button>
+                </div>
+                <span className={styles.fieldHint}>空关键词列出该仓最近完整批次全部来源（服务端最多 50 条）；已绑定、未绑定、零库存都列出。</span>
+              </div>
+              {search.status === 'error' && (
+                <p role="alert" className={styles.statusLine} data-testid="catalog-binding-search-error">
+                  {search.message}
+                  {' '}
+                  <button type="button" className={demoStyles.textLink} onClick={() => void runSearch()} disabled={busy}>重试搜索</button>
+                </p>
+              )}
+              {search.status === 'ok' && search.items.length === 0 && (
+                <p className={styles.sectionNote} data-testid="catalog-binding-search-empty">
+                  {search.message ?? '该仓库没有匹配的 BS 单品（真实空结果，不是读取失败）。'}
+                </p>
+              )}
+              {search.status === 'ok' && search.items.length > 0 && (
+                <>
+                  <p className={styles.sectionNote} data-testid="catalog-binding-search-count">
+                    该仓结果 {search.items.length} 条（含已绑定、未绑定与零库存）。
+                  </p>
+                  <div className={styles.bindingResultList} data-testid="catalog-binding-search-results">
+                    {search.items.map((item) => (
+                      <button
+                        key={item.externalSku}
+                        type="button"
+                        className={styles.bindingResultButton}
+                        aria-pressed={selected?.externalSku === item.externalSku}
+                        data-testid="catalog-binding-search-result"
+                        data-sku={item.externalSku}
+                        disabled={busy || writeLocked}
+                        onClick={() => setSelected(item)}
+                      >
+                        <span className={styles.bindingResultName}>
+                          {item.sourceName?.trim() || '（来源未提供品名）'} · <span className={styles.codeCell}>{item.externalSku}</span>
+                        </span>
+                        <span className={styles.bindingResultQty}>
+                          {bindingQtyText(item.onHand)}{item.unit ? ` ${item.unit}` : ''}
+                        </span>
+                        <span className={styles.bindingResultMeta}>
+                          {bindingSourceBoundText(item, itemId)}
+                          {item.mappingStatus ? ` · ${currentMappingStatusLabel(item.mappingStatus)}` : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {selectionSummary && (
+                <div
+                  className={selectionSummary.warn ? `${styles.bindingSelection} ${styles.bindingSelectionWarn}` : styles.bindingSelection}
+                  data-testid="catalog-binding-selection"
+                >
+                  {selectionSummary.text}
+                </div>
+              )}
+              <label className={styles.field}>
+                备注（选填，另存为本次操作说明）
+                <Input
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  maxLength={BINDING_NOTE_LIMIT}
+                  aria-label="绑定备注"
+                  data-testid="catalog-binding-note"
+                  disabled={busy || writeLocked}
+                />
+              </label>
+              <div className={styles.formActions}>
+                <Button
+                  type="button"
+                  onClick={() => void submitBinding()}
+                  disabled={busy || writeLocked || !selected || Boolean(blockedReason)}
+                  data-testid="catalog-binding-save"
+                >
+                  {busy ? '正在保存…' : editor.mode === 'replace' ? '保存更换' : '保存绑定'}
+                </Button>
+                <Button type="button" variant="outline" onClick={closeEditor} disabled={busy} data-testid="catalog-binding-cancel">取消</Button>
+                {selected ? <span className={styles.fieldHint}>取消不写入；保存期间不能重复提交。</span> : null}
+              </div>
+            </div>
+          )}
+          {feedback && (
+            <p className={styles.bindingFeedback} data-tone={feedback.tone} role="status" aria-live="polite" data-testid="catalog-binding-feedback">
+              {feedback.message}
+            </p>
+          )}
+        </>
       )}
     </section>
   );

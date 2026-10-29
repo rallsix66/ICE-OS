@@ -30,7 +30,6 @@ const NAV: NavItem[] = [
     match: (pathname) =>
       pathname === '/dashboard/catalog'
       || /^\/dashboard\/catalog\/[0-9a-f-]{36}$/i.test(pathname)
-      || pathname.startsWith('/dashboard/catalog/mappings')
       || pathname.startsWith('/dashboard/catalog/issues'),
   },
   {
@@ -70,7 +69,6 @@ function resolveActive(pathname: string, items: NavItem[]) {
 function pageLabel(pathname: string, fallback: string): string {
   if (pathname.startsWith('/dashboard/sync')) return '数据同步';
   if (pathname.startsWith('/dashboard/inventory')) return '商品库存';
-  if (pathname.startsWith('/dashboard/catalog/mappings')) return '来源 SKU 对应';
   if (pathname.startsWith('/dashboard/catalog/issues')) return '待处理';
   if (pathname.startsWith('/dashboard/catalog/intake')) return '持续新品（旧入口）';
   if (pathname.startsWith('/dashboard/catalog/sources')) return '来源核实（旧入口）';

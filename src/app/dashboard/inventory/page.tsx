@@ -12,6 +12,7 @@ import {
   getInventoryProductSummary,
   getInventorySyncOverview,
   getInventoryWarehouseRows,
+  getSourceBinding,
   requireInventoryAdmin,
 } from '@/features/inventory/server/reads';
 import { getInventoryDomesticSnapshot } from '@/features/inventory/server/domestic-reads';
@@ -22,6 +23,7 @@ import type {
   InventoryProductSummaryDto,
   InventoryWarehouseRowDto,
   InventoryWarehouseRowsDto,
+  SourceBindingDto,
 } from '@/features/inventory/types';
 
 export const dynamic = 'force-dynamic';
@@ -162,6 +164,28 @@ export default async function InventoryPage({
 
   const warehouseStates = overseasRows?.warehouses ?? productSummary?.warehouses ?? [];
 
+  // 仓库行详情：读取固定来源（仓 + 原 SKU）的当前绑定，供详情内直接绑定/更换商品。
+  // 国内行只读冻结快照，不提供 BigSeller 绑定；读取失败显示“可重试”，不当作“未绑定”。
+  const bindingTarget = detailRow && detailRow.source === 'bigseller' && detailRow.warehouseId ? detailRow : null;
+  let sourceBinding: SourceBindingDto | null = null;
+  let sourceBindingError: string | null = null;
+  if (bindingTarget?.warehouseId) {
+    try {
+      const binding = await getSourceBinding(identity, bindingTarget.warehouseId, bindingTarget.externalSku);
+      if (binding) {
+        sourceBinding = binding;
+      } else {
+        // 读不到不等于“未绑定”：显示可重试，避免把未知写成未绑定。
+        sourceBindingError = '没有读取到该来源的绑定信息';
+      }
+    } catch (error) {
+      sourceBindingError = shortFailure(error) ?? '绑定信息读取失败';
+    }
+  }
+
+  // 恢复入口只在有未完成原请求/本地未知记录时出现；身份用于判断本地记录是否属于当前管理员。
+  const viewer = { actorId: identity.profileUserId, accountId: overview?.account.accountId ?? '' };
+
   return (
     <InventoryView
       query={query}
@@ -175,6 +199,11 @@ export default async function InventoryPage({
       detailRow={detailRow}
       itemDetail={itemDetail}
       itemError={itemError}
+      pending={overview?.pendingAction ?? null}
+      viewer={viewer}
+      sourceBinding={sourceBinding}
+      sourceBindingError={sourceBindingError}
+      bindingReady={Boolean(bindingTarget)}
     />
   );
 }

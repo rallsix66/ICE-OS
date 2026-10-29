@@ -218,53 +218,45 @@ export function SyncView({
       note: warehouseStateLabel(row),
     }));
 
-  /* 首屏来源行需要的事实：最后成功数据时间、下次计划、参与仓数量。 */
+  /* 首屏来源行需要的事实：最后成功数据时间（只在读取失败时给一行短状态）。 */
   const latestObservation = latestObservationAt(warehouseStates);
   const lastDataTime = latestObservation ?? overview.scopeLastAllSuccessAt ?? null;
   const lastDataText = lastDataTime ? (formatTimestamp(lastDataTime) || '时间未记录') : '尚无成功数据';
-  const lastDataNote = latestObservation
-    ? '来源批次观测时间'
-    : (warehouseStatesError ? '逐仓观测时间未读到' : lastDataTime ? '范围内最后全部成功时间' : '失败时保留上次成功数据');
+  const lastDataAlert = latestObservation
+    ? null
+    : (warehouseStatesError ? '逐仓状态读取失败' : null);
 
   const pendingTotal = Math.max(0, Number(overview.mappingQueueTotal ?? 0) || 0);
 
-  /* 国内冻结快照：只读展示“表格快照 + 最新文件日期”，并列出文件覆盖日期集合，不提供立即同步。 */
+  /* 国内冻结快照：只读展示状态与最新文件日期，不提供立即同步。 */
   const domesticAvailable = domesticSnapshot?.available === true;
   const domesticDates = domesticAvailable
-    ? Array.from(new Set(
-      (domesticSnapshot?.fileDates ?? [])
-        .map((entry) => entry.fileDate)
-        .filter(Boolean),
-    )).sort()
+    ? (domesticSnapshot?.fileDates ?? []).map((entry) => entry.fileDate).filter(Boolean).sort()
     : [];
-  const domesticDateText = domesticDates.length > 0
-    ? `最新文件 ${domesticDates[domesticDates.length - 1]}`
-    : '文件日期见库存页';
-  const domesticNote = domesticAvailable
-    ? `文件覆盖：${domesticDates.join('、')}`
-    : (domesticSnapshot?.reason ?? '冻结表格快照，文件日期见库存页');
+  const domesticDateText = domesticDates.length > 0 ? domesticDates[domesticDates.length - 1] : '—';
+  const domesticReason = domesticAvailable ? null : ((domesticSnapshot?.reason ?? '').trim() || null);
   const domesticStatus: { label: string; tone: Tone } = domesticAvailable
     ? { label: '表格快照', tone: 'neutral' }
     : { label: '未读取', tone: 'amber' };
 
-  /* 只有真实异常才需要处理：登录/后台/最近任务失败；其余状态在来源行与设置面板里。 */
+  /* 只有真实异常才需要处理：登录/后台/最近任务失败。 */
   const alerts: Array<{ tone: 'amber' | 'red'; title: string; body: string; href?: string; linkLabel?: string }> = [];
   if (account.status === 'needs_login') {
     alerts.push({
       tone: 'amber',
       title: 'BigSeller 登录已失效，自动同步已暂停',
-      body: '后台不会继续自动重试。请先在浏览器亲自登录 BigSeller，再按运行说明由管理员复位账号状态；本页不提供绕过登录的按钮。',
+      body: '需人工重新登录并复位账号状态后才能继续。',
     });
   } else if (account.status === 'disabled') {
-    alerts.push({ tone: 'amber', title: 'BigSeller 账号已停用', body: '自动同步不会执行；如需恢复请由管理员在后台确认。' });
+    alerts.push({ tone: 'amber', title: 'BigSeller 账号已停用', body: '自动同步不会执行。' });
   }
   if (!overview.worker) {
-    alerts.push({ tone: 'amber', title: '后台同步程序未登记', body: '还没有读到后台心跳；自动同步不会执行。请确认后台程序已启动（关闭业务网页不影响后台）。' });
+    alerts.push({ tone: 'amber', title: '后台同步程序未登记', body: '自动同步不会执行，请确认后台程序已启动。' });
   } else if (!overview.worker.online) {
     alerts.push({
       tone: 'amber',
       title: '后台同步程序离线',
-      body: `最后一次心跳：${timestampOr(overview.worker.lastSeenAt, '暂无记录')}。离线期间自动同步暂停，但不会清空已有库存。`,
+      body: `最后心跳：${timestampOr(overview.worker.lastSeenAt, '暂无记录')}。自动同步暂停，已有库存不清空。`,
     });
   }
   if (latestRun && latestDisplay && ['failed', 'partial', 'outcome_unknown', 'needs_login'].includes(latestRun.status)) {
@@ -302,14 +294,12 @@ export function SyncView({
       ) : (
         <p className={styles.statusOkLine} data-testid="sync-no-alerts">
           <StatusPill tone="green">运行正常</StatusPill>
-          登录、后台和最近任务都没有需要处理的异常。
         </p>
       )}
 
       <section className={styles.detailSection} data-testid="sync-scope-progress" aria-label="逐仓结果">
         <div className={styles.sectionHeader}>
           <h2>逐仓结果</h2>
-          <p>每仓以最后一次完整成功批次为准；失败仓保留上次成功数据并标旧时间。</p>
         </div>
         <div className={styles.sectionBody}>
           <div className={styles.pillRow}>
@@ -324,7 +314,7 @@ export function SyncView({
           </div>
           {scope.empty ? (
             <p className={styles.inlineNotice} data-testid="sync-scope-empty-summary">
-              {scope.notice}
+              已停止发布；在「设置」重新勾选并保存后恢复。
             </p>
           ) : null}
           <div className={styles.tableWrap}>
@@ -342,7 +332,7 @@ export function SyncView({
                 {progressRows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className={styles.wrapCell}>
-                      还没有已确认参与的仓库；未配置参与仓库时停止发布，也不会把“没有行”当作空仓。
+                      还没有已确认参与的仓库。
                     </td>
                   </tr>
                 ) : (
@@ -366,12 +356,11 @@ export function SyncView({
                         <td>
                           {pendingCell.text}
                           {pendingCell.alert ? (
-                            <span className={styles.pendingNote}>数量保留，未计入商品合计；到「来源 SKU 对应」处理</span>
+                            <span className={styles.pendingNote}>未计入商品合计</span>
                           ) : null}
                         </td>
                         <td>
                           <StatusPill tone={row.note.tone as Tone}>{row.note.label}</StatusPill>
-                          {row.note.note ? <span className={styles.rowSub}>{row.note.note}</span> : null}
                         </td>
                       </tr>
                     );
@@ -382,34 +371,25 @@ export function SyncView({
           </div>
           {warehouseStatesError ? (
             <p className={styles.inlineError}>
-              逐仓读取状态没有读到：{warehouseStatesError}。上表退回总览字段（不显示 0），“待处理（未对应）”显示“—”。
-              可点右上角“刷新状态”重试。
+              逐仓状态读取失败：{warehouseStatesError}。上表为总览字段，可刷新重试。
             </p>
-          ) : (
-            <p className={styles.mappingNote}>
-              文件保存成功不等于 SKU 全部已对应；未对应数量保留，不计入商品合计。
-            </p>
-          )}
+          ) : null}
         </div>
       </section>
 
       <details className={styles.collapsible} data-testid="sync-runs" open={query.run !== '' || runsAttention}>
         <summary>
           任务历史与任务详情
-          <span className={styles.summaryHint}>
-            共 {runs.length} 条（新的在前）；失败原因、问题行和文件校验都在这里按需展开
-          </span>
+          <span className={styles.summaryHint}>共 {runs.length} 条</span>
         </summary>
         <div className={styles.collapsibleBody}>
           {activeRuns.length > 0 ? (
             <p className={styles.inlineNotice}>
-              当前有 {activeRuns.length} 个进行中的任务。此时点“立即同步”会返回同一个任务，不会额外排队；被覆盖的自动时间点记入该任务。
+              当前有 {activeRuns.length} 个进行中的任务；「立即同步」返回同一任务，不额外排队。
             </p>
           ) : null}
           {runs.length === 0 ? (
-            <p className={styles.inlineNotice}>
-              还没有同步任务。开启自动同步或点“立即同步”后，任务会出现在这里；下载成功与库存保存成功分开显示。
-            </p>
+            <p className={styles.inlineNotice}>还没有同步任务。</p>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
@@ -432,7 +412,6 @@ export function SyncView({
                       <tr key={run.id} data-testid="sync-run-row">
                         <td>
                           <StatusPill tone={display.tone as Tone}>{display.label}</StatusPill>
-                          <span className={styles.rowSub}>{display.nextStep}</span>
                         </td>
                         <td>{triggerLabel(run.triggerKind)}</td>
                         <td>{timestampOr(run.plannedFor, '未安排')}</td>
@@ -463,21 +442,16 @@ export function SyncView({
               </table>
             </div>
           )}
-          <p className={styles.mappingNote}>
-            状态说明：等待 → 下载 → 检查 → 保存 → 全部成功/部分成功/失败；登录失效显示“需要登录”，提交后没拿到回执显示“结果待核对”。
-          </p>
-
           {query.run ? (
             <section id={RUN_DETAIL_ANCHOR} data-testid="sync-run-detail" aria-label="同步任务详情">
               <div className={styles.sectionHeader}>
                 <h2>任务详情</h2>
-                <p>只列本次任务的业务结果；文件指纹等诊断放在下方。</p>
               </div>
               <div className={styles.sectionBody}>
                 {runError ? (
-                  <p className={styles.inlineError}>读取任务详情失败：{runError}。这不等于任务不存在；可刷新重试或查看列表状态。</p>
+                  <p className={styles.inlineError}>读取任务详情失败：{runError}。可刷新重试。</p>
                 ) : !runDetail || !detailStatus ? (
-                  <p className={styles.inlineNotice}>没有找到该任务（可能不在授权范围或已被清理）。不显示为 0，也不伪造任务内容。</p>
+                  <p className={styles.inlineNotice}>没有找到该任务（可能不在授权范围或已被清理）。</p>
                 ) : (
                   <>
                     <div className={styles.pillRow}>
@@ -492,7 +466,6 @@ export function SyncView({
                         </StatusPill>
                       ) : null}
                     </div>
-                    <p className={styles.mappingNote}>{detailStatus.nextStep}</p>
 
                     <div className={styles.subGrid}>
                       <div className={styles.subPanel}>
@@ -504,14 +477,12 @@ export function SyncView({
                             {
                               label: '本次观测时间',
                               value: timestampOr(runDetail.observationAt ?? null, '未记录（缺失时不发布）'),
-                              hint: '观测时间只取来源导出完成时间；恢复/重放不会用当前时间顶替。',
                             },
                             {
                               label: '覆盖的自动时间点',
                               value: (runDetail.coveredSlots ?? []).length > 0
                                 ? (runDetail.coveredSlots ?? []).map((slot) => timestampOr(slot, '时间未标注')).join('、')
                                 : '无',
-                              hint: '被正在执行的任务覆盖的自动时间点不会再单独补跑。',
                             },
                             {
                               label: '错误原因',
@@ -531,7 +502,7 @@ export function SyncView({
                             { label: '本任务观测时间', value: timestampOr(runDetail.observationAt ?? null, '未记录') },
                             {
                               label: '问题行',
-                              value: (runDetail.issues ?? []).length > 0 ? `${(runDetail.issues ?? []).length} 行（下方可查）` : '没有解析问题行',
+                              value: (runDetail.issues ?? []).length > 0 ? `${(runDetail.issues ?? []).length} 行` : '没有解析问题行',
                             },
                           ]}
                         />
@@ -539,33 +510,29 @@ export function SyncView({
                     </div>
 
                     <details className={styles.collapsible} data-testid="sync-run-file-diagnostics">
-                      <summary>
-                        文件与后台诊断
-                        <span className={styles.summaryHint}>文件指纹、表头、行数与校验结果；排查时才需要展开</span>
-                      </summary>
+                      <summary>文件与后台诊断</summary>
                       <div className={styles.collapsibleBody}>
                         {runDetail.file ? (
                           <FactList
                             rows={[
-                              { label: '文件指纹', value: fingerprintPrefix(runDetail.file) || '未记录', hint: '只显示前 12 位；采集身份与内容哈希分离（不同任务可同内容）。' },
+                              { label: '文件指纹', value: fingerprintPrefix(runDetail.file) || '未记录' },
                               {
                                 label: '文件行数',
                                 value: runDetail.file.rowCount === null || runDetail.file.rowCount === undefined
                                   ? '未记录'
                                   : `${formatQuantity(runDetail.file.rowCount)} 行`,
-                                hint: `空白行 ${runDetail.file.blankRowCount ?? 0} 行（只统计真正空白行）`,
+                                hint: `空白行 ${runDetail.file.blankRowCount ?? 0} 行`,
                               },
                               { label: '工作表', value: runDetail.file.sheetName ?? '未记录' },
                               { label: '下载时间', value: timestampOr(runDetail.file.downloadedAt ?? null, '未记录') },
                               {
                                 label: '表头',
                                 value: headerNames(runDetail.file.header).length > 0 ? headerNames(runDetail.file.header).join(' / ') : '未记录',
-                                hint: '按表头含义精确匹配；缺列/歧义/重复整份阻断。',
                               },
                             ]}
                           />
                         ) : (
-                          <p className={styles.mappingNote}>本次任务还没有登记导出文件（可能仍在下载或文件级失败）。</p>
+                          <p className={styles.mappingNote}>本次任务还没有导出文件。</p>
                         )}
                         {runDetail.fileValidation ? (
                           <div>
@@ -578,7 +545,7 @@ export function SyncView({
                         ) : null}
                         {(runDetail.warehouseDiscovery ?? []).length > 0 ? (
                           <div>
-                            <p className={styles.mappingNote}>本次发现的仓库（新仓/改名先待确认）：</p>
+                            <p className={styles.mappingNote}>本次发现的仓库（待确认）：</p>
                             <ul className={styles.hintList}>
                               {(runDetail.warehouseDiscovery ?? []).map((warehouse) => (
                                 <li key={`${warehouse.externalId}-${warehouse.name}`}>
@@ -610,7 +577,7 @@ export function SyncView({
                         <tbody>
                           {(runDetail.warehouses ?? []).length === 0 ? (
                             <tr>
-                              <td colSpan={9} className={styles.wrapCell}>本次任务还没有逐仓结果；没有结果不等于仓库为空。</td>
+                              <td colSpan={9} className={styles.wrapCell}>本次任务没有逐仓结果。</td>
                             </tr>
                           ) : (
                             (runDetail.warehouses ?? []).map((warehouse) => (
@@ -650,7 +617,7 @@ export function SyncView({
                         <tbody>
                           {(runDetail.issues ?? []).length === 0 ? (
                             <tr>
-                              <td colSpan={5} className={styles.wrapCell}>本次没有解析问题行；没有列出不代表整批一定完整，请看逐仓结果。</td>
+                              <td colSpan={5} className={styles.wrapCell}>本次没有解析问题行。</td>
                             </tr>
                           ) : (
                             (runDetail.issues ?? []).map((issue, index) => (
@@ -679,17 +646,14 @@ export function SyncView({
   /* 设置面板里的按需诊断（不占首屏；只在设置面板内展开）。 */
   const diagnosticsContent = (
     <details className={styles.collapsible} data-testid="sync-diagnostics">
-      <summary>
-        后台诊断
-        <span className={styles.summaryHint}>后台主机、心跳、账号与范围版本；日常不用看</span>
-      </summary>
+      <summary>后台诊断</summary>
       <div className={styles.collapsibleBody}>
         <div className={styles.subGrid}>
           <div className={styles.subPanel}>
             <h4>后台程序</h4>
             <FactList
               rows={[
-                { label: '后台状态', value: worker.label, hint: worker.hint },
+                { label: '后台状态', value: worker.label },
                 { label: '最后联系', value: timestampOr(overview.worker?.lastSeenAt ?? null, '还没有心跳记录') },
                 { label: '运行主机', value: overview.worker?.host ?? '未登记' },
                 { label: '最近尝试', value: timestampOr(latestRun?.startedAt ?? null, '还没有同步记录') },
@@ -700,7 +664,7 @@ export function SyncView({
             <h4>账号与范围</h4>
             <FactList
               rows={[
-                { label: '登录状态', value: login.label, hint: login.hint },
+                { label: '登录状态', value: login.label },
                 { label: '最近登录成功', value: timestampOr(account.lastLoginOkAt, '暂无记录') },
                 { label: '范围版本', value: scopeVersion > 0 ? `第 ${scopeVersion} 版` : '尚未创建参与范围' },
                 { label: '参与仓库', value: scopeLabels.length > 0 ? scopeLabels.join('、') : (scope.empty ? '明确空范围（已停止发布）' : '暂无') },
@@ -721,7 +685,7 @@ export function SyncView({
         </div>
         <div className={styles.headerLinks}>
           <Link className={styles.headerLink} href="/dashboard/inventory">
-            去「商品库存」查看数量
+            商品库存
           </Link>
           {/* 用原生链接刷新当前状态；不改变任何设置，也不触发同步。 */}
           <a className={styles.headerLink} href={buildSyncUrl(query)} data-testid="sync-refresh-status">
@@ -744,7 +708,7 @@ export function SyncView({
           viewer={viewer}
           selectedRunId={query.run}
           lastDataText={lastDataText}
-          lastDataNote={lastDataNote}
+          lastDataAlert={lastDataAlert}
           pendingTotal={pendingTotal}
           detailContent={detailContent}
           diagnostics={diagnosticsContent}
@@ -753,7 +717,6 @@ export function SyncView({
         <section className={styles.sourceRow} data-testid="sync-source-row-domestic" aria-label="聚水潭国内表格快照">
           <div className={styles.sourceIdentity}>
             <h2>聚水潭 · 国内表格快照</h2>
-            <p>只读冻结表格快照，不自动同步</p>
           </div>
           <div className={styles.sourceCell} data-testid="sync-source-domestic-status">
             <span className={styles.sourceLabel}>状态</span>
@@ -762,16 +725,15 @@ export function SyncView({
           <div className={styles.sourceCell} data-testid="sync-source-domestic-file-date">
             <span className={styles.sourceLabel}>原文件日期</span>
             <span className={styles.sourceValue}>{domesticDateText}</span>
-            <small>{domesticNote}</small>
+            {domesticReason ? <small>{domesticReason}</small> : null}
           </div>
           <div className={styles.sourceCell} data-testid="sync-source-domestic-next-plan">
             <span className={styles.sourceLabel}>下次计划</span>
             <span className={styles.sourceValue}>不自动同步</span>
           </div>
           <div className={styles.sourceCell} data-testid="sync-source-domestic-pending">
-            <span className={styles.sourceLabel}>待处理对应</span>
+            <span className={styles.sourceLabel}>待处理</span>
             <span className={styles.sourceValue}>—</span>
-            <small>冻结快照不产生同步对应</small>
           </div>
           <div className={styles.sourceActions}>
             <Link className={styles.sourceLink} href="/dashboard/inventory?source=domestic" data-testid="sync-source-domestic-link">
@@ -779,10 +741,6 @@ export function SyncView({
             </Link>
           </div>
         </section>
-
-        <p className={styles.futureSources} data-testid="sync-future-sources">
-          <span data-testid="inventory-not-connected">其他来源：飞书物流 · 喜运达轨迹 —— 未接入（不显示 0，也不计入库存合计）</span>
-        </p>
       </section>
     </div>
   );

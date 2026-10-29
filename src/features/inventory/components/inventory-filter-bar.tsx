@@ -143,9 +143,6 @@ export function InventoryFilterBar({
           ))}
         </div>
       ) : null}
-      {domesticScope ? (
-        <p className={styles.toolbarNote}>国内表格快照没有仓库/市场维度；仓库筛选只作用于海外来源。</p>
-      ) : null}
     </section>
   );
 }
