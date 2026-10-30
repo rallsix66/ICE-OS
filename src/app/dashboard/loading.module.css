@@ -1,0 +1,77 @@
+.skeleton {
+  display: grid;
+  gap: 14px;
+  padding-top: 2px;
+}
+
+.title,
+.search,
+.select,
+.panelHead,
+.row {
+  border-radius: 8px;
+  background: #eceef2;
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}
+
+.title {
+  width: 168px;
+  height: 24px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.search {
+  height: 40px;
+  flex: 1 1 280px;
+}
+
+.select {
+  width: 148px;
+  height: 40px;
+}
+
+.panel {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.panelHead {
+  height: 42px;
+  border-radius: 0;
+  background: #f3f4f7;
+}
+
+.row {
+  height: 52px;
+  border-radius: 0;
+  animation-delay: 80ms;
+}
+
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title,
+  .search,
+  .select,
+  .panelHead,
+  .row {
+    animation: none;
+  }
+}

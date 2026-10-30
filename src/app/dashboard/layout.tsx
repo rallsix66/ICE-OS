@@ -8,8 +8,8 @@
 import { getCurrentUser, getCurrentActiveUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { InactiveAccountPage } from './_components/inactive-account-page';
-import { getCatalogWorkspaceNavState } from '@/features/catalog/workspace-nav-state';
 import { IceV4WorkspaceShell } from '@/ui/ice-v4/workspace-shell';
+import { PageTransition } from '@/ui/ice-v4/page-transition';
 
 export default async function DashboardLayout({
   children,
@@ -27,15 +27,12 @@ export default async function DashboardLayout({
     return <InactiveAccountPage />;
   }
 
-  const navModules = getCatalogWorkspaceNavState();
-
   return (
     <IceV4WorkspaceShell
       displayName={activeUser.displayName}
       roleName={activeUser.roleName}
-      navModules={navModules}
     >
-      {children}
+      <PageTransition>{children}</PageTransition>
     </IceV4WorkspaceShell>
   );
 }

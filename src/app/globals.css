@@ -79,6 +79,21 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* ICE 数据面共享样式变量：只在商品库 / 商品库存 / 数据同步使用。 */
+  --ice-ui-text: #273244;
+  --ice-ui-muted: #667384;
+  --ice-ui-faint: #8a94a1;
+  --ice-ui-line: #e4e7ec;
+  --ice-ui-line-strong: #d5dae3;
+  --ice-ui-accent: #4057c0;
+  --ice-ui-accent-strong: #31449b;
+  --ice-ui-accent-soft: #eef1ff;
+  --ice-ui-radius: 10px;
+  --ice-ui-radius-sm: 8px;
+  --ice-ui-control: 40px;
+  --ice-ui-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ice-ui-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 @layer base {

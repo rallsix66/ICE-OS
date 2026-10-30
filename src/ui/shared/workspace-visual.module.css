@@ -84,6 +84,43 @@
   outline-offset: 3px;
 }
 
+/* 滚动条与原生控件统一：细、浅、不抢视线（系统默认样式不再露出来）。 */
+.app * {
+  scrollbar-width: thin;
+  scrollbar-color: #d2d7e0 transparent;
+}
+
+.app ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.app ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #d2d7e0;
+  background-clip: content-box;
+}
+
+.app ::-webkit-scrollbar-thumb:hover {
+  background: #b9c1cc;
+  background-clip: content-box;
+}
+
+.app :where(input[type='number'])::-webkit-outer-spin-button,
+.app :where(input[type='number'])::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.app :where(input[type='number']) {
+  appearance: textfield;
+}
+
 .app :where(button):disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -96,10 +133,16 @@
   display: flex;
   width: 208px;
   flex-direction: column;
-  padding: 32px 17px 23px;
+  padding: 34px 17px 23px;
   overflow-y: auto;
   background: var(--ice-navy);
   color: #c1cbd9;
+  scrollbar-width: none;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .brand {
@@ -175,6 +218,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  margin-top: 24px;
 }
 
 .navigation > button,
@@ -764,7 +808,7 @@
   .brand small { margin-top: 4px; font-size: 5px; }
   .workspaceLabel { position: absolute; top: 17px; right: 22px; margin: 5px 0 0; font-size: 11px; }
   .workspaceLabel > span:last-child { margin-left: 12px; }
-  .navigation { flex-direction: row; gap: 4px; margin-top: 15px; overflow-x: auto; scrollbar-width: none; }
+  .navigation { flex-direction: row; gap: 4px; margin-top: 18px; overflow-x: auto; scrollbar-width: none; }
   .navigation > button,
   .navigation > a { min-height: 43px; flex: 1 0 auto; justify-content: center; gap: 8px; padding: 10px 12px; border-radius: 6px 6px 0 0; font-size: 11px; white-space: nowrap; }
   .navigation > button > svg,
@@ -821,7 +865,7 @@
 @media (max-width: 600px) {
   .sidebar { padding: 14px 16px 0; }
   .workspaceLabel { top: 14px; right: 16px; }
-  .navigation { gap: 3px; margin-top: 14px; }
+  .navigation { gap: 3px; margin-top: 16px; }
   .navigation > button,
   .navigation > a { flex: 0 0 auto; padding: 10px 13px; font-size: 11px; }
   .topbar { min-height: 54px; gap: 8px; padding: 0 16px; }

@@ -1,0 +1,252 @@
+/*
+ * 表格工具：可排序表头、列宽拖拽、「显示列」菜单。
+ * 与 data-surface 的控件同一套尺度：36px 按钮、8/10px 圆角、一个靛蓝强调。
+ */
+
+.head {
+  position: relative;
+  padding-right: 0;
+  padding-left: 0;
+  white-space: nowrap;
+}
+
+.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.headInner {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  /* 给右缘分界线留出握持区，避免点排序时误触拖拽。 */
+  padding-right: 10px;
+}
+
+.headActive {
+  color: var(--ice-ui-text);
+}
+
+.headDragging {
+  background: #f2f4fb !important;
+}
+
+.sortButton {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sortButton:hover {
+  color: var(--ice-ui-text);
+}
+
+.sortLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sortIcon {
+  flex: 0 0 auto;
+  color: var(--ice-ui-accent);
+}
+
+.sortIconIdle {
+  flex: 0 0 auto;
+  color: #aeb7c7;
+  opacity: 0.4;
+  transition: opacity 140ms var(--ice-ui-ease-out);
+}
+
+.sortButton:hover .sortIconIdle,
+.sortButton:focus-visible .sortIconIdle {
+  color: #8f9bb0;
+  opacity: 1;
+}
+
+/* 列宽分界线：18px 抓取区；hover 时显示左右箭头图标与蓝色分界线，拖拽时另出竖向引导线。 */
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 18px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizeHandle::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e4e8f0;
+  content: '';
+  transition: background 120ms var(--ice-ui-ease-out), width 120ms var(--ice-ui-ease-out);
+}
+
+.resizeIcon {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  color: var(--ice-ui-accent);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 120ms var(--ice-ui-ease-out);
+  pointer-events: none;
+}
+
+.resizeHandle:hover::before,
+.resizeHandle:focus-visible::before,
+.headDragging .resizeHandle::before {
+  background: var(--ice-ui-accent);
+  width: 2px;
+}
+
+.resizeHandle:hover .resizeIcon,
+.resizeHandle:focus-visible .resizeIcon,
+.headDragging .resizeIcon {
+  opacity: 0.85;
+}
+
+.resizeHandle:focus-visible {
+  outline: none;
+}
+
+.resizeGuide {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 1000;
+  width: 1px;
+  background: var(--ice-ui-accent);
+  pointer-events: none;
+}
+
+/* ---------- 「显示列」 ---------- */
+
+.menuWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.menuButton {
+  display: inline-flex;
+  height: var(--ice-ui-control);
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: var(--ice-ui-radius);
+  background: #fff;
+  color: #4b5a70;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 150ms var(--ice-ui-ease-out), background 150ms var(--ice-ui-ease-out);
+}
+
+.menuButton:hover {
+  border-color: #c9d0e0;
+  background: #f7f8fc;
+}
+
+.menuBadge {
+  display: inline-grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ice-ui-accent-soft);
+  color: var(--ice-ui-accent-strong);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.menuPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: 188px;
+  padding: 6px;
+  border: 1px solid #e3e7ee;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(23, 32, 56, 0.14);
+  animation: menuIn 140ms var(--ice-ui-ease-out);
+}
+
+.menuRow {
+  padding: 5px 8px;
+  border-radius: 7px;
+}
+
+.menuRow:hover {
+  background: #f6f8fc;
+}
+
+.menuFoot {
+  margin-top: 4px;
+  padding: 6px 8px 2px;
+  border-top: 1px solid #eef1f5;
+}
+
+/* 「恢复默认」也是按钮，不再是裸文字链接。 */
+.menuReset {
+  display: inline-flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 7px;
+  background: #f7f8fc;
+  color: var(--ice-ui-accent-strong);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 150ms var(--ice-ui-ease-out), background 150ms var(--ice-ui-ease-out);
+}
+
+.menuReset:hover {
+  border-color: #c9d0e0;
+  background: #eef1fb;
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menuPanel {
+    animation: none;
+  }
+
+  .sortIconIdle,
+  .resizeIcon,
+  .resizeHandle::before {
+    transition: none;
+  }
+}

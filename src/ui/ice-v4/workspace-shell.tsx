@@ -2,30 +2,26 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronRight, ChevronDown, Package, Boxes, RefreshCw } from 'lucide-react';
+import { ChevronRight, Package, Boxes, RefreshCw } from 'lucide-react';
 import { LogoutButton } from '@/app/dashboard/_components/logout-button';
-import { ICE_V4_DATA_MAINTENANCE_HREF } from './navigation-config';
 import styles from './ice-v4.module.css';
 import shellStyles from './shell.module.css';
 
 type NavItem = {
   href: string;
   label: string;
-  caption: string;
   icon: typeof Package;
   match?: (pathname: string) => boolean;
 };
 
 /**
- * 一级常驻导航：ICE 商品库 + 本包新增的「商品库存」「数据同步」两个业务入口。
- * 数据维护（基线/冻结观测/人工决定/原始证据）按既有管理员权限收进账户菜单；
- * 新品/来源旧 URL 保留安全引导与后端能力，但不再常驻侧栏。
+ * 一级常驻导航：三个业务入口。
+ * 数据维护/待处理等内部页面不放进日常界面，URL 仍保留可达。
  */
 const NAV: NavItem[] = [
   {
     href: '/dashboard/catalog',
     label: 'ICE 商品库',
-    caption: '真实主资料与 BigSeller 库存',
     icon: Package,
     match: (pathname) =>
       pathname === '/dashboard/catalog'
@@ -35,13 +31,11 @@ const NAV: NavItem[] = [
   {
     href: '/dashboard/inventory',
     label: '商品库存',
-    caption: 'BigSeller 各仓数量与来源时间',
     icon: Boxes,
   },
   {
     href: '/dashboard/sync',
     label: '数据同步',
-    caption: '自动读取、频率与失败排查',
     icon: RefreshCw,
   },
 ];
@@ -85,26 +79,21 @@ export function IceV4WorkspaceShell({
 }: {
   displayName: string;
   roleName: string;
-  /** @deprecated 侧栏已不展示模块可用性；保留入参仅为兼容既有布局接线。 */
-  navModules?: { intake: 'available' | 'disabled'; sources: 'available' | 'disabled' };
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isAdmin = roleName === 'admin';
   const currentRole = roleLabel(roleName);
   const active = resolveActive(pathname, NAV);
   const currentPage = pageLabel(pathname, active.label);
   const initials = displayName.slice(0, 2).toUpperCase();
-  const showPageHeading = pathname === '/dashboard/catalog';
 
   return (
     <div className={styles.app} style={{ minHeight: '100vh', width: '100%' }}>
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
           <span className={styles.brandMark}>i</span>
-          <span>ICE<small>INVENTORY & OPERATIONS</small></span>
+          <span>ICE</span>
         </div>
-        <div className={styles.workspaceLabel}><span className={styles.workspaceDot} />经营工作台 <span>v4</span></div>
         <nav aria-label="工作台导航" className={styles.navigation}>
           {NAV.map((item) => {
             const isActive = item.href === active.href;
@@ -125,10 +114,6 @@ export function IceV4WorkspaceShell({
             );
           })}
         </nav>
-        <div className={styles.sidebarBottom}>
-          <strong>本地独立资料环境</strong>
-          <p>商品库使用本地真实主资料与 BigSeller 库存；演示数据见 /demo/ice-v4。</p>
-        </div>
       </aside>
       <div className={styles.workspace}>
         <header className={styles.topbar}>
@@ -136,57 +121,18 @@ export function IceV4WorkspaceShell({
             工作台<ChevronRight size={13} aria-hidden /><strong>{currentPage}</strong>
           </div>
           <div className={styles.topbarRight}>
-            <span className={styles.demoTag} style={{ background: '#eef1ff', color: '#4057c0' }}>
-              <span style={{ background: '#5266d7' }} aria-hidden />真实资料
-            </span>
-            <details className={`${styles.accountMenu} ${shellStyles.accountMenu}`} data-testid="ice-v4-account-menu">
-              <summary
-                className={shellStyles.accountSummary}
-                aria-label={`当前账户 ${displayName}，角色${currentRole}`}
-              >
-                <span className={styles.avatar} aria-hidden>{initials}</span>
-                <span className={shellStyles.accountIdentity}>
-                  <strong className={shellStyles.accountName}>{displayName}</strong>
-                  <small className={shellStyles.accountRole}>{currentRole}</small>
-                </span>
-                <ChevronDown size={14} aria-hidden className={shellStyles.accountCaret} />
-              </summary>
-              <div className={styles.accountPanel} role="region" aria-label="账户与可用操作" data-testid="ice-v4-account-panel">
-                <strong>{displayName}</strong>
-                <p className={shellStyles.accountPanelRole}>当前角色：{currentRole}</p>
-                <p className={shellStyles.accountPanelText}>
-                  可查看商品资料、库存明细、变更记录和已授权的数据来源。
-                </p>
-                {isAdmin && (
-                  <div className={shellStyles.accountMaintenance} data-testid="ice-v4-maintenance-block">
-                    <Link
-                      className={shellStyles.accountMaintenanceLink}
-                      href={ICE_V4_DATA_MAINTENANCE_HREF}
-                      data-testid="ice-v4-maintenance-entry"
-                    >
-                      数据维护
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </details>
+            <div className={shellStyles.accountStatic} data-testid="ice-v4-account">
+              <span className={styles.avatar} aria-hidden>{initials}</span>
+              <span className={shellStyles.accountIdentity}>
+                <strong className={shellStyles.accountName}>{displayName}</strong>
+                <small className={shellStyles.accountRole}>{currentRole}</small>
+              </span>
+            </div>
             <LogoutButton />
           </div>
         </header>
         <main className={styles.main} id="ice-v4-main">
-          {showPageHeading && (
-            <div className={styles.pageHeading}>
-              <div>
-                <p className={styles.eyebrow}>ICE / BUSINESS WORKSPACE</p>
-                <h1>{active.label}<span>{active.caption}</span></h1>
-              </div>
-            </div>
-          )}
           {children}
-          <footer className={styles.footer}>
-            <span>ICE v4 · 本地经营工作台</span>
-            <span>库存按 BigSeller 定时同步更新 · 当前货值暂未计算 · 演示见 /demo/ice-v4</span>
-          </footer>
         </main>
       </div>
     </div>
