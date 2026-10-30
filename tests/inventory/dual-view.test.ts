@@ -18,12 +18,14 @@ import type {
 } from '@/features/inventory/types';
 import type { InventoryQueryState } from '@/features/inventory/model';
 import {
+  buildInventoryListHref,
   buildInventoryRowDetailHref,
   buildProductToWarehouseHref,
   DEFAULT_INVENTORY_QUERY,
   inventoryPageNumbers,
   marketsDisplay,
   parseInventorySearchParams,
+  parseInventorySortKey,
   UNKNOWN_MARKET_TOKEN,
   warehouseRowLastKnownText,
 } from '@/features/inventory/model';
@@ -498,5 +500,72 @@ describe('S1–S3 收尾：范围/计数/旧值说明', () => {
       lastKnownAt: null,
     });
     expect(domestic).toBeNull();
+  });
+});
+
+describe('估算货值排序（sort=value）', () => {
+  it('仓库明细：实物数量 × 成本，降序；缺成本排最后，不当 0', () => {
+    const overseas = overseasRows([
+      overseasRow({ rowKey: 'bigseller:wh1:A', externalSku: 'A', itemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', onHand: 2 }),
+      overseasRow({ rowKey: 'bigseller:wh1:B', externalSku: 'B', itemId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', onHand: 3 }),
+      overseasRow({ rowKey: 'bigseller:wh1:C', externalSku: 'C', itemId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', onHand: 100 }),
+    ]);
+    const costMap = {
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa': '10',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb': '5',
+    };
+    const desc = mergeWarehouseRowsPage({
+      query: query({ sort: 'value', sortDir: 'desc' }),
+      overseas,
+      domestic: null,
+      costMap,
+    });
+    // A = 2×10 = 20，B = 3×5 = 15，C 缺成本 → 最后。
+    expect(desc.rows.map((row) => row.externalSku)).toEqual(['A', 'B', 'C']);
+    const asc = mergeWarehouseRowsPage({
+      query: query({ sort: 'value', sortDir: 'asc' }),
+      overseas,
+      domestic: null,
+      costMap,
+    });
+    expect(asc.rows.map((row) => row.externalSku)).toEqual(['B', 'A', 'C']);
+  });
+
+  it('商品汇总：全部范围用海外数量，仅国内用国内数量', () => {
+    const rows = [
+      summaryRow({ itemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', iceCode: 'WM0001', overseasOnHand: 2 }),
+      summaryRow({ itemId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', iceCode: 'WM0002', overseasOnHand: 3 }),
+    ];
+    const costMap = {
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa': '10',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb': '5',
+    };
+    const all = mergeProductSummary({
+      query: query({ sort: 'value', sortDir: 'desc' }),
+      summary: summaryDto(rows),
+      domestic: null,
+      costMap,
+    });
+    expect(all.rows.map((row) => row.iceCode)).toEqual(['WM0001', 'WM0002']);
+
+    const domestic = domesticSnapshot([
+      domesticRow({ itemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', iceCode: 'WM0001', actualQty: 1, availableQty: 1 }),
+      domesticRow({ itemId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', iceCode: 'WM0002', actualQty: 10, availableQty: 10, legacyCandidateId: 'mc-2', externalSku: 'WM0002' }),
+    ]);
+    const domesticOnly = mergeProductSummary({
+      query: query({ source: 'domestic', sort: 'value', sortDir: 'desc' }),
+      summary: summaryDto(rows),
+      domestic,
+      costMap,
+    });
+    // 仅国内：WM0001 = 1×10 = 10，WM0002 = 10×5 = 50。
+    expect(domesticOnly.rows.map((row) => row.iceCode)).toEqual(['WM0002', 'WM0001']);
+  });
+
+  it('URL 排序键 value 可解析并保留在列表链接里', () => {
+    expect(parseInventorySortKey('value')).toBe('value');
+    const href = buildInventoryListHref({ ...query(), sort: 'value', sortDir: 'desc' });
+    expect(href).toContain('sort=value');
+    expect(href).toContain('dir=desc');
   });
 });

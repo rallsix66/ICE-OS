@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { Globe2, X } from 'lucide-react';
+import { Checkbox, SelectMenu } from '@/ui/ice-v4/data-surface';
 import styles from './sync-view.module.css';
 import { StatusPill } from './display';
 import {
@@ -32,6 +34,7 @@ import {
   type LocalViewerIdentity,
 } from '../client-pending';
 import { requestManualSyncAction, saveSyncSettingsAction } from '../server/actions';
+import { useDialogFocusTrap } from '@/features/catalog/components/use-dialog-focus-trap';
 import { registerOriginalRequest } from './pending-recovery';
 import { settlementReleasesLock, settlementTone } from '../settlement';
 
@@ -42,11 +45,11 @@ const TONE_BY_RESULT = (outcome: InventoryActionOutcome): MessageTone => settlem
 const FAILURE_RUN_STATUSES = ['failed', 'partial', 'outcome_unknown', 'needs_login'];
 
 /**
- * BigSeller 来源行（R6 紧凑来源总览）：
- * - 一行展示真实同步状态、最后成功数据时间、下次计划、待处理对应与关键操作；
- * - 「立即同步」是主操作；「详情」「设置」按需在同页展开面板（不整页跳转，默认折叠）；
- * - 详情内容由服务端页面渲染后传入（逐仓结果、任务历史、失败详情、原请求核对）；
- * - 设置面板含频率/参与仓/保存 + 后台诊断 <details>；
+ * BigSeller 来源卡片（客户端）：卡片网格的容器。
+ * - 首屏两张卡：BigSeller（左）与聚水潭（右，服务端渲染后传入），窄屏一列；
+ * - 卡片右上角只给一句“是否正常”状态；异常收进卡片内一行短状态；
+ * - 「立即同步」是主操作；「详情」「设置」打开同一右侧抽屉，用顶部页签切换；
+ * - 抽屉内容由服务端页面渲染后传入（逐仓结果、任务历史、失败详情、原请求核对、设置）；
  * - 所有写动作仍走统一 pending 流程：先登记原请求 → 本地记录 → 原动作 → 结果未知核对；
  * - 写锁 = 服务端 pending 或本地保留原请求，覆盖设置/立即同步/仓库勾选等输入。
  */
@@ -62,6 +65,7 @@ export function SyncControls({
   pendingTotal,
   detailContent,
   diagnostics,
+  domesticCard,
 }: {
   overview: InventoryOverviewDto;
   selectedWarehouseIds: string[];
@@ -79,6 +83,8 @@ export function SyncControls({
   detailContent: ReactNode;
   /** 设置面板内的后台诊断（服务端渲染的 <details>）。 */
   diagnostics: ReactNode;
+  /** 聚水潭来源卡片（服务端渲染；只读快照，不提供立即同步）。 */
+  domesticCard: ReactNode;
 }) {
   const router = useRouter();
   const saved = intervalDisplay(overview.settings.intervalMinutes);
@@ -107,6 +113,14 @@ export function SyncControls({
   const writeLocked = pendingLocked || Boolean(local);
   const localOwner = local ? localUnknownOwnerCheck(local, viewer) : { trusted: true, reason: null };
   const locatedSelectedRunRef = useRef<string | null>(null);
+  /** 抽屉页签与卡片触发按钮：打开后焦点进抽屉，关闭后回到触发按钮。 */
+  const detailTabRef = useRef<HTMLButtonElement | null>(null);
+  const settingsTabRef = useRef<HTMLButtonElement | null>(null);
+  const detailToggleRef = useRef<HTMLButtonElement | null>(null);
+  const settingsToggleRef = useRef<HTMLButtonElement | null>(null);
+  const lastOpenRef = useRef<OpenPanel>(null);
+  /** 首屏自动打开（待核对/空范围/?run=）不抢焦点；用户主动打开才把焦点放进抽屉。 */
+  const skipAutoFocusRef = useRef(openPanel !== null);
 
   const warehouses = overview.warehouses ?? [];
   // 首屏排序必须确定性（不依赖 locale/ICU）：先已确认参与，再按仓库外部编码/名称码点。
@@ -131,58 +145,122 @@ export function SyncControls({
     || !draftInterval.ok
     || draftInterval.minutes !== overview.settings.intervalMinutes
     || scopeChange.kind !== 'unchanged';
-  const savedScopeText = scope.empty ? '参与仓库为空（已停止发布）' : `参与仓库 ${scope.count} 个`;
-  const savedSummaryText = `${overview.settings.enabled ? '自动同步已开启' : '自动同步已关闭'} · ${saved.display} · ${savedScopeText} · 下次计划 ${nextRunText}`;
+  const savedScopeText = scope.empty ? '空范围' : `${scope.count} 个仓库`;
+  const savedMinutes = Number(saved.inputValue) || 0;
+  const savedIntervalText = savedMinutes > 0 && savedMinutes % 60 === 0
+    ? `每 ${savedMinutes / 60} 小时`
+    : `每 ${savedMinutes} 分钟`;
+  const savedSummaryText = `${savedIntervalText} · ${savedScopeText}`;
 
   const latestRun = overview.lastRun ?? overview.runs[0] ?? null;
   const latestDisplay = latestRun ? runStatusDisplay(latestRun.status) : null;
   const lastFailedRun = latestRun && latestDisplay && FAILURE_RUN_STATUSES.includes(latestRun.status);
 
-  /* 来源行状态：真实同步状态优先，其次账号/后台这类会阻止同步的当前状态。 */
+  /* 卡片右上角“是否正常”：异常优先；只给状态词，长解释不进卡片。 */
+  const healthNotes: string[] = [];
   let statusLabel = '未运行';
   let statusTone: Tone = 'neutral';
-  let statusReason: string | null = null;
   if (overview.pendingAction) {
     statusLabel = '结果待核对';
     statusTone = 'amber';
-    statusReason = '先核对原请求，再同步或改设置。';
+    healthNotes.push('原请求待核对，先核对再同步或改设置');
   } else if (activeRun) {
-    statusLabel = activeRun.statusLabel;
+    statusLabel = '同步中';
     statusTone = 'blue';
   } else if (overview.account.status === 'needs_login') {
     statusLabel = '需要重新登录';
     statusTone = 'amber';
-    statusReason = '登录已失效，自动同步暂停。';
+    healthNotes.push('登录已失效，自动同步暂停');
   } else if (overview.account.status === 'disabled') {
     statusLabel = '账号已停用';
     statusTone = 'neutral';
-    statusReason = '自动同步不会执行。';
+    healthNotes.push('账号已停用，自动同步不执行');
   } else if (!overview.worker) {
     statusLabel = '后台未登记';
     statusTone = 'amber';
-    statusReason = '后台同步程序未登记，自动同步不会执行。';
+    healthNotes.push('后台同步程序未登记');
   } else if (!overview.worker.online) {
     statusLabel = '后台离线';
     statusTone = 'amber';
-    statusReason = `后台离线（最后心跳 ${timestampOr(overview.worker.lastSeenAt, '暂无记录')}），自动同步暂停。`;
+    healthNotes.push(`后台离线 · 最后心跳 ${timestampOr(overview.worker.lastSeenAt, '暂无记录')}`);
+  } else if (scope.empty) {
+    statusLabel = '空范围';
+    statusTone = 'amber';
+  } else if (lastFailedRun) {
+    const unknown = latestRun?.status === 'outcome_unknown';
+    statusLabel = unknown ? '结果待核对' : '最近同步失败';
+    statusTone = latestRun?.status === 'failed' || latestRun?.status === 'needs_login' ? 'red' : 'amber';
+    healthNotes.push(unknown ? '保存结果待确认，先核对原请求' : `失败原因：${errorCodeLabel(latestRun?.errorCode ?? null) ?? '未记录'}`);
+  } else if (latestRun?.status === 'success') {
+    statusLabel = '正常';
+    statusTone = 'green';
   } else if (latestDisplay) {
     statusLabel = latestDisplay.label;
     statusTone = latestDisplay.tone;
-    if (latestRun?.status === 'outcome_unknown') {
-      statusReason = '保存结果暂未确认，不要重复同步。';
-    } else if (lastFailedRun) {
-      statusReason = `${errorCodeLabel(latestRun?.errorCode ?? null) ?? '本次同步未成功'}；保留上次成功数据。`;
-    }
-  }
-  if (scope.empty && !activeRun && !overview.pendingAction) {
-    statusLabel = '未安排（空范围）';
-    statusTone = 'amber';
-    statusReason = '参与仓库为空：已停止发布。';
   }
 
-  const detailOpen = openPanel === 'detail'
-    || (openPanel !== 'settings' && (autoDetail || autoSelectedRun));
-  const settingsOpen = openPanel === 'settings';
+  /* 立即同步被阻止时的短原因（模型里是长句，卡片只留状态词）。 */
+  const blockedShort = blockedReason
+    ? scope.empty
+      ? '参与仓库为空，无法立即同步'
+      : overview.account.status === 'needs_login'
+        ? '需要重新登录，无法立即同步'
+        : overview.account.status === 'disabled'
+          ? '账号已停用，无法同步'
+          : blockedReason
+    : null;
+
+  /* 抽屉当前页签：本地“结果未知”原请求 / URL 选中任务出现时自动落到详情页签，用户关闭后不再自动弹出。 */
+  const panel: OpenPanel = openPanel ?? (autoDetail || autoSelectedRun ? 'detail' : null);
+  const detailOpen = panel === 'detail';
+  const settingsOpen = panel === 'settings';
+
+  /** 关闭抽屉：同时收起自动弹出（本地恢复入口 / URL 选中任务），后续不自动重开。 */
+  const dismissAutoDetail = useCallback(() => {
+    if (autoDetail) setDismissedLocalId(localRequestId);
+    if (autoSelectedRun) setDismissedSelectedRunId(selectedRunId);
+  }, [autoDetail, autoSelectedRun, localRequestId, selectedRunId]);
+
+  const closeDrawer = useCallback(() => {
+    dismissAutoDetail();
+    setOpenPanel(null);
+  }, [dismissAutoDetail]);
+
+  /* 抽屉是 modal：Tab / Shift+Tab 限制在抽屉内，焦点跑出立刻拉回（与商品详情弹层同一 hook）。 */
+  useDialogFocusTrap(panel !== null, '#sync-source-drawer');
+
+  /* Esc 关闭 + 打开时锁背景滚动（与库存详情抽屉一致）。 */
+  useEffect(() => {
+    if (!panel) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeDrawer();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.documentElement.style.overflow = previousOverflow;
+    };
+  }, [panel, closeDrawer]);
+
+  /* 焦点：打开/切页签进入对应页签按钮；关闭回到触发按钮；首屏自动打开不抢焦点。 */
+  useEffect(() => {
+    const previous = lastOpenRef.current;
+    lastOpenRef.current = panel;
+    if (!panel) {
+      if (previous === 'detail') detailToggleRef.current?.focus();
+      else if (previous === 'settings') settingsToggleRef.current?.focus();
+      return;
+    }
+    if (previous === null && skipAutoFocusRef.current) {
+      skipAutoFocusRef.current = false;
+      return;
+    }
+    (panel === 'detail' ? detailTabRef : settingsTabRef).current?.focus();
+  }, [panel]);
 
   // T3：URL 选中任务（?run=）时，把该任务详情带入当前视口。
   // 只在首次定位该任务时生效（切换任务/刷新会重新定位）；样式或流式内容补齐造成的布局变化会再校正，
@@ -204,19 +282,13 @@ export function SyncControls({
     };
   }, [selectedRunId, detailOpen]);
 
-  function togglePanel(panel: Exclude<OpenPanel, null>): void {
-    if (panel === 'detail') {
-      if (detailOpen) {
-        // 用户主动收起：本地恢复入口 / URL 选中任务之后不再自动弹出，直到出现新的对应状态。
-        if (autoDetail) setDismissedLocalId(localRequestId);
-        if (autoSelectedRun) setDismissedSelectedRunId(selectedRunId);
-        setOpenPanel(null);
-      } else {
-        setOpenPanel('detail');
-      }
+  /** 卡片上的「详情」「设置」：打开抽屉对应页签；当前页签再点一次即关闭。 */
+  function togglePanel(nextPanel: Exclude<OpenPanel, null>): void {
+    if (panel === nextPanel) {
+      closeDrawer();
       return;
     }
-    setOpenPanel((current) => (current === 'settings' ? null : 'settings'));
+    setOpenPanel(nextPanel);
   }
 
   function toggleWarehouse(warehouseId: string) {
@@ -250,13 +322,13 @@ export function SyncControls({
     if (scopeChange.kind === 'cleared' && !clearConfirm) {
       setClearConfirm(true);
       setMessage({
-        text: '清空全部参与仓库会“停止发布”（不会回退旧范围、不会自动选全部仓库）。请确认后再点一次“确认清空并保存”。',
+        text: '清空参与仓库会停止发布，请再次确认。',
         tone: 'warn',
       });
       return;
     }
     setBusy('save');
-    setMessage({ text: '正在保存自动同步设置…', tone: 'ok' });
+    setMessage({ text: '正在保存…', tone: 'ok' });
     const intervalMinutes = parsed.minutes;
     const intent = buildSettingsIntent({
       enabled,
@@ -320,7 +392,7 @@ export function SyncControls({
     } catch {
       // 业务动作网络异常：保留已登记本地记录并整页重载；以服务端 pending 为准，绝不自动重发。
       setMessage({
-        text: '保存结果暂未确认（连接中断）。刷新页面后从“原请求待核对”入口核对，不要直接重复保存。',
+        text: '保存结果未确认（连接中断）。刷新后核对原请求，不要重复保存。',
         tone: 'warn',
       });
       window.location.reload();
@@ -331,11 +403,11 @@ export function SyncControls({
 
   async function requestManualSync() {
     if (blockedReason) {
-      setMessage({ text: blockedReason, tone: 'error' });
+      setMessage({ text: blockedShort ?? blockedReason, tone: 'error' });
       return;
     }
     setBusy('manual');
-    setMessage({ text: '正在提交“立即同步”…', tone: 'ok' });
+    setMessage({ text: '正在提交…', tone: 'ok' });
     const manualRequestId = crypto.randomUUID();
     const manualIntent = buildManualSyncIntent();
     try {
@@ -362,7 +434,7 @@ export function SyncControls({
       router.refresh();
     } catch {
       setMessage({
-        text: '立即同步的提交结果暂未确认（连接中断）。刷新后从“原请求待核对”入口核对；后台不会重复排队。',
+        text: '同步提交结果未确认（连接中断）。刷新后核对原请求。',
         tone: 'warn',
       });
       window.location.reload();
@@ -372,216 +444,305 @@ export function SyncControls({
   }
 
   return (
-    <div data-testid="sync-controls" id="sync-controls" className={styles.controls}>
-      <section className={styles.sourceRow} data-testid="sync-source-row-bigseller" aria-label="BigSeller 海外库存同步">
-        <div className={styles.sourceIdentity}>
-          <h2>BigSeller · 海外库存</h2>
-        </div>
+    <div data-testid="sync-controls" id="sync-controls" className={styles.sourceGrid}>
+      <section
+        className={`${styles.sourceCard} ${styles.cardBigseller}`}
+        data-testid="sync-source-row-bigseller"
+        data-stagger="0"
+        aria-label="BigSeller 海外库存同步"
+      >
+        <header className={styles.cardHead}>
+          <span className={styles.cardIcon} aria-hidden>
+            <Globe2 size={18} strokeWidth={1.8} />
+          </span>
+          <div className={styles.cardIdentity}>
+            <h2>BigSeller</h2>
+            <span className={styles.cardPurpose}>海外库存</span>
+          </div>
+          <div className={styles.cardStatus} data-testid="sync-source-status">
+            <StatusPill tone={statusTone}>{statusLabel}</StatusPill>
+          </div>
+        </header>
 
-        <div className={styles.sourceCell} data-testid="sync-source-status">
-          <span className={styles.sourceLabel}>状态</span>
-          <StatusPill tone={statusTone}>{statusLabel}</StatusPill>
-        </div>
+        <dl className={styles.cardFacts}>
+          <div data-testid="sync-source-last-data">
+            <dt>最后成功数据</dt>
+            <dd>
+              {lastDataText}
+              {lastDataAlert ? <small>{lastDataAlert}</small> : null}
+            </dd>
+          </div>
+          <div data-testid="sync-source-next-plan">
+            <dt>下次计划</dt>
+            <dd>{nextRunText}</dd>
+          </div>
+          <div data-testid="sync-source-pending">
+            <dt>待处理未对应</dt>
+            <dd data-testid="sync-mapping">{formatQuantity(pendingTotal) || '0'}</dd>
+          </div>
+        </dl>
 
-        <div className={styles.sourceCell} data-testid="sync-source-last-data">
-          <span className={styles.sourceLabel}>最后成功数据</span>
-          <span className={styles.sourceValue}>{lastDataText}</span>
-          {lastDataAlert ? <small>{lastDataAlert}</small> : null}
-        </div>
-
-        <div className={styles.sourceCell} data-testid="sync-source-next-plan">
-          <span className={styles.sourceLabel}>下次计划</span>
-          <span className={styles.sourceValue}>{nextRunText}</span>
-        </div>
-
-        <div className={styles.sourceCell} data-testid="sync-source-pending">
-          <span className={styles.sourceLabel}>待处理</span>
-          <span className={styles.sourceValue} data-testid="sync-mapping">{formatQuantity(pendingTotal) || '0'}</span>
-        </div>
-
-        <div className={styles.sourceActions}>
+        <div className={styles.cardActions}>
           <button
             type="button"
             className={styles.primaryButton}
             onClick={requestManualSync}
             disabled={busy !== null || writeLocked || blockedReason !== null}
-            title={blockedReason ?? '立即同步使用已保存的自动同步范围；已有活动任务时返回同一个任务'}
+            title={blockedShort ?? '按已保存范围立即同步'}
             data-testid="sync-manual-button"
           >
             {busy === 'manual' ? '正在提交…' : '立即同步'}
           </button>
           <button
+            ref={detailToggleRef}
             type="button"
             className={styles.secondaryButton}
             onClick={() => togglePanel('detail')}
             aria-expanded={detailOpen}
-            aria-controls="sync-source-detail-panel"
+            aria-controls="sync-source-drawer"
             data-testid="sync-source-detail-toggle"
           >
-            {detailOpen ? '收起详情' : '详情'}
+            详情
           </button>
           <span className={styles.actionWrap} data-testid="sync-settings-toggle">
             <button
+              ref={settingsToggleRef}
               type="button"
               className={styles.secondaryButton}
               onClick={() => togglePanel('settings')}
               aria-expanded={settingsOpen}
-              aria-controls="sync-settings-panel"
+              aria-controls="sync-source-drawer"
               data-testid="sync-source-settings-toggle"
             >
-              {settingsOpen ? '收起设置' : '设置'}
+              设置
             </button>
           </span>
         </div>
 
-        {statusReason ? <p className={styles.sourceReason} data-testid="sync-source-reason">{statusReason}</p> : null}
+        {healthNotes.length > 0 ? (
+          <div data-testid="sync-source-reason">
+            <ul className={styles.cardAlerts} data-testid="sync-alerts">
+              {healthNotes.map((note) => (
+                <li key={note} data-testid="sync-alert-item">{note}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {blockedShort ? <p className={styles.blockedNote} data-testid="sync-manual-blocked">{blockedShort}</p> : null}
+
+        {scope.empty ? (
+          <p className={styles.cardNotice} data-testid="sync-scope-empty-notice">参与仓库为空：已停止发布</p>
+        ) : null}
+
+        {writeLocked ? (
+          <p className={styles.writeLocked} data-testid="sync-write-locked">
+            原请求待核对：保存设置与立即同步暂不可用。
+            {local
+              ? localOwner.trusted
+                ? ' 本地还保留一条结果未知的原请求。'
+                : ` 本地原请求${localOwner.reason ? `：${localOwner.reason}` : '身份不可信'}。`
+              : ''}
+          </p>
+        ) : null}
       </section>
 
-      {blockedReason ? <p className={styles.blockedNote} data-testid="sync-manual-blocked">{blockedReason}</p> : null}
+      {domesticCard}
 
-      {scope.empty ? (
-        <div className={styles.inlineNotice} data-testid="sync-scope-empty-notice">
-          <strong>{scope.label}</strong>
-          <br />
-          在「设置」重新勾选参与仓库并保存后恢复。
-        </div>
-      ) : null}
-
-      {writeLocked ? (
-        <p className={styles.writeLocked} data-testid="sync-write-locked">
-          原请求待核对：保存设置与立即同步暂不可用。
-          {local
-            ? localOwner.trusted
-              ? ' 本地还保留一条结果未知的原请求，先在「详情」核对。'
-              : ` 本地保留的原请求${localOwner.reason ? `：${localOwner.reason}` : '归属/身份不可信'}，保持锁定。`
-            : ''}
-        </p>
-      ) : null}
-
-      {detailOpen ? (
-        <section
-          className={styles.sourcePanel}
-          id="sync-source-detail-panel"
-          data-testid="sync-source-detail-panel"
-          aria-label="BigSeller 同步详情"
+      {panel ? (
+        <div
+          className={styles.drawerBackdrop}
+          role="presentation"
+          onClick={closeDrawer}
+          data-testid="sync-drawer-backdrop"
         >
-          <div className={styles.panelInner}>{detailContent}</div>
-        </section>
-      ) : null}
-
-      {settingsOpen ? (
-        <section
-          className={styles.settingsPanel}
-          id="sync-settings-panel"
-          data-testid="sync-settings"
-          aria-label="自动同步设置"
-        >
-          <div data-testid="sync-source-settings-panel" className={styles.panelInner}>
-            <p className={styles.savedSummary} data-testid="sync-settings-summary">
-              <strong>当前已保存：</strong>
-              {savedSummaryText}
-            </p>
-            <div className={styles.formGrid}>
-              <div className={styles.field}>
-                <span>自动同步</span>
-                <label className={styles.checkLine}>
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    disabled={busy !== null || writeLocked}
-                    onChange={(event) => setEnabled(event.target.checked)}
-                    aria-label="开启自动同步"
-                  />
-                  开启自动同步
-                </label>
+          <aside
+            id="sync-source-drawer"
+            className={styles.drawer}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`BigSeller ${detailOpen ? '同步详情' : '自动同步设置'}`}
+            onClick={(event) => event.stopPropagation()}
+            data-testid="sync-drawer"
+          >
+            <header className={styles.drawerHead}>
+              <div>
+                <h2>BigSeller</h2>
+                <p>{detailOpen ? '同步详情' : '自动同步设置'}</p>
               </div>
-
-              <div className={styles.field}>
-                <span>同步频率</span>
-                <div className={styles.intervalRow}>
-                  <input
-                    value={intervalValue}
-                    onChange={(event) => setIntervalValue(event.target.value)}
-                    inputMode="numeric"
-                    aria-label="同步频率数值"
-                    disabled={busy !== null || writeLocked}
-                  />
-                  <select
-                    value={intervalUnit}
-                    onChange={(event) => setIntervalUnit(event.target.value === 'hours' ? 'hours' : 'minutes')}
-                    aria-label="同步频率单位"
-                    disabled={busy !== null || writeLocked}
-                  >
-                    <option value="minutes">分钟</option>
-                    <option value="hours">小时</option>
-                  </select>
-                </div>
-                <p className={styles.fieldHint} data-tone={intervalError ? 'error' : undefined}>
-                  {intervalError || '范围 5–1440 分钟（1–24 小时）'}
-                </p>
-              </div>
-
-              <div className={styles.field}>
-                <span>参与仓库</span>
-                <div className={styles.warehouseGrid} data-testid="sync-warehouse-picker">
-                  {selectableWarehouses.length === 0 ? (
-                    <p className={styles.fieldHint}>还没有读到该账号可见的仓库清单。</p>
-                  ) : (
-                    selectableWarehouses.map((warehouse) => (
-                      <label key={warehouse.id} className={styles.checkLine} title={warehouse.externalId}>
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(warehouse.id)}
-                          disabled={busy !== null || writeLocked}
-                          onChange={() => toggleWarehouse(warehouse.id)}
-                          aria-label={`参与仓库：${warehouse.name}`}
-                        />
-                        <span>
-                          {warehouse.name}
-                          <small className={styles.rowSub}>
-                            {warehouseStatusLabel(warehouse.status)}
-                            {warehouse.market ? ` · 市场 ${warehouse.market}` : ' · 市场待确认'}
-                          </small>
-                        </span>
-                      </label>
-                    ))
-                  )}
-                </div>
-                <p className={styles.fieldHint} data-testid="sync-scope-change-hint">
-                  {scopeChange.kind === 'unchanged'
-                    ? `参与仓库未修改（当前保存 ${selectedWarehouseIds.length} 个${scope.empty ? '，且为明确空范围' : ''}）。`
-                    : scopeChange.kind === 'cleared'
-                      ? '将明确清空参与仓库：保存后停止发布；立即同步会被拒绝。'
-                      : `将更新为 ${scopeChange.warehouseIds.length} 个参与仓库。`}
-                </p>
-              </div>
-            </div>
-
-            {draftDirty ? (
-              <p className={styles.draftNotice} data-testid="sync-draft-notice">
-                有未保存的设置草稿：<strong>立即同步仍使用已保存范围</strong>（{savedSummaryText.split(' · ').slice(1, 3).join(' · ')}）。
-              </p>
-            ) : null}
-
-            <div className={styles.panelActions}>
               <button
                 type="button"
-                className={styles.primaryButton}
-                onClick={saveSettings}
-                disabled={busy !== null || writeLocked}
-                data-testid="sync-save-settings"
+                className={styles.drawerClose}
+                onClick={closeDrawer}
+                aria-label="关闭"
+                title="关闭"
+                data-testid="sync-drawer-close"
               >
-                {busy === 'save'
-                  ? '正在保存…'
-                  : scopeChange.kind === 'cleared' && clearConfirm
-                    ? '确认清空并保存'
-                    : '保存设置'}
+                <X size={18} strokeWidth={1.8} aria-hidden />
+              </button>
+            </header>
+
+            <div className={styles.drawerTabs} role="tablist" aria-label="来源面板">
+              <button
+                ref={detailTabRef}
+                type="button"
+                role="tab"
+                id="sync-drawer-tab-detail"
+                className={styles.drawerTab}
+                data-active={detailOpen || undefined}
+                aria-selected={detailOpen}
+                aria-controls="sync-source-detail-panel"
+                tabIndex={detailOpen ? 0 : -1}
+                onClick={() => setOpenPanel('detail')}
+                data-testid="sync-drawer-tab-detail"
+              >
+                详情
+              </button>
+              <button
+                ref={settingsTabRef}
+                type="button"
+                role="tab"
+                id="sync-drawer-tab-settings"
+                className={styles.drawerTab}
+                data-active={settingsOpen || undefined}
+                aria-selected={settingsOpen}
+                aria-controls="sync-settings-panel"
+                tabIndex={settingsOpen ? 0 : -1}
+                onClick={() => setOpenPanel('settings')}
+                data-testid="sync-drawer-tab-settings"
+              >
+                设置
               </button>
             </div>
 
-            {diagnostics}
-          </div>
-        </section>
+            <div className={styles.drawerBody}>
+              {detailOpen ? (
+                <div
+                  id="sync-source-detail-panel"
+                  className={styles.drawerPanel}
+                  role="tabpanel"
+                  aria-labelledby="sync-drawer-tab-detail"
+                  data-testid="sync-source-detail-panel"
+                >
+                  <div className={styles.panelInner}>{detailContent}</div>
+                </div>
+              ) : null}
+
+              {settingsOpen ? (
+                <div
+                  id="sync-settings-panel"
+                  className={styles.drawerPanel}
+                  role="tabpanel"
+                  aria-labelledby="sync-drawer-tab-settings"
+                  data-testid="sync-settings"
+                >
+                  <div data-testid="sync-source-settings-panel" className={styles.panelInner}>
+                    <p className={styles.savedSummary} data-testid="sync-settings-summary">
+                      <strong>已保存</strong>
+                      {' · '}
+                      {savedSummaryText}
+                    </p>
+                    <div className={styles.formGrid}>
+                      <div className={styles.field}>
+                        <span>自动同步</span>
+                        <Checkbox
+                          checked={enabled}
+                          onChange={setEnabled}
+                          label="开启自动同步"
+                          disabled={busy !== null || writeLocked}
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <span>同步频率</span>
+                        <div className={styles.intervalRow}>
+                          <input
+                            value={intervalValue}
+                            onChange={(event) => setIntervalValue(event.target.value)}
+                            inputMode="numeric"
+                            aria-label="同步频率数值"
+                            disabled={busy !== null || writeLocked}
+                          />
+                          <SelectMenu
+                            value={intervalUnit}
+                            onChange={(value) => setIntervalUnit(value === 'hours' ? 'hours' : 'minutes')}
+                            options={[
+                              { value: 'minutes', label: '分钟' },
+                              { value: 'hours', label: '小时' },
+                            ]}
+                            ariaLabel="同步频率单位"
+                            testId="sync-interval-unit"
+                            disabled={busy !== null || writeLocked}
+                          />
+                        </div>
+                        {intervalError ? (
+                          <p className={styles.fieldHint} data-tone="error">{intervalError}</p>
+                        ) : null}
+                      </div>
+
+                      <div className={`${styles.field} ${styles.fieldWide}`}>
+                        <span>参与仓库</span>
+                        <div className={styles.warehouseGrid} data-testid="sync-warehouse-picker">
+                          {selectableWarehouses.length === 0 ? (
+                            <p className={styles.fieldHint}>未读到仓库清单</p>
+                          ) : (
+                            selectableWarehouses.map((warehouse) => (
+                              <div key={warehouse.id} className={styles.warehouseOption} title={warehouse.externalId}>
+                                <Checkbox
+                                  checked={selected.includes(warehouse.id)}
+                                  onChange={() => toggleWarehouse(warehouse.id)}
+                                  disabled={busy !== null || writeLocked}
+                                  ariaLabel={`参与仓库：${warehouse.name}`}
+                                  label={(
+                                    <span className={styles.warehouseLabel}>
+                                      {warehouse.name}
+                                      <small className={styles.rowSub}>{warehouseStatusLabel(warehouse.status)}</small>
+                                    </span>
+                                  )}
+                                />
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <p className={styles.fieldHint} data-testid="sync-scope-change-hint">
+                          {scopeChange.kind === 'unchanged'
+                            ? `未修改（当前 ${selectedWarehouseIds.length} 个）`
+                            : scopeChange.kind === 'cleared'
+                              ? '将清空参与仓库：保存后停止发布'
+                              : `将更新为 ${scopeChange.warehouseIds.length} 个参与仓库`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {draftDirty ? (
+                      <p className={styles.draftNotice} data-testid="sync-draft-notice">
+                        有未保存设置：<strong>立即同步仍按已保存范围执行</strong>
+                      </p>
+                    ) : null}
+
+                    <div className={styles.panelActions}>
+                      <button
+                        type="button"
+                        className={styles.primaryButton}
+                        onClick={saveSettings}
+                        disabled={busy !== null || writeLocked}
+                        data-testid="sync-save-settings"
+                      >
+                        {busy === 'save'
+                          ? '正在保存…'
+                          : scopeChange.kind === 'cleared' && clearConfirm
+                            ? '确认清空并保存'
+                            : '保存设置'}
+                      </button>
+                    </div>
+
+                    {diagnostics}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </aside>
+        </div>
       ) : null}
 
       {message ? (

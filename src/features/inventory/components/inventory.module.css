@@ -11,45 +11,24 @@
   line-height: 1.7;
 }
 
-.pageHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px 20px;
-}
-
-.pageHeader h1 {
-  margin: 0;
-  color: #233044;
-  font-size: 23px;
-  font-weight: 600;
-  letter-spacing: -0.3px;
-}
-
-.pageHeader p {
-  margin: 6px 0 0;
-  max-width: 62rem;
-  color: var(--inv-muted);
-  font-size: 12px;
-}
-
-.headerLinks {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-}
-
 .headerLink {
-  color: #5266d7;
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 7px;
+  background: #fff;
+  color: #4b5a70;
   font-size: 12px;
   text-decoration: none;
 }
 
 .headerLink:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  border-color: #c9d0e0;
+  background: #f7f8fc;
+  color: var(--ice-ui-text);
+  text-decoration: none;
 }
 
 .cardGrid {
@@ -350,24 +329,25 @@
   border-collapse: collapse;
   white-space: nowrap;
   text-align: left;
+  font-variant-numeric: tabular-nums;
 }
 
 .table th {
-  padding: 9px 12px;
-  border-top: 1px solid #eef0f3;
-  border-bottom: 1px solid #e9ecf1;
-  background: #f9fafc;
-  color: #8a94a1;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ice-ui-line);
+  background: #f8f9fb;
+  color: var(--ice-ui-faint);
   font-size: 11px;
   font-weight: 500;
+  line-height: 1.5;
 }
 
 .table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid #f0f1f4;
-  color: #5e6a7a;
-  font-size: 12px;
-  vertical-align: top;
+  padding: 11px 12px;
+  border-bottom: 1px solid #f1f2f5;
+  color: #4c586a;
+  font-size: 13px;
+  vertical-align: middle;
   font-variant-numeric: tabular-nums;
 }
 
@@ -387,7 +367,7 @@
 }
 
 .table .numCell {
-  text-align: right;
+  text-align: left;
 }
 
 .rowTitle {
@@ -757,7 +737,7 @@
 }
 
 .numCell {
-  text-align: right;
+  text-align: left;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -766,26 +746,6 @@
   white-space: normal;
   line-height: 1.55;
   min-width: 12rem;
-}
-
-.emptyState {
-  margin: 0 20px 18px;
-  padding: 18px 20px;
-  border: 1px dashed #c9d1dd;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: #4a5668;
-}
-
-.emptyState strong {
-  display: block;
-  margin-bottom: 6px;
-  color: #2f3b4e;
-}
-
-.emptyState p {
-  margin: 0;
-  font-size: 12px;
 }
 
 .mappingEditor {
@@ -836,45 +796,6 @@
  * 双视图 v1：仓库明细 / 商品汇总 / 国内表格快照
  * ------------------------------------------------------------------ */
 
-.viewTabs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 0 20px;
-  margin: 4px 0 12px;
-}
-
-.viewTab {
-  border: 1px solid #c8d4e4;
-  border-radius: 999px;
-  background: #fff;
-  color: #2d4a72;
-  padding: 6px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  line-height: 1.5;
-}
-
-.viewTab:hover {
-  border-color: #7ea3ce;
-  background: #f2f7fd;
-}
-
-.viewTabActive,
-.viewTabActive:hover {
-  border-color: #2d4a72;
-  background: #2d4a72;
-  color: #fff;
-}
-
-.viewTabNote {
-  color: #6b7a90;
-  font-size: 12px;
-  line-height: 1.7;
-}
-
 .secondaryButton {
   display: inline-flex;
   align-items: center;
@@ -896,12 +817,17 @@
 }
 
 .numericHead {
-  text-align: right;
+  text-align: left;
   white-space: nowrap;
 }
 
+/* 数值列表头与内容统一靠左。 */
+.numericHead > div {
+  justify-content: flex-start;
+}
+
 .numCellMuted {
-  text-align: right;
+  text-align: left;
   color: #9aa7b8;
   font-variant-numeric: tabular-nums;
 }
@@ -988,123 +914,63 @@
  * ------------------------------------------------------------------ */
 
 .page {
+  gap: 12px;
   font-size: 13px;
   line-height: 1.6;
-  gap: 12px;
 }
 
-.titleRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 20px;
-}
-
-.pageHeader {
-  display: block;
-}
-
+/* 视图切换：统一分段控件（与共享设计语言一致）。 */
 .viewTabs {
-  padding: 0;
-  margin: 10px 0 0;
-}
-
-.toolbar {
-  display: grid;
-  gap: 6px;
-  padding: 10px 14px;
-  border: 1px solid var(--inv-line);
-  border-radius: 10px;
-  background: #fff;
-}
-
-.toolbarForm {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px 12px;
-}
-
-.toolbarSearch {
-  flex: 1 1 22rem;
-  min-width: 14rem;
-}
-
-.toolbarField {
-  display: grid;
-  gap: 3px;
-  color: #6f7b8d;
-  font-size: 12px;
-}
-
-.toolbarSearch input,
-.toolbarField select {
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 10px;
-  border: 1px solid #dce1e8;
-  border-radius: 6px;
-  background: #fff;
-  color: #273244;
-  font: inherit;
-  font-size: 13px;
-}
-
-.toolbarSearch input {
-  min-width: 0;
-}
-
-.clearLink {
-  align-self: center;
-  color: #5266d7;
-  font-size: 12px;
-  text-decoration: none;
-}
-
-.clearLink:hover {
-  text-decoration: underline;
-}
-
-.toolbarNote {
-  margin: 0;
-  color: #8d98a8;
-  font-size: 12px;
-}
-
-.chipRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chip {
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border: 1px solid #cfd9ea;
-  border-radius: 999px;
-  background: #f5f7fd;
-  color: #3d4b60;
-  font-size: 12px;
-  text-decoration: none;
+  gap: 4px;
+  width: fit-content;
+  padding: 3px;
+  border-radius: var(--ice-ui-radius);
+  background: #f1f3f8;
 }
 
-.chip:hover {
-  border-color: #9fb0d6;
+.viewTab {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ice-ui-muted);
+  font-size: 13px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
+}
+
+.viewTab:hover {
+  color: var(--ice-ui-text);
+}
+
+.viewTabActive,
+.viewTabActive:hover {
+  border-color: var(--ice-ui-line);
+  background: #fff;
+  color: var(--ice-ui-accent-strong);
+}
+
+.toolbarWrap {
+  display: grid;
+  gap: 8px;
 }
 
 .pageStatus {
   margin: 0;
-  color: #64718a;
+  color: var(--ice-ui-faint);
   font-size: 12px;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
 .statusSep {
   margin: 0 6px;
-  color: #b4bcc8;
+  color: #b8bfca;
 }
 
 .statusWarn {
@@ -1113,7 +979,7 @@
 
 .panel {
   min-width: 0;
-  border: 1px solid var(--inv-line);
+  border: 1px solid var(--ice-ui-line);
   border-radius: 10px;
   background: #fff;
   overflow: hidden;
@@ -1126,8 +992,33 @@
   justify-content: space-between;
   gap: 6px 16px;
   padding: 9px 14px;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--ice-ui-line);
   background: #fbfcfe;
+}
+
+/* 表格工具行：显示列/跳转放在表头上方，但不再做成占满整行的条带。 */
+.tableTools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 6px;
+}
+
+.toolSpacer {
+  flex: 1 1 auto;
+}
+
+.toolJump {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+/* 宽度自适应列：吸收剩余空间，保证其它列默认宽度不被拉伸。 */
+.fixedTable .filler {
+  width: auto;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .panelSummary {
@@ -1156,12 +1047,22 @@
   outline: none;
 }
 
+.fixedTable {
+  table-layout: fixed;
+  /* 窄屏（含手机）不把百分比列压扁，保留横向滚动。 */
+  min-width: 720px;
+}
+
+.fixedTable.matrixTable {
+  min-width: 1100px;
+}
+
 .fixedTable thead th {
   position: sticky;
   top: 0;
   z-index: 3;
-  background: #f7f9fc;
-  border-bottom: 1px solid #e2e7ef;
+  background: #f8f9fb;
+  border-bottom: 1px solid var(--ice-ui-line);
 }
 
 .fixedTable td,
@@ -1174,15 +1075,42 @@
   left: 0;
   z-index: 2;
   background: #fff;
-  box-shadow: 1px 0 0 #eef0f4;
+  box-shadow: 1px 0 0 var(--ice-ui-line);
 }
 
 .fixedTable thead .stickyCol {
   z-index: 4;
-  background: #f7f9fc;
+  background: #f8f9fb;
+}
+
+/* 汇总表状态/操作列：操作列不写宽、吸收剩余空间，状态列右边界就是操作列左边界，拖状态列可见。 */
+.fixedTable th.stickyStatus,
+.fixedTable td.stickyStatus,
+.fixedTable th.stickyAction,
+.fixedTable td.stickyAction {
+  background: #fff;
+}
+
+.fixedTable thead th.stickyStatus,
+.fixedTable thead th.stickyAction {
+  background: #f8f9fb;
+}
+
+.fixedTable tbody tr:hover td.stickyStatus,
+.fixedTable tbody tr:hover td.stickyAction {
+  background: #fafbfe;
+}
+
+.fixedTable tbody tr[data-focus='true'] td.stickyStatus,
+.fixedTable tbody tr[data-focus='true'] td.stickyAction {
+  background: #fff8e6;
 }
 
 .fixedTable tbody tr:hover td {
+  background-color: #fafbfe;
+}
+
+.fixedTable tbody tr:hover td.stickyCol {
   background-color: #fafbfe;
 }
 
@@ -1192,39 +1120,70 @@
 }
 
 .fixedTable td {
-  padding: 8px 12px;
+  padding: 10px 12px;
+  position: relative;
 }
 
 .fixedTable th {
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: 9px 12px;
+  font-size: 11px;
+}
+
+/* 列边界：表头与内容共用同一条竖线，状态列等列宽变化时边界可见。 */
+.fixedTable td::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: #eef1f6;
+  content: '';
+  pointer-events: none;
+}
+
+.fixedTable td.filler::after,
+.fixedTable td:last-child::after,
+.fixedTable .stickyCol::after {
+  display: none;
+}
+
+.clickableRow {
+  cursor: pointer;
 }
 
 .rowTitle {
-  font-size: 14px;
+  color: var(--ice-ui-text);
+  font-size: 13px;
   font-weight: 600;
 }
 
 .rowSub {
-  font-size: 12px;
+  font-size: 11px;
+  color: var(--ice-ui-faint);
 }
 
 .rowNameButton {
   padding: 0;
   border: 0;
   background: none;
-  color: #2f3f57;
+  color: var(--ice-ui-text);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
 }
 
 .rowNameButton:hover {
-  color: #2d4a72;
+  color: var(--ice-ui-accent-strong);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.rowNameButton:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .rowDetailButton {
@@ -1243,127 +1202,63 @@
   background: #f2f7fd;
 }
 
-.actionHead,
+/* 详情主表操作列：与其它次级按钮一致的中性小按钮（图标+文字）。 */
+.detailActionButton {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 7px;
+  background: #fff;
+  color: #4b5a70;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.detailActionButton:hover:not(:disabled) {
+  border-color: #c9d0e0;
+  background: #f7f8fc;
+  color: var(--ice-ui-text);
+}
+
+.detailActionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.actionHead {
+  text-align: left;
+  white-space: nowrap;
+}
+
 .actionCell {
-  width: 72px;
-  text-align: center;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .statusLine {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: #3f4d63;
-  font-size: 13px;
+  gap: 7px;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
 }
 
 .statusDot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
   border-radius: 50%;
-  background: #98a2b2;
+  background: #9aa3b2;
 }
 
-.statusDot[data-tone='green'] { background: #3f9d6b; }
-.statusDot[data-tone='amber'] { background: #cf9a2f; }
-.statusDot[data-tone='red'] { background: #c0564c; }
-.statusDot[data-tone='blue'] { background: #4d7fca; }
-
-.tableFooter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  padding: 8px 14px;
-  border-top: 1px solid #eef0f4;
-  background: #fbfcfe;
-}
-
-.pageSummary {
-  color: #7a8799;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.pageLinks {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pageLink,
-.pageLinkDisabled,
-.pageLinkCurrent,
-.pageGap {
-  display: inline-flex;
-  min-width: 30px;
-  min-height: 28px;
-  align-items: center;
-  justify-content: center;
-  padding: 3px 8px;
-  border: 1px solid #dee4ef;
-  border-radius: 6px;
-  color: #4b5f8f;
-  font-size: 12px;
-  text-decoration: none;
-}
-
-.pageLink:hover {
-  border-color: #b8c3e8;
-  background: #f4f6ff;
-}
-
-.pageLinkDisabled {
-  color: #b4bcc8;
-  border-color: #eef0f4;
-}
-
-.pageLinkCurrent {
-  border-color: #2d4a72;
-  background: #2d4a72;
-  color: #fff;
-  font-weight: 600;
-}
-
-.pageGap {
-  border: 0;
-  color: #9aa7b8;
-}
-
-.pageJump {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pageJump input {
-  width: 4.6rem;
-  min-height: 28px;
-  padding: 3px 8px;
-  border: 1px solid #dce1e8;
-  border-radius: 6px;
-  background: #fff;
-  color: #273244;
-  font: inherit;
-  font-size: 12px;
-}
-
-.pageJumpButton {
-  min-height: 28px;
-  padding: 3px 12px;
-  border: 1px solid #c8d4e4;
-  border-radius: 6px;
-  background: #fff;
-  color: #2d4a72;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.pageJumpButton:hover {
-  border-color: #7ea3ce;
-  background: #f2f7fd;
-}
+.statusDot[data-tone='green'] { background: #3f8f6b; }
+.statusDot[data-tone='amber'] { background: #c08a3e; }
+.statusDot[data-tone='red'] { background: #b5533f; }
+.statusDot[data-tone='blue'] { background: #5266d7; }
 
 .srOnly {
   position: absolute;
@@ -1377,13 +1272,6 @@
   border: 0;
 }
 
-.footNote {
-  margin: 0;
-  color: #9aa7b8;
-  font-size: 11px;
-  line-height: 1.7;
-}
-
 .detailBackdrop {
   position: fixed;
   inset: 0;
@@ -1391,16 +1279,18 @@
   display: flex;
   justify-content: flex-end;
   background: rgba(23, 33, 48, 0.34);
+  animation: detailBackdropIn 200ms var(--ice-ui-ease-out);
 }
 
 .detailDrawer {
   display: flex;
-  width: min(560px, 94vw);
+  width: min(820px, 94vw);
   height: 100%;
   flex-direction: column;
   background: #fff;
   box-shadow: -18px 0 46px rgba(24, 36, 54, 0.22);
   outline: none;
+  animation: detailDrawerIn 200ms var(--ice-ui-ease-out);
 }
 
 .detailDrawerHead {
@@ -1409,7 +1299,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 18px 12px;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--ice-ui-line);
 }
 
 .detailDrawerHead h2 {
@@ -1422,25 +1312,32 @@
 
 .detailDrawerHead p {
   margin: 3px 0 0;
-  color: #8d98a8;
+  color: var(--ice-ui-faint);
   font-size: 12px;
 }
 
 .detailClose {
+  display: grid;
+  width: 32px;
+  height: 32px;
   flex: none;
-  min-height: 30px;
-  padding: 4px 12px;
-  border: 1px solid #d7dfea;
-  border-radius: 7px;
-  background: #fff;
-  color: #46536a;
-  font-size: 13px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #6f7b8d;
   cursor: pointer;
+  transition: background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
 }
 
 .detailClose:hover {
-  border-color: #9fb0d6;
-  background: #f4f6ff;
+  background: #f0f2f8;
+  color: var(--ice-ui-text);
+}
+
+.detailClose:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 1px;
 }
 
 .detailDrawerBody {
@@ -1450,11 +1347,21 @@
   padding: 14px 18px;
 }
 
-.detailDrawerFoot {
-  padding: 8px 18px;
-  border-top: 1px solid #eef0f4;
-  color: #9aa7b8;
-  font-size: 11px;
+@keyframes detailBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes detailDrawerIn {
+  from { opacity: 0.6; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detailBackdrop,
+  .detailDrawer {
+    animation: none;
+  }
 }
 
 .detailLead {
@@ -1607,6 +1514,106 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 汇总详情：顶部动态问题横幅 + 参与仓/问题折叠列表（只放短句）。 */
+.detailBanner {
+  display: flex;
+  align-items: center;
+  margin: 2px 0 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 8px;
+  background: #f8f9fb;
+  color: var(--ice-ui-text);
+  font-size: 13px;
+}
+
+.detailBanner[data-tone='amber'] {
+  border-color: #efe3c8;
+  background: #fdf9ef;
+}
+
+.detailBanner[data-tone='red'] {
+  border-color: #f2ded9;
+  background: #fcf2ef;
+}
+
+.detailBanner[data-tone='green'] {
+  border-color: #dcebe2;
+  background: #f4faf7;
+}
+
+.participantList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.participantRow {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--ice-ui-line);
+  font-size: 12px;
+}
+
+.participantRow:last-child {
+  border-bottom: 0;
+}
+
+.participantName {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--ice-ui-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participantState {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+.participantState[data-bound='true'] {
+  color: #3f8f6b;
+}
+
+.participantDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #b8bfca;
+}
+
+.participantDot[data-bound='true'] {
+  background: #3f8f6b;
+}
+
+.participantQty {
+  flex: none;
+  color: var(--ice-ui-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.problemList {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0 0 0 16px;
+  color: #6b5a3e;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .detailLoading {
   margin: 12px 0 0;
   padding: 12px;
@@ -1656,7 +1663,7 @@
   max-height: none;
 }
 
-.panel:has(.tableScroll) .tableFooter {
+.panel:has(.tableScroll) .pagerBar {
   flex: none;
 }
 
@@ -1664,14 +1671,29 @@
   flex: none;
 }
 
-.toolbar {
-  padding: 8px 12px;
+/* 分页条：紧贴表格面板底部，内部沿用共享 pager 样式。 */
+.pagerBar {
+  flex: none;
+  padding: 0 14px;
+  border-top: 1px solid var(--ice-ui-line);
 }
 
-.toolbarField span {
-  font-size: 11px;
+/* 刷新图标在请求期间转动；reduced-motion 关闭。 */
+.refreshSpinning {
+  animation: refreshSpin 900ms linear infinite;
 }
-/* 修复轮 2b：flex 子链允许收缩，表格在面板内滚动，分页底栏不被内容顶出视口。 */
+
+@keyframes refreshSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refreshSpinning {
+    animation: none;
+  }
+}
+
+/* 修复轮 2b：flex 子链允许收缩，表格在面板内滚动，分页条不被内容顶出视口。 */
 .panel:has(.tableScroll) .panelSection {
   display: flex;
   flex: 1 1 auto;
@@ -1692,10 +1714,10 @@
   gap: 10px;
 }
 
-.page > .pageHeader,
-.page > .toolbar,
+.page > header,
+.page > .viewTabs,
+.page > .toolbarWrap,
 .page > .pageStatus,
-.page > .footNote,
 .page > .inlineError {
   flex: none;
 }
@@ -1703,10 +1725,10 @@
 .panel:has(.tableScroll) .tableScroll {
   min-height: 120px;
 }
-/* 修复轮 4：商品列限宽换行，长名称不把行操作挤出表格可视区。 */
+/* 商品列宽度由表头默认宽度控制（300/280），这里只负责长名称截断。 */
 .fixedTable .stickyCol {
-  min-width: 260px;
-  max-width: 380px;
+  min-width: 0;
+  max-width: none;
   white-space: normal;
 }
 
@@ -1716,5 +1738,5 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 340px;
+  max-width: 100%;
 }

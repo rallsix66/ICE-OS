@@ -8,7 +8,13 @@ import {
   isUuid,
   type InventoryQueryState,
 } from '../model';
-import type { InventoryDomesticRowDto, InventoryItemDetailDto, InventoryWarehouseRowDto, SourceBindingDto } from '../types';
+import type {
+  InventoryDomesticRowDto,
+  InventoryItemDetailDto,
+  InventoryWarehouseDto,
+  InventoryWarehouseRowDto,
+  SourceBindingDto,
+} from '../types';
 import type { InventoryDetailTarget } from './detail-context';
 import { InventoryDetailContext } from './detail-context';
 import { InventoryDetailPanel } from './inventory-detail-panel';
@@ -43,6 +49,7 @@ export function InventoryDetailLayer({
   itemError,
   domesticRows,
   domesticIncluded,
+  warehouses,
   sourceBinding,
   sourceBindingError,
   bindingReady,
@@ -58,6 +65,8 @@ export function InventoryDetailLayer({
   domesticRows: InventoryDomesticRowDto[];
   /** 列表有效范围是否包含国内（与列/计数同一判断；失败仓/明确仓市场下钻不带国内）。 */
   domesticIncluded: boolean;
+  /** 页面已读的参与仓清单（overview.warehouses），供汇总详情列全参与仓。 */
+  warehouses: InventoryWarehouseDto[];
   /** 当前打开仓库行的固定来源绑定（服务端读取；用于详情内直接绑定/更换商品）。 */
   sourceBinding: SourceBindingDto | null;
   sourceBindingError: string | null;
@@ -160,6 +169,7 @@ export function InventoryDetailLayer({
         itemError={itemError}
         domesticRows={domesticRows}
         domesticIncluded={domesticIncluded}
+        warehouses={warehouses}
         sourceBinding={sourceBinding}
         sourceBindingError={sourceBindingError}
         bindingReady={bindingReady}

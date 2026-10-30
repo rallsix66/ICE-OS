@@ -16,6 +16,9 @@ import {
   requireInventoryAdmin,
 } from '@/features/inventory/server/reads';
 import { getInventoryDomesticSnapshot } from '@/features/inventory/server/domestic-reads';
+import { requireCatalogAdmin } from '@/features/catalog/authorization';
+import { catalogRepository } from '@/features/catalog/repository';
+import { adoptedUnitCostFromFinancial } from '@/features/catalog/local-display/adopted-price';
 import type {
   InventoryDomesticSnapshotDto,
   InventoryItemDetailDto,
@@ -74,6 +77,28 @@ export default async function InventoryPage({
     return <ReadFailurePanel kind={classifyReadFailure(error)} backHref="/dashboard/catalog" backLabel="返回 ICE 商品库" />;
   }
 
+  // 估算货值：单独走 amount:read 权限；无权限不读成本、不显示该列。
+  // 成本读取失败时保留列但全部按缺成本显示“—”，不把缺失写成 0。
+  let amountAllowed = false;
+  try {
+    await requireCatalogAdmin('amount:read');
+    amountAllowed = true;
+  } catch {
+    amountAllowed = false;
+  }
+  const inventoryCostMap: Record<string, string> = {};
+  if (amountAllowed) {
+    try {
+      const batch = await catalogRepository.baselineAmountsMap(identity);
+      for (const [itemId, financial] of batch) {
+        const cost = adoptedUnitCostFromFinancial(financial);
+        if (cost.state === 'priced') inventoryCostMap[itemId] = cost.amountCny;
+      }
+    } catch {
+      /* 成本读取失败：列保留，金额按缺成本显示“—”。 */
+    }
+  }
+
   // 国内表格快照没有仓库/市场维度：选择「仅国内」时不再把海外仓/市场条件带进国内查询。
   const domesticScope = query.source === 'domestic';
   const warehouseFilter = domesticScope ? 'all' : query.warehouse;
@@ -123,10 +148,20 @@ export default async function InventoryPage({
   const productSummary: InventoryProductSummaryDto | null = summarySettled.status === 'fulfilled' ? summarySettled.value : null;
 
   const warehouseRows = query.view === 'warehouse'
-    ? mergeWarehouseRowsPage({ query: { ...query, warehouse: warehouseFilter, market: marketFilter }, overseas: overseasRows, domestic })
+    ? mergeWarehouseRowsPage({
+      query: { ...query, warehouse: warehouseFilter, market: marketFilter },
+      overseas: overseasRows,
+      domestic,
+      costMap: inventoryCostMap,
+    })
     : null;
   const mergedSummary = query.view === 'product' && productSummary
-    ? mergeProductSummary({ query: { ...query, warehouse: warehouseFilter, market: marketFilter }, summary: productSummary, domestic })
+    ? mergeProductSummary({
+      query: { ...query, warehouse: warehouseFilter, market: marketFilter },
+      summary: productSummary,
+      domestic,
+      costMap: inventoryCostMap,
+    })
     : null;
 
   // 详情目标行：优先 URL 的 row（来源+仓+SKU），其次 item（商品汇总/商品详情）。
@@ -204,6 +239,8 @@ export default async function InventoryPage({
       sourceBinding={sourceBinding}
       sourceBindingError={sourceBindingError}
       bindingReady={Boolean(bindingTarget)}
+      costMap={amountAllowed ? inventoryCostMap : undefined}
+      showValue={amountAllowed}
     />
   );
 }

@@ -22,6 +22,29 @@ import type {
 } from './types';
 import type { InventoryQueryState } from './model';
 import { compareStableText, UNKNOWN_MARKET_TOKEN } from './model';
+import { multiplyMoneyByQuantity, parseMoney, parseQuantity } from '@/features/catalog/local-display/decimal';
+
+/** 估算货值用的成本映射：itemId → 当前采用单位成本（人民币字符串，不含运费）。 */
+export type InventoryCostMap = Record<string, string>;
+
+/** 估算货值（4 位定点 bigint）：实物数量 × 采用单位成本；任一缺失返回 null（缺成本不是 0）。 */
+export function estimateValueScaled(
+  qty: number | null | undefined,
+  costAmountCny: string | null | undefined,
+): bigint | null {
+  const quantity = parseQuantity(qty === null || qty === undefined ? null : String(qty));
+  const cost = parseMoney(costAmountCny);
+  if (quantity === null || cost === null) return null;
+  return multiplyMoneyByQuantity(cost, quantity);
+}
+
+function compareValueScaled(a: bigint | null, b: bigint | null, dir: InventoryQueryState['sortDir']): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  const factor = dir === 'desc' ? -1 : 1;
+  return a === b ? 0 : a > b ? factor : -factor;
+}
 
 export interface DualQueryState {
   q: string;
@@ -36,7 +59,7 @@ export interface DualQueryState {
 
 export type DualQueryInput = Pick<
   InventoryQueryState,
-  'q' | 'warehouse' | 'market' | 'view' | 'source' | 'page' | 'limit' | 'focus'
+  'q' | 'warehouse' | 'market' | 'view' | 'source' | 'page' | 'limit' | 'focus' | 'sort' | 'sortDir'
 >;
 
 export interface WarehouseRowsCounts {
@@ -161,6 +184,76 @@ function compareRows(a: InventoryWarehouseRowDto, b: InventoryWarehouseRowDto): 
     || compareStableText(a.externalSku, b.externalSku);
 }
 
+/* ------------------------------------------------------------------ *
+ * URL 排序（sort/dir）：在合并后的全量行上排序，再切页；空值永远排最后。
+ * ------------------------------------------------------------------ */
+
+function isSortValueEmpty(value: string | number | null | undefined): boolean {
+  return value === null || value === undefined || value === '';
+}
+
+function compareSortValues(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined,
+  dir: InventoryQueryState['sortDir'],
+): number {
+  const factor = dir === 'desc' ? -1 : 1;
+  const aEmpty = isSortValueEmpty(a);
+  const bEmpty = isSortValueEmpty(b);
+  if (aEmpty && bEmpty) return 0;
+  if (aEmpty) return 1;
+  if (bEmpty) return -1;
+  if (typeof a === 'number' && typeof b === 'number') return (a - b) * factor;
+  return compareStableText(String(a), String(b)) * factor;
+}
+
+/** 仓库明细状态排序：已绑定（含待采用）> 未绑定。 */
+function warehouseStatusRank(row: InventoryWarehouseRowDto): number {
+  return row.status === 'adopted' || row.status === 'pending_adoption' ? 0 : 1;
+}
+
+function warehouseSortValue(
+  row: InventoryWarehouseRowDto,
+  sort: InventoryQueryState['sort'],
+): string | number | null {
+  if (sort === 'name') return row.itemName ?? row.iceCode ?? row.sourceName ?? row.externalSku;
+  if (sort === 'warehouse') return row.warehouseName;
+  if (sort === 'onHand') return row.onHand;
+  if (sort === 'available') return row.warehouseAvailable;
+  if (sort === 'status') return warehouseStatusRank(row);
+  return null;
+}
+
+/** 汇总状态排序：已绑定 > 未绑定 > 无当前库存（与列表状态列同一口径）。 */
+function summaryStatusRank(row: InventoryProductSummaryRowDto, domesticOnlyScope: boolean): number {
+  if (domesticOnlyScope) return row.domestic ? 0 : 1;
+  if (!row.hasCurrentData) return 2;
+  const bound = row.mapped || row.notMappedWarehouses.length < row.scopeWarehouseCount;
+  return bound ? 0 : 1;
+}
+
+function summaryMarketValue(
+  row: InventoryProductSummaryRowDto,
+  sort: InventoryQueryState['sort'],
+): number | null {
+  if (!sort.startsWith('market-')) return null;
+  const token = sort.slice('market-'.length);
+  const market = token === 'unknown' ? null : token;
+  return row.marketCells.find((cell) => cell.market === market)?.onHand ?? null;
+}
+
+function summarySortValue(
+  row: InventoryProductSummaryRowDto,
+  sort: InventoryQueryState['sort'],
+  domesticOnlyScope: boolean,
+): string | number | null {
+  if (sort === 'name') return row.nameCn ?? row.iceCode;
+  if (sort === 'domestic') return row.domestic?.onHand ?? null;
+  if (sort === 'total') return row.overseasOnHand;
+  if (sort === 'status') return summaryStatusRank(row, domesticOnlyScope);
+  return summaryMarketValue(row, sort);
+}
+
 /**
  * 合并海外行与国内行，按统一顺序切页。
  * 来源范围同时约束行集合、计数与搜索：仅国内时只有国内有效行（不混入海外-only 商品/数量）。
@@ -169,8 +262,11 @@ export function mergeWarehouseRowsPage(input: {
   query: DualQueryInput;
   overseas: InventoryWarehouseRowsDto | null;
   domestic: InventoryDomesticSnapshotDto | null;
+  /** itemId → 当前采用单位成本；无金额权限时为空。 */
+  costMap?: InventoryCostMap;
 }): WarehouseRowsPageResult {
   const { query, overseas, domestic } = input;
+  const costMap = input.costMap ?? {};
   const overseasIncluded = query.source !== 'domestic';
   const domesticAvailable = Boolean(domestic?.available);
   // 国内快照没有仓库/市场维度：有仓/市场下钻时国内行不混入（避免与所选范围矛盾）。
@@ -194,6 +290,20 @@ export function mergeWarehouseRowsPage(input: {
   };
 
   const merged = [...overseasRows, ...domesticSourceRows].sort(compareRows);
+  // URL 排序：先对合并后的全量行排序，再切页（空值最后、稳定）。
+  if (query.sort === 'value') {
+    merged.sort((a, b) => compareValueScaled(
+      estimateValueScaled(a.onHand, costMap[a.itemId ?? '']),
+      estimateValueScaled(b.onHand, costMap[b.itemId ?? '']),
+      query.sortDir,
+    ));
+  } else if (query.sort) {
+    merged.sort((a, b) => compareSortValues(
+      warehouseSortValue(a, query.sort),
+      warehouseSortValue(b, query.sort),
+      query.sortDir,
+    ));
+  }
   const total = merged.length;
   const pageCount = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(Math.max(1, Math.trunc(query.page || 1)), pageCount);
@@ -314,8 +424,11 @@ export function mergeProductSummary(input: {
   query: DualQueryInput;
   summary: InventoryProductSummaryDto;
   domestic: InventoryDomesticSnapshotDto | null;
+  /** itemId → 当前采用单位成本；无金额权限时为空。 */
+  costMap?: InventoryCostMap;
 }): ProductSummaryMergeResult {
   const { query, summary, domestic } = input;
+  const costMap = input.costMap ?? {};
   const limit = Math.max(1, Math.trunc(query.limit || 50));
   const domesticAvailable = Boolean(domestic?.available);
   // 有仓/市场下钻时国内列不参与（国内快照没有仓库/市场维度，不冒充归属）。
@@ -393,6 +506,26 @@ export function mergeProductSummary(input: {
   }
 
   rows.sort((a, b) => compareStableText(a.iceCode, b.iceCode) || compareStableText(a.nameCn, b.nameCn) || compareStableText(a.itemId, b.itemId));
+  // URL 排序：先对合并后的全量商品行排序，再切页（空值最后、稳定）。
+  if (query.sort === 'value') {
+    rows.sort((a, b) => compareValueScaled(
+      estimateValueScaled(
+        domesticOnlyScope ? a.domestic?.onHand : a.overseasOnHand,
+        costMap[a.itemId],
+      ),
+      estimateValueScaled(
+        domesticOnlyScope ? b.domestic?.onHand : b.overseasOnHand,
+        costMap[b.itemId],
+      ),
+      query.sortDir,
+    ));
+  } else if (query.sort) {
+    rows.sort((a, b) => compareSortValues(
+      summarySortValue(a, query.sort, domesticOnlyScope),
+      summarySortValue(b, query.sort, domesticOnlyScope),
+      query.sortDir,
+    ));
+  }
 
   const marketColumns = domesticOnlyScope
     ? []

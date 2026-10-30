@@ -633,6 +633,40 @@ export interface InventoryQueryState {
   row: string;
   /** 详情显式“查看全仓”；列表始终沿用筛选。 */
   allWarehouses: boolean;
+  /** 排序键（URL 参数 sort）：空 = 原始顺序；服务端/合并层先排序再切页。 */
+  sort: InventorySortKey;
+  /** 排序方向（URL 参数 dir）。 */
+  sortDir: InventorySortDir;
+}
+
+export type InventorySortDir = 'asc' | 'desc';
+
+/** 可排序键：商品/仓库/实物/可售/估算货值/状态/国内/合计 + 汇总表的各市场列（market-<token>）。 */
+export type InventorySortKey =
+  | ''
+  | 'name'
+  | 'warehouse'
+  | 'onHand'
+  | 'available'
+  | 'value'
+  | 'status'
+  | 'domestic'
+  | 'total'
+  | `market-${string}`;
+
+const INVENTORY_SORT_KEYS = new Set(['name', 'warehouse', 'onHand', 'available', 'value', 'status', 'domestic', 'total']);
+const MARKET_SORT_KEY_PATTERN = /^market-(unknown|[A-Za-z0-9_-]{1,24})$/;
+
+export function parseInventorySortKey(raw: string | null | undefined): InventorySortKey {
+  const value = (raw ?? '').trim();
+  if (!value) return '';
+  if (INVENTORY_SORT_KEYS.has(value)) return value as InventorySortKey;
+  if (MARKET_SORT_KEY_PATTERN.test(value)) return value as InventorySortKey;
+  return '';
+}
+
+export function parseInventorySortDir(raw: string | null | undefined): InventorySortDir {
+  return (raw ?? '').trim().toLowerCase() === 'desc' ? 'desc' : 'asc';
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -667,6 +701,8 @@ export const DEFAULT_INVENTORY_QUERY: InventoryQueryState = {
   focus: '',
   row: '',
   allWarehouses: false,
+  sort: '',
+  sortDir: 'asc',
 };
 
 export function parseInventoryView(raw: string | null | undefined): InventoryViewMode {
@@ -705,12 +741,14 @@ export function parseInventorySearchParams(params: URLSearchParams): InventoryQu
     focus,
     row,
     allWarehouses,
+    sort: parseInventorySortKey(params.get('sort')),
+    sortDir: parseInventorySortDir(params.get('dir')),
   };
 }
 
 export function buildInventoryListHref(
   state: Pick<InventoryQueryState, 'q' | 'warehouse' | 'market' | 'page'> &
-    Partial<Pick<InventoryQueryState, 'view' | 'source' | 'focus' | 'row'>>,
+    Partial<Pick<InventoryQueryState, 'view' | 'source' | 'focus' | 'row' | 'sort' | 'sortDir'>>,
 ): string {
   const params = new URLSearchParams();
   if (state.q) params.set('q', state.q);
@@ -720,6 +758,10 @@ export function buildInventoryListHref(
   if (state.source && state.source !== 'all') params.set('source', state.source);
   if (state.focus) params.set('focus', state.focus);
   if (state.row) params.set('row', state.row);
+  if (state.sort) {
+    params.set('sort', state.sort);
+    params.set('dir', state.sortDir === 'desc' ? 'desc' : 'asc');
+  }
   if (state.page > 1) params.set('page', String(state.page));
   const qs = params.toString();
   return qs ? `/dashboard/inventory?${qs}` : '/dashboard/inventory';
@@ -738,6 +780,10 @@ export function buildInventoryDetailHref(
   if (state.source && state.source !== 'all') params.set('source', state.source);
   if (state.focus) params.set('focus', state.focus);
   if (state.row) params.set('row', state.row);
+  if (state.sort) {
+    params.set('sort', state.sort);
+    params.set('dir', state.sortDir === 'desc' ? 'desc' : 'asc');
+  }
   if (state.page > 1) params.set('page', String(state.page));
   params.set('item', state.item);
   if (options.allWarehouses) params.set('all', '1');
@@ -2367,7 +2413,7 @@ export function sourceScopeIncludesDomestic(source: InventorySourceScope): boole
 }
 
 /** 国内表格快照的固定口径说明：文件日期、未注明仓库/单位/观测时间，不冒充实时库存。 */
-export const DOMESTIC_SNAPSHOT_LABEL = '国内（聚水潭表格快照）';
+export const DOMESTIC_SNAPSHOT_LABEL = '聚水潭';
 
 export function domesticSnapshotNotice(fileDates: string[]): string {
   const dates = [...new Set(fileDates.filter(Boolean))].sort();

@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { RefreshCw, Table2 } from 'lucide-react';
+import { PageHeading } from '@/ui/ice-v4/data-surface';
+import shared from '@/ui/ice-v4/data-surface.module.css';
 import styles from './sync-view.module.css';
 import { StatusPill } from './display';
 import { SyncControls } from './sync-controls';
@@ -39,10 +42,11 @@ import type {
 import type { LocalViewerIdentity } from '../client-pending';
 
 /**
- * /dashboard/sync 页面主体（R6 紧凑来源总览）：
- * 首屏按数据来源一行展示状态、最后成功数据时间、下次计划与关键操作；
- * 逐仓结果、任务历史、失败详情与原请求核对收进同一来源的「详情」面板；
- * 频率、参与仓库、保存与后台诊断收进「设置」面板（诊断再按需展开）。
+ * /dashboard/sync 页面主体（来源卡片化）：
+ * 首屏只有两个已接入来源卡片（BigSeller 海外库存、聚水潭国内表格快照），
+ * 每张卡展示来源身份、是否正常、关键事实与操作；异常收进对应卡片的一行短状态。
+ * 逐仓结果、任务历史、失败详情与原请求核对收进右侧抽屉的「详情」页签；
+ * 频率、参与仓库、保存与后台诊断收进「设置」页签（诊断再按需展开）。
  * 写动作仍由客户端组件完成，统一走 pending 登记 → 原动作 → 结果未知核对流程。
  */
 
@@ -90,12 +94,7 @@ interface WarehouseProgressRow {
 function pendingMappingCell(row: WarehouseProgressRow): { text: string; alert: boolean } {
   if (row.pendingMappingRows === null || row.pendingMappingRows === undefined) return { text: '—', alert: false };
   if (row.pendingMappingRows > 0) {
-    return {
-      text: row.adoptedRows && row.adoptedRows > 0 && !row.failed && !row.stale
-        ? `同步成功，另有 ${formatQuantity(row.pendingMappingRows)} 条来源待对应`
-        : `另有 ${formatQuantity(row.pendingMappingRows)} 条来源待对应`,
-      alert: true,
-    };
+    return { text: `另有 ${formatQuantity(row.pendingMappingRows)} 条待对应`, alert: true };
   }
   return { text: '已全部对应', alert: false };
 }
@@ -228,46 +227,57 @@ export function SyncView({
 
   const pendingTotal = Math.max(0, Number(overview.mappingQueueTotal ?? 0) || 0);
 
-  /* 国内冻结快照：只读展示状态与最新文件日期，不提供立即同步。 */
+  /* 国内冻结快照：只读卡片，不提供立即同步，也不造假来源。 */
   const domesticAvailable = domesticSnapshot?.available === true;
   const domesticDates = domesticAvailable
     ? (domesticSnapshot?.fileDates ?? []).map((entry) => entry.fileDate).filter(Boolean).sort()
     : [];
   const domesticDateText = domesticDates.length > 0 ? domesticDates[domesticDates.length - 1] : '—';
-  const domesticReason = domesticAvailable ? null : ((domesticSnapshot?.reason ?? '').trim() || null);
   const domesticStatus: { label: string; tone: Tone } = domesticAvailable
-    ? { label: '表格快照', tone: 'neutral' }
+    ? { label: '快照可用', tone: 'green' }
     : { label: '未读取', tone: 'amber' };
 
-  /* 只有真实异常才需要处理：登录/后台/最近任务失败。 */
-  const alerts: Array<{ tone: 'amber' | 'red'; title: string; body: string; href?: string; linkLabel?: string }> = [];
-  if (account.status === 'needs_login') {
-    alerts.push({
-      tone: 'amber',
-      title: 'BigSeller 登录已失效，自动同步已暂停',
-      body: '需人工重新登录并复位账号状态后才能继续。',
-    });
-  } else if (account.status === 'disabled') {
-    alerts.push({ tone: 'amber', title: 'BigSeller 账号已停用', body: '自动同步不会执行。' });
-  }
-  if (!overview.worker) {
-    alerts.push({ tone: 'amber', title: '后台同步程序未登记', body: '自动同步不会执行，请确认后台程序已启动。' });
-  } else if (!overview.worker.online) {
-    alerts.push({
-      tone: 'amber',
-      title: '后台同步程序离线',
-      body: `最后心跳：${timestampOr(overview.worker.lastSeenAt, '暂无记录')}。自动同步暂停，已有库存不清空。`,
-    });
-  }
-  if (latestRun && latestDisplay && ['failed', 'partial', 'outcome_unknown', 'needs_login'].includes(latestRun.status)) {
-    alerts.push({
-      tone: latestRun.status === 'failed' || latestRun.status === 'needs_login' ? 'red' : 'amber',
-      title: `最近任务：${latestDisplay.label}`,
-      body: `${errorCodeLabel(latestRun.errorCode) ?? latestDisplay.nextStep}（任务时间：${timestampOr(latestRun.startedAt, '未记录')}）`,
-      href: '#sync-runs',
-      linkLabel: '查看任务详情',
-    });
-  }
+  /** 聚水潭卡片由服务端渲染后交给客户端卡片网格，保证首屏顺序固定为 BigSeller → 聚水潭。 */
+  const domesticCard = (
+    <section
+      className={`${styles.sourceCard} ${styles.cardDomestic}`}
+      data-testid="sync-source-row-domestic"
+      data-stagger="1"
+      aria-label="聚水潭国内表格快照"
+    >
+      <header className={styles.cardHead}>
+        <span className={styles.cardIcon} aria-hidden>
+          <Table2 size={18} strokeWidth={1.8} />
+        </span>
+        <div className={styles.cardIdentity}>
+          <h2>聚水潭</h2>
+          <span className={styles.cardPurpose}>国内表格快照</span>
+        </div>
+        <div className={styles.cardStatus} data-testid="sync-source-domestic-status">
+          <StatusPill tone={domesticStatus.tone}>{domesticStatus.label}</StatusPill>
+        </div>
+      </header>
+      <dl className={styles.cardFacts}>
+        <div data-testid="sync-source-domestic-file-date">
+          <dt>原文件日期</dt>
+          <dd>{domesticDateText}</dd>
+        </div>
+        <div data-testid="sync-source-domestic-next-plan">
+          <dt>下次计划</dt>
+          <dd>不自动同步</dd>
+        </div>
+        <div data-testid="sync-source-domestic-pending">
+          <dt>待处理</dt>
+          <dd>—</dd>
+        </div>
+      </dl>
+      <div className={styles.cardActions}>
+        <Link className={styles.sourceLink} href="/dashboard/inventory?source=domestic" data-testid="sync-source-domestic-link">
+          查看国内明细
+        </Link>
+      </div>
+    </section>
+  );
 
   const runsAttention = Boolean(pending)
     || Boolean(latestRun && latestDisplay && ['failed', 'partial', 'outcome_unknown', 'needs_login'].includes(latestRun.status));
@@ -276,26 +286,6 @@ export function SyncView({
   const detailContent = (
     <>
       <PendingRecoveryPanel key={pendingRecoveryKey(pending)} pending={pending} viewer={viewer} />
-
-      {alerts.length > 0 ? (
-        <ul className={styles.alertList} data-testid="sync-alerts">
-          {alerts.map((alert) => (
-            <li key={alert.title} className={styles.alertItem} data-tone={alert.tone} data-testid="sync-alert-item">
-              <div className={styles.alertText}>
-                <strong>{alert.title}</strong>
-                <p>{alert.body}</p>
-              </div>
-              {alert.href ? (
-                <a className={styles.alertLink} href={alert.href}>{alert.linkLabel ?? '去处理'}</a>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className={styles.statusOkLine} data-testid="sync-no-alerts">
-          <StatusPill tone="green">运行正常</StatusPill>
-        </p>
-      )}
 
       <section className={styles.detailSection} data-testid="sync-scope-progress" aria-label="逐仓结果">
         <div className={styles.sectionHeader}>
@@ -314,24 +304,23 @@ export function SyncView({
           </div>
           {scope.empty ? (
             <p className={styles.inlineNotice} data-testid="sync-scope-empty-summary">
-              已停止发布；在「设置」重新勾选并保存后恢复。
+              参与仓库为空：已停止发布
             </p>
           ) : null}
           <div className={styles.tableWrap}>
-            <table className={styles.table}>
+            <table className={`${styles.table} ${styles.progressTable}`}>
               <thead>
                 <tr>
                   <th>参与仓库</th>
                   <th>最近一次任务结果</th>
                   <th>当前数据时间</th>
                   <th>待处理（未对应）</th>
-                  <th>说明</th>
                 </tr>
               </thead>
               <tbody>
                 {progressRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className={styles.wrapCell}>
+                    <td colSpan={4} className={styles.wrapCell}>
                       还没有已确认参与的仓库。
                     </td>
                   </tr>
@@ -346,6 +335,9 @@ export function SyncView({
                         </td>
                         <td>
                           {row.resultLabel}
+                          <span className={styles.resultStatus}>
+                            <StatusPill tone={row.note.tone as Tone}>{row.note.label}</StatusPill>
+                          </span>
                           {row.errorCode ? <span className={`${styles.rowSub} ${styles.rowSubAlert}`}>{errorCodeLabel(row.errorCode) ?? '本次未成功'}</span> : null}
                         </td>
                         <td>
@@ -359,9 +351,6 @@ export function SyncView({
                             <span className={styles.pendingNote}>未计入商品合计</span>
                           ) : null}
                         </td>
-                        <td>
-                          <StatusPill tone={row.note.tone as Tone}>{row.note.label}</StatusPill>
-                        </td>
                       </tr>
                     );
                   })
@@ -371,7 +360,7 @@ export function SyncView({
           </div>
           {warehouseStatesError ? (
             <p className={styles.inlineError}>
-              逐仓状态读取失败：{warehouseStatesError}。上表为总览字段，可刷新重试。
+              逐仓状态读取失败：{warehouseStatesError}
             </p>
           ) : null}
         </div>
@@ -385,7 +374,7 @@ export function SyncView({
         <div className={styles.collapsibleBody}>
           {activeRuns.length > 0 ? (
             <p className={styles.inlineNotice}>
-              当前有 {activeRuns.length} 个进行中的任务；「立即同步」返回同一任务，不额外排队。
+              进行中任务 {activeRuns.length} 个
             </p>
           ) : null}
           {runs.length === 0 ? (
@@ -449,9 +438,9 @@ export function SyncView({
               </div>
               <div className={styles.sectionBody}>
                 {runError ? (
-                  <p className={styles.inlineError}>读取任务详情失败：{runError}。可刷新重试。</p>
+                  <p className={styles.inlineError}>读取任务详情失败：{runError}</p>
                 ) : !runDetail || !detailStatus ? (
-                  <p className={styles.inlineNotice}>没有找到该任务（可能不在授权范围或已被清理）。</p>
+                  <p className={styles.inlineNotice}>没有找到该任务。</p>
                 ) : (
                   <>
                     <div className={styles.pillRow}>
@@ -679,26 +668,23 @@ export function SyncView({
 
   return (
     <div className={styles.page} data-testid="sync-page">
-      <header className={styles.pageHeader}>
-        <div className={styles.headerText}>
-          <h1>数据同步</h1>
-        </div>
-        <div className={styles.headerLinks}>
-          <Link className={styles.headerLink} href="/dashboard/inventory">
-            商品库存
-          </Link>
-          {/* 用原生链接刷新当前状态；不改变任何设置，也不触发同步。 */}
-          <a className={styles.headerLink} href={buildSyncUrl(query)} data-testid="sync-refresh-status">
-            刷新状态
+      <PageHeading
+        title="数据同步"
+        actions={
+          // 用原生链接刷新当前状态；不改变设置，也不触发同步。
+          <a
+            className={`${shared.button} ${shared.buttonIcon}`}
+            href={buildSyncUrl(query)}
+            aria-label="刷新状态"
+            title="刷新状态"
+            data-testid="sync-refresh-status"
+          >
+            <RefreshCw size={16} strokeWidth={1.8} aria-hidden />
           </a>
-        </div>
-      </header>
+        }
+      />
 
-      <section className={styles.sourceList} data-testid="sync-status-overview" aria-label="数据来源同步状态">
-        <div className={styles.sourceListHead}>
-          <h2>数据来源</h2>
-        </div>
-
+      <section data-testid="sync-status-overview" aria-label="数据来源同步状态">
         <SyncControls
           key={`sync-controls-v${overview.scope.version}-c${overview.scope.warehouseCount}-e${overview.scope.empty ? 1 : 0}-r${query.run || 'none'}`}
           overview={overview}
@@ -712,35 +698,8 @@ export function SyncView({
           pendingTotal={pendingTotal}
           detailContent={detailContent}
           diagnostics={diagnosticsContent}
+          domesticCard={domesticCard}
         />
-
-        <section className={styles.sourceRow} data-testid="sync-source-row-domestic" aria-label="聚水潭国内表格快照">
-          <div className={styles.sourceIdentity}>
-            <h2>聚水潭 · 国内表格快照</h2>
-          </div>
-          <div className={styles.sourceCell} data-testid="sync-source-domestic-status">
-            <span className={styles.sourceLabel}>状态</span>
-            <StatusPill tone={domesticStatus.tone}>{domesticStatus.label}</StatusPill>
-          </div>
-          <div className={styles.sourceCell} data-testid="sync-source-domestic-file-date">
-            <span className={styles.sourceLabel}>原文件日期</span>
-            <span className={styles.sourceValue}>{domesticDateText}</span>
-            {domesticReason ? <small>{domesticReason}</small> : null}
-          </div>
-          <div className={styles.sourceCell} data-testid="sync-source-domestic-next-plan">
-            <span className={styles.sourceLabel}>下次计划</span>
-            <span className={styles.sourceValue}>不自动同步</span>
-          </div>
-          <div className={styles.sourceCell} data-testid="sync-source-domestic-pending">
-            <span className={styles.sourceLabel}>待处理</span>
-            <span className={styles.sourceValue}>—</span>
-          </div>
-          <div className={styles.sourceActions}>
-            <Link className={styles.sourceLink} href="/dashboard/inventory?source=domestic" data-testid="sync-source-domestic-link">
-              查看国内明细
-            </Link>
-          </div>
-        </section>
       </section>
     </div>
   );

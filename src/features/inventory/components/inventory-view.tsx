@@ -1,4 +1,8 @@
+'use client';
+
 import Link from 'next/link';
+import { PageHeading } from '@/ui/ice-v4/data-surface';
+import { useTableControls } from '@/ui/ice-v4/table-tools';
 import styles from './inventory.module.css';
 import {
   buildInventoryListHref,
@@ -16,8 +20,14 @@ import type {
   InventoryWarehouseRowDto,
   SourceBindingDto,
 } from '../types';
-import type { ProductSummaryMergeResult, WarehouseRowsPageResult } from '../dual-view';
+import type { InventoryCostMap, ProductSummaryMergeResult, WarehouseRowsPageResult } from '../dual-view';
 import { domesticIncludedInScope } from '../dual-view';
+import {
+  SUMMARY_TABLE_STORAGE_KEY,
+  WAREHOUSE_TABLE_STORAGE_KEY,
+  summaryTableColumns,
+  warehouseTableColumns,
+} from './inventory-columns';
 import { InventoryDetailLayer } from './inventory-detail-layer';
 import { InventoryFilterBar } from './inventory-filter-bar';
 import { InventoryPagination } from './inventory-pagination';
@@ -27,11 +37,8 @@ import { WarehouseRowsTable } from './warehouse-rows-table';
 import type { LocalViewerIdentity } from '../client-pending';
 
 /**
- * /dashboard/inventory：同一入口的「仓库明细 / 商品汇总」双视图。
- * - 首屏只有标题、两视图页签、一行筛选、主表与固定分页；规则说明与常驻统计不占页面；
- * - 每行只有一个「详情」入口（名称也可点开同一详情），点击立即打开右侧详情层；
- * - 来源范围约束数据集合与计数；独立市场下拉已删除，只保留可清除的下钻标签；
- * - 未完成原请求只在存在时于筛选栏下方出现恢复入口（不写进主表）。
+ * /dashboard/inventory：同一入口的「仓库明细 / 商品汇总」双视图（客户端壳）。
+ * 表格布局状态（显示列/列宽）在这里持有，工具栏「显示列」与两张表共用。
  */
 export function InventoryView({
   query,
@@ -50,6 +57,8 @@ export function InventoryView({
   sourceBinding,
   sourceBindingError,
   bindingReady,
+  costMap,
+  showValue,
 }: {
   query: InventoryQueryState;
   effectiveFilters: { warehouse: string; market: string };
@@ -71,17 +80,24 @@ export function InventoryView({
   sourceBindingError: string | null;
   /** 服务端已针对当前行尝试读取绑定（false = 页面读取尚未返回）。 */
   bindingReady: boolean;
+  /** itemId → 当前采用单位成本（仅 amount:read 权限时有值；无权限不传）。 */
+  costMap?: InventoryCostMap;
+  /** 是否显示「估算货值」列（无金额权限不显示）。 */
+  showValue?: boolean;
 }) {
   const warehouses = overview?.warehouses ?? [];
   const domesticScope = query.source === 'domestic';
-  const failedStates = warehouseStates.filter((state) => state.warehouseStatus === 'confirmed' && state.failed);
+  const failedCount = warehouseStates.filter((state) => state.warehouseStatus === 'confirmed' && state.failed).length;
   const scopeEmpty = overview?.scope.empty === true;
-  const statusText = [
-    scopeEmpty ? '参与仓库为空：已停止发布，列表不显示为 0；请先在数据同步页选择参与仓库。' : null,
-    failedStates.length > 0
-      ? `${failedStates.length} 个仓本次失败，沿用上次成功数据：${failedStates.map((state) => state.name).join('、')}`
-      : null,
-  ].filter(Boolean).join(' · ');
+  const showValueColumn = showValue === true;
+
+  const warehouseColumns = warehouseTableColumns(showValueColumn);
+  const summaryColumns = summaryTableColumns({ merged: productSummary, domesticOnlyScope: domesticScope, showValue: showValueColumn });
+  const warehouseControls = useTableControls({ storageKey: WAREHOUSE_TABLE_STORAGE_KEY, columns: warehouseColumns });
+  const summaryControls = useTableControls({ storageKey: SUMMARY_TABLE_STORAGE_KEY, columns: summaryColumns });
+  const activeColumns = query.view === 'warehouse' ? warehouseColumns : summaryColumns;
+  const activeControls = query.view === 'warehouse' ? warehouseControls : summaryControls;
+  const page = warehouseRows ?? productSummary;
 
   function viewHref(view: InventoryQueryState['view']): string {
     return buildInventoryListHref({
@@ -91,10 +107,18 @@ export function InventoryView({
       view,
       source: query.source,
       page: 1,
+      sort: query.sort,
+      sortDir: query.sortDir,
     });
   }
 
-  const page = warehouseRows ?? productSummary;
+  // 表格/分页用同一有效筛选（来源范围下 warehouse/market 可能被服务端忽略）。
+  const listQuery: InventoryQueryState = {
+    ...query,
+    warehouse: effectiveFilters.warehouse,
+    market: effectiveFilters.market,
+  };
+
   // 详情里的国内分区与列表同一有效范围（明确的海外仓/市场下钻不带国内）。
   const domesticDetailIncluded = domesticIncludedInScope({
     source: query.source,
@@ -104,54 +128,42 @@ export function InventoryView({
 
   return (
     <div className={styles.page} data-testid="inventory-page">
-      <header className={styles.pageHeader}>
-        <div className={styles.titleRow}>
-          <h1>商品库存</h1>
-          <nav className={styles.headerLinks} aria-label="库存相关入口">
-            <Link className={styles.headerLink} href="/dashboard/sync">数据同步</Link>
-            <Link
-              className={styles.headerLink}
-              href={buildInventoryListHref({
-                q: query.q,
-                warehouse: effectiveFilters.warehouse,
-                market: effectiveFilters.market,
-                view: query.view,
-                source: query.source,
-                focus: query.focus,
-                page: query.page,
-              })}
-            >
-              刷新
-            </Link>
-          </nav>
-        </div>
-        <div className={styles.viewTabs} role="tablist" aria-label="库存视图" data-testid="inventory-view-tabs">
-          <Link
-            className={`${styles.viewTab} ${query.view === 'warehouse' ? styles.viewTabActive : ''}`}
-            role="tab"
-            aria-selected={query.view === 'warehouse'}
-            href={viewHref('warehouse')}
-            data-testid="inventory-view-warehouse"
-          >
-            仓库明细
-          </Link>
-          <Link
-            className={`${styles.viewTab} ${query.view === 'product' ? styles.viewTabActive : ''}`}
-            role="tab"
-            aria-selected={query.view === 'product'}
-            href={viewHref('product')}
-            data-testid="inventory-view-product"
-          >
-            商品汇总
-          </Link>
-        </div>
-      </header>
+      <PageHeading title="商品库存" />
 
-      <InventoryFilterBar query={{ ...query, warehouse: effectiveFilters.warehouse, market: effectiveFilters.market }} warehouses={warehouses} />
+      <div className={styles.viewTabs} role="tablist" aria-label="库存视图" data-testid="inventory-view-tabs">
+        <Link
+          className={`${styles.viewTab} ${query.view === 'warehouse' ? styles.viewTabActive : ''}`}
+          role="tab"
+          aria-selected={query.view === 'warehouse'}
+          href={viewHref('warehouse')}
+          data-testid="inventory-view-warehouse"
+        >
+          仓库明细
+        </Link>
+        <Link
+          className={`${styles.viewTab} ${query.view === 'product' ? styles.viewTabActive : ''}`}
+          role="tab"
+          aria-selected={query.view === 'product'}
+          href={viewHref('product')}
+          data-testid="inventory-view-product"
+        >
+          商品汇总
+        </Link>
+      </div>
 
-      {statusText ? (
+      <InventoryFilterBar
+        query={listQuery}
+        warehouses={warehouses}
+        columns={activeColumns}
+        controls={activeControls}
+        total={page?.total ?? null}
+      />
+
+      {scopeEmpty || failedCount > 0 ? (
         <p className={styles.pageStatus} data-testid="inventory-status-line">
-          {statusText}
+          {scopeEmpty ? <span>参与仓库为空</span> : null}
+          {scopeEmpty && failedCount > 0 ? <span className={styles.statusSep}>·</span> : null}
+          {failedCount > 0 ? <span>{failedCount} 个仓沿用上次成功数据</span> : null}
         </p>
       ) : null}
 
@@ -159,7 +171,7 @@ export function InventoryView({
 
       {query.view === 'warehouse' && !domestic?.available && query.source !== 'overseas' ? (
         <p className={styles.inlineError} data-testid="inventory-domestic-failure">
-          {DOMESTIC_SNAPSHOT_LABEL}未读取{domestic?.reason ? `：${domestic.reason}` : ''}；此处不显示 0。
+          {DOMESTIC_SNAPSHOT_LABEL}未读取{domestic?.reason ? `：${domestic.reason}` : ''}
         </p>
       ) : null}
 
@@ -170,6 +182,7 @@ export function InventoryView({
         itemError={itemError}
         domesticRows={domesticDetailRows}
         domesticIncluded={domesticDetailIncluded}
+        warehouses={warehouses}
         sourceBinding={sourceBinding}
         sourceBindingError={sourceBindingError}
         bindingReady={bindingReady}
@@ -177,20 +190,32 @@ export function InventoryView({
         pendingLocked={pendingBlocksWrites(pending)}
       >
         <div className={styles.panel}>
-        {query.view === 'warehouse' && warehouseRows ? (
-          <WarehouseRowsTable query={query} page={warehouseRows} />
-        ) : null}
-        {query.view === 'product' && productSummary ? (
-          <ProductSummaryTable query={query} merged={productSummary} domesticOnlyScope={domesticScope} />
-        ) : null}
-        {page ? (
-          <InventoryPagination
-            query={query}
-            total={page.total}
-            limit={page.limit}
-            page={page.page}
-          />
-        ) : null}
+          {query.view === 'warehouse' && warehouseRows ? (
+            <WarehouseRowsTable
+              query={listQuery}
+              page={warehouseRows}
+              controls={warehouseControls}
+              columns={warehouseColumns}
+              costMap={costMap}
+              showValue={showValueColumn}
+            />
+          ) : null}
+          {query.view === 'product' && productSummary ? (
+            <ProductSummaryTable
+              query={listQuery}
+              merged={productSummary}
+              domesticOnlyScope={domesticScope}
+              controls={summaryControls}
+              columns={summaryColumns}
+              costMap={costMap}
+              showValue={showValueColumn}
+            />
+          ) : null}
+          {page ? (
+            <div className={styles.pagerBar}>
+              <InventoryPagination query={listQuery} total={page.total} limit={page.limit} page={page.page} />
+            </div>
+          ) : null}
         </div>
       </InventoryDetailLayer>
     </div>
