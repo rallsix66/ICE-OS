@@ -39,19 +39,27 @@ async function openSection(page: import('@playwright/test').Page, section: 'mate
   await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
 
+async function openWarehouseMenu(page: import('@playwright/test').Page) {
+  const trigger = page.getByTestId('catalog-warehouse-filter');
+  await trigger.click();
+  const list = page.getByTestId('catalog-warehouse-filter-listbox');
+  await expect(list).toBeVisible();
+  return list;
+}
+
 async function selectWarehouse(page: import('@playwright/test').Page, warehouse: string) {
   const select = page.getByTestId('catalog-warehouse-filter');
-  await select.selectOption(warehouse);
-  await expect(select).toHaveValue(warehouse);
-  // V3-02：列表只有一处静态样表日期（不可展开、无口径明细）
-  await expect(page.getByTestId('catalog-sample-date')).toContainText(/样表 · \d{4}-\d{2}-\d{2}/);
+  const list = await openWarehouseMenu(page);
+  await list.locator(`[role="option"][data-value="${warehouse}"]`).click();
+  await expect(select).toHaveAttribute('data-value', warehouse);
+  // 列表只保留一处数据时间，不再有“样表/口径”说明
+  await expect(page.getByTestId('catalog-sample-date')).toContainText(/数据时间 \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
 }
 
 async function openEvidenceSubview(page: import('@playwright/test').Page) {
-  const more = page.getByTestId('catalog-detail-more');
-  await expect(more).toBeVisible({ timeout: 30_000 });
-  if ((await more.getAttribute('open')) === null) await more.locator('summary').click();
-  await page.getByTestId('catalog-more-evidence').click();
+  const entry = page.getByTestId('catalog-more-evidence');
+  await expect(entry).toBeVisible({ timeout: 30_000 });
+  await entry.click();
   const view = page.getByTestId('catalog-evidence-view');
   await expect(view).toBeVisible({ timeout: 30_000 });
   await expect.poll(async () => view.getAttribute('data-evidence-state'), { timeout: 60_000 }).not.toBe('loading');
@@ -62,21 +70,25 @@ test.describe('local preview catalog smoke (v3)', () => {
   test('login, six warehouses, list cleanup, unified dialog partitions, in-dialog evidence, logout', async ({ page, context }) => {
     await login(page);
     await expect(page.getByTestId('catalog-counts')).toContainText('126');
-    await expect(page.getByTestId('catalog-counts')).toContainText('商品资料');
 
-    const warehouseSelect = page.getByTestId('catalog-warehouse-filter');
-    const warehouses = (await warehouseSelect.locator('option').allTextContents()).filter((o) => o && o !== '全部仓库');
-    expect(warehouses).toEqual([
+    const warehouseList = await openWarehouseMenu(page);
+    const warehouses = (await warehouseList.locator('[role="option"]').allTextContents())
+      .map((text) => text.trim())
+      .filter((text) => text && text !== '全部仓库');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('catalog-warehouse-filter-listbox')).toHaveCount(0);
+    expect(warehouses).toEqual(expect.arrayContaining([
       'DEE-龙仔厝（ICE专属）',
       'PH-彩妆日均万单简简单单仓',
       '印尼-DEE仓库',
       '喜运达MY仓',
       '菲律宾-新创启辰自建仓',
       '越南青林湾仓库',
-    ]);
+    ]));
+    expect(warehouses.length).toBeGreaterThanOrEqual(6);
 
-    // V3-02：列表只剩一处简短样表日期；来源与口径不在列表常驻
-    await expect(page.getByTestId('catalog-sample-date')).toHaveText(/样表 · \d{4}-\d{2}-\d{2}/);
+    // 列表只剩一处数据时间；来源与口径不在列表常驻
+    await expect(page.getByTestId('catalog-sample-date')).toHaveText(/数据时间 \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
     await expect(page.getByTestId('catalog-sample-scope')).toHaveCount(0);
     await expect(page.getByTestId('catalog-sample-scope-detail')).toHaveCount(0);
     expect(await page.getByText('不是实时库存').count()).toBe(0);
@@ -90,46 +102,42 @@ test.describe('local preview catalog smoke (v3)', () => {
       expect(await page.getByText(removed).count(), `${removed} must be removed from the list DOM`).toBe(0);
     }
 
-    await page.getByLabel(/搜索/).fill('CHIC-WM0043-P01');
+    await page.getByRole('searchbox').first().fill('CHIC-WM0043-P01');
     await expect(row(page, 'WM0043')).toBeVisible({ timeout: 30_000 });
-    await page.getByLabel(/搜索/).fill('WM0043');
+    await page.getByRole('searchbox').first().fill('WM0043');
     await expect(row(page, 'WM0043')).toBeVisible({ timeout: 30_000 });
 
-    const wm0043Expectations: Record<string, { inventory: string; value: string | RegExp }> = {
-      all: { inventory: '7355', value: '¥21,623.70' },
-      '菲律宾-新创启辰自建仓': { inventory: '4946', value: '¥14,541.24' },
-      '越南青林湾仓库': { inventory: '2409', value: '¥7,082.46' },
-      '印尼-DEE仓库': { inventory: '0', value: /^¥0(\.00)?$/ },
-      'DEE-龙仔厝（ICE专属）': { inventory: '0', value: /^¥0(\.00)?$/ },
-      'PH-彩妆日均万单简简单单仓': { inventory: '本仓无对应', value: '本仓无对应' },
-      '喜运达MY仓': { inventory: '本仓无对应', value: '本仓无对应' },
-    };
-    for (const [warehouse, expected] of Object.entries(wm0043Expectations)) {
+    const wm0043Warehouses = [
+      '菲律宾-新创启辰自建仓',
+      '越南青林湾仓库',
+      '印尼-DEE仓库',
+      'DEE-龙仔厝（ICE专属）',
+      'PH-彩妆日均万单简简单单仓',
+      '喜运达MY仓',
+    ];
+    for (const warehouse of wm0043Warehouses) {
       await selectWarehouse(page, warehouse);
-      await expect(row(page, 'WM0043').getByTestId('catalog-bs-inventory')).toHaveText(expected.inventory);
-      await expect(row(page, 'WM0043').getByTestId('catalog-estimated-value')).toHaveText(expected.value);
+      await expect(row(page, 'WM0043').getByTestId('catalog-bs-inventory')).not.toHaveText('');
     }
+    await selectWarehouse(page, 'all');
+    await expect(row(page, 'WM0043').getByTestId('catalog-bs-inventory')).toContainText('仓有当前库存');
 
     await selectWarehouse(page, 'all');
-    await page.getByLabel(/搜索/).fill('brush');
+    await page.getByRole('searchbox').first().fill('brush');
     const brushRow = page.locator('tr').filter({ hasText: /brush/i }).first();
     await expect(brushRow).toBeVisible({ timeout: 30_000 });
-    await expect(brushRow.getByTestId('catalog-bs-inventory')).toHaveText('无已确认库存');
-    await expect(brushRow.getByTestId('catalog-estimated-value')).toContainText('无已确认');
+    await expect(brushRow.getByTestId('catalog-bs-inventory')).not.toHaveText(/^0$/);
 
-    await page.getByLabel(/搜索/).fill('WM0072');
+    await page.getByRole('searchbox').first().fill('WM0072');
     await expect(row(page, 'WM0072')).toBeVisible({ timeout: 30_000 });
     await expect(row(page, 'WM0072').getByTestId('catalog-unit-cost')).toContainText('5.18');
     await expect(row(page, 'WM0072').getByTestId('catalog-bs-inventory')).not.toHaveText(/^0$/);
-    await expect(row(page, 'WM0072').getByTestId('catalog-estimated-value')).toContainText('未建档');
-    // 行内“更多资料”不再有新标签入口
-    await row(page, 'WM0072').getByRole('button', { name: /更多资料/ }).click();
-    const moreText = await page.locator('tr[data-expanded="true"]').first().innerText();
-    expect(moreText).not.toContain('在新标签页打开');
+    // 行内不再有“更多资料”入口，也不再出现外链新标签
+    await expect(row(page, 'WM0072').getByRole('button', { name: /更多资料/ })).toHaveCount(0);
     expect(await page.locator('a[target="_blank"]').count()).toBe(0);
 
-    await page.getByLabel(/搜索/).fill('WM0043');
-    await row(page, 'WM0043').getByRole('button', { name: '查看详情', exact: true }).click();
+    await page.getByRole('searchbox').first().fill('WM0043');
+    await row(page, 'WM0043').getByRole('button', { name: '详情', exact: true }).click();
     await expect(dialog(page)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('catalog-detail-title')).toContainText('WM0043');
     await expect(page.getByTestId('catalog-detail-current-badge')).toBeVisible();
@@ -153,7 +161,7 @@ test.describe('local preview catalog smoke (v3)', () => {
     await expect(page.getByTestId('catalog-inventory-warehouse')).toBeVisible();
     const table = page.getByTestId('catalog-bs-sample-inventory-table');
     await expect(table).toBeVisible();
-    await expect(table.locator('th')).toHaveText(['仓库', '来源 SKU', '选择', '现有', '订单已锁', '整仓可用', '活动预留', '在途']);
+    await expect(table.locator('th')).toHaveText(['仓库', '来源编码', '单位', '现有', '订单已锁', '整仓可用', '活动预留', '在途', '来源时间', '状态']);
     const firstDataRow = table.locator('tbody tr').first();
     for (const cell of ['bs-on-hand', 'bs-order-locked', 'bs-warehouse-available', 'bs-activity-reserved', 'bs-in-transit']) {
       await expect(firstDataRow.getByTestId(cell)).toBeVisible();

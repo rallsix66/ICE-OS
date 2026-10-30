@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
+import surface from '@/ui/ice-v4/data-surface.module.css';
 import { fetchCatalogDetailAttachmentsAction, fetchCatalogDetailRevisionAction, fetchCatalogDetailViewAction } from '../actions';
 import type { CatalogListClientPayload, CatalogListClientRow } from '../local-display/list-client-types';
 import type { useCatalogUrlState } from '../shell/use-catalog-url-state';
@@ -169,16 +170,6 @@ function CatalogDetailLoader({
     const frame = window.requestAnimationFrame(() => bodyRef.current?.focus({ preventScroll: true }));
     return () => window.cancelAnimationFrame(frame);
   }, []);
-
-  const requestToggleEditing = () => {
-    if (editing) {
-      if (dirtyRef.current) { setLeaveIntent('edit'); return; }
-      setEditing(false);
-      return;
-    }
-    if (isHistorical) { onBackToCurrent(); return; }
-    setEditing(true);
-  };
 
   /** V3-01：切换历史版本也属于离开当前编辑，必须先保护未保存草稿。 */
   const requestRevisionChange = (next: number) => {
@@ -432,11 +423,7 @@ function CatalogDetailLoader({
     evidenceTriggerSelectorRef.current = revisionTrigger
       ? `[data-evidence-revision="${revisionTrigger.getAttribute('data-evidence-revision')}"]`
       : null;
-    const details = active?.closest('details') ?? null;
-    /* 菜单项点开后菜单会收起，焦点应回到“更多”触发按钮（summary），而不是已隐藏的菜单项。 */
-    evidenceTriggerRef.current = details
-      ? (details.querySelector('summary') as HTMLElement | null) ?? active
-      : active;
+    evidenceTriggerRef.current = active;
   };
 
   const openEvidenceForCurrent = () => {
@@ -613,16 +600,6 @@ function CatalogDetailLoader({
               返回当前资料
             </button>
           )}
-          {!isHistorical && !revisionInvalid && displayReady && activeView && activeView.writeAccess.canWrite && !activeView.historical && (
-            <button
-              type="button"
-              className={styles.headerButton}
-              aria-pressed={editing}
-              onClick={requestToggleEditing}
-            >
-              {editing ? '收起编辑' : '编辑资料'}
-            </button>
-          )}
           {fromHref && (
             <button
               type="button"
@@ -635,24 +612,14 @@ function CatalogDetailLoader({
             </button>
           )}
           {displayReady && activeView && (
-            <details className={styles.moreMenu} data-testid="catalog-detail-more">
-              <summary className={styles.headerButton} aria-label="更多操作">更多</summary>
-              <div className={styles.morePanel} role="menu" aria-label="更多操作">
-                <button
-                  type="button"
-                  className={styles.moreItem}
-                  role="menuitem"
-                  data-testid="catalog-more-evidence"
-                  onClick={(event) => {
-                    const menu = event.currentTarget.closest('details');
-                    if (menu instanceof HTMLDetailsElement) menu.open = false;
-                    openEvidenceForCurrent();
-                  }}
-                >
-                  数据来源
-                </button>
-              </div>
-            </details>
+            <button
+              type="button"
+              className={styles.headerButton}
+              data-testid="catalog-more-evidence"
+              onClick={openEvidenceForCurrent}
+            >
+              数据来源
+            </button>
           )}
           <button type="button" aria-label="关闭商品详情" data-testid="catalog-detail-close" className={demoStyles.iconButton} onClick={requestClose}><X size={20} /></button>
         </div>
@@ -681,8 +648,8 @@ function CatalogDetailLoader({
           <div className={styles.dialogStatus}>
             {revisionInvalid && (
               <section className={styles.statusLine} role="alert" data-testid="catalog-detail-revision-error">
-                <span>资料版本参数无效，本次未读取任何版本；不会静默当作当前资料。</span>
-                <button type="button" className={demoStyles.textLink} onClick={onBackToCurrent}>查看当前资料</button>
+                <span>资料版本参数无效，未读取任何版本</span>
+                <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={onBackToCurrent}>查看当前资料</button>
               </section>
             )}
             {!revisionInvalid && listRow && !displayReady && (
@@ -702,16 +669,16 @@ function CatalogDetailLoader({
               <p className={`${styles.statusLine} ${styles.statusLineStale}`} role="status" data-testid="catalog-detail-stale-notice">
                 {staleNotice}
                 {' '}
-                <button type="button" className={demoStyles.textLink} onClick={() => runFetch(warehouseFilter, false, ++requestSeq.current)}>重试</button>
+                <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => runFetch(warehouseFilter, false, ++requestSeq.current)}>重试</button>
               </p>
             )}
             {error && (
               <p className={`${styles.statusLine} ${styles.statusLineError}`} role="alert" data-testid="catalog-detail-fetch-error">
                 {error}
                 {' '}
-                {!isHistorical && <button type="button" className={demoStyles.textLink} onClick={() => runFetch(warehouseFilter, false, ++requestSeq.current)}>重试</button>}
-                {isHistorical && <button type="button" className={demoStyles.textLink} onClick={() => { setError(null); setRevisionAttempt((n) => n + 1); }}>重试</button>}
-                {isHistorical && <button type="button" className={demoStyles.textLink} onClick={onBackToCurrent}>返回当前资料</button>}
+                {!isHistorical && <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => runFetch(warehouseFilter, false, ++requestSeq.current)}>重试</button>}
+                {isHistorical && <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => { setError(null); setRevisionAttempt((n) => n + 1); }}>重试</button>}
+                {isHistorical && <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={onBackToCurrent}>返回当前资料</button>}
               </p>
             )}
           </div>
@@ -762,7 +729,7 @@ function CatalogDetailLoader({
                   <p className={styles.statusLine} role="status" data-testid="catalog-detail-list-sync-notice">
                     列表数据尚未与详情一致，正在更新…
                     {' '}
-                    <button type="button" className={demoStyles.textLink} onClick={() => router.refresh()}>刷新列表</button>
+                    <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => router.refresh()}>刷新列表</button>
                   </p>
                 ) : null}
                 onRevisionSaved={() => {

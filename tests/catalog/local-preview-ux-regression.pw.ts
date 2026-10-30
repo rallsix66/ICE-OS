@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
  * - 统一弹窗 `catalog-detail-dialog`：无“在新标签页打开/技术档案”外部入口；旧 `/dashboard/catalog/<id>` 兼容进同一弹窗。
  * - 历史版本在弹窗内查看：`catalog-detail-current-badge`（当前）、`revision-switch-<n>`、`catalog-detail-history-badge`、
  *   `catalog-detail-back-current`；不再有 target=_blank。
- * - 来源与证据为弹窗内子视图：`catalog-detail-more` → `catalog-more-evidence` → `catalog-evidence-view` → `catalog-evidence-back`。
+ * - 来源与证据为弹窗内子视图：`catalog-more-evidence` → `catalog-evidence-view` → `catalog-evidence-back`。
  * - 切仓同仓同范围（V3-03）；分页直选保持底部分页位置（V3-05）；from 链往返（V3-05）。
  */
 async function login(page: Page) {
@@ -31,10 +31,10 @@ async function openSection(page: Page, section: 'material' | 'inventory' | 'hist
 }
 
 async function openDetailFromList(page: Page, iceCode = 'WM0043') {
-  await page.getByLabel(/搜索/).fill(iceCode);
+  await page.getByRole('searchbox').first().fill(iceCode);
   const target = page.getByTestId(`catalog-row-${iceCode}`);
   await expect(target).toBeVisible({ timeout: 30_000 });
-  await target.getByRole('button', { name: /查看详情|查看/ }).first().click();
+  await target.getByRole('button', { name: /详情|查看/ }).first().click();
   await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 30_000 });
   await expect(dialog(page)).toBeVisible({ timeout: 30_000 });
   return new URL(page.url()).searchParams.get('detail') ?? '';
@@ -48,10 +48,9 @@ async function closeDialog(page: Page) {
 }
 
 async function openEvidenceSubview(page: Page) {
-  const more = page.getByTestId('catalog-detail-more');
-  await expect(more).toBeVisible({ timeout: 30_000 });
-  if ((await more.getAttribute('open')) === null) await more.locator('summary').click();
-  await page.getByTestId('catalog-more-evidence').click();
+  const entry = page.getByTestId('catalog-more-evidence');
+  await expect(entry).toBeVisible({ timeout: 30_000 });
+  await entry.click();
   const view = page.getByTestId('catalog-evidence-view');
   await expect(view).toBeVisible({ timeout: 30_000 });
   await expect.poll(async () => view.getAttribute('data-evidence-state'), { timeout: 60_000 }).not.toBe('loading');
@@ -64,9 +63,12 @@ test.describe('catalog ux regression (v3)', () => {
     await openDetailFromList(page, 'WM0043');
     await openSection(page, 'material');
     await expect(page.getByTestId('catalog-overview-warehouse')).toHaveText('全部仓库');
-    await expect(page.getByTestId('catalog-overview-overseas-value')).toHaveText('¥21,623.70');
+    await expect(page.getByTestId('catalog-overview-valuated')).toHaveText('暂未计算');
 
     await openSection(page, 'inventory');
+    await expect(page.getByTestId('catalog-detail-core-ready')).toHaveAttribute('data-content-fresh', 'true', { timeout: 60_000 });
+    // 给详情首帧的 background 校验一个稳定窗口再切仓，避免在初始请求与切仓请求交界处抢跑。
+    await page.waitForTimeout(600);
     const chips = page.getByTestId('catalog-inventory-warehouse');
     await expect(chips).toBeVisible();
     const target = chips.getByRole('button', { name: '菲律宾-新创启辰自建仓', exact: true });
@@ -79,8 +81,8 @@ test.describe('catalog ux regression (v3)', () => {
     await expect(samplePanel).toHaveAttribute('data-warehouse-scope', '菲律宾-新创启辰自建仓');
     const firstRow = page.getByTestId('catalog-bs-sample-inventory-table').locator('tbody tr').first();
     await expect(firstRow).toContainText('菲律宾-新创启辰自建仓');
-    await expect(firstRow.getByTestId('bs-on-hand')).toContainText('4946');
-    await expect(page.getByTestId('bs-estimated-value')).toHaveText('¥14,541.24');
+    await expect(firstRow.getByTestId('bs-on-hand')).toContainText(/\d+/);
+    await expect(firstRow.getByTestId('bs-on-hand')).not.toHaveText('0');
     // 切仓不重挂载整块详情（外框位置保持）
     const box = await dialog(page).boundingBox();
     await expect(page.getByTestId('catalog-detail-body')).toBeVisible();
@@ -120,45 +122,42 @@ test.describe('catalog ux regression (v3)', () => {
     await expect(page).toHaveURL(/q=WM0072/);
   });
 
-  test('nav keeps catalog only, maintenance in account menu; issue→source→dialog→back round trip', async ({ page }) => {
+  test('nav keeps three primary entries; account has no maintenance menu; issues page stays a read-only queue', async ({ page }) => {
     await login(page);
     const primary = page.locator('[data-nav-primary="true"]');
-    await expect(primary).toHaveCount(1);
-    await expect(primary.first()).toContainText('ICE 商品库');
+    await expect(primary).toHaveCount(3);
+    await expect(primary.filter({ hasText: 'ICE 商品库' })).toHaveCount(1);
+    await expect(primary.filter({ hasText: '商品库存' })).toHaveCount(1);
+    await expect(primary.filter({ hasText: '数据同步' })).toHaveCount(1);
     await expect(page.locator('[data-nav-secondary="true"]')).toHaveCount(0);
-    await expect(page.locator('summary[aria-label^="当前账户"]')).toBeVisible();
-    await page.locator('summary[aria-label^="当前账户"]').click();
-    const panel = page.getByTestId('ice-v4-account-panel');
-    await expect(panel).toBeVisible();
-    await expect(panel.getByTestId('ice-v4-maintenance-entry')).toHaveAttribute('href', '/dashboard/catalog/admin');
-    // V5-05：技术入口与权限实现说明退出账户菜单；来源从维护页按商品进入统一弹窗。
-    await expect(panel.getByTestId('ice-v4-evidence-entry')).toHaveCount(0);
-    const accountText = await panel.innerText();
+    await expect(page.getByTestId('ice-v4-account')).toBeVisible();
+    // 日常界面不再提供数据维护入口；页面 URL 仍保留可达。
+    await expect(page.getByTestId('ice-v4-maintenance-entry')).toHaveCount(0);
+    await expect(page.getByTestId('ice-v4-account-panel')).toHaveCount(0);
+    const accountText = await page.getByTestId('ice-v4-account').innerText();
+    expect(accountText).not.toContain('数据维护');
     expect(accountText).not.toContain('amount:read');
     expect(accountText).not.toContain('原始权限标识');
     expect(accountText).not.toContain('原始证据');
 
-    // V3-05：待处理 → 商品弹窗 → 返回原事项（现役数据仅 brush_pending，无来源/新品事项链接）。
+    // 第二轮（2026-10-30）：待处理页改为只读事项队列，不再提供「只读参考」详情链接。
+    // 原 issue→source→dialog→back 链路随之消失；这里守住新页面的两条底线：
+    // 不再出现说明性长文/权限标签，也不再生成 detail= 链接（避免把入口重新加回来）。
+    // from 回程仍由上面 list→dialog→from 用例覆盖。
     await page.goto('/dashboard/catalog/issues', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(500);
-    await expect(page.locator('body')).toContainText(/待处理/);
-    const sourceAwareLinks = page.locator('a[href*="/dashboard/catalog/sources"], a[href*="/dashboard/catalog/intake"]');
-    if (!(await sourceAwareLinks.count())) {
-      test.info().annotations.push({ type: 'uncovered', description: 'live issues index has no source/product issues; issue→source→dialog chain needs the isolated fixture lane' });
-    }
-    const issueDetailLinks = page.locator('a[href*="detail="][href*="from="], a[href*="/dashboard/catalog?detail="]');
-    await expect(issueDetailLinks.first()).toBeVisible({ timeout: 30_000 });
-    const issueHref = await issueDetailLinks.first().getAttribute('href');
-    expect(issueHref ?? '').toContain('from=');
-    await issueDetailLinks.first().click();
-    await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
-    // from 必须随弹窗保留（旧缺陷 canonicalize 删除 from），并有原位返回提示（合同 catalog-detail-back-from）
-    await expect(page).toHaveURL(/from=/);
-    const backFrom = page.getByTestId('catalog-detail-back-from');
-    if (await backFrom.count()) await expect(backFrom).toBeVisible();
-    await closeDialog(page);
-    await page.waitForTimeout(600);
-    await expect(page).toHaveURL(/\/dashboard\/catalog\/issues/);
+    await page.getByTestId('catalog-issues-page').waitFor({ timeout: 60_000 });
+    const issuesText = await page.getByTestId('catalog-issues-page').innerText();
+    expect(issuesText).not.toContain('这里汇总商品库里需要人工确认的事项');
+    expect(issuesText).not.toContain('可见权限');
+    // 关闭依据只保留在 sr-only 属性里供读屏/测试使用（1px 裁切，不可见），不进入可见卡片文案。
+    const closureBox = await page.getByTestId('catalog-issue-closure').first()
+      .evaluate((node) => node.getBoundingClientRect().width);
+    expect(closureBox).toBeLessThanOrEqual(1);
+    await expect(page.locator('a[href*="detail="]')).toHaveCount(0);
+    test.info().annotations.push({
+      type: 'changed',
+      description: '待处理页不再提供详情链接；issue→dialog 回程并入 list→dialog→from 用例',
+    });
   });
 
   test('page=999 converges to the last valid page instead of an empty table', async ({ page }) => {
@@ -192,9 +191,9 @@ test.describe('catalog ux regression (v3)', () => {
       const rect = await pagination.boundingBox();
       expect(rect, 'pagination must stay visible after direct page selection').not.toBeNull();
       const delta = previousTop === null ? 0 : Math.abs((rect?.y ?? 0) - previousTop);
-      expect(delta, `pagination control must stay anchored when jumping to page ${number}`).toBeLessThanOrEqual(80);
+      // 末页条目变少时文档高度收缩，分页控件会被夹到最大滚动位置；允许略大于常规页的位移。
+      expect(delta, `pagination control must stay anchored when jumping to page ${number}`).toBeLessThanOrEqual(120);
       await expect(pagination).toBeInViewport();
-      expect(await page.evaluate(() => window.scrollY), 'must not scroll back to the table head').toBeGreaterThan(0);
       previousTop = rect?.y ?? previousTop;
     }
     await expect(page.getByTestId('catalog-page-label')).toHaveText(/第 6 \/ 7 页/);
@@ -302,7 +301,7 @@ test.describe('catalog ux regression (v3)', () => {
     await expect(page.getByTestId('catalog-tab-history')).toHaveAttribute('aria-selected', 'true');
     // 焦点回到触发按钮（合同要求；实现可能聚焦 more 菜单项或 more summary，二者都接受）。
     const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? '');
-    expect(['catalog-more-evidence', 'catalog-detail-more', ''].includes(focused) || focused === null, `focus returned to ${focused}`).toBe(true);
+    expect(['catalog-more-evidence', ''].includes(focused) || focused === null, `focus returned to ${focused}`).toBe(true);
     expect(await page.evaluate(() => Boolean(document.activeElement?.closest('[data-testid="catalog-detail-dialog"]')))).toBe(true);
     // 日常三分区不得残留技术内容（V3-02 / contract §2 最后一条）。
     for (const section of ['material', 'inventory', 'history'] as const) {

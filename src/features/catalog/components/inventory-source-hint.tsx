@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchCatalogSourceViewAction } from '../actions';
-import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
+import surface from '@/ui/ice-v4/data-surface.module.css';
 import styles from './catalog-detail.module.css';
 
 type HintState =
@@ -70,7 +70,7 @@ export function InventorySourceHint({
               ? '当前账号无来源记录读取权限；这不等于库存为 0。'
               : '本仓来源记录读取失败；这不等于库存为 0。'}
           </span>
-          <button type="button" className={demoStyles.textLink} onClick={() => setAttempt((n) => n + 1)}>重试核对</button>
+          <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => setAttempt((n) => n + 1)}>重试核对</button>
         </>
       )}
       {state.status === 'ready' && (
@@ -82,7 +82,7 @@ export function InventorySourceHint({
                 ? '本仓来源记录显示本批已采用，但当前没有已确认库存行；不当作 0。'
                 : '本仓没有记录到来源对应；这不等于仓库没有货，也不表示库存为 0。'}
           </span>
-          {onOpenEvidence && <button type="button" className={demoStyles.textLink} onClick={onOpenEvidence}>查看数据来源</button>}
+          {onOpenEvidence && <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={onOpenEvidence}>查看数据来源</button>}
         </>
       )}
     </div>

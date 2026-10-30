@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
+import surface from '@/ui/ice-v4/data-surface.module.css';
 import { Pill } from '@/ui/ice-v4/primitives';
 import {
   confirmInventoryMappingsAction,
@@ -164,8 +164,8 @@ function overseasInventoryFact(params: {
   if (!sample || sample.status !== 'loaded') return { value: '—', hint: '库存未接入（不是 0）', warn: true };
   if (params.bsNotCreated) return { value: '—', hint: 'BS 未建档', warn: true };
   const scope = sample.valuation;
-  if (scope.pendingTotal) return { value: '合计待核对', hint: '同仓多个来源编码逐行显示；未确认合计口径前不擅自相加', warn: true };
-  if (scope.inventoryState === 'failed') return { value: '本仓同步失败', hint: '现值保留上次成功批次，不用 0 代替', warn: true };
+  if (scope.pendingTotal) return { value: '合计待核对', hint: '同仓多来源编码，逐行显示', warn: true };
+  if (scope.inventoryState === 'failed') return { value: '本仓同步失败', hint: '沿用上次成功值', warn: true };
   if (scope.confirmedOnHandTotal !== null) {
     const isZero = scope.confirmedOnHandTotal === '0';
     return {
@@ -173,9 +173,9 @@ function overseasInventoryFact(params: {
       hint: `${scope.confirmedLineCount} 行已采用 · 单个商品计数`,
     };
   }
-  if (scope.inventoryState === 'unmapped_source') return { value: '—', hint: '本仓有来源行但未确认对应（不是 0）', warn: true };
-  if (scope.inventoryState === 'unseen') return { value: '—', hint: '对应已确认，等待下一次完整同步采用（不是 0）', warn: true };
-  if (scope.inventoryState === 'no_source' || scope.inventoryState === 'no_data') return { value: '—', hint: scope.valuationReason ?? '本仓没有该商品的来源记录（不是 0）', warn: true };
+  if (scope.inventoryState === 'unmapped_source') return { value: '—', hint: '来源未确认对应（不是 0）', warn: true };
+  if (scope.inventoryState === 'unseen') return { value: '—', hint: '待下次同步采用（不是 0）', warn: true };
+  if (scope.inventoryState === 'no_source' || scope.inventoryState === 'no_data') return { value: '—', hint: scope.valuationReason ?? '本仓无来源记录（不是 0）', warn: true };
   return { value: '—', hint: scope.valuationReason ?? '库存不可确认', warn: true };
 }
 
@@ -185,24 +185,24 @@ function valuatedFact(params: {
   bsSample: BsSampleDetail | null;
   bsSampleError: { code: string; message: string } | null;
 }): Fact {
-  if (params.historical) return { value: '—', hint: '历史版本只保留当时口径的估值记录，不重算' };
+  if (params.historical) return { value: '—', hint: '历史版本不重算估值' };
   if (params.bsSampleError) {
-    return { value: '暂未计算', hint: '库存读取失败时不估值，也不沿用旧金额', warn: true };
+    return { value: '暂未计算', hint: '库存读取失败', warn: true };
   }
-  return { value: '暂未计算', hint: '本包不新做估值：旧样表价格不能乘新库存当作当前货值' };
+  return { value: '暂未计算', hint: null };
 }
 
 function unitCostFact(params: { historical: boolean; adopted: AdoptedUnitCost | null; bsSampleError: { code: string; message: string } | null }): Fact {
-  if (params.historical) return { value: '历史版本不显示当前价格', hint: '历史快照只代表当时资料版本，不掺当前价格' };
+  if (params.historical) return { value: '历史版本不显示当前价格', hint: null };
   if (params.bsSampleError) {
     return {
       value: params.bsSampleError.code === 'forbidden' ? '不可见' : '价格读取失败',
-      hint: params.bsSampleError.code === 'forbidden' ? '账号没有金额读取权限（服务端限制）' : params.bsSampleError.message,
+      hint: params.bsSampleError.code === 'forbidden' ? '无金额读取权限' : params.bsSampleError.message,
       warn: true,
     };
   }
   const adopted = params.adopted;
-  if (!adopted) return { value: '价格未读取', hint: '未取得当前采用价格版本', warn: true };
+  if (!adopted) return { value: '价格未读取', hint: null, warn: true };
   if (adopted.state === 'priced') return { value: formatCnyPrice(adopted.amountCny) ?? `¥${adopted.amountCny}`, hint: '人民币 / 单品 · 不含运费不含税' };
   return { value: adopted.reason, hint: '缺价不当作 0', warn: true };
 }
@@ -223,7 +223,6 @@ function OverviewCard({
       <dt>{label}</dt>
       <dd>
         <span data-testid={testId} className={fact.warn ? styles.overviewValueWarn : undefined}>{fact.value}</span>
-        {fact.hint ? <span className={styles.overviewHint}>{fact.hint}</span> : null}
         {extra}
       </dd>
     </div>
@@ -509,7 +508,7 @@ function DetailEditPanel({ core, principalKey, onDirtyChange, onSaved, registerD
             <label className={styles.field}>
               补码依据
               <Input name="reason" required maxLength={1000} value={draft.codeReason} onChange={(event) => setDraft((prev) => ({ ...prev, codeReason: event.target.value }))} />
-              <span className={styles.fieldHint}>依据会写入修订审计；不改变已有货号，也不重新分配。</span>
+              <span className={styles.fieldHint}>依据会写入修订审计</span>
             </label>
             <div className={styles.formActions}>
               <Button type="submit">保存首次货号</Button>
@@ -575,7 +574,7 @@ function DetailEditPanel({ core, principalKey, onDirtyChange, onSaved, registerD
               value={draft.fieldValue}
               onChange={(event) => setDraft((prev) => ({ ...prev, fieldValue: event.target.value }))}
             />
-            <span className={styles.fieldHint}>拟采用值即上方输入内容；留空时须勾选下方“确认明确清空”，否则视为尚未输入，不提交。</span>
+            <span className={styles.fieldHint}>留空须勾选“确认明确清空”</span>
           </label>
           <label className={styles.checkRow}>
             <input
@@ -611,10 +610,8 @@ function DetailEditPanel({ core, principalKey, onDirtyChange, onSaved, registerD
       {pendingRequest && (
         <section aria-label="待核对原请求" data-testid="pending-original-request" className={styles.pendingBox}>
           <strong>原请求结果待核对</strong>
-          <span>保留原请求编号与原始意图；不会自动用新请求编号重发。</span>
           <p data-testid="pending-original-input" className={styles.fieldHint}>
             原请求：{pendingRequest.kind === 'initial_code' ? '首次补码' : '非价格资料修订'} · 资料版本 {pendingRequest.input.expectedRevision}
-            {' '}· 原字段、理由与请求编号已保留，未自动改写。
           </p>
           <div className={styles.formActions}>
             <Button type="button" variant="outline" disabled={busy} data-testid="catalog-check-original" onClick={() => startTransition(() => checkOriginal(pendingRequest))}>
@@ -624,7 +621,7 @@ function DetailEditPanel({ core, principalKey, onDirtyChange, onSaved, registerD
               重试原请求（同一编号）
             </Button>
           </div>
-          <p className={styles.fieldHint}>核对不会写入；“重试原请求”才会以同一请求编号与原参数重投。</p>
+          <p className={styles.fieldHint}>核对只读；重试使用同一请求编号。</p>
         </section>
       )}
     </section>
@@ -823,14 +820,14 @@ export function CatalogDetail({
       const result = await attachmentLoad();
       if (!result) {
         setAttachmentsState('error');
-        setAttachmentsError('相关处理入口读取失败（不等于已处理完成或模块未启用），可重试。');
+        setAttachmentsError('处理入口读取失败，可重试');
         return;
       }
       setAttachments(result);
       setAttachmentsState('ready');
     } catch {
       setAttachmentsState('error');
-      setAttachmentsError('相关处理入口读取失败，请重试。');
+      setAttachmentsError('处理入口读取失败，可重试');
     }
   }, [attachmentLoad]);
 
@@ -992,6 +989,7 @@ export function CatalogDetail({
           <button
             type="button"
             className={styles.headerButton}
+            aria-label={editing ? '收起编辑' : '编辑资料'}
             aria-pressed={editing}
             onClick={() => editingRequested(!editing)}
           >
@@ -999,11 +997,6 @@ export function CatalogDetail({
           </button>
         )}
       </div>
-      {historical && (
-        <p className={styles.sectionNote}>
-          只读历史版本：不显示当前库存、当前价格与编辑入口。
-        </p>
-      )}
     </header>
   ) : null;
 
@@ -1086,13 +1079,12 @@ export function CatalogDetail({
   ] as const).filter((entry) => entry.value !== null);
 
   const materialPanel = (
-    <div role="tabpanel" id="catalog-panel-material" aria-labelledby="catalog-tab-material" className={styles.sectionStack} data-testid="catalog-tabpanel-material">
+    <div role="tabpanel" id="catalog-panel-material" aria-labelledby="catalog-tab-material" className={`${styles.sectionStack} ${styles.panelFade}`} data-testid="catalog-tabpanel-material">
       {editing && canEdit && (
         <section className={styles.section} aria-label="编辑资料" data-testid="catalog-detail-edit">
           <div className={styles.sectionHead}>
             <div>
               <h2 className={styles.sectionTitle}>编辑资料</h2>
-              <p className={styles.sectionNote}>只允许既有首次补码与非价格修订；显示当前值、拟采用值与依据，保存后旧版本保持。</p>
             </div>
           </div>
           {editingLeaveConfirm}
@@ -1126,18 +1118,6 @@ export function CatalogDetail({
               当前账号仅可查看，不能编辑资料。
             </p>
           )}
-          <div className={styles.hero}>
-            <span className={`${demoStyles.productArt} ${demoStyles.productArtLarge}`} aria-label="商品图片占位">
-              <Package size={32} strokeWidth={1.3} />
-              <small>占位</small>
-            </span>
-            <div className={styles.heroText}>
-              {optionalFieldRow(item.fields.englishName).show && (
-                <p className={styles.heroMeta}>{optionalFieldRow(item.fields.englishName).value}</p>
-              )}
-              <p className={styles.heroCaption}>{imageCaption(item)}</p>
-            </div>
-          </div>
           <dl className={styles.identityGrid} data-testid="catalog-material-details">
             <MaterialRow label="中文产品名称" testId="catalog-material-name">{item.nameCn}</MaterialRow>
             <MaterialRow label="公司货号（ICE）" testId="catalog-material-ice-code">{item.iceCode ?? '待补货号'}</MaterialRow>
@@ -1187,14 +1167,11 @@ export function CatalogDetail({
             <MaterialRow label="图片引用" testId="catalog-material-image">{imageCaption(item)}</MaterialRow>
             <MaterialRow label="采用进货价" testId="catalog-material-unit-cost">
               <span data-testid="catalog-material-unit-cost-value">{overviewUnitCost.value}</span>
-              <span className={styles.fieldHint}>{overviewUnitCost.hint ?? '人民币 / 单品 · 不含运费不含税'}</span>
             </MaterialRow>
           </dl>
           {onOpenEvidence && (
-            <p className={styles.sectionNote} data-testid="catalog-material-source-link">
-              资料来源：本批采用资料、真实修订与来源对应。
-              {' '}
-              <button type="button" className={demoStyles.textLink} onClick={() => onOpenEvidence()}>查看数据来源</button>
+            <p data-testid="catalog-material-source-link">
+              <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => onOpenEvidence()}>查看数据来源</button>
             </p>
           )}
           {extraLegacyFields.length > 0 && (
@@ -1218,12 +1195,11 @@ export function CatalogDetail({
   );
 
   const inventoryPanel = (
-    <div role="tabpanel" id="catalog-panel-inventory" aria-labelledby="catalog-tab-inventory" className={styles.sectionStack} data-testid="catalog-tabpanel-inventory">
+    <div role="tabpanel" id="catalog-panel-inventory" aria-labelledby="catalog-tab-inventory" className={`${styles.sectionStack} ${styles.panelFade}`} data-testid="catalog-tabpanel-inventory">
       <section className={styles.section} aria-label="库存明细">
         <div className={styles.sectionHead}>
           <div>
             <h2 className={styles.sectionTitle}>库存明细</h2>
-            <p className={styles.sectionNote}>BigSeller 库存（海外）；数量按单个商品计数，锁定与在途不计入当前货值。</p>
           </div>
         </div>
         <div className={styles.sectionBody}>
@@ -1257,11 +1233,11 @@ export function CatalogDetail({
             />
           )}
           {historical && (
-            <p className={styles.sectionNote} data-testid="catalog-inventory-historical">
-              历史版本不显示当前库存、当前价格与估算货值。
+            <p data-testid="catalog-inventory-historical">
+              历史版本不显示当前库存。
               {onBackToCurrent ? (
                 <> {' '}
-                  <button type="button" className={demoStyles.textLink} onClick={onBackToCurrent}>返回当前资料</button>
+                  <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={onBackToCurrent}>返回当前资料</button>
                 </>
               ) : null}
             </p>
@@ -1287,7 +1263,7 @@ export function CatalogDetail({
                         <p role="alert">
                           {attachmentsError ?? '处理入口读取失败。'}
                           {' '}
-                          <button type="button" className={demoStyles.textLink} onClick={() => void loadAttachments(true)}>重试</button>
+                          <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => void loadAttachments(true)}>重试</button>
                         </p>
                       )}
                       {attachmentsState === 'ready' && attachments && (
@@ -1299,10 +1275,8 @@ export function CatalogDetail({
             </section>
           )}
           {onOpenEvidence && (
-            <p className={styles.sectionNote} data-testid="catalog-inventory-source-link">
-              库存来源：BigSeller 自动导出（账号/仓库/来源编码）与当前参与仓库范围。
-              {' '}
-              <button type="button" className={demoStyles.textLink} onClick={() => onOpenEvidence()}>查看数据来源</button>
+            <p data-testid="catalog-inventory-source-link">
+              <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => onOpenEvidence()}>查看数据来源</button>
             </p>
           )}
         </div>
@@ -1321,7 +1295,7 @@ export function CatalogDetail({
   );
 
   const historyPanel = (
-    <div role="tabpanel" id="catalog-panel-history" aria-labelledby="catalog-tab-history" className={styles.sectionStack} data-testid="catalog-tabpanel-history">
+    <div role="tabpanel" id="catalog-panel-history" aria-labelledby="catalog-tab-history" className={`${styles.sectionStack} ${styles.panelFade}`} data-testid="catalog-tabpanel-history">
       <section className={styles.section} aria-label="变更记录">
         <div className={styles.sectionHead}>
           <div>
@@ -1341,7 +1315,7 @@ export function CatalogDetail({
           {historyError && (
             <p role="alert">
               {historyError}{' '}
-              <button type="button" className={demoStyles.textLink} onClick={() => { setHistory([]); setHistoryEmptyConfirmed(false); setHistoryRetryToken((n) => n + 1); void loadHistory(true); }}>重试</button>
+              <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => { setHistory([]); setHistoryEmptyConfirmed(false); setHistoryRetryToken((n) => n + 1); void loadHistory(true); }}>重试</button>
             </p>
           )}
           {!historyLoading && historyEmptyConfirmed && history.length === 0 && (
@@ -1364,7 +1338,7 @@ export function CatalogDetail({
                     ) : onSelectRevision ? (
                       <button
                         type="button"
-                        className={demoStyles.textLink}
+                        className={`${surface.button} ${surface.buttonSmall}`}
                         data-testid={`revision-switch-${entry.revision}`}
                         onClick={() => onSelectRevision(entry.revision)}
                       >
@@ -1392,7 +1366,7 @@ export function CatalogDetail({
                       <> {' · '}
                         <button
                           type="button"
-                          className={demoStyles.textLink}
+                          className={`${surface.button} ${surface.buttonSmall}`}
                           data-testid="revision-evidence-open"
                           data-evidence-revision={entry.revision}
                           onClick={() => onOpenEvidence(entry.revision)}
@@ -1470,7 +1444,7 @@ function BsSampleBusinessBlock({
           <strong>BigSeller 库存读取失败：</strong>
           {sampleError.message}
           <span className={styles.overviewHint}>
-            {sampleError.code === 'forbidden' ? '权限不足，不是「库存为 0」，也不回退旧样表。' : '请重试；失败期间不以 0 或旧仓数据代替，也不回退旧样表。'}
+            {sampleError.code === 'forbidden' ? '权限不足（不是 0）' : '可重试（不是 0）'}
           </span>
         </span>
         {onRetry
@@ -1481,13 +1455,13 @@ function BsSampleBusinessBlock({
   }
   if (!sample) return null;
   if (sample.status === 'not_available') {
-    return <p className={styles.sectionNote} data-testid="catalog-bs-sample-not-imported">库存模块当前未接入：{sample.message}；不当作 0。</p>;
+    return <p className={styles.sectionNote} data-testid="catalog-bs-sample-not-imported">库存模块未接入：{sample.message}</p>;
   }
   if (sample.status !== 'loaded') return null;
   const sourceLabel = sample.sourceLabel ?? 'BigSeller 自动导出';
   const observationText = sample.observationAt
     ? new Date(sample.observationAt).toLocaleString('zh-CN', { hour12: false })
-    : '未读取到';
+    : null;
   const valuation = sample.valuation;
   const rows = sample.rows;
   const filtered = warehouse ? rows.filter((row) => row.warehouse === warehouse) : rows;
@@ -1509,19 +1483,19 @@ function BsSampleBusinessBlock({
   const scopeReason = (() => {
     if (!warehouse) {
       if (sample.totals.hasCurrentData) return null;
-      return '当前范围暂无已采用的 BigSeller 库存行；不当作库存 0，也不回退旧样表。';
+      return '当前范围暂无已采用库存行';
     }
     const entry = scopedWarehouses[0];
-    if (!entry) return '该仓库不在本次参与范围。';
+    if (!entry) return '该仓库不在本次参与范围';
     if (entry.status === 'failed') {
-      return `本仓最近一次同步失败${entry.lastErrorCode ? `（${entry.lastErrorCode}）` : ''}；当前值保留上次成功时间${entry.lastSuccessAt ? ` ${new Date(entry.lastSuccessAt).toLocaleString('zh-CN', { hour12: false })}` : '（暂无成功批次）'}，不用 0 代替。`;
+      return `本仓同步失败${entry.lastErrorCode ? `（${entry.lastErrorCode}）` : ''} · 沿用上次成功值${entry.lastSuccessAt ? ` ${new Date(entry.lastSuccessAt).toLocaleString('zh-CN', { hour12: false })}` : ''}`;
     }
-    if (entry.status === 'unseen') return '本仓对应已确认，但当前完整批次还没有该商品的采用行；等待下一次完整同步，不是 0。';
-    if (entry.status === 'not_mapped' && entry.reason === 'unmapped_source') return '本仓有该商品的已知来源行，但尚未确认对应；未计入合计，不是 0。';
-    if (entry.status === 'not_mapped' && entry.reason === 'no_source') return '本仓没有该商品的来源记录；不当作库存 0。';
+    if (entry.status === 'unseen') return '对应已确认，待下次同步';
+    if (entry.status === 'not_mapped' && entry.reason === 'unmapped_source') return '本仓有来源行，未确认对应';
+    if (entry.status === 'not_mapped' && entry.reason === 'no_source') return '本仓无来源记录';
     /* 正常有已采用行（含多码待合计/同仓待核）不显示“暂无采用”空态；待合计与待核由各自区块说明。 */
     if (entry.status === 'current' && entry.rows.length > 0) return null;
-    return '本仓暂无已采用的 BigSeller 库存行；不当作库存 0，也不回退旧样表。';
+    return '本仓暂无已采用库存行';
   })();
   const coverage = sample.totals.coverage;
   const coverageText = coverage
@@ -1533,7 +1507,7 @@ function BsSampleBusinessBlock({
         <div>
           <h3 className={styles.sectionTitle}>BigSeller 库存（海外）</h3>
           <p className={styles.sectionNote}>
-            {sourceLabel} · 最近来源：{observationText}
+            {sourceLabel}{observationText ? ` · ${observationText}` : ''}
           </p>
         </div>
         <p className={styles.sectionNote}>
@@ -1541,7 +1515,7 @@ function BsSampleBusinessBlock({
           {warehouse && onShowAllWarehouses && (
             <>
               {' · '}
-              <button type="button" className={demoStyles.textLink} onClick={onShowAllWarehouses}>查看全部仓库</button>
+              <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={onShowAllWarehouses}>查看全部仓库</button>
             </>
           )}
         </p>
@@ -1572,13 +1546,13 @@ function BsSampleBusinessBlock({
       {pendingTotal && (
         <p className={styles.sectionNote} data-testid="catalog-inventory-pending-total">
           合计待核对：{pendingGroups.map((group) => `${group.name}${group.unit ? `（${group.unit}）` : ''}：${group.rows.map((line) => `${line.externalSku}=${line.onHand ?? '未知'}`).join('、')}`).join('；')}
-          {pendingGroups.length === 0 ? '同仓多个来源编码，逐行显示，未确认合计口径前不擅自相加。' : ' —— 逐行显示；未确认合计口径前不擅自相加，也不选一条充当完整库存。'}
+          （逐行显示，未相加）
         </p>
       )}
       {pendingSources.length > 0 && (
         <div data-testid="catalog-pending-sources">
           <p className={styles.sectionNote}>
-            同仓待确认来源 {pendingSources.length} 行：未确认对应、未计入合计；来源数量 0 表示“来源为 0、待确认归属”，不是没有来源，也不自动绑定。
+            同仓待确认来源 {pendingSources.length} 行（未计入合计）
           </p>
           <div className={demoStyles.tableScroll}>
             <table className={demoStyles.table} data-testid="catalog-pending-sources-table">
@@ -1607,21 +1581,16 @@ function BsSampleBusinessBlock({
         </div>
         <div>
           <dt>当前货值</dt>
-          <dd>暂未计算（本包不新做估值：旧样表价格不能乘新库存冒充当前货值）</dd>
+          <dd>暂未计算</dd>
         </div>
         <div>
           <dt>覆盖</dt>
           <dd data-testid="catalog-inventory-coverage">{coverageText}</dd>
         </div>
       </dl>
-      <p className={styles.sectionNote} data-testid="catalog-inventory-transit-note">
-        数量按单个商品计数、原值保存，不乘除装箱数；同仓多编码逐行保留（0 库存也显示）；在途为来源观测值，不是业务在途；旧来源证据不用于判断当前来源。
-      </p>
       {onOpenEvidence && (
-        <p className={styles.sectionNote} data-testid="catalog-inventory-source-link">
-          旧来源证据仅作历史记录，不用于判断当前库存。
-          {' '}
-          <button type="button" className={demoStyles.textLink} onClick={() => onOpenEvidence()}>查看数据来源</button>
+        <p data-testid="catalog-inventory-source-link">
+          <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => onOpenEvidence()}>查看数据来源</button>
         </p>
       )}
       {sample.warnings.length > 0 && (
@@ -1739,6 +1708,7 @@ function WarehouseBindingsBlock({
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<BindingFeedback | null>(null);
+  const searchSeq = useRef(0);
   const localUnknown = useSyncExternalStore(subscribeLocalUnknown, getLocalUnknownSnapshot, getLocalUnknownServerSnapshot);
 
   /** 读取仓库绑定：失败给明确错误与重试，不当作“没有绑定”。 */
@@ -1746,12 +1716,12 @@ function WarehouseBindingsBlock({
     try {
       const result = await getItemBindingsAction({ itemId });
       if (!result.ok || !result.data) {
-        setState({ status: 'error', message: result.message ?? '仓库绑定读取失败，可重试；失败不代表没有绑定。' });
+        setState({ status: 'error', message: result.message ?? '仓库绑定读取失败，可重试' });
         return;
       }
       setState({ status: 'ready', data: result.data });
     } catch {
-      setState({ status: 'error', message: '仓库绑定读取失败（网络或传输异常），可重试；失败不代表没有绑定。' });
+      setState({ status: 'error', message: '仓库绑定读取失败（网络异常），可重试' });
     }
   }, [itemId]);
 
@@ -1801,8 +1771,12 @@ function WarehouseBindingsBlock({
     return [...byId.values()];
   }, [data]);
 
+  const boundGroups = groups.filter((group) => group.bindings.length > 0);
+  const unboundGroups = groups.filter((group) => group.bindings.length === 0);
+
   const openEditor = (target: BindingEditorTarget) => {
     if (!writeAllowed) return;
+    searchSeq.current += 1;
     setEditor(target);
     setQuery('');
     setSearch({ status: 'idle' });
@@ -1813,6 +1787,7 @@ function WarehouseBindingsBlock({
 
   const closeEditor = () => {
     if (busy) return;
+    searchSeq.current += 1;
     setEditor(null);
     setQuery('');
     setSearch({ status: 'idle' });
@@ -1820,24 +1795,32 @@ function WarehouseBindingsBlock({
     setNote('');
   };
 
-  /** 搜索该仓完整可选来源：空关键词列出该仓最近完整批次全部来源（服务端有上限）。 */
-  async function runSearch() {
-    if (!editor || busy) return;
-    const target = editor;
-    const term = query.trim();
+  /** 搜索该仓完整可选来源：空关键词列出该仓最近完整批次全部来源（服务端有上限）。
+   *  输入即搜：请求带序号，慢的旧响应回来时直接丢弃，不覆盖新结果。 */
+  const runSearch = useCallback(async (target: BindingEditorTarget, term: string) => {
+    const seq = ++searchSeq.current;
     setSearch({ status: 'searching' });
     setSelected(null);
     try {
-      const result = await searchWarehouseSourceItemsAction({ warehouseId: target.warehouseId, search: term });
+      const result = await searchWarehouseSourceItemsAction({ warehouseId: target.warehouseId, search: term.trim() });
+      if (seq !== searchSeq.current) return;
       if (!result.ok) {
-        setSearch({ status: 'error', message: result.message ?? '搜索失败，可重试；读取失败不等于该仓没有可用单品。' });
+        setSearch({ status: 'error', message: result.message ?? '搜索失败，可重试' });
         return;
       }
       setSearch({ status: 'ok', items: result.items, message: result.message });
     } catch {
-      setSearch({ status: 'error', message: '搜索失败（网络或传输异常），可重试；读取失败不等于该仓没有可用单品。' });
+      if (seq !== searchSeq.current) return;
+      setSearch({ status: 'error', message: '搜索失败（网络异常），可重试' });
     }
-  }
+  }, []);
+
+  /* 输入即搜：300ms 防抖；关闭/换行时清理定时器并让旧请求序号失效。 */
+  useEffect(() => {
+    if (!editor) return;
+    const timer = window.setTimeout(() => { void runSearch(editor, query); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [editor, query, runSearch]);
 
   const relation = editor && selected ? bindingTargetRelation(selected, itemId, editor.oldBinding) : null;
   const blockedReason = (() => {
@@ -1982,12 +1965,119 @@ function WarehouseBindingsBlock({
     }
   }
 
+  /* 就地展开的编辑器行：点哪个仓库的绑定/更换，就插在该仓库行下面；保存/取消后收起。 */
+  const editorRow = editor ? (
+    <tr data-testid="catalog-binding-editor-row">
+      <td colSpan={4} className={styles.bindingEditorCell}>
+        <div className={styles.form} aria-label="仓库绑定编辑" data-testid="catalog-binding-editor" data-mode={editor.mode}>
+          <div className={styles.bindingEditorMeta}>
+            <strong>{editor.mode === 'replace' ? '更换绑定' : editor.mode === 'add' ? '添加同仓来源' : '绑定 BS 商品'}</strong>
+            <span>商品 <strong>{itemLabel}</strong></span>
+            <span>仓库 <strong>{editor.warehouseName}</strong>{editor.market ? `（${editor.market}）` : ''}</span>
+            {editor.oldBinding ? <span>原 SKU <strong>{editor.oldBinding.externalSku}</strong></span> : null}
+            <span>账号 <strong>{accountLabel}</strong></span>
+          </div>
+          <div className={styles.field}>
+            <div className={styles.bindingSearchRow}>
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  void runSearch(editor, query);
+                }}
+                placeholder="SKU / 原品名 / 69 编码"
+                maxLength={120}
+                aria-label="搜索该仓 BS 单品"
+                data-testid="catalog-binding-search-input"
+                disabled={busy || writeLocked}
+              />
+              {search.status === 'searching' ? <span className={styles.fieldHint} role="status">搜索中…</span> : null}
+            </div>
+          </div>
+          {search.status === 'error' && (
+            <p role="alert" className={styles.statusLine} data-testid="catalog-binding-search-error">
+              {search.message}
+              {' '}
+              <button type="button" className={`${surface.button} ${surface.buttonSmall}`} onClick={() => void runSearch(editor, query)} disabled={busy}>重试搜索</button>
+            </p>
+          )}
+          {search.status === 'ok' && search.items.length === 0 && (
+            <p className={styles.sectionNote} data-testid="catalog-binding-search-empty">
+              {search.message ?? '没有匹配的 BS 单品'}
+            </p>
+          )}
+          {search.status === 'ok' && search.items.length > 0 && (
+            <>
+              <p className={styles.sectionNote} data-testid="catalog-binding-search-count">结果 {search.items.length} 条</p>
+              <div className={styles.bindingResultList} data-testid="catalog-binding-search-results">
+                {search.items.map((item) => (
+                  <button
+                    key={item.externalSku}
+                    type="button"
+                    className={styles.bindingResultButton}
+                    aria-pressed={selected?.externalSku === item.externalSku}
+                    data-testid="catalog-binding-search-result"
+                    data-sku={item.externalSku}
+                    disabled={busy || writeLocked}
+                    onClick={() => setSelected(item)}
+                  >
+                    <span className={styles.bindingResultName}>
+                      {item.sourceName?.trim() || '（来源未提供品名）'} · <span className={styles.codeCell}>{item.externalSku}</span>
+                    </span>
+                    <span className={styles.bindingResultQty}>
+                      {bindingQtyText(item.onHand)}{item.unit ? ` ${item.unit}` : ''}
+                    </span>
+                    <span className={styles.bindingResultMeta}>
+                      {bindingSourceBoundText(item, itemId)}
+                      {item.mappingStatus ? ` · ${currentMappingStatusLabel(item.mappingStatus)}` : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {selectionSummary && (
+            <div
+              className={selectionSummary.warn ? `${styles.bindingSelection} ${styles.bindingSelectionWarn}` : styles.bindingSelection}
+              data-testid="catalog-binding-selection"
+            >
+              {selectionSummary.text}
+            </div>
+          )}
+          <label className={styles.field}>
+            备注（选填）
+            <Input
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              maxLength={BINDING_NOTE_LIMIT}
+              aria-label="绑定备注"
+              data-testid="catalog-binding-note"
+              disabled={busy || writeLocked}
+            />
+          </label>
+          <div className={styles.formActions}>
+            <Button
+              type="button"
+              onClick={() => void submitBinding()}
+              disabled={busy || writeLocked || !selected || Boolean(blockedReason)}
+              data-testid="catalog-binding-save"
+            >
+              {busy ? '正在保存…' : editor.mode === 'replace' ? '保存更换' : '保存绑定'}
+            </Button>
+            <Button type="button" variant="outline" onClick={closeEditor} disabled={busy} data-testid="catalog-binding-cancel">取消</Button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  ) : null;
+
   return (
     <section className={styles.section} aria-label="仓库绑定" data-testid="catalog-warehouse-bindings">
       <div className={styles.sectionHead}>
         <div>
           <h2 className={styles.sectionTitle}>仓库绑定</h2>
-          <p className={styles.sectionNote}>固定本商品，按仓库更换或添加 BS 单品；绑定立即生效，库存等下一次完整同步采用。</p>
         </div>
         <button
           type="button"
@@ -2009,7 +2099,7 @@ function WarehouseBindingsBlock({
           {' '}
           <button
             type="button"
-            className={demoStyles.textLink}
+            className={`${surface.button} ${surface.buttonSmall}`}
             onClick={() => { setState({ status: 'loading' }); void loadBindings(); }}
           >
             重试
@@ -2022,231 +2112,142 @@ function WarehouseBindingsBlock({
           {writeLocked && (
             <p className={styles.pendingBox} data-testid="catalog-binding-locked">
               {data?.pendingLocked
-                ? '有一笔未完成的原请求待核对：核对完成前不能再次更换绑定，服务端同样拒绝新写入。'
-                : '本地保留了一条结果未知的原请求：核对/恢复前保持锁定。'}
+                ? '原请求待核对，暂不能更换绑定'
+                : '结果未知的原请求待核对，暂锁定'}
               {localOwner.reason ? ` ${localOwner.reason}` : ''}
-              {' '}请到数据同步页的“原请求待核对”入口处理。
+              {' '}请到数据同步页处理。
             </p>
           )}
           {groups.length === 0 ? (
-            <p className={styles.sectionNote} data-testid="catalog-binding-empty">当前没有可用的 BS 来源仓库；未绑定不等于库存 0。</p>
+            <p className={styles.sectionNote} data-testid="catalog-binding-empty">当前没有可用的 BS 来源仓库</p>
           ) : (
-            <div className={demoStyles.tableScroll}>
-              <table className={`${demoStyles.table} ${styles.bindingTable}`} data-testid="catalog-binding-table">
-                <thead><tr><th>仓库</th><th>BS 品名与 SKU</th><th>现有库存</th><th>操作</th></tr></thead>
-                <tbody>
-                  {groups.map((group) => (group.bindings.length === 0 ? (
-                    <tr key={group.warehouseId} data-testid="catalog-binding-row" data-warehouse={group.name} data-sku="">
-                      <td>
-                        <strong>{group.name}</strong>
-                        {group.market ? <span className={styles.fieldHint}>{group.market}</span> : null}
-                        {group.rowCount !== null ? <span className={styles.fieldHint}>该仓来源 {group.rowCount} 行</span> : null}
-                      </td>
-                      <td data-testid="catalog-binding-sku">未绑定 BS 单品</td>
-                      <td data-testid="catalog-binding-on-hand">未绑定</td>
-                      <td>
-                        <button
-                          type="button"
-                          className={styles.headerButton}
-                          data-testid="catalog-binding-bind"
-                          disabled={!writeAllowed}
-                          onClick={() => openEditor({
-                            mode: 'bind',
-                            warehouseId: group.warehouseId,
-                            warehouseExternalId: group.externalId,
-                            warehouseName: group.name,
-                            market: group.market,
-                            oldBinding: null,
-                          })}
-                        >
-                          绑定 BS 商品
-                        </button>
-                      </td>
-                    </tr>
-                  ) : group.bindings.map((binding, index) => (
-                    <tr key={binding.mappingId} data-testid="catalog-binding-row" data-warehouse={group.name} data-sku={binding.externalSku}>
-                      <td>
-                        <strong>{group.name}</strong>
-                        {group.market ? <span className={styles.fieldHint}>{group.market}</span> : null}
-                      </td>
-                      <td>
-                        <strong data-testid="catalog-binding-source-name">{binding.sourceName?.trim() || 'BS 单品'}</strong>
-                        <span className={styles.fieldHint} data-testid="catalog-binding-sku">
-                          SKU {binding.externalSku}
-                          {binding.unit ? ` · 单位 ${binding.unit}` : ''}
-                          {' · '}{currentMappingStatusLabel(binding.mappingStatus)}
-                          {' · '}{bindingAdoptionText(binding.adoption)}
-                        </span>
-                      </td>
-                      <td>
-                        <span data-testid="catalog-binding-on-hand">{bindingQtyText(binding.onHand)}</span>
-                        <span className={styles.fieldHint}>
-                          {binding.observedAt ? `来源时间 ${new Date(binding.observedAt).toLocaleString('zh-CN', { hour12: false })}` : '来源时间未记录'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className={styles.bindingRowOps}>
-                          {binding.mappingStatus === 'confirmed' ? (
-                            <button
-                              type="button"
-                              className={styles.headerButton}
-                              data-testid="catalog-binding-replace"
-                              disabled={!writeAllowed}
-                              onClick={() => openEditor({
-                                mode: 'replace',
-                                warehouseId: group.warehouseId,
-                                warehouseExternalId: group.externalId,
-                                warehouseName: group.name,
-                                market: group.market,
-                                oldBinding: binding,
-                              })}
-                            >
-                              更换绑定
-                            </button>
-                          ) : (
-                            <span className={styles.fieldHint}>非生效对应（{currentMappingStatusLabel(binding.mappingStatus)}），不可更换</span>
-                          )}
-                          {index === 0 && (
-                            <button
-                              type="button"
-                              className={styles.headerButton}
-                              data-testid="catalog-binding-add-source"
-                              disabled={!writeAllowed}
-                              onClick={() => openEditor({
-                                mode: 'add',
-                                warehouseId: group.warehouseId,
-                                warehouseExternalId: group.externalId,
-                                warehouseName: group.name,
-                                market: group.market,
-                                oldBinding: null,
-                              })}
-                            >
-                              添加同仓来源
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {editor && (
-            <div className={styles.form} aria-label="仓库绑定编辑" data-testid="catalog-binding-editor" data-mode={editor.mode}>
-              <div className={styles.bindingEditorMeta}>
-                <strong>{editor.mode === 'replace' ? '更换绑定' : editor.mode === 'add' ? '添加同仓来源' : '绑定 BS 商品'}</strong>
-                <span>商品 <strong>{itemLabel}</strong>（固定）</span>
-                <span>仓库 <strong>{editor.warehouseName}</strong>{editor.market ? `（${editor.market}）` : ''}</span>
-                {editor.oldBinding ? <span>原 SKU <strong>{editor.oldBinding.externalSku}</strong></span> : null}
-                <span>来源账号 <strong>{accountLabel}</strong></span>
-              </div>
-              <div className={styles.field}>
-                <span>搜索该仓 BS 单品</span>
-                <div className={styles.bindingSearchRow}>
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        void runSearch();
-                      }
-                    }}
-                    placeholder="SKU / 原品名 / 69 编码"
-                    maxLength={120}
-                    aria-label="搜索该仓 BS 单品"
-                    data-testid="catalog-binding-search-input"
-                    disabled={busy || writeLocked}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void runSearch()}
-                    disabled={busy || writeLocked || search.status === 'searching'}
-                    data-testid="catalog-binding-search-submit"
-                  >
-                    {search.status === 'searching' ? '搜索中…' : '搜索'}
-                  </Button>
+            <>
+              {boundGroups.length > 0 && (
+                <div className={demoStyles.tableScroll}>
+                  <table className={`${demoStyles.table} ${styles.bindingTable}`} data-testid="catalog-binding-table">
+                    <thead><tr><th>仓库</th><th>BS 品名与 SKU</th><th>现有库存</th><th>操作</th></tr></thead>
+                    <tbody>
+                      {boundGroups.map((group) => group.bindings.map((binding, index) => {
+                        const replaceTarget = Boolean(editor && editor.mode === 'replace' && editor.oldBinding?.mappingId === binding.mappingId);
+                        const addTarget = Boolean(editor && editor.mode === 'add' && editor.warehouseId === group.warehouseId && index === 0);
+                        return (
+                          <Fragment key={binding.mappingId}>
+                            <tr data-testid="catalog-binding-row" data-warehouse={group.name} data-sku={binding.externalSku}>
+                              <td>
+                                <strong>{group.name}</strong>
+                                {group.market ? <span className={styles.fieldHint}>{group.market}</span> : null}
+                              </td>
+                              <td>
+                                <strong data-testid="catalog-binding-source-name">{binding.sourceName?.trim() || 'BS 单品'}</strong>
+                                <span className={styles.fieldHint} data-testid="catalog-binding-sku">
+                                  SKU {binding.externalSku}
+                                  {binding.unit ? ` · 单位 ${binding.unit}` : ''}
+                                  {' · '}{currentMappingStatusLabel(binding.mappingStatus)}
+                                  {' · '}{bindingAdoptionText(binding.adoption)}
+                                </span>
+                              </td>
+                              <td>
+                                <span data-testid="catalog-binding-on-hand">{bindingQtyText(binding.onHand)}</span>
+                                <span className={styles.fieldHint}>
+                                  {binding.observedAt ? `来源时间 ${new Date(binding.observedAt).toLocaleString('zh-CN', { hour12: false })}` : '来源时间未记录'}
+                                </span>
+                              </td>
+                              <td>
+                                <div className={styles.bindingRowOps}>
+                                  {binding.mappingStatus === 'confirmed' ? (
+                                    <button
+                                      type="button"
+                                      className={styles.headerButton}
+                                      data-testid="catalog-binding-replace"
+                                      disabled={!writeAllowed}
+                                      onClick={() => openEditor({
+                                        mode: 'replace',
+                                        warehouseId: group.warehouseId,
+                                        warehouseExternalId: group.externalId,
+                                        warehouseName: group.name,
+                                        market: group.market,
+                                        oldBinding: binding,
+                                      })}
+                                    >
+                                      更换绑定
+                                    </button>
+                                  ) : (
+                                    <span className={styles.fieldHint}>非生效对应（{currentMappingStatusLabel(binding.mappingStatus)}），不可更换</span>
+                                  )}
+                                  {index === 0 && (
+                                    <button
+                                      type="button"
+                                      className={styles.headerButton}
+                                      data-testid="catalog-binding-add-source"
+                                      disabled={!writeAllowed}
+                                      onClick={() => openEditor({
+                                        mode: 'add',
+                                        warehouseId: group.warehouseId,
+                                        warehouseExternalId: group.externalId,
+                                        warehouseName: group.name,
+                                        market: group.market,
+                                        oldBinding: null,
+                                      })}
+                                    >
+                                      添加同仓来源
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                            {replaceTarget || addTarget ? editorRow : null}
+                          </Fragment>
+                        );
+                      }))}
+                    </tbody>
+                  </table>
                 </div>
-                <span className={styles.fieldHint}>空关键词列出该仓最近完整批次全部来源（服务端最多 50 条）；已绑定、未绑定、零库存都列出。</span>
-              </div>
-              {search.status === 'error' && (
-                <p role="alert" className={styles.statusLine} data-testid="catalog-binding-search-error">
-                  {search.message}
-                  {' '}
-                  <button type="button" className={demoStyles.textLink} onClick={() => void runSearch()} disabled={busy}>重试搜索</button>
-                </p>
               )}
-              {search.status === 'ok' && search.items.length === 0 && (
-                <p className={styles.sectionNote} data-testid="catalog-binding-search-empty">
-                  {search.message ?? '该仓库没有匹配的 BS 单品（真实空结果，不是读取失败）。'}
-                </p>
-              )}
-              {search.status === 'ok' && search.items.length > 0 && (
-                <>
-                  <p className={styles.sectionNote} data-testid="catalog-binding-search-count">
-                    该仓结果 {search.items.length} 条（含已绑定、未绑定与零库存）。
-                  </p>
-                  <div className={styles.bindingResultList} data-testid="catalog-binding-search-results">
-                    {search.items.map((item) => (
-                      <button
-                        key={item.externalSku}
-                        type="button"
-                        className={styles.bindingResultButton}
-                        aria-pressed={selected?.externalSku === item.externalSku}
-                        data-testid="catalog-binding-search-result"
-                        data-sku={item.externalSku}
-                        disabled={busy || writeLocked}
-                        onClick={() => setSelected(item)}
-                      >
-                        <span className={styles.bindingResultName}>
-                          {item.sourceName?.trim() || '（来源未提供品名）'} · <span className={styles.codeCell}>{item.externalSku}</span>
-                        </span>
-                        <span className={styles.bindingResultQty}>
-                          {bindingQtyText(item.onHand)}{item.unit ? ` ${item.unit}` : ''}
-                        </span>
-                        <span className={styles.bindingResultMeta}>
-                          {bindingSourceBoundText(item, itemId)}
-                          {item.mappingStatus ? ` · ${currentMappingStatusLabel(item.mappingStatus)}` : ''}
-                        </span>
-                      </button>
-                    ))}
+              {unboundGroups.length > 0 && (
+                <details className={styles.unboundGroup} data-testid="catalog-binding-unbound-group">
+                  <summary>未绑定仓库（{unboundGroups.length}）</summary>
+                  <div className={demoStyles.tableScroll}>
+                    <table className={`${demoStyles.table} ${styles.bindingTable}`} data-testid="catalog-binding-unbound-table">
+                      <thead><tr><th>仓库</th><th>BS 品名与 SKU</th><th>现有库存</th><th>操作</th></tr></thead>
+                      <tbody>
+                        {unboundGroups.map((group) => (
+                          <Fragment key={group.warehouseId}>
+                            <tr data-testid="catalog-binding-row" data-warehouse={group.name} data-sku="">
+                              <td>
+                                <strong>{group.name}</strong>
+                                {group.market ? <span className={styles.fieldHint}>{group.market}</span> : null}
+                                {group.rowCount !== null ? <span className={styles.fieldHint}>该仓来源 {group.rowCount} 行</span> : null}
+                              </td>
+                              <td data-testid="catalog-binding-sku">未绑定 BS 单品</td>
+                              <td data-testid="catalog-binding-on-hand">未绑定</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className={styles.headerButton}
+                                  data-testid="catalog-binding-bind"
+                                  disabled={!writeAllowed}
+                                  onClick={() => openEditor({
+                                    mode: 'bind',
+                                    warehouseId: group.warehouseId,
+                                    warehouseExternalId: group.externalId,
+                                    warehouseName: group.name,
+                                    market: group.market,
+                                    oldBinding: null,
+                                  })}
+                                >
+                                  绑定 BS 商品
+                                </button>
+                              </td>
+                            </tr>
+                            {editor && editor.mode === 'bind' && editor.warehouseId === group.warehouseId ? editorRow : null}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </>
+                </details>
               )}
-              {selectionSummary && (
-                <div
-                  className={selectionSummary.warn ? `${styles.bindingSelection} ${styles.bindingSelectionWarn}` : styles.bindingSelection}
-                  data-testid="catalog-binding-selection"
-                >
-                  {selectionSummary.text}
-                </div>
-              )}
-              <label className={styles.field}>
-                备注（选填，另存为本次操作说明）
-                <Input
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  maxLength={BINDING_NOTE_LIMIT}
-                  aria-label="绑定备注"
-                  data-testid="catalog-binding-note"
-                  disabled={busy || writeLocked}
-                />
-              </label>
-              <div className={styles.formActions}>
-                <Button
-                  type="button"
-                  onClick={() => void submitBinding()}
-                  disabled={busy || writeLocked || !selected || Boolean(blockedReason)}
-                  data-testid="catalog-binding-save"
-                >
-                  {busy ? '正在保存…' : editor.mode === 'replace' ? '保存更换' : '保存绑定'}
-                </Button>
-                <Button type="button" variant="outline" onClick={closeEditor} disabled={busy} data-testid="catalog-binding-cancel">取消</Button>
-                {selected ? <span className={styles.fieldHint}>取消不写入；保存期间不能重复提交。</span> : null}
-              </div>
-            </div>
+            </>
           )}
           {feedback && (
             <p className={styles.bindingFeedback} data-tone={feedback.tone} role="status" aria-live="polite" data-testid="catalog-binding-feedback">

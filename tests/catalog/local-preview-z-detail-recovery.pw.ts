@@ -3,7 +3,7 @@ import { patchCatalogActionFailure, type CatalogActionProbe } from './catalog-de
 
 /**
  * v3（V3-01/V3-08）：来源与授权证据不再是独立页面，而是**同一商品弹窗内的子视图**
- * （`catalog-detail-more` → `catalog-more-evidence` → `catalog-evidence-view`，`catalog-evidence-back` 原位返回）。
+ * （`catalog-more-evidence` → `catalog-evidence-view`，`catalog-evidence-back` 原位返回）。
  *
  * 本文件保留 v2 的失败恢复语义并迁移到子视图：
  * - 有界一次性审计请求、失败后只手动重试、迟到响应不串商品；
@@ -29,10 +29,10 @@ function row(page: Page, iceCode: string) {
 
 /** 从列表真实点击打开统一弹窗；返回该商品的 UUID（v3 仍由 URL detail 参数承载）。 */
 async function openDetailFromList(page: Page, iceCode: string) {
-  await page.getByLabel(/搜索/).fill(iceCode);
+  await page.getByRole('searchbox').first().fill(iceCode);
   const target = row(page, iceCode);
   await expect(target).toBeVisible({ timeout: 30_000 });
-  await target.getByRole('button', { name: /查看详情|查看/ }).first().click();
+  await target.getByRole('button', { name: /详情|查看/ }).first().click();
   await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 30_000 });
   const itemId = new URL(page.url()).searchParams.get('detail') ?? '';
   expect(itemId, 'detail URL must carry the item UUID').toMatch(/^[0-9a-f-]{36}$/);
@@ -56,11 +56,8 @@ function evidenceView(page: Page) {
   return page.getByTestId('catalog-evidence-view');
 }
 
-/** 打开弹窗内“来源与证据”子视图（更多菜单 → 菜单项），并等到非 loading 终态。 */
+/** 打开弹窗内“来源与证据”子视图（头部直接入口），并等到非 loading 终态。 */
 async function openEvidenceSubview(page: Page) {
-  const more = page.getByTestId('catalog-detail-more');
-  await expect(more).toBeVisible({ timeout: 30_000 });
-  if ((await more.getAttribute('open')) === null) await more.locator('summary').click();
   const entry = page.getByTestId('catalog-more-evidence');
   await expect(entry).toBeVisible({ timeout: 30_000 });
   await entry.click();

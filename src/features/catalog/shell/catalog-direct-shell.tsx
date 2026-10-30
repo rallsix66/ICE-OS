@@ -43,7 +43,12 @@ export function CatalogDirectShell({
             ? '当前账户没有列表访问权限；已打开的商品详情仍按服务端权限独立读取。'
             : '独立本地平台模式未启用列表读取；已打开的商品详情仍按服务端权限独立读取。'}
         {' '}
-        <Link className="underline underline-offset-4" href="/dashboard/catalog">返回商品库</Link>
+        <Link
+          className="ml-1 inline-flex h-9 items-center rounded-lg border border-amber-300 bg-white px-3 text-[13px] font-medium text-amber-900 hover:bg-amber-50"
+          href="/dashboard/catalog"
+        >
+          返回商品库
+        </Link>
       </section>
       <CatalogDetailDialog payload={null} url={url} cacheContext={cacheContext} />
     </main>

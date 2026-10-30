@@ -19,10 +19,26 @@
   /* U1：外框固定。切换分区 / 加载 / 空态 / 失败态都不改变弹窗位置与尺寸。 */
   height: min(92vh, 960px);
   max-height: calc(100dvh - 24px);
-  /* R3 + emil-design-eng：真实商品详情是高频入口，去掉缩放/淡入的位移入场，
-     缓存已即时供数时不再多等一次布局稳定；遮罩透明度保留（不影响几何）。 */
-  animation: none !important;
+  /* R3 + 展示打磨：保留克制的 160ms 进入过渡（透明度 + 轻微缩放下沉），
+     用独立 scale / translate 属性，并在 translate 里显式带上弹窗居中的 -50%/-50%
+     （base-ui 的居中由 translate 属性实现，不能只写 0 4px，否则弹窗会被甩到左上角）。
+     只做进入：不做关闭动画、不加延迟、不用 spring；正文内容不依赖动画，遮罩沿用 Dialog。 */
+  animation: detailDialogEnter 160ms cubic-bezier(0.23, 1, 0.32, 1) !important;
   transition: none !important;
+}
+
+@keyframes detailDialogEnter {
+  from {
+    opacity: 0;
+    scale: 0.985;
+    translate: -50% calc(-50% + 4px);
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: -50% -50%;
+  }
 }
 
 .headerActions {
@@ -254,6 +270,16 @@
   min-width: 0;
 }
 
+/* 页签切换：120ms 淡入，只做透明度，不做位移；reduced-motion 下关闭。 */
+.panelFade {
+  animation: panelFade 120ms var(--ice-ui-ease-out) both;
+}
+
+@keyframes panelFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .section {
   min-width: 0;
   padding: 18px;
@@ -315,44 +341,6 @@
 }
 
 /* ---- 商品资料 ---- */
-
-.hero {
-  display: flex;
-  align-items: flex-start;
-  gap: 18px;
-  min-width: 0;
-}
-
-.heroText {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.heroName {
-  margin: 0;
-  color: #3d5374;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.heroMeta {
-  margin: 0;
-  color: #7b8ba4;
-  font-size: 12px;
-  line-height: 1.8;
-  overflow-wrap: anywhere;
-}
-
-.heroCaption {
-  margin: 0;
-  color: #a3adbb;
-  font-size: 11px;
-  line-height: 1.8;
-}
 
 .identityGrid {
   display: grid;
@@ -444,36 +432,49 @@
   overflow-wrap: anywhere;
 }
 
+/* 仓库范围：统一分段控件（用 --ice-ui-* 变量），不再是一排独立胶囊。 */
 .controls {
-  display: flex;
+  display: inline-flex;
+  max-width: 100%;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: var(--ice-ui-radius-sm);
+  background: #f7f8fc;
 }
 
 .controlsLabel {
-  color: #8d98aa;
+  padding: 0 8px 0 6px;
+  color: var(--ice-ui-faint);
   font-size: 11px;
 }
 
 .chip {
-  min-height: 32px;
-  padding: 5px 12px;
-  border: 1px solid #dce1e8;
-  border-radius: 999px;
-  background: #fff;
-  color: #5a687a;
+  min-height: 30px;
+  padding: 5px 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ice-ui-muted);
   font-size: 12px;
   line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
+}
+
+.chip:hover:not(:disabled) {
+  color: var(--ice-ui-text);
 }
 
 .chip[aria-pressed="true"] {
-  border-color: #8495ed;
-  background: #eef1ff;
-  color: #31449b;
-  /* V4-01：选中态不得改变字重/占位宽度；只用边框、底色和内描边表达。 */
-  box-shadow: inset 0 0 0 1px #8495ed;
+  border-color: var(--ice-ui-line);
+  background: #fff;
+  color: var(--ice-ui-accent-strong);
+  /* V4-01：选中态不得改变字重/占位宽度；只用边框、底色和阴影表达。 */
+  box-shadow: 0 1px 2px rgba(23, 37, 64, 0.08);
 }
 
 .chip:disabled {
@@ -761,11 +762,6 @@
     gap: 8px;
   }
 
-  .hero {
-    flex-direction: column;
-    gap: 12px;
-  }
-
   .pageTitle {
     font-size: 18px;
   }
@@ -779,6 +775,14 @@
 @media (prefers-reduced-motion: reduce) {
   .detailBody {
     scroll-behavior: auto;
+  }
+
+  .panelFade {
+    animation: none;
+  }
+
+  .dialogShell {
+    animation: none !important;
   }
 }
 
@@ -890,53 +894,6 @@
   .pageRoot .tabBar {
     padding: 0 6px;
   }
-}
-
-/* ---- 更多菜单（低频动作收在此处，不再占用标题区） ---- */
-
-.moreMenu {
-  position: relative;
-}
-
-.moreMenu > summary {
-  list-style: none;
-}
-
-.moreMenu > summary::-webkit-details-marker {
-  display: none;
-}
-
-.morePanel {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
-  display: flex;
-  min-width: 196px;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px;
-  border: 1px solid #dfe4ee;
-  border-radius: 9px;
-  background: #fff;
-  box-shadow: 0 12px 28px rgba(23, 37, 64, 0.16);
-}
-
-.moreItem {
-  padding: 8px 10px;
-  border-radius: 6px;
-  color: #2d3f5a;
-  font-size: 12.5px;
-  text-decoration: none;
-}
-
-.moreItem:hover {
-  background: #f3f6fc;
-}
-
-.moreItem:focus-visible {
-  outline: 3px solid #8495ed;
-  outline-offset: 1px;
 }
 
 /* ---- U2：概览按库存阶段组织 ---- */
@@ -1161,6 +1118,29 @@
   gap: 6px;
 }
 
+/* 未绑定仓库折叠组：没有绑定的仓库不占一张空大表。 */
+.unboundGroup {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #eef0f5;
+}
+
+.unboundGroup > summary {
+  cursor: pointer;
+  color: #4c607c;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.unboundGroup > summary:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: 3px;
+}
+
+.unboundGroup[open] > summary {
+  margin-bottom: 8px;
+}
+
 /* 仓库绑定表：四列各自独立换行，避免来源 SKU/单位/状态与数量挤在同一行相互覆盖。 */
 .bindingTable {
   width: 100%;
@@ -1188,6 +1168,14 @@
 
 .bindingTable :is(th, td):nth-child(4) {
   width: 18%;
+}
+
+/* 行内展开的绑定编辑器：跨整行的单元格不继承列宽，紧贴在触发它的仓库行下面。 */
+.bindingTable td.bindingEditorCell {
+  width: auto;
+  padding: 0 10px 10px;
+  background: #fbfcff;
+  vertical-align: top;
 }
 
 .bindingTable :is(td) > strong,

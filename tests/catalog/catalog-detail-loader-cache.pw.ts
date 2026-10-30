@@ -1,4 +1,4 @@
-﻿import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 /**
  * 详情 loader 缓存负向与 R4 刷新语义（UI 补修包 v2 / repair-matrix §4）。
@@ -20,16 +20,16 @@ async function login(page: Page) {
 }
 
 async function openWm0043FromList(page: Page) {
-  await page.getByLabel(/搜索/).fill('WM0043');
+  await page.getByRole('searchbox').first().fill('WM0043');
   await expect(page.getByTestId('catalog-row-WM0043')).toBeVisible();
-  await page.getByRole('button', { name: '查看详情' }).first().click();
+  await page.getByRole('button', { name: '详情', exact: true }).first().click();
 }
 
 async function openFromList(page: Page, iceCode: string) {
-  await page.getByLabel(/搜索/).fill(iceCode);
+  await page.getByRole('searchbox').first().fill(iceCode);
   const row = page.getByTestId(`catalog-row-${iceCode}`);
   await expect(row).toBeVisible({ timeout: 30_000 });
-  await row.getByRole('button', { name: '查看详情' }).click();
+  await row.getByRole('button', { name: '详情', exact: true }).click();
 }
 
 /** 分区必须真实点击（不得用注入 CSS/JS 强制显示）。 */
@@ -236,7 +236,7 @@ test.describe('catalog detail loader cache negatives', () => {
       const payload = data.data as { bsSample?: { basisDocumentSha256?: string } };
       if (payload.bsSample) payload.bsSample.basisDocumentSha256 = mutatedSha;
     }, async () => {
-      await page.getByRole('button', { name: '查看详情' }).first().click();
+      await page.getByRole('button', { name: '详情', exact: true }).first().click();
       await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
       await expect(page.getByTestId('catalog-detail-core-ready')).toHaveAttribute('data-content-fresh', 'false');
       await expect(page.getByTestId('catalog-detail-core-ready')).toHaveAttribute('data-list-projection-synced', 'false');
@@ -260,7 +260,7 @@ test.describe('catalog detail loader cache negatives', () => {
       (data as { success?: boolean; error?: string }).error = '权限不足（测试注入）';
       delete (data as { data?: unknown }).data;
     }, async () => {
-      await page.getByRole('button', { name: '查看详情' }).first().click();
+      await page.getByRole('button', { name: '详情', exact: true }).first().click();
       await expect(page.getByTestId('catalog-detail-fetch-error')).toContainText('权限', { timeout: 60_000 });
       await expect(page.getByTestId('catalog-detail-core-ready')).toHaveCount(0);
       // 授权失守后不得继续渲染任何金额：概览四卡与库存/资料分区都不存在，弹层内无人民币金额。
@@ -299,11 +299,11 @@ test.describe('catalog detail loader cache negatives', () => {
       }
       return route.fallback();
     });
-    await page.getByLabel(/搜索/).fill('WM0043');
-    await page.getByRole('button', { name: '查看详情' }).first().click();
+    await page.getByRole('searchbox').first().fill('WM0043');
+    await page.getByRole('button', { name: '详情', exact: true }).first().click();
     await closeDetail(page, { timeout: 5000 }).catch(() => {});
-    await page.getByLabel(/搜索/).fill('WM0072');
-    await page.getByRole('button', { name: '查看详情' }).first().click();
+    await page.getByRole('searchbox').first().fill('WM0072');
+    await page.getByRole('button', { name: '详情', exact: true }).first().click();
     // 身份来自详情 DTO（catalog-material-ice-code），不是列表摘要，才能证明迟到响应没覆盖新开启的详情。
     await expect(page.getByTestId('catalog-material-ice-code')).toContainText('WM0072', { timeout: 60_000 });
     await expect(page.getByTestId('catalog-material-ice-code')).not.toContainText('WM0043');
@@ -329,12 +329,11 @@ test.describe('catalog detail loader cache negatives', () => {
   });
 
   /**
-   * R4：列表刷新必须触发详情重新取数（fetch 次数与内容都更新），
-   * 但编辑草稿与当前分区不得因此被重置（弹窗 loader / CatalogDetail 的 key
-   * 不再包含列表 revision 与投影快照）。
+   * R4：列表刷新必须触发详情重新取数（fetch 次数与内容都更新），当前分区不得被重置。
+   * 日常弹窗已不再提供编辑入口（编辑能力只保留在低频直链页），因此不再断言编辑草稿。
    * 全程只用浏览器会话内的响应改写，不写现役库。
    */
-  test('list refresh refetches detail but keeps the edit draft', async ({ page }) => {
+  test('list refresh refetches detail and keeps the current section', async ({ page }) => {
     await login(page);
     await openFromList(page, WM0072);
     await expect(page.getByTestId('catalog-detail-core-ready')).toBeVisible({ timeout: 60_000 });
@@ -349,12 +348,9 @@ test.describe('catalog detail loader cache negatives', () => {
       // 第 1 个响应只改估值口径投影：出现「刷新列表」入口，但版本不变、不会自动刷新。
       await expect(page.getByTestId('catalog-detail-list-sync-notice')).toBeVisible({ timeout: 60_000 });
 
-      // 编辑中草稿（不保存），并保持「商品资料」分区。
+      // 保持「商品资料」分区。
       await openSection(page, 'material');
-      await page.getByRole('button', { name: '编辑资料', exact: true }).click();
-      await expect(page.getByTestId('catalog-detail-edit')).toBeVisible();
-      const draftValue = 'R4 DRAFT KEEP';
-      await page.getByLabel('明确采用值（留空表示明确空串）').fill(draftValue);
+      await expect(page.getByTestId('catalog-tab-material')).toHaveAttribute('aria-selected', 'true');
 
       // 真实列表刷新（router.refresh）→ 详情必须重新取数。
       await page.getByTestId('catalog-detail-list-sync-notice').getByRole('button', { name: '刷新列表' }).click();
@@ -369,11 +365,6 @@ test.describe('catalog detail loader cache negatives', () => {
       // v3：刷新后仍是同一个统一弹窗（不重挂载、不叠第二弹窗）
       await expect(page.getByTestId(DETAIL_DIALOG)).toHaveCount(1);
       await expect(page.getByTestId(DETAIL_DIALOG)).toHaveAttribute('data-evidence', 'off');
-
-      // 编辑草稿与编辑态不被重置（重新挂载会丢输入）。
-      await expect(page.getByTestId('catalog-detail-edit')).toBeVisible();
-      await expect(page.getByRole('button', { name: '收起编辑', exact: true })).toBeVisible();
-      await expect(page.getByLabel('明确采用值（留空表示明确空串）')).toHaveValue(draftValue);
       await expect(page.getByTestId('catalog-tab-material')).toHaveAttribute('aria-selected', 'true');
       await expect(page.getByTestId('catalog-tabpanel-material')).toBeVisible();
     });

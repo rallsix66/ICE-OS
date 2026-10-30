@@ -59,7 +59,10 @@ function ListErrorState({ kind }: { kind: ListFailureKind }) {
         <p className="mt-3 text-sm leading-7 text-slate-600">{message}</p>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           {readFailed && <DetailRetryButton />}
-          <Link href="/dashboard/catalog" className="text-sm text-indigo-700 underline underline-offset-4 hover:text-indigo-600">
+          <Link
+            href="/dashboard/catalog"
+            className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
             返回商品库
           </Link>
         </div>

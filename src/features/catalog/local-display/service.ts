@@ -23,7 +23,7 @@ import { requireCatalogAdmin } from '../authorization';
 import { loadPreparedBsSampleInventory, type PreparedBsSampleInventory } from '../sources/bs-sample-inventory-adapter';
 
 const BASIS_PATH = 'docs/catalog/local-sample-valuation-basis-20261021.json';
-const NOT_COMPUTED_REASON = '当前货值暂未计算（本包不新做估值：旧样表价格不能乘新库存冒充当前货值）';
+const NOT_COMPUTED_REASON = '暂未计算';
 
 export class CatalogDisplayReadError extends Error {
   constructor(
