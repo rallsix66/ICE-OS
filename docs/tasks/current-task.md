@@ -1,5 +1,9 @@
 # Current Task Packet
 
+> 2026-10-29 追加：三页 UI 整备 v1 已在本地实施并通过商品库浏览器主套件 22/22；未提交/未推送/未部署。范围、构建号与证据见 [ui-refresh-v1.md](ui-refresh-v1.md)。
+> 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
+> 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
+
 ## 当前任务：详情内绑定编辑、界面减字与复核结果采用 v1
 
 状态：**CATALOG_BINDING_REVIEW_V1_LOCAL_PASS**（2026-10-29 原线程独立复审通过）。[原合同](catalog-binding-inline-edit-v1.md)、[最终独立报告](../../.local/catalog-binding-r1-r4-independent-20261029/independent-review.md)。R1–R4四项阻断已关闭，无剩余功能补修；已正确的510条匹配及当前库存保持，原三页签、减字和两方向逐来源编辑均保留。
