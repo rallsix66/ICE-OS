@@ -219,6 +219,7 @@ export function SortableTh({
     startX: number;
     startWidth: number;
     width: number;
+    renderedWidth: number;
     maxWidth: number;
     tableWidth: number;
   } | null>(null);
@@ -246,7 +247,7 @@ export function SortableTh({
     };
   }, [cancelFrame, restoreBody]);
 
-  /** 当前可增长的上限：自身宽度 + 操作列可让出的宽度（操作列不写宽、吸收剩余空间，最小 76px）。
+  /** 当前可增长的上限：自身宽度 + 操作列可让出的宽度（操作列吸收剩余宽度，留出按钮可用的最小宽度）。
    *  其它数据列是百分比，拖拽时保持原宽不动；这样拖动任何一列（含状态列）分界线都跟手。 */
   const measureDragBounds = useCallback((th: HTMLTableCellElement | null, startWidth: number) => {
     const table = th?.closest('table');
@@ -254,8 +255,24 @@ export function SortableTh({
     const actionsTh = table?.querySelector<HTMLElement>('thead th[data-sort-key="actions"]')
       ?? table?.querySelector<HTMLElement>('thead th:not([data-sort-key])')
       ?? null;
-    const slack = Math.max(0, Math.round((actionsTh?.getBoundingClientRect().width ?? 0) - 76));
+    // 操作列的最小可用宽度：76px 按钮区 + 单元格左右内边距（与 px 内容盒宽度的视觉一致）。
+    const actionsStyle = actionsTh ? window.getComputedStyle(actionsTh) : null;
+    const actionsPadding = actionsStyle
+      ? (Number.parseFloat(actionsStyle.paddingLeft) || 0) + (Number.parseFloat(actionsStyle.paddingRight) || 0)
+      : 0;
+    const actionsMin = 76 + actionsPadding;
+    const slack = Math.max(0, Math.round((actionsTh?.getBoundingClientRect().width ?? 0) - actionsMin));
     return { tableWidth, maxWidth: Math.min(MAX_COLUMN_WIDTH, startWidth + slack) };
+  }, []);
+
+  /**
+   * 拖动中与松手后都用百分比写列宽：百分比是唯一能让「写入值」和「浏览器实际列宽」一致的表示
+   * （px 会按内容盒解释、并对剩余空间重新分配，造成列边界与写入值/蓝线错位）。
+   * 写完后按实际列边界定位蓝线，达到最小/最大宽度时边界和蓝线一起停。
+   */
+  const applyWidth = useCallback((th: HTMLTableCellElement | null, tableWidth: number, targetWidth: number) => {
+    if (!th || tableWidth <= 0) return;
+    th.style.width = `${((targetWidth / tableWidth) * 100).toFixed(4)}%`;
   }, []);
 
   /** 一帧只改一次宽度：拖动时不必每个 pointermove 都触发排版。 */
@@ -267,10 +284,15 @@ export function SortableTh({
       if (!drag) return;
       const next = Math.round(Math.max(MIN_COLUMN_WIDTH, Math.min(drag.maxWidth, drag.startWidth + (pendingX.current - drag.startX))));
       drag.width = next;
-      if (thRef.current) thRef.current.style.width = `${next}px`;
-      setGuideLeft(pendingX.current);
+      const th = thRef.current;
+      if (th) {
+        applyWidth(th, drag.tableWidth, next);
+        drag.renderedWidth = th.getBoundingClientRect().width;
+        // 蓝线 = 实际列边界（不是鼠标坐标）：触界时两者一起停。
+        setGuideLeft(th.getBoundingClientRect().right);
+      }
     });
-  }, []);
+  }, [applyWidth]);
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLSpanElement>) => {
     if (!resizable) return;
@@ -281,9 +303,10 @@ export function SortableTh({
     const startWidth = Math.round(th?.getBoundingClientRect().width ?? (typeof width === 'number' ? width : 160));
     const { tableWidth, maxWidth } = measureDragBounds(th, startWidth);
     pendingX.current = event.clientX;
-    dragRef.current = { startX: event.clientX, startWidth, width: startWidth, maxWidth, tableWidth };
+    dragRef.current = { startX: event.clientX, startWidth, width: startWidth, renderedWidth: startWidth, maxWidth, tableWidth };
     event.currentTarget.setPointerCapture(event.pointerId);
-    setGuideLeft(event.clientX);
+    const startedRect = th?.getBoundingClientRect();
+    setGuideLeft(startedRect ? startedRect.right : event.clientX);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, [measureDragBounds, resizable, width]);
@@ -298,12 +321,19 @@ export function SortableTh({
     const drag = dragRef.current;
     pendingX.current = event.clientX;
     cancelFrame();
-    // 松手时把最后一帧的宽度真正落到表头上，再按表格宽度换算成百分比写入记忆。
+    // 松手仍按同一套百分比布局落宽：不再从 px 改写成百分比，避免松手跳动。
     if (drag) {
       const next = Math.round(Math.max(MIN_COLUMN_WIDTH, Math.min(drag.maxWidth, drag.startWidth + (event.clientX - drag.startX))));
-      if (thRef.current) thRef.current.style.width = `${next}px`;
+      const th = thRef.current;
+      if (th) {
+        applyWidth(th, drag.tableWidth, next);
+        drag.renderedWidth = th.getBoundingClientRect().width;
+      }
       drag.width = next;
     }
+    const finalWidth = drag?.renderedWidth ?? 0;
+    const tableWidth = drag?.tableWidth ?? 0;
+    const startWidth = drag?.startWidth ?? 0;
     dragRef.current = null;
     thRef.current = null;
     setGuideLeft(null);
@@ -311,10 +341,11 @@ export function SortableTh({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    if (!drag || !controls || drag.width === drag.startWidth) return;
-    const percent = drag.tableWidth > 0 ? Math.round((drag.width / drag.tableWidth) * 10000) / 100 : 0;
-    controls.setWidth(column.key, percent > 0 ? `${percent}%` : drag.width);
-  }, [cancelFrame, column.key, controls, restoreBody]);
+    // 没拖动（点击/双击/微动 < 0.5px）不写记忆；真正拖动后保存最终百分比。
+    if (!drag || !controls || !tableWidth || Math.abs(finalWidth - startWidth) < 0.5) return;
+    const percent = Math.round((finalWidth / tableWidth) * 100000) / 1000;
+    controls.setWidth(column.key, `${percent}%`);
+  }, [applyWidth, cancelFrame, column.key, controls, restoreBody]);
 
   const onHandleKeyDown = useCallback((event: React.KeyboardEvent<HTMLSpanElement>) => {
     if (!controls) return;

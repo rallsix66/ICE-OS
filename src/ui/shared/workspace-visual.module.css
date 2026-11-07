@@ -654,7 +654,9 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.detailDialog { display: flex; width: min(1060px, calc(100vw - 40px)); max-width: calc(100vw - 40px); max-height: 90vh; max-height: 90dvh; flex-direction: column; gap: 0; padding: 0; overflow: hidden; border: 1px solid #e0e5ef; border-radius: 12px; background: #fff; box-shadow: 0 24px 90px #172b4926; }
+/* R15：详情弹窗固定实际宽高（高度按视口确定），打开后不随内容长短变化，标题/关闭/页签因此不跳动。
+   短内容在正文留白，长内容在 .detailBody 内滚动。 */
+.detailDialog { display: flex; width: min(1060px, calc(100vw - 40px)); height: 90vh; height: 90dvh; max-width: calc(100vw - 40px); max-height: 90dvh; flex-direction: column; gap: 0; padding: 0; overflow: hidden; border: 1px solid #e0e5ef; border-radius: 12px; background: #fff; box-shadow: 0 24px 90px #172b4926; }
 .detailDialog *,
 .detailDialog *::before,
 .detailDialog *::after,
@@ -944,7 +946,7 @@
   .dateFilters input { width: 100%; min-width: 0; }
   .dateFilters > span:not(.subtle) { display: none; }
   .dateFilters > .subtle { width: 100%; }
-  .detailDialog { width: calc(100vw - 24px); max-width: calc(100vw - 24px); max-height: 92vh; max-height: 92dvh; border-radius: 10px; }
+  .detailDialog { width: calc(100vw - 24px); max-width: calc(100vw - 24px); height: 92vh; height: 92dvh; max-height: 92dvh; border-radius: 10px; }
   .detailHeader { align-items: flex-start; gap: 10px; padding: 18px; }
   .detailHeader [data-slot="dialog-title"] { font-size: 15px; }
   .detailHeader [data-slot="dialog-description"] { font-size: 11px; }
@@ -964,6 +966,13 @@
   .identityGrid { grid-template-columns: minmax(0, 1fr); }
   .identityGrid > div { padding: 11px 0; }
   .detailContent .factGrid { margin-top: 3px; }
+}
+
+/* R15：矮屏下按视口确定高度，优先保住关闭按钮、页签与正文可用高度。 */
+@media (max-height: 620px) {
+  .detailDialog { height: calc(100dvh - 12px); max-height: calc(100dvh - 12px); }
+  .detailHeader { padding: 9px 18px 7px; }
+  .detailBody { padding-top: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
