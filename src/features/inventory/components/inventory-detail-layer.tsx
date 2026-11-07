@@ -81,7 +81,14 @@ export function InventoryDetailLayer({
   const router = useRouter();
   const [target, setTarget] = useState<InventoryDetailTarget | null>(() => initialTargetOf(query, detailRow, itemDetail));
   const targetRef = useRef(target);
+  /** 详情地址是否真正提交进了历史栈（router.push 完成后才置 true）。 */
   const pushedRef = useRef(false);
+  /**
+   * 已发起、尚未提交的详情导航。
+   * 打开详情时 router.push 要等路由/服务端请求完成才改地址；这段时间里用户点关闭，
+   * 不能直接 router.back()（会退到真正的上一页，即从数据同步进入时退回数据同步）。
+   */
+  const pendingNavRef = useRef<{ itemId: string | null; rowKey: string | null; cancelled: boolean } | null>(null);
   useEffect(() => { targetRef.current = target; }, [target]);
 
   const listHref = useMemo(
@@ -97,20 +104,52 @@ export function InventoryDetailLayer({
     [query.q, query.warehouse, query.market, query.view, query.source, query.focus, query.page],
   );
 
+  /* 详情地址真正提交后才标记“已进入详情”；若用户已在等待期间关闭，则提交后立刻退回列表。
+     这样快速关闭既不会把 back() 发到上一页，也不会让 URL 停在详情。 */
+  useEffect(() => {
+    const onDetailUrl = Boolean(query.item || query.row);
+    if (!onDetailUrl) {
+      pushedRef.current = false;
+      pendingNavRef.current = null;
+      return;
+    }
+    const pending = pendingNavRef.current;
+    if (!pending) return;
+    /* 只接管自己发起、且确实落地的那一个详情地址（直接前进到别的详情时不抢）。 */
+    if (pending.itemId !== (query.item || null) || pending.rowKey !== (query.row || null)) return;
+    pendingNavRef.current = null;
+    if (pending.cancelled) {
+      pushedRef.current = false;
+      router.back();
+      return;
+    }
+    pushedRef.current = true;
+  }, [query.item, query.row, router]);
+
   const close = useCallback(() => {
     if (!targetRef.current) return;
     targetRef.current = null;
     setTarget(null);
-    if (pushedRef.current) {
+    /* 同步读当前地址：已经提交的详情地址可以安全 back；尚未提交时 back 会退到上一页。 */
+    const params = new URLSearchParams(window.location.search);
+    const onDetailUrl = Boolean(params.get('item') || params.get('row'));
+    if (pushedRef.current || (onDetailUrl && pendingNavRef.current)) {
       pushedRef.current = false;
+      pendingNavRef.current = null;
       router.back();
-    } else {
-      router.replace(listHref, { scroll: false });
+      return;
     }
+    const pending = pendingNavRef.current;
+    if (pending) {
+      /* 地址还没提交：先标记取消并覆盖为列表地址；若提交仍挡不住，再由上面的 effect 提交后 back。 */
+      pending.cancelled = true;
+    }
+    router.replace(listHref, { scroll: false });
   }, [router, listHref]);
 
   const openRow = useCallback((row: InventoryWarehouseRowDto) => {
-    pushedRef.current = true;
+    pendingNavRef.current = { itemId: row.itemId, rowKey: row.rowKey, cancelled: false };
+    pushedRef.current = false;
     const next: InventoryDetailTarget = { kind: 'row', row };
     targetRef.current = next;
     setTarget(next);
@@ -118,7 +157,8 @@ export function InventoryDetailLayer({
   }, [router, query]);
 
   const openProduct = useCallback((next: { itemId: string; label: string | null; sublabel: string | null }) => {
-    pushedRef.current = true;
+    pendingNavRef.current = { itemId: next.itemId, rowKey: null, cancelled: false };
+    pushedRef.current = false;
     const value: InventoryDetailTarget = { kind: 'product', ...next };
     targetRef.current = value;
     setTarget(value);
@@ -135,6 +175,7 @@ export function InventoryDetailLayer({
         targetRef.current = null;
         setTarget(null);
         pushedRef.current = false;
+        pendingNavRef.current = null;
       }
     };
     window.addEventListener('popstate', onPopState);
