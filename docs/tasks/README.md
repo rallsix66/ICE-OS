@@ -2,7 +2,7 @@
 
 本目录按可独立验收的业务结果组织任务，控制范围、依赖和交付标准。完整任务可分内部步骤、跨会话接续完成，不因会话结束或内部步骤完成而重复要求批准。
 
-当前入口为[current-task.md](./current-task.md)。当前 **INVENTORY_SYNC_UI_V1_DOCS_GIT_CLOSED**（功能验收 **INVENTORY_SYNC_UI_V1_LOCAL_PASS**，2026-10-28主审独立复审通过；文档与 Git 收尾同日完成）；[独立报告](../../.local/inventory-sync-ui-tail-independent-20261028/independent-review.md)、[尾项验收说明](./inventory-sync-ui-v1-tail-repair-acceptance.md)、[运行与交接 §0.11](../inventory/inventory-sync-v1.md)。T1–T3已关闭，无剩余功能修复包；历史任务、数据和证据保留，`.local` 与私有输入未入库。
+当前入口为[current-task.md](./current-task.md)。当前 **`SHIPMENT_IN_TRANSIT_V1_LOCAL_FINAL`**（物流在途板块：本机功能验收及文档、本地版本收尾完成，2026-11-07；验收基线 `SHIPMENT_IN_TRANSIT_V1_R16_LOCAL_PASS`）；[最终功能说明](./shipment-in-transit-v1-final.md)、[运行交接](./shipment-in-transit-v1-runbook.md)、[任务合同](./shipment-in-transit-v1.md)（§23 收尾）、[R16 独立报告](../../.local/shipment-v1-r16-independent-20261107/independent-review.md)。板块已取得本机验收并完成文档与本地 Git 收尾，无剩余功能修复包；远端推送、正式部署与长期运行验收未完成，历史任务、数据和证据保留，`.local` 与私有输入未入库。
 
 ## 文档层级
 
