@@ -32,9 +32,9 @@
 ## 2. 页面入口与查看
 
 - 日常地址：http://127.0.0.1:3011/dashboard/in-transit （导航「物流在途」）。
-- 读取状态统一在 `/dashboard/sync`：飞书 · 物流在途来源卡显示最近成功、下次计划、待处理；失败时只保留一句原因 + 「查看同步」。
-- 物流在途页顶部显示最近成功读取时间、本次结果（新增/更新/未变/失败）、票数与明细数；「待复核」按钮显示拆合票待办数。
-- 商品库详情第四页签「关联货票」、概览「在途库存」卡片可看商品级在途并打开原票。
+- 读取状态统一在 `/dashboard/sync`：飞书 · 物流在途来源卡显示最近成功、下次计划、待处理。物流在途页不再显示成功读取横栏，读取失败时只在页内保留一句提示和「查看同步」入口。
+- 「待复核」按钮显示拆合票待办数。
+- 商品库详情 → 「关联货票」、概览「在途库存」卡片可看商品级在途并打开原票。
 
 ## 3. 依赖
 
@@ -128,7 +128,7 @@ Get-FileHash ".local\shipment-v1-closeout-20261107\backup\<file>.dump" -Algorith
 
 # 恢复到临时库验证（不改现役数据）
 & '<pg bin>\createdb.exe' --host 127.0.0.1 --port 59345 --username postgres <临时库名>
-& '<pg bin>\pg_restore.exe' --no-owner --no-privileges --dbname <临时库名> ".local\shipment-v1-closeout-20261107\backup\<file>.dump"
+& '<pg bin>\pg_restore.exe' --no-owner --no-privileges --host 127.0.0.1 --port 59345 --username postgres --dbname <临时库名> ".local\shipment-v1-closeout-20261107\backup\<file>.dump"
 # 核对票/明细/绑定计数后删除临时库
 & '<pg bin>\dropdb.exe' --host 127.0.0.1 --port 59345 --username postgres <临时库名>
 ```
