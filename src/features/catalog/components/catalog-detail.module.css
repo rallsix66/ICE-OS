@@ -16,13 +16,9 @@
   gap: 0;
   padding: 0;
   overflow: hidden;
-  /* U1：外框固定。切换分区 / 加载 / 空态 / 失败态都不改变弹窗位置与尺寸。 */
-  height: min(92vh, 960px);
-  max-height: calc(100dvh - 24px);
-  /* R3 + 展示打磨：保留克制的 160ms 进入过渡（透明度 + 轻微缩放下沉），
-     用独立 scale / translate 属性，并在 translate 里显式带上弹窗居中的 -50%/-50%
-     （base-ui 的居中由 translate 属性实现，不能只写 0 4px，否则弹窗会被甩到左上角）。
-     只做进入：不做关闭动画、不加延迟、不用 spring；正文内容不依赖动画，遮罩沿用 Dialog。 */
+  /* R14：宽高规则与共用 detailDialog 一致（1060px 规则 / max-height 90vh），只保留进入过渡。 */
+  max-height: 90vh;
+  max-height: 90dvh;
   animation: detailDialogEnter 160ms cubic-bezier(0.23, 1, 0.32, 1) !important;
   transition: none !important;
 }
@@ -78,7 +74,8 @@
   flex: 1 1 auto;
   flex-direction: column;
   gap: 16px;
-  padding: 18px 26px 28px;
+  /* R14：正文内边距与共用 detailBody（24px 26px）一致。 */
+  padding: 24px 26px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -789,14 +786,12 @@
 /* ---- U1：固定外壳 + 分区栏 ---- */
 
 .dialogHeader {
+  /* R14：内边距/标题层级/背景统一由共用 .detailHeader 决定，这里只保留标题与操作区的布局。 */
   display: flex;
   flex: 0 0 auto;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px 16px;
-  padding: 14px 20px 10px;
-  border-bottom: 1px solid #eef0f5;
-  background: #fff;
 }
 
 .dialogTitleBlock {
@@ -809,9 +804,6 @@
 
 .dialogMeta {
   margin: 0;
-  color: #7c8ba1;
-  font-size: 12px;
-  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
@@ -824,7 +816,7 @@
 
 .dialogStatus {
   flex: 0 0 auto;
-  padding: 10px 20px 0;
+  padding: 10px 26px 0;
 }
 
 .dialogFrame {
@@ -835,66 +827,7 @@
   flex-direction: column;
 }
 
-/* 分区栏固定在外框内，不参与正文滚动；高频切换故不做任何位移动画。 */
-.tabBar {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: stretch;
-  gap: 2px;
-  padding: 0 14px;
-  border-bottom: 1px solid #eef0f5;
-  background: #fff;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tabBar::-webkit-scrollbar {
-  display: none;
-}
-
-.tab {
-  min-height: 40px;
-  padding: 9px 13px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: #667a96;
-  font-size: 12.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.tab:hover {
-  color: #2d3f5a;
-}
-
-.tab:focus-visible {
-  outline: 3px solid #8495ed;
-  outline-offset: -3px;
-}
-
-.tabActive {
-  color: #31449b;
-  border-bottom-color: #5266d7;
-  font-weight: 650;
-}
-
-/* 直链页：滚动长文时分区栏仍可见（弹窗内由固定外框保证）。 */
-.pageRoot .tabBar {
-  position: sticky;
-  top: 0;
-  z-index: 6;
-  border-top: 1px solid #eef0f5;
-  box-shadow: 0 6px 14px -12px rgba(23, 37, 64, 0.35);
-  margin-bottom: 2px;
-}
-
-@media (max-width: 700px) {
-  .pageRoot .tabBar {
-    padding: 0 6px;
-  }
-}
+/* R15：分区栏样式与键盘交互已提到共用 src/ui/ice-v4/detail-tabs.*，这里不再保留副本。 */
 
 /* ---- U2：概览按库存阶段组织 ---- */
 
@@ -951,11 +884,6 @@
   .dialogHeader {
     padding: 9px 16px 7px;
     gap: 6px 12px;
-  }
-
-  .tab {
-    min-height: 34px;
-    padding: 6px 11px;
   }
 
   .detailBody {
@@ -1308,5 +1236,165 @@
 
 .bindingFeedback[data-tone="error"] {
   color: #9d4f4d;
+}
+
+/* ---- 第十轮：在途库存卡片（可点击 → 关联货票页签） ---- */
+
+.overviewItemAction {
+  cursor: pointer;
+  transition: border-color 140ms var(--ice-ui-ease-out), background 140ms var(--ice-ui-ease-out);
+}
+
+.overviewItemAction:hover {
+  border-color: #c9d4ea;
+  background: #fbfcff;
+}
+
+.overviewItemAction:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+}
+
+/* ---- 第十轮：关联货票页签 ---- */
+
+.transitSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.transitSummary > div {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #eef0f5;
+  border-radius: 8px;
+  background: #fbfcff;
+}
+
+.transitSummary dt {
+  color: #93a0b3;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.transitSummary dd {
+  margin: 3px 0 0;
+  color: #2d3f5a;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.transitMarket {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #eef0f5;
+  border-radius: 10px;
+  background: #fbfcff;
+}
+
+.transitMarketHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  color: #5a687a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.transitMarketHead h3 {
+  margin: 0;
+  color: #2d3f5a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.transitMarketMeta {
+  color: #667a96;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 900px 抽屉内不挤压：表格自身横向滚动，不改变外层布局。 */
+.transitTableWrap {
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid #eef0f5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.transitTable {
+  width: 100%;
+  min-width: 720px;
+  table-layout: fixed;
+}
+
+.transitTable :is(th, td) {
+  padding: 7px 9px;
+  font-size: 12px;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.transitTable th:nth-child(1) { width: 18%; }
+.transitTable th:nth-child(2) { width: 20%; }
+.transitTable th:nth-child(3) { width: 26%; }
+.transitTable th:nth-child(4),
+.transitTable th:nth-child(5),
+.transitTable th:nth-child(6) { width: 12%; }
+
+.transitRow {
+  cursor: pointer;
+}
+
+.transitRow:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: -2px;
+}
+
+.transitRow:focus-visible td {
+  background: #f4f6ff;
+}
+
+.transitWaybills {
+  display: block;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.transitStatusLabel {
+  display: block;
+  color: #2d3f5a;
+  font-weight: 600;
+}
+
+.transitStatusText {
+  display: block;
+  margin-top: 2px;
+  color: #667a96;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.transitSub {
+  display: block;
+  margin-top: 2px;
+  color: #98a2b2;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.transitNum {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 

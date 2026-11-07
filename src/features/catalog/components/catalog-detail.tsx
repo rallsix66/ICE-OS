@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import surface from '@/ui/ice-v4/data-surface.module.css';
+import { DetailTabs } from '@/ui/ice-v4/detail-tabs';
 import { Pill } from '@/ui/ice-v4/primitives';
 import {
   confirmInventoryMappingsAction,
@@ -32,12 +33,15 @@ import {
   fieldBusinessValue,
   optionalFieldRow,
 } from '../local-display/field-labels';
+import { resolveSpecification } from '../specification';
 import {
   appendNonPriceRevisionAction,
   assignInitialCodeAction,
   checkCatalogRequestOutcomeAction,
   fetchCatalogDetailHistoryAction,
 } from '../actions';
+import { fetchProductShipmentTransitAction } from '@/features/shipment/server/actions';
+import type { ProductShipmentTransitDto, ProductShipmentTransitTicketDto } from '@/features/shipment/types';
 import { DetailAttachments, type DetailAttachmentsModel } from './detail-attachments';
 import { DetailRetryButton } from './detail-retry-button';
 import { useUnsavedLeaveGuard } from './use-unsaved-leave-guard';
@@ -76,9 +80,60 @@ const CARTON_SIZE_KEYS = ['cartonLength', 'cartonWidth', 'cartonHeight'] as cons
 const SECTIONS = [
   { key: 'material', label: '商品资料' },
   { key: 'inventory', label: '库存明细' },
+  { key: 'shipments', label: '关联货票' },
   { key: 'history', label: '变更记录' },
 ] as const;
 export type CatalogDetailSection = (typeof SECTIONS)[number]['key'];
+/** 弹窗加载/切版本时用同一排页签占位，外框与标题不跳动。 */
+export const CATALOG_DETAIL_SECTIONS = SECTIONS;
+
+/** 关联货票页签 & 概览卡片用：固定 en-US 千分位（验收文本 30,000）。 */
+const TRANSIT_QUANTITY_FORMAT = new Intl.NumberFormat('en-US');
+
+function formatTransitQuantity(value: number): string {
+  return TRANSIT_QUANTITY_FORMAT.format(value);
+}
+
+/** 关联货票页签的“物流情况”：票级状态短标签（H 判断）+ G 列原文；两列各管各的，不互相顶替。 */
+const TRANSIT_STATUS_LABELS: Record<ProductShipmentTransitTicketDto['effectiveStatusClass'], string> = {
+  in_transit: '运输在途',
+  partial: '部分到货',
+  arrived_pending_shelving: '已到货待上架',
+  arrived: '全部已上架',
+  unknown: '状态未知',
+};
+
+function transitStatusLabel(ticket: ProductShipmentTransitTicketDto): string {
+  return TRANSIT_STATUS_LABELS[ticket.effectiveStatusClass] ?? TRANSIT_STATUS_LABELS.unknown;
+}
+
+/** 关联货票页签的“物流情况”：只显示飞书 G 列原文；G 为空才是「未填写」（不借 H 列补位）。 */
+function transitStatusText(ticket: ProductShipmentTransitTicketDto): string {
+  const text = (ticket.transportText ?? '').trim();
+  return text || '未填写';
+}
+
+function transitReadAtText(iso: string | null): string {
+  if (!iso) return '—';
+  const timestamp = Date.parse(iso);
+  if (!Number.isFinite(timestamp)) return '—';
+  return new Date(timestamp).toLocaleString('zh-CN', { hour12: false });
+}
+
+/** 概览卡片/页签摘要的“票数 + 待核条数（含待复核）”短句。 */
+function transitPendingHint(data: ProductShipmentTransitDto): string {
+  if (data.pendingItemCount === 0) return `${data.ticketCount} 票在途`;
+  const conflict = data.conflictItemCount > 0 ? `（含 ${data.conflictItemCount} 条待复核）` : '';
+  return `${data.ticketCount} 票 · ${data.pendingItemCount} 条明细待核${conflict}`;
+}
+
+/** 页签单行：剩余在途展示（全待核/全待复核才写提示；已知数量即使为 0 也照常显示）。 */
+function transitRemainingText(ticket: ProductShipmentTransitTicketDto): string {
+  if (ticket.remainingState !== 'known' || ticket.remainingQuantity === null) {
+    return ticket.conflictItemCount > 0 ? '待复核' : '待核';
+  }
+  return formatTransitQuantity(ticket.remainingQuantity);
+}
 
 type Fact = { value: string; hint?: string | null; warn?: boolean };
 
@@ -112,16 +167,26 @@ function legacyFieldValue(field: FieldObservation | undefined): string | null {
   return raw ? raw : null;
 }
 
-/** 缺值 / 明确为空 / 未读取 的表述互斥，不把缺失写成 0。 */
+/**
+ * 规格 / 单位：表列优先，规格缺失时从标准名称提取（与列表同一解析器）。
+ * - `parse_failed` 是真实错误，必须显式告警，不得被名称提取掩盖；
+ * - 名称提取命中时 hint 标明「名称提取」，避免把推断值当成来源事实；
+ * - 单位仍按商品库「单位」字段单独拼接，两者不互相替代。
+ */
 export function catalogSpecFact(item: CatalogDetailCoreView['item']): Fact {
   const field = item.fields.specification ?? item.specification;
-  const business = fieldBusinessValue(field);
   const unit = fieldBusinessValue(item.fields.unit);
   const unitPart = unit === '待补' || unit === '未知' || unit === '解析失败' ? '' : ` / ${unit}`;
-  if (business === '待补') return { value: '规格缺失（待补）', hint: '单位待补', warn: true };
-  if (business === '未知') return { value: '规格未知', hint: null, warn: true };
-  if (business === '解析失败') return { value: '规格解析失败', hint: null, warn: true };
-  return { value: `${business}${unitPart}`, hint: unitPart ? null : '单位待补' };
+  if (field?.state === 'parse_failed') return { value: '规格解析失败', hint: null, warn: true };
+  const resolved = resolveSpecification({ specification: field, nameCn: item.nameCn });
+  if (!resolved.text) {
+    const business = fieldBusinessValue(field);
+    if (business === '未知') return { value: '规格未知', hint: null, warn: true };
+    if (business === '解析失败') return { value: '规格解析失败', hint: null, warn: true };
+    return { value: '规格缺失（待补）', hint: '单位待补', warn: true };
+  }
+  const hints = [resolved.source === 'name' ? '名称提取' : null, unitPart ? null : '单位待补'].filter(Boolean);
+  return { value: `${resolved.text}${unitPart}`, hint: hints.length ? hints.join(' · ') : null };
 }
 
 function imageCaption(item: CatalogDetailCoreView['item']): string {
@@ -212,19 +277,52 @@ function OverviewCard({
   fact,
   testId,
   extra,
+  hint,
+  hintTestId,
+  cardTestId,
+  onActivate,
+  activateLabel,
 }: {
   label: string;
   fact: Fact;
   testId: string;
   extra?: React.ReactNode;
+  /** 数值下方的补充说明（例如关联货票的票数/待核条数）。 */
+  hint?: string | null;
+  hintTestId?: string;
+  /** 整张卡片可点击时（例如「在途库存」→ 关联货票页签）的外层测试 id。 */
+  cardTestId?: string;
+  onActivate?: () => void;
+  activateLabel?: string;
 }) {
-  return (
-    <div className={styles.overviewItem}>
+  const content = (
+    <>
       <dt>{label}</dt>
       <dd>
         <span data-testid={testId} className={fact.warn ? styles.overviewValueWarn : undefined}>{fact.value}</span>
+        {hint ? <span className={styles.overviewHint} data-testid={hintTestId}>{hint}</span> : null}
         {extra}
       </dd>
+    </>
+  );
+  if (!onActivate) {
+    return <div className={styles.overviewItem} data-testid={cardTestId}>{content}</div>;
+  }
+  return (
+    <div
+      className={`${styles.overviewItem} ${styles.overviewItemAction}`}
+      role="button"
+      tabIndex={0}
+      aria-label={activateLabel ?? label}
+      data-testid={cardTestId}
+      onClick={onActivate}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        onActivate();
+      }}
+    >
+      {content}
     </div>
   );
 }
@@ -705,11 +803,46 @@ export function CatalogDetail({
   const [dirtyState, setDirtyState] = useState(false);
   const [section, setSection] = useState<CatalogDetailSection>(defaultSection);
   const sectionRef = useRef<CatalogDetailSection>(defaultSection);
-  const scrollPositions = useRef<Record<CatalogDetailSection, number>>({ material: 0, inventory: 0, history: 0 });
+  const scrollPositions = useRef<Record<CatalogDetailSection, number>>({ material: 0, inventory: 0, shipments: 0, history: 0 });
   const localBodyRef = useRef<HTMLDivElement | null>(null);
   const activeBodyRef = bodyRef ?? localBodyRef;
   const dirtyBridge = useRef<{ persist: () => void; clearDraft: () => void; clearAll: () => void } | null>(null);
   const pendingHref = useRef<string | null>(null);
+
+  /* 第十轮：概览「在途库存」与「关联货票」页签共用同一份按商品读取的在途数据。 */
+  const [transit, setTransit] = useState<ProductShipmentTransitDto | null>(null);
+  /* R11：数据未读完时卡片显示「读取中」；只有成功读取且确认没有当前票才显示「无在途记录」。 */
+  const [transitLoading, setTransitLoading] = useState(!historical);
+  const [transitError, setTransitError] = useState<string | null>(null);
+  const [transitRetryToken, setTransitRetryToken] = useState(0);
+  const transitSeq = useRef(0);
+  const loadTransit = useCallback(async () => {
+    const seq = transitSeq.current + 1;
+    transitSeq.current = seq;
+    if (historical) {
+      setTransit(null);
+      setTransitError(null);
+      setTransitLoading(false);
+      return;
+    }
+    setTransitLoading(true);
+    setTransitError(null);
+    try {
+      const result = await fetchProductShipmentTransitAction(item.itemId);
+      if (transitSeq.current !== seq) return;
+      if (result.success) setTransit(result.data);
+      else setTransitError(result.error);
+    } catch {
+      if (transitSeq.current === seq) setTransitError('在途数据读取失败（网络或传输异常），可重试。');
+    } finally {
+      if (transitSeq.current === seq) setTransitLoading(false);
+    }
+  }, [historical, item.itemId]);
+  useEffect(() => {
+    /* 下一帧再读：与详情其它异步读取一致，避免在 effect 里同步 setState 造成级联渲染。 */
+    const frame = window.requestAnimationFrame(() => { void loadTransit(); });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loadTransit, transitRetryToken]);
 
   /* 编辑入口：弹窗由标题区（loader）控制，直链页自己控制。 */
   const [internalEditing, setInternalEditing] = useState(false);
@@ -919,7 +1052,18 @@ export function CatalogDetail({
   const overviewUnitCost = unitCostFact({ historical, adopted, bsSampleError });
 
   const domesticFact: Fact = { value: '未接入', hint: null };
-  const transitFact: Fact = { value: '未接入', hint: null };
+  /* 第十轮：在途库存卡片使用真实数据（与「关联货票」页签同一份读取结果）。 */
+  const transitFact: Fact = historical
+    ? { value: '—', hint: null }
+    : transitError
+      ? { value: '读取失败', hint: transitError, warn: true }
+      : transitLoading || !transit
+        ? { value: '读取中', hint: null }
+        : transit.ticketCount === 0
+          ? { value: '无在途记录', hint: null }
+          : transit.allPending
+            ? { value: '待核', hint: transitPendingHint(transit) }
+            : { value: formatTransitQuantity(transit.knownRemaining), hint: transitPendingHint(transit) };
 
   const overview = (
     <section className={styles.overview} aria-label="库存与货值概览" data-testid="catalog-detail-overview">
@@ -944,7 +1088,16 @@ export function CatalogDetail({
       <dl className={styles.overviewGrid}>
         <OverviewCard label="国内库存" fact={domesticFact} testId="catalog-overview-domestic" />
         <OverviewCard label="BigSeller 库存" fact={overviewInventory} testId="catalog-overview-overseas" />
-        <OverviewCard label="在途库存" fact={transitFact} testId="catalog-overview-transit" />
+        <OverviewCard
+          label="在途库存"
+          fact={transitFact}
+          testId="catalog-overview-transit"
+          hint={transitFact.hint}
+          hintTestId="catalog-overview-transit-hint"
+          cardTestId="catalog-overview-transit-card"
+          onActivate={() => changeSection('shipments')}
+          activateLabel="查看该商品的相关货票"
+        />
         <OverviewCard label="当前货值" fact={overviewValue} testId="catalog-overview-valuated" />
       </dl>
     </section>
@@ -1001,36 +1154,16 @@ export function CatalogDetail({
   ) : null;
 
   const tabBar = (
-    <div className={styles.tabBar} role="tablist" aria-label="商品详情分区" data-testid="catalog-detail-tabs">
-      {SECTIONS.map((entry) => {
-        const selected = entry.key === section;
-        return (
-          <button
-            key={entry.key}
-            type="button"
-            role="tab"
-            id={`catalog-tab-${entry.key}`}
-            aria-selected={selected}
-            aria-controls={`catalog-panel-${entry.key}`}
-            tabIndex={selected ? 0 : -1}
-            className={selected ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            data-testid={`catalog-tab-${entry.key}`}
-            onClick={() => changeSection(entry.key)}
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-              event.preventDefault();
-              const index = SECTIONS.findIndex((option) => option.key === entry.key);
-              const delta = event.key === 'ArrowRight' ? 1 : -1;
-              const next = SECTIONS[(index + delta + SECTIONS.length) % SECTIONS.length];
-              changeSection(next.key);
-              window.requestAnimationFrame(() => document.getElementById(`catalog-tab-${next.key}`)?.focus());
-            }}
-          >
-            {entry.label}
-          </button>
-        );
-      })}
-    </div>
+    <DetailTabs
+      tabs={SECTIONS}
+      active={section}
+      onSelect={(key) => changeSection(key as CatalogDetailSection)}
+      ariaLabel="商品详情分区"
+      idPrefix="catalog-tab"
+      panelIdPrefix="catalog-panel"
+      testIdPrefix="catalog-tab"
+      sticky={!embedded}
+    />
   );
 
   const leavePromptNode = leavePrompt ? (
@@ -1294,6 +1427,185 @@ export function CatalogDetail({
     </div>
   );
 
+  const shipmentsPanel = (
+    <div role="tabpanel" id="catalog-panel-shipments" aria-labelledby="catalog-tab-shipments" className={`${styles.sectionStack} ${styles.panelFade}`} data-testid="catalog-tabpanel-shipments">
+      <section className={styles.section} aria-label="关联货票">
+        <div className={styles.sectionHead}>
+          <div>
+            <h2 className={styles.sectionTitle}>关联货票</h2>
+          </div>
+        </div>
+        <div className={styles.sectionBody}>
+          {historical ? (
+            <p className={styles.sectionNote} data-testid="catalog-shipments-historical">
+              历史资料版本不显示当前在途。
+              {onBackToCurrent ? (
+                <> {' '}
+                  <button
+                    type="button"
+                    className={`${surface.button} ${surface.buttonSmall}`}
+                    data-testid="catalog-shipments-historical-back"
+                    onClick={onBackToCurrent}
+                  >
+                    返回当前资料
+                  </button>
+                </>
+              ) : null}
+            </p>
+          ) : transitLoading && !transit ? (
+            <p className={styles.sectionNote} role="status" data-testid="catalog-shipments-loading">读取中</p>
+          ) : transitError ? (
+            <p className={styles.sectionNote} role="alert" data-testid="catalog-shipments-error">
+              读取失败：{transitError}
+              {' '}
+              <button
+                type="button"
+                className={`${surface.button} ${surface.buttonSmall}`}
+                data-testid="catalog-shipments-retry"
+                onClick={() => setTransitRetryToken((token) => token + 1)}
+              >
+                重试
+              </button>
+            </p>
+          ) : !transit || transit.ticketCount === 0 ? (
+            <p className={styles.sectionNote} data-testid="catalog-shipments-empty">
+              无在途记录
+            </p>
+          ) : (
+            <>
+              <dl className={styles.transitSummary} data-testid="catalog-shipments-summary">
+                <div>
+                  <dt>已知剩余在途</dt>
+                  <dd data-testid="catalog-shipments-total">
+                    {transit.allPending ? '待核' : formatTransitQuantity(transit.knownRemaining)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>待核明细</dt>
+                  <dd data-testid="catalog-shipments-pending">
+                    {transit.pendingItemCount} 条明细待核
+                    {transit.conflictItemCount > 0 ? `（含 ${transit.conflictItemCount} 条待复核）` : ''}
+                  </dd>
+                </div>
+                <div>
+                  <dt>最近成功读取</dt>
+                  <dd data-testid="catalog-shipments-read-at">{transitReadAtText(transit.latestReadAt)}</dd>
+                </div>
+              </dl>
+
+              {transit.markets.map((market) => {
+                const marketTickets = transit.tickets.filter((ticket) => ticket.market === market.market);
+                const marketAllPending = marketTickets.length > 0 && marketTickets.every((ticket) => ticket.remainingState === 'pending');
+                return (
+                  <section
+                    key={market.market ?? '__unknown__'}
+                    className={styles.transitMarket}
+                    data-testid="catalog-shipments-market"
+                    data-market={market.market ?? ''}
+                  >
+                    <div className={styles.transitMarketHead}>
+                      <h3 data-testid="catalog-shipments-market-name">{market.market ?? '未提供市场'}</h3>
+                      <span className={styles.transitMarketMeta} data-testid="catalog-shipments-market-total">
+                        已知剩余 {marketAllPending ? '待核' : formatTransitQuantity(market.knownRemaining)}
+                      </span>
+                      <span className={styles.transitMarketMeta}>{market.ticketCount} 票</span>
+                      {market.pendingItemCount > 0 ? (
+                        <span className={styles.transitMarketMeta}>
+                          {market.pendingItemCount} 条待核
+                          {market.conflictItemCount > 0 ? `（含 ${market.conflictItemCount} 条待复核）` : ''}
+                        </span>
+                      ) : null}
+                      <span className={styles.transitMarketMeta} data-testid="catalog-shipments-market-orders">
+                        采购单：{market.purchaseOrders.length > 0 ? market.purchaseOrders.join('、') : '无采购单号'}
+                      </span>
+                    </div>
+                    <div className={styles.transitTableWrap}>
+                      <table className={`${demoStyles.table} ${styles.transitTable}`} data-testid="catalog-shipments-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">采购单号</th>
+                            <th scope="col">运单号</th>
+                            <th scope="col">物流情况</th>
+                            <th scope="col">发货量</th>
+                            <th scope="col">累计已上架</th>
+                            <th scope="col">剩余在途</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketTickets.map((ticket) => {
+                            const openTicket = () => router.push(`/dashboard/in-transit?ticket=${ticket.shipmentId}`);
+                            return (
+                              <tr
+                                key={ticket.shipmentId}
+                                role="button"
+                                tabIndex={0}
+                                className={styles.transitRow}
+                                data-testid="catalog-shipments-ticket"
+                                data-ticket-no={ticket.ticketNo}
+                                data-shipment-id={ticket.shipmentId}
+                                aria-label={`打开原票 ${ticket.purchaseOrder ?? ticket.ticketNo}`}
+                                onClick={openTicket}
+                                onKeyDown={(event) => {
+                                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                                  event.preventDefault();
+                                  openTicket();
+                                }}
+                              >
+                                <td data-testid="catalog-shipments-order">
+                                  <span>
+                                    {ticket.purchaseOrder ?? '无采购单号'}
+                                  </span>
+                                  {!ticket.purchaseOrder ? <span className={styles.transitSub}>{ticket.ticketNo}</span> : null}
+                                </td>
+                                <td data-testid="catalog-shipments-waybills">
+                                  <span className={styles.transitWaybills} title={ticket.waybillsText ?? ''}>
+                                    {ticket.waybillsText?.trim() || '未提供'}
+                                  </span>
+                                  {ticket.waybillCount > 1 ? (
+                                    <span className={styles.transitSub} data-testid="catalog-shipments-waybill-count">
+                                      {ticket.waybillCount} 个运单，按整票计一次
+                                    </span>
+                                  ) : null}
+                                </td>
+                                <td
+                                  data-testid="catalog-shipments-transport"
+                                  title={transitStatusText(ticket)}
+                                >
+                                  <span className={styles.transitStatusLabel}>{transitStatusLabel(ticket)}</span>
+                                  <span className={styles.transitStatusText}>{transitStatusText(ticket)}</span>
+                                </td>
+                                <td className={styles.transitNum} data-testid="catalog-shipments-shipped">
+                                  {formatTransitQuantity(ticket.shippedQuantity)}
+                                </td>
+                                <td className={styles.transitNum} data-testid="catalog-shipments-received">
+                                  {ticket.receivedQuantity === null ? '待核' : formatTransitQuantity(ticket.receivedQuantity)}
+                                </td>
+                                <td className={styles.transitNum} data-testid="catalog-shipments-remaining">
+                                  {transitRemainingText(ticket)}
+                                  {ticket.pendingItemCount > 0 && ticket.remainingState === 'known' ? (
+                                    <span className={styles.transitSub} data-testid="catalog-shipments-ticket-pending">
+                                      {ticket.pendingItemCount} 条待核
+                                      {ticket.conflictItemCount > 0 ? `（含 ${ticket.conflictItemCount} 条待复核）` : ''}
+                                    </span>
+                                  ) : null}
+                                  {ticket.manualConflict ? <Pill tone="amber">待复核</Pill> : null}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                );
+              })}
+            </>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+
   const historyPanel = (
     <div role="tabpanel" id="catalog-panel-history" aria-labelledby="catalog-tab-history" className={`${styles.sectionStack} ${styles.panelFade}`} data-testid="catalog-tabpanel-history">
       <section className={styles.section} aria-label="变更记录">
@@ -1415,6 +1727,7 @@ export function CatalogDetail({
         {!historical && section === 'material' && overview}
         {section === 'material' && materialPanel}
         {section === 'inventory' && inventoryPanel}
+        {section === 'shipments' && shipmentsPanel}
         {section === 'history' && historyPanel}
       </div>
     </div>

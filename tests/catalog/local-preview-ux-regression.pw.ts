@@ -223,6 +223,8 @@ test.describe('catalog ux regression (v3)', () => {
 
     await page.getByTestId('catalog-tab-inventory').focus();
     await page.keyboard.press('ArrowRight');
+    await expect(page.getByTestId('catalog-tab-shipments')).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('ArrowRight');
     await expect(page.getByTestId('catalog-tab-history')).toHaveAttribute('aria-selected', 'true');
 
     await openSection(page, 'material');

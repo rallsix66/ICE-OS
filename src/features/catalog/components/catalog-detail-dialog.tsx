@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import surface from '@/ui/ice-v4/data-surface.module.css';
+import { DetailTabs } from '@/ui/ice-v4/detail-tabs';
 import { fetchCatalogDetailAttachmentsAction, fetchCatalogDetailRevisionAction, fetchCatalogDetailViewAction } from '../actions';
 import type { CatalogListClientPayload, CatalogListClientRow } from '../local-display/list-client-types';
 import type { useCatalogUrlState } from '../shell/use-catalog-url-state';
@@ -25,7 +26,7 @@ import {
   type CatalogDetailScope,
   type CatalogDetailView,
 } from '../shell/catalog-detail-cache';
-import { CatalogDetail, catalogSpecFact, warehouseLabelOf, type CatalogDetailSection } from './catalog-detail';
+import { CatalogDetail, catalogSpecFact, warehouseLabelOf, type CatalogDetailSection, CATALOG_DETAIL_SECTIONS } from './catalog-detail';
 import { type DetailAttachmentsModel } from './detail-attachments';
 import { ItemEvidencePanel, type EvidenceValuationState } from './item-evidence-panel';
 import { useDialogFocusTrap } from './use-dialog-focus-trap';
@@ -644,6 +645,18 @@ function CatalogDetailLoader({
       )}
 
       <div className={styles.dialogBodyWrap}>
+        {!displayReady && (
+          /* 加载中/切版本时先渲染同一排页签占位：外框、标题、关闭按钮与页签栏位置不变。 */
+          <DetailTabs
+            tabs={CATALOG_DETAIL_SECTIONS}
+            active={detailSection}
+            ariaLabel="商品详情分区"
+            idPrefix="catalog-tab"
+            panelIdPrefix="catalog-panel"
+            testIdPrefix="catalog-tab"
+            disabled
+          />
+        )}
         {!displayReady && (listRow || pending || error || staleNotice || revisionInvalid) && (
           <div className={styles.dialogStatus}>
             {revisionInvalid && (
@@ -803,7 +816,7 @@ export function CatalogDetailDialog({
       if (!next) closeGuardRef.current();
     }}>
       <DialogContent
-        className={`sm:max-w-5xl ${demoStyles.detailDialog} ${styles.dialogShell}`}
+        className={`${demoStyles.detailDialog} ${styles.dialogShell}`}
         showCloseButton={false}
         aria-describedby="catalog-detail-desc"
         data-testid="catalog-detail-dialog"
