@@ -14,15 +14,22 @@
 
 /* ---------- 来源卡片网格 ---------- */
 
-.sourceGrid {
+/* R15：三张卡 + 下方同步记录纵向排列；记录区不再占用卡片弹层。 */
+.syncRoot {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
   gap: 12px;
   min-width: 0;
 }
 
-/* 桌面：BigSeller 左、聚水潭右；详情/设置面板固定落在两张卡下方，跨整行。 */
+.sourceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 桌面：BigSeller 左、聚水潭中、飞书物流在途右；详情/设置面板固定在卡片下方。 */
 .cardBigseller {
   grid-column: 1;
   grid-row: 1;
@@ -33,9 +40,16 @@
   grid-row: 1;
 }
 
+.cardFeishu {
+  grid-column: 3;
+  grid-row: 1;
+  scroll-margin-top: 16px;
+}
+
 .sourceCard {
   display: flex;
   min-width: 0;
+  height: 100%;
   flex-direction: column;
   gap: 12px;
   padding: 16px;
@@ -148,11 +162,65 @@
   line-height: 1.5;
 }
 
+/* 「待处理」数值本身就是处理入口（点击打开原处理页）；保持与数值同样式，仅补可点击反馈。 */
+.factLink {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+}
+
+.factLink:hover {
+  color: var(--ice-ui-accent-strong);
+  border-bottom-color: currentColor;
+}
+
+.factLink:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+}
+
 .cardActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  /* 三张卡同屏等高：操作按钮统一贴底对齐。 */
+  margin-top: auto;
+}
+
+/* 卡片内「详情」（最近尝试/错误/原文件信息）：默认收起，不占主区域。 */
+.cardDetail {
+  padding-top: 10px;
+  border-top: 1px solid var(--ice-ui-line);
+}
+
+.cardDetail > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  list-style: none;
+}
+
+.cardDetail > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cardDetail > summary::before {
+  content: '▸';
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+}
+
+.cardDetail[open] > summary::before {
+  content: '▾';
+}
+
+.cardDetailBody {
+  padding-top: 8px;
 }
 
 .actionWrap {
@@ -316,7 +384,7 @@
   outline-offset: 2px;
 }
 
-/* ---------- 右侧抽屉（详情 / 设置页签） ---------- */
+/* ---------- 详情/设置弹层（与 ICE v4 共用 detailDialog 一致：1060px 规则 / 90vh / 居中） ---------- */
 
 .statusMessage {
   grid-column: 1 / -1;
@@ -327,112 +395,20 @@
   inset: 0;
   z-index: 60;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
   background: rgba(23, 33, 48, 0.34);
   animation: drawerBackdropIn 200ms var(--ice-ui-ease-out);
 }
 
-.drawer {
-  display: flex;
-  width: min(900px, 92vw);
-  height: 100%;
-  flex-direction: column;
-  background: #fff;
-  box-shadow: -18px 0 46px rgba(24, 36, 54, 0.22);
-  outline: none;
-  animation: drawerIn 200ms var(--ice-ui-ease-out);
+.drawerBackdrop > * {
+  margin: auto;
 }
 
-.drawerHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px 12px;
-  border-bottom: 1px solid var(--ice-ui-line);
-}
-
-.drawerHead h2 {
-  margin: 0;
-  color: #26364c;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.drawerHead p {
-  margin: 3px 0 0;
-  color: var(--ice-ui-faint);
-  font-size: 12px;
-}
-
-.drawerClose {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  place-items: center;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: #6f7b8d;
-  cursor: pointer;
-  transition: background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
-}
-
-.drawerClose:hover {
-  background: #f0f2f8;
-  color: var(--ice-ui-text);
-}
-
-.drawerClose:focus-visible {
-  outline: 2px solid #8495ed;
-  outline-offset: 1px;
-}
-
-.drawerTabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 18px 0;
-  border-bottom: 1px solid var(--ice-ui-line);
-}
-
-.drawerTab {
-  display: inline-flex;
-  height: 34px;
-  align-items: center;
-  padding: 0 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 6px 6px 0 0;
-  background: transparent;
-  color: var(--ice-ui-muted);
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
-}
-
-.drawerTab:hover {
-  background: #f7f8fc;
-  color: var(--ice-ui-text);
-}
-
-.drawerTab[data-active] {
-  border-bottom-color: var(--ice-ui-accent);
-  color: var(--ice-ui-accent-strong);
-  font-weight: 600;
-}
-
-.drawerTab:focus-visible {
-  outline: 2px solid #8495ed;
-  outline-offset: -2px;
-}
-
-.drawerBody {
-  min-height: 0;
-  flex: 1;
-  overflow: auto;
-  padding: 14px 18px;
+@keyframes drawerBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .drawerPanel {
@@ -441,14 +417,11 @@
   gap: 12px;
 }
 
-@keyframes drawerBackdropIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes drawerIn {
-  from { opacity: 0.6; transform: translateX(24px); }
-  to { opacity: 1; transform: none; }
+/* 共用 .statusTabs 的选中态用 aria-pressed；这里页签是 role=tab，用 aria-selected 对应同一视觉。 */
+.syncTabs > button[aria-selected='true'] {
+  border-color: #d2dcf6;
+  background: #eff3fd;
+  color: #6c80bd;
 }
 
 .panelInner {
@@ -700,7 +673,7 @@
 }
 
 .table th {
-  padding: 9px 12px;
+  padding: 11px 14px;
   border-bottom: 1px solid #e9ecf1;
   background: #f9fafc;
   color: var(--ice-ui-faint);
@@ -711,10 +684,10 @@
 }
 
 .table td {
-  padding: 10px 12px;
+  padding: 13px 14px;
   border-bottom: 1px solid #f2f3f6;
   color: #4d5a6b;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.65;
   vertical-align: top;
   font-variant-numeric: tabular-nums;
@@ -764,25 +737,18 @@
   color: #a2493f;
 }
 
-/* 逐仓：文件保存成功 ≠ SKU 全部已对应。 */
-.pendingNote {
-  display: block;
-  margin-top: 2px;
-  color: #a37e45;
-  font-size: 11px;
-  line-height: 1.6;
-}
-
 /* ---------- 面板内按需展开（任务历史 / 诊断） ---------- */
 
-.collapsible {
+.collapsible,
+.belowPanel {
   min-width: 0;
   border: 1px solid var(--ice-ui-line);
   border-radius: 9px;
   background: #fff;
 }
 
-.collapsible > summary {
+.collapsible > summary,
+.belowPanel > summary {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -797,11 +763,13 @@
   list-style: none;
 }
 
-.collapsible > summary::-webkit-details-marker {
+.collapsible > summary::-webkit-details-marker,
+.belowPanel > summary::-webkit-details-marker {
   display: none;
 }
 
-.collapsible > summary::before {
+.collapsible > summary::before,
+.belowPanel > summary::before {
   content: '▸';
   display: inline-block;
   width: 1em;
@@ -809,11 +777,13 @@
   font-size: 11px;
 }
 
-.collapsible[open] > summary::before {
+.collapsible[open] > summary::before,
+.belowPanel[open] > summary::before {
   content: '▾';
 }
 
-.collapsible > summary:hover {
+.collapsible > summary:hover,
+.belowPanel > summary:hover {
   background: #fafbfe;
 }
 
@@ -825,7 +795,8 @@
   line-height: 1.6;
 }
 
-.collapsibleBody {
+.collapsibleBody,
+.belowBody {
   display: grid;
   min-width: 0;
   gap: 12px;
@@ -863,47 +834,23 @@
   line-height: 1.5;
 }
 
-.factList {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-}
-
-.factList > div {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.factList dt {
-  margin: 0;
-  color: var(--ice-ui-faint);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.factList dd {
-  margin: 0;
-  color: #4c586a;
-  font-size: 12px;
-  line-height: 1.65;
-  overflow-wrap: anywhere;
-}
-
-.factList dd small {
-  display: block;
-  margin-top: 2px;
-  color: var(--ice-ui-faint);
-  font-size: 11px;
-  line-height: 1.6;
-}
-
 .hintList {
   margin: 0;
   padding-left: 18px;
   color: #5e6a7a;
   font-size: 12px;
   line-height: 1.7;
+}
+
+@media (max-width: 1100px) {
+  .sourceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cardFeishu {
+    grid-column: 1;
+    grid-row: 2;
+  }
 }
 
 /* ---------- 窄屏：卡片一列；抽屉在移动端全宽 ---------- */
@@ -923,8 +870,12 @@
     order: 2;
   }
 
-  .statusMessage {
+  .cardFeishu {
     order: 3;
+  }
+
+  .statusMessage {
+    order: 4;
   }
 }
 
@@ -948,18 +899,9 @@
 }
 
 @media (max-width: 640px) {
-  .drawer {
-    width: 100%;
-  }
-
-  .drawerHead,
-  .drawerTabs {
-    padding-right: 14px;
-    padding-left: 14px;
-  }
-
-  .drawerBody {
-    padding: 12px 14px;
+  /* 详情弹层宽度由共用 detailDialog 的响应式规则接管。 */
+  .drawerBackdrop {
+    padding: 12px;
   }
 }
 
@@ -969,8 +911,7 @@
   }
 
   .sourceCard,
-  .drawerBackdrop,
-  .drawer {
+  .drawerBackdrop {
     animation: none;
   }
 }

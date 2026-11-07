@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { RefreshCw, Table2 } from 'lucide-react';
 import { PageHeading } from '@/ui/ice-v4/data-surface';
 import shared from '@/ui/ice-v4/data-surface.module.css';
+import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import styles from './sync-view.module.css';
 import { StatusPill } from './display';
 import { SyncControls } from './sync-controls';
@@ -110,7 +112,7 @@ function runWarehouseBreakdown(warehouses: NonNullable<InventoryRunDetailDto['wa
 
 function FactList({ rows }: { rows: Array<{ label: string; value: string; hint?: string }> }) {
   return (
-    <dl className={styles.factList}>
+    <dl className={demoStyles.detailList}>
       {rows.map((row) => (
         <div key={row.label}>
           <dt>{row.label}</dt>
@@ -141,6 +143,22 @@ function latestObservationAt(states: InventoryWarehouseReadStateV2Dto[] | null):
   return latest;
 }
 
+/** 最近成功批次时间：取逐仓最后完整成功批次时间（lastSuccessAt）的最新一条；没有成功批次返回 null。 */
+function latestBatchSuccessAt(states: InventoryWarehouseReadStateV2Dto[] | null): string | null {
+  let latest: string | null = null;
+  let latestTime = Number.NEGATIVE_INFINITY;
+  for (const state of states ?? []) {
+    if (!state.lastSuccessAt) continue;
+    const time = Date.parse(state.lastSuccessAt);
+    if (!Number.isFinite(time)) continue;
+    if (time > latestTime) {
+      latest = state.lastSuccessAt;
+      latestTime = time;
+    }
+  }
+  return latest;
+}
+
 export function SyncView({
   overview,
   query,
@@ -150,6 +168,8 @@ export function SyncView({
   runError,
   domesticSnapshot,
   viewer,
+  shipmentCard,
+  sourceNotes,
 }: {
   overview: InventoryOverviewDto;
   query: SyncQueryState;
@@ -163,6 +183,10 @@ export function SyncView({
   domesticSnapshot: InventoryDomesticSnapshotDto | null;
   /** 服务端会话身份（页面传入）：本地保留原请求的归属判断与本地记录绑定；客户端不自行生成。 */
   viewer: LocalViewerIdentity | null;
+  /** 第十二轮：飞书 · 物流在途来源卡（读取状态统一在本页，与其它来源同网格）。 */
+  shipmentCard?: ReactNode;
+  /** R15：飞书来源读取记录（原卡片「详情」内容），统一放在三卡下方。 */
+  sourceNotes?: ReactNode;
 }) {
   const account = overview.account;
   const login = loginStateDisplay(account.status);
@@ -217,6 +241,13 @@ export function SyncView({
       note: warehouseStateLabel(row),
     }));
 
+  /* 卡片「最近成功」= 最近一次成功批次时间；逐仓读不到时退回「最后全部成功」时间，都没有才写「尚无成功记录」。 */
+  const latestBatchSuccess = latestBatchSuccessAt(warehouseStates) ?? overview.scopeLastAllSuccessAt ?? null;
+  const lastSuccessText = latestBatchSuccess
+    ? (formatTimestamp(latestBatchSuccess) || '时间未记录')
+    : '尚无成功记录';
+  const lastSuccessAlert = !latestBatchSuccess && warehouseStatesError ? '逐仓状态读取失败' : null;
+
   /* 首屏来源行需要的事实：最后成功数据时间（只在读取失败时给一行短状态）。 */
   const latestObservation = latestObservationAt(warehouseStates);
   const lastDataTime = latestObservation ?? overview.scopeLastAllSuccessAt ?? null;
@@ -227,17 +258,19 @@ export function SyncView({
 
   const pendingTotal = Math.max(0, Number(overview.mappingQueueTotal ?? 0) || 0);
 
-  /* 国内冻结快照：只读卡片，不提供立即同步，也不造假来源。 */
+  /* 国内冻结快照：只读卡片；成功导入记录时间当前没有可读记录 → 「暂无记录」，不写 0。 */
   const domesticAvailable = domesticSnapshot?.available === true;
   const domesticDates = domesticAvailable
     ? (domesticSnapshot?.fileDates ?? []).map((entry) => entry.fileDate).filter(Boolean).sort()
     : [];
-  const domesticDateText = domesticDates.length > 0 ? domesticDates[domesticDates.length - 1] : '—';
+  const domesticLatestFile = domesticDates.length > 0
+    ? (domesticSnapshot?.fileDates ?? []).find((entry) => entry.fileDate === domesticDates[domesticDates.length - 1]) ?? null
+    : null;
   const domesticStatus: { label: string; tone: Tone } = domesticAvailable
     ? { label: '快照可用', tone: 'green' }
     : { label: '未读取', tone: 'amber' };
 
-  /** 聚水潭卡片由服务端渲染后交给客户端卡片网格，保证首屏顺序固定为 BigSeller → 聚水潭。 */
+  /** 聚水潭卡片由服务端渲染后交给客户端卡片网格，保证首屏顺序固定为 BigSeller → 聚水潭 → 飞书。 */
   const domesticCard = (
     <section
       className={`${styles.sourceCard} ${styles.cardDomestic}`}
@@ -258,13 +291,13 @@ export function SyncView({
         </div>
       </header>
       <dl className={styles.cardFacts}>
-        <div data-testid="sync-source-domestic-file-date">
-          <dt>原文件日期</dt>
-          <dd>{domesticDateText}</dd>
+        <div data-testid="sync-source-domestic-last-success">
+          <dt>最近成功</dt>
+          <dd>暂无记录</dd>
         </div>
         <div data-testid="sync-source-domestic-next-plan">
-          <dt>下次计划</dt>
-          <dd>不自动同步</dd>
+          <dt>下次同步</dt>
+          <dd>手动导入</dd>
         </div>
         <div data-testid="sync-source-domestic-pending">
           <dt>待处理</dt>
@@ -279,13 +312,61 @@ export function SyncView({
     </section>
   );
 
-  const runsAttention = Boolean(pending)
-    || Boolean(latestRun && latestDisplay && ['failed', 'partial', 'outcome_unknown', 'needs_login'].includes(latestRun.status));
-
-  /* 详情面板（服务端渲染后作为 children 交给客户端外壳，按需显示；内容与旧语义一致）。 */
+  /* 三卡下方的同步记录（原「详情」页签内容 + 原卡片内折叠的来源信息）。 */
   const detailContent = (
     <>
       <PendingRecoveryPanel key={pendingRecoveryKey(pending)} pending={pending} viewer={viewer} />
+
+      {/* 聚水潭原文件信息（原聚水潭卡片「详情」）：卡片不再有展开区，内容统一放在这里。 */}
+      <section className={styles.detailSection} data-testid="sync-source-domestic-detail" aria-label="聚水潭原文件">
+        <div className={styles.sectionHeader}>
+          <h2>聚水潭原文件</h2>
+        </div>
+        <div className={styles.sectionBody}>
+          <FactList rows={[
+            {
+              label: '原文件日期',
+              value: domesticAvailable ? (domesticLatestFile?.fileDate ?? '未提供') : '未读取',
+              hint: domesticLatestFile?.fileName ?? undefined,
+            },
+            {
+              label: '冻结记录',
+              value: domesticAvailable ? `${formatQuantity(domesticSnapshot?.recordCount ?? 0)} 条` : '未读取',
+              hint: domesticAvailable ? `已关联 ${formatQuantity(domesticSnapshot?.linkedSelectedCount ?? 0)} 条` : undefined,
+            },
+            {
+              label: '快照校验',
+              value: domesticAvailable ? (domesticSnapshot?.cached ? '本进程已校验' : '已校验') : '未读取',
+              hint: domesticAvailable ? `指纹 ${(domesticSnapshot?.sourceRecordsSha256 ?? '').slice(0, 12) || '未记录'}` : domesticSnapshot?.reason ?? undefined,
+            },
+          ]} />
+        </div>
+      </section>
+
+      {/* 最近尝试与错误详情：卡片主区域只保留「最近成功 / 下次同步 / 待处理」。 */}
+      <section className={styles.detailSection} data-testid="sync-source-status-detail" aria-label="来源状态">
+        <div className={styles.sectionHeader}>
+          <h2>来源状态</h2>
+        </div>
+        <div className={styles.sectionBody}>
+          <FactList
+            rows={[
+              {
+                label: '最近尝试',
+                value: latestRun
+                  ? `${timestampOr(latestRun.startedAt, '未开始')} · ${latestDisplay?.label ?? '状态未记录'}`
+                  : '还没有同步记录',
+                hint: latestRun?.errorCode
+                  ? `${errorCodeLabel(latestRun.errorCode) ?? '未记录'} · 错误码 ${latestRun.errorCode}`
+                  : undefined,
+              },
+              { label: '最近成功数据', value: lastDataText, hint: lastDataAlert ?? undefined },
+              { label: '后台状态', value: worker.label },
+              { label: '登录状态', value: login.label },
+            ]}
+          />
+        </div>
+      </section>
 
       <section className={styles.detailSection} data-testid="sync-scope-progress" aria-label="逐仓结果">
         <div className={styles.sectionHeader}>
@@ -347,9 +428,6 @@ export function SyncView({
                         </td>
                         <td>
                           {pendingCell.text}
-                          {pendingCell.alert ? (
-                            <span className={styles.pendingNote}>未计入商品合计</span>
-                          ) : null}
                         </td>
                       </tr>
                     );
@@ -366,12 +444,12 @@ export function SyncView({
         </div>
       </section>
 
-      <details className={styles.collapsible} data-testid="sync-runs" open={query.run !== '' || runsAttention}>
-        <summary>
-          任务历史与任务详情
+      <section className={styles.detailSection} data-testid="sync-runs" aria-label="任务历史与任务详情">
+        <div className={styles.sectionHeader}>
+          <h2>任务历史与任务详情</h2>
           <span className={styles.summaryHint}>共 {runs.length} 条</span>
-        </summary>
-        <div className={styles.collapsibleBody}>
+        </div>
+        <div className={styles.sectionBody}>
           {activeRuns.length > 0 ? (
             <p className={styles.inlineNotice}>
               进行中任务 {activeRuns.length} 个
@@ -628,7 +706,9 @@ export function SyncView({
             </section>
           ) : null}
         </div>
-      </details>
+      </section>
+
+      {sourceNotes}
     </>
   );
 
@@ -693,12 +773,13 @@ export function SyncView({
           pendingLocked={pendingLocked}
           viewer={viewer}
           selectedRunId={query.run}
-          lastDataText={lastDataText}
-          lastDataAlert={lastDataAlert}
+          lastSuccessText={lastSuccessText}
+          lastSuccessAlert={lastSuccessAlert}
           pendingTotal={pendingTotal}
-          detailContent={detailContent}
+          detailsBelow={detailContent}
           diagnostics={diagnosticsContent}
           domesticCard={domesticCard}
+          shipmentCard={shipmentCard ?? null}
         />
       </section>
     </div>

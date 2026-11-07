@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Globe2, X } from 'lucide-react';
 import { Checkbox, SelectMenu } from '@/ui/ice-v4/data-surface';
+import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import styles from './sync-view.module.css';
 import { StatusPill } from './display';
 import {
+  buildInventoryListHref,
   buildManualSyncIntent,
   buildSettingsIntent,
   compareStableText,
-  errorCodeLabel,
   formatQuantity,
   formatTimestamp,
   intervalDisplay,
@@ -19,7 +21,6 @@ import {
   resolveScopeChange,
   runStatusDisplay,
   scopeDisplay,
-  timestampOr,
   warehouseStatusLabel,
   type IntervalUnit,
   type Tone,
@@ -39,17 +40,16 @@ import { registerOriginalRequest } from './pending-recovery';
 import { settlementReleasesLock, settlementTone } from '../settlement';
 
 type MessageTone = 'ok' | 'warn' | 'error';
-type OpenPanel = 'detail' | 'settings' | null;
 
 const TONE_BY_RESULT = (outcome: InventoryActionOutcome): MessageTone => settlementTone(outcome);
 const FAILURE_RUN_STATUSES = ['failed', 'partial', 'outcome_unknown', 'needs_login'];
 
 /**
  * BigSeller 来源卡片（客户端）：卡片网格的容器。
- * - 首屏两张卡：BigSeller（左）与聚水潭（右，服务端渲染后传入），窄屏一列；
+ * - 首屏三张卡：BigSeller、聚水潭、飞书（服务端渲染后传入），窄屏一列；
  * - 卡片右上角只给一句“是否正常”状态；异常收进卡片内一行短状态；
- * - 「立即同步」是主操作；「详情」「设置」打开同一右侧抽屉，用顶部页签切换；
- * - 抽屉内容由服务端页面渲染后传入（逐仓结果、任务历史、失败详情、原请求核对、设置）；
+ * - R15：卡片不再有「详情」入口；「设置」直接打开设置弹窗（不再夹带详情页签）；
+ * - 任务历史、逐仓结果、原请求核对与来源读取记录统一放到三张卡下方，按需展开；
  * - 所有写动作仍走统一 pending 流程：先登记原请求 → 本地记录 → 原动作 → 结果未知核对；
  * - 写锁 = 服务端 pending 或本地保留原请求，覆盖设置/立即同步/仓库勾选等输入。
  */
@@ -60,31 +60,34 @@ export function SyncControls({
   pendingLocked,
   viewer,
   selectedRunId,
-  lastDataText,
-  lastDataAlert,
+  lastSuccessText,
+  lastSuccessAlert,
   pendingTotal,
-  detailContent,
+  detailsBelow,
   diagnostics,
   domesticCard,
+  shipmentCard,
 }: {
   overview: InventoryOverviewDto;
   selectedWarehouseIds: string[];
   activeRun: { id: string; statusLabel: string } | null;
   pendingLocked: boolean;
   viewer: LocalViewerIdentity | null;
-  /** 当前 URL 选中的任务 id（?run=）；有值时外层详情自动展开，选中任务详情随面板可见。 */
+  /** 当前 URL 选中的任务 id（?run=）；有值时下方同步记录自动展开。 */
   selectedRunId: string;
-  /** 最后成功数据时间（服务端按逐仓观测时间计算）；读取失败时给一行短状态。 */
-  lastDataText: string;
-  lastDataAlert: string | null;
+  /** 最近一次成功批次时间（逐仓最后完整成功批次取最新）；没有成功批次时为「尚无成功记录」。 */
+  lastSuccessText: string;
+  lastSuccessAlert: string | null;
   /** 待处理对应总数（来源 SKU × 仓库；未计入商品合计）。 */
   pendingTotal: number;
-  /** 详情面板内容（服务端渲染；原请求核对/逐仓结果/任务历史）。 */
-  detailContent: ReactNode;
+  /** 三张卡下方的同步记录（原请求核对/逐仓结果/任务历史/来源读取记录；服务端渲染）。 */
+  detailsBelow: ReactNode;
   /** 设置面板内的后台诊断（服务端渲染的 <details>）。 */
   diagnostics: ReactNode;
   /** 聚水潭来源卡片（服务端渲染；只读快照，不提供立即同步）。 */
   domesticCard: ReactNode;
+  /** 飞书 · 物流在途来源卡片（服务端渲染；读取状态统一在本页）。 */
+  shipmentCard: ReactNode;
 }) {
   const router = useRouter();
   const saved = intervalDisplay(overview.settings.intervalMinutes);
@@ -97,30 +100,23 @@ export function SyncControls({
   const [clearConfirm, setClearConfirm] = useState(false);
   const [busy, setBusy] = useState<null | 'save' | 'manual'>(null);
   const [message, setMessage] = useState<{ text: string; tone: MessageTone } | null>(null);
-  /** 详情/设置面板默认折叠：有待核对原请求或 URL 选中任务时展开详情；明确空范围时展开设置方便恢复。 */
-  const [openPanel, setOpenPanel] = useState<OpenPanel>(
-    overview.pendingAction ? 'detail' : scope.empty ? 'settings' : selectedRunId ? 'detail' : null,
-  );
-  /** 本地“结果未知”原请求出现时自动展开详情（恢复入口在详情内）；用户可手动收起。 */
-  const [dismissedLocalId, setDismissedLocalId] = useState<string | null>(null);
-  /** URL 选中任务时自动展开详情；用户手动“收起详情”后不再自动展开，直到选中另一个任务。 */
-  const [dismissedSelectedRunId, setDismissedSelectedRunId] = useState<string | null>(null);
+  /** R15：卡片下方同步记录按需展开；有待核对原请求或 URL 选中任务时默认展开。 */
+  const [belowOpen, setBelowOpen] = useState(Boolean(overview.pendingAction) || Boolean(selectedRunId));
+  /** 设置弹窗：明确空范围时自动打开方便恢复；用户关闭后不再自动打开。 */
+  const [settingsOpen, setSettingsOpen] = useState(scope.empty);
   // R2 v4：本地保留的“结果未知”原请求也计入写锁（服务端 pending 之外的浏览器副本）。
   const local = useSyncExternalStore(subscribeLocalUnknown, getLocalUnknownSnapshot, getLocalUnknownServerSnapshot);
   const localRequestId = local?.requestId ?? null;
-  const autoDetail = Boolean(localRequestId) && dismissedLocalId !== localRequestId;
-  const autoSelectedRun = Boolean(selectedRunId) && dismissedSelectedRunId !== selectedRunId;
   const writeLocked = pendingLocked || Boolean(local);
   const localOwner = local ? localUnknownOwnerCheck(local, viewer) : { trusted: true, reason: null };
-  const locatedSelectedRunRef = useRef<string | null>(null);
-  /** 抽屉页签与卡片触发按钮：打开后焦点进抽屉，关闭后回到触发按钮。 */
-  const detailTabRef = useRef<HTMLButtonElement | null>(null);
-  const settingsTabRef = useRef<HTMLButtonElement | null>(null);
-  const detailToggleRef = useRef<HTMLButtonElement | null>(null);
+  /** 本地出现「结果未知」原请求时自动展开下方同步记录（同一次渲染内调整，避免 effect 里 setState）。 */
+  const [belowOpenForRequest, setBelowOpenForRequest] = useState<string | null>(localRequestId);
+  if (localRequestId && belowOpenForRequest !== localRequestId) {
+    setBelowOpenForRequest(localRequestId);
+    setBelowOpen(true);
+  }
+  /** 设置弹窗与卡片触发按钮：打开后焦点进弹窗，关闭后回到触发按钮。 */
   const settingsToggleRef = useRef<HTMLButtonElement | null>(null);
-  const lastOpenRef = useRef<OpenPanel>(null);
-  /** 首屏自动打开（待核对/空范围/?run=）不抢焦点；用户主动打开才把焦点放进抽屉。 */
-  const skipAutoFocusRef = useRef(openPanel !== null);
 
   const warehouses = overview.warehouses ?? [];
   // 首屏排序必须确定性（不依赖 locale/ICU）：先已确认参与，再按仓库外部编码/名称码点。
@@ -133,11 +129,16 @@ export function SyncControls({
       return externalDelta !== 0 ? externalDelta : compareStableText(a.name, b.name);
     });
   const scopeChange = resolveScopeChange({ savedWarehouseIds: selectedWarehouseIds, draftWarehouseIds: selected });
-  const nextRunText = overview.settings.nextRunAt
-    ? formatTimestamp(overview.settings.nextRunAt) || '待后台确认'
-    : overview.settings.enabled
-      ? '待后台确认'
-      : '未安排（自动同步已关闭）';
+  /** R15：库存同步程序未运行时，2026-10-29 遗留的旧计划不能再显示成“下次同步”。 */
+  const workerRunning = Boolean(overview.worker?.online);
+  const scheduledEnabled = workerRunning && overview.settings.enabled;
+  const nextRunText = !workerRunning
+    ? '暂无执行计划'
+    : overview.settings.nextRunAt && scheduledEnabled
+      ? formatTimestamp(overview.settings.nextRunAt) || '待后台确认'
+      : scheduledEnabled
+        ? '待后台确认'
+        : '未安排（自动同步已关闭）';
   const blockedReason = manualSyncBlockedReason({ scopeEmpty: scope.empty, accountStatus: overview.account.status });
   // 草稿是否偏离已保存设置：立即同步始终按已保存范围执行，不能让人误以为草稿已生效。
   const draftInterval = normalizeIntervalInput(intervalValue, intervalUnit);
@@ -156,14 +157,23 @@ export function SyncControls({
   const latestDisplay = latestRun ? runStatusDisplay(latestRun.status) : null;
   const lastFailedRun = latestRun && latestDisplay && FAILURE_RUN_STATUSES.includes(latestRun.status);
 
-  /* 卡片右上角“是否正常”：异常优先；只给状态词，长解释不进卡片。 */
+  /* 卡片右上角“是否正常”：异常优先；卡片只留一句短状态，错误码/最近尝试都在下方同步记录里。 */
   const healthNotes: string[] = [];
   let statusLabel = '未运行';
   let statusTone: Tone = 'neutral';
   if (overview.pendingAction) {
     statusLabel = '结果待核对';
     statusTone = 'amber';
-    healthNotes.push('原请求待核对，先核对再同步或改设置');
+    healthNotes.push('先核对原请求，再同步或改设置');
+  } else if (!overview.worker) {
+    statusLabel = '后台未登记';
+    statusTone = 'amber';
+    healthNotes.push('后台同步程序未登记');
+  } else if (!overview.worker.online) {
+    /* 后台离线优先于历史遗留的排队任务：离线时不能把队列里的旧任务显示成「同步中」，也不能显示旧计划。 */
+    statusLabel = '库存自动同步未运行';
+    statusTone = 'amber';
+    if (activeRun) healthNotes.push('同步程序未运行，队列中的任务不会执行');
   } else if (activeRun) {
     statusLabel = '同步中';
     statusTone = 'blue';
@@ -175,14 +185,6 @@ export function SyncControls({
     statusLabel = '账号已停用';
     statusTone = 'neutral';
     healthNotes.push('账号已停用，自动同步不执行');
-  } else if (!overview.worker) {
-    statusLabel = '后台未登记';
-    statusTone = 'amber';
-    healthNotes.push('后台同步程序未登记');
-  } else if (!overview.worker.online) {
-    statusLabel = '后台离线';
-    statusTone = 'amber';
-    healthNotes.push(`后台离线 · 最后心跳 ${timestampOr(overview.worker.lastSeenAt, '暂无记录')}`);
   } else if (scope.empty) {
     statusLabel = '空范围';
     statusTone = 'amber';
@@ -190,7 +192,7 @@ export function SyncControls({
     const unknown = latestRun?.status === 'outcome_unknown';
     statusLabel = unknown ? '结果待核对' : '最近同步失败';
     statusTone = latestRun?.status === 'failed' || latestRun?.status === 'needs_login' ? 'red' : 'amber';
-    healthNotes.push(unknown ? '保存结果待确认，先核对原请求' : `失败原因：${errorCodeLabel(latestRun?.errorCode ?? null) ?? '未记录'}`);
+    healthNotes.push(unknown ? '保存结果待确认，先核对原请求' : '最近一次同步失败，原因见下方同步记录');
   } else if (latestRun?.status === 'success') {
     statusLabel = '正常';
     statusTone = 'green';
@@ -210,23 +212,11 @@ export function SyncControls({
           : blockedReason
     : null;
 
-  /* 抽屉当前页签：本地“结果未知”原请求 / URL 选中任务出现时自动落到详情页签，用户关闭后不再自动弹出。 */
-  const panel: OpenPanel = openPanel ?? (autoDetail || autoSelectedRun ? 'detail' : null);
-  const detailOpen = panel === 'detail';
-  const settingsOpen = panel === 'settings';
+  /* R15：卡片上只保留「设置」弹层；详情页签与专用切换逻辑已删除。 */
+  const panel: 'settings' | null = settingsOpen ? 'settings' : null;
+  const closeDrawer = useCallback(() => setSettingsOpen(false), []);
 
-  /** 关闭抽屉：同时收起自动弹出（本地恢复入口 / URL 选中任务），后续不自动重开。 */
-  const dismissAutoDetail = useCallback(() => {
-    if (autoDetail) setDismissedLocalId(localRequestId);
-    if (autoSelectedRun) setDismissedSelectedRunId(selectedRunId);
-  }, [autoDetail, autoSelectedRun, localRequestId, selectedRunId]);
-
-  const closeDrawer = useCallback(() => {
-    dismissAutoDetail();
-    setOpenPanel(null);
-  }, [dismissAutoDetail]);
-
-  /* 抽屉是 modal：Tab / Shift+Tab 限制在抽屉内，焦点跑出立刻拉回（与商品详情弹层同一 hook）。 */
+  /* 设置弹窗是 modal：Tab / Shift+Tab 限制在弹窗内，焦点跑出立刻拉回（与商品详情弹层同一 hook）。 */
   useDialogFocusTrap(panel !== null, '#sync-source-drawer');
 
   /* Esc 关闭 + 打开时锁背景滚动（与库存详情抽屉一致）。 */
@@ -246,33 +236,29 @@ export function SyncControls({
     };
   }, [panel, closeDrawer]);
 
-  /* 焦点：打开/切页签进入对应页签按钮；关闭回到触发按钮；首屏自动打开不抢焦点。 */
+  /* 焦点：打开进入弹窗关闭按钮；关闭回到「设置」。首屏自动打开（空范围）不抢焦点。 */
+  const skipAutoFocusRef = useRef(scope.empty);
   useEffect(() => {
-    const previous = lastOpenRef.current;
-    lastOpenRef.current = panel;
     if (!panel) {
-      if (previous === 'detail') detailToggleRef.current?.focus();
-      else if (previous === 'settings') settingsToggleRef.current?.focus();
+      settingsToggleRef.current?.focus();
       return;
     }
-    if (previous === null && skipAutoFocusRef.current) {
+    if (skipAutoFocusRef.current) {
       skipAutoFocusRef.current = false;
       return;
     }
-    (panel === 'detail' ? detailTabRef : settingsTabRef).current?.focus();
+    document.getElementById('sync-drawer-close')?.focus();
   }, [panel]);
 
-  // T3：URL 选中任务（?run=）时，把该任务详情带入当前视口。
-  // 只在首次定位该任务时生效（切换任务/刷新会重新定位）；样式或流式内容补齐造成的布局变化会再校正，
-  // 位置稳定后停止并断开监听，手动收起或之后再展开都不会持续把用户拉回。
+  /* URL 选中任务（?run=）时展开下方同步记录，并把该任务详情带入当前视口（只定位首次）。 */
+  const locatedSelectedRunRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!selectedRunId || !detailOpen) return;
+    if (!selectedRunId || !belowOpen) return;
     if (locatedSelectedRunRef.current === selectedRunId) return;
     locatedSelectedRunRef.current = selectedRunId;
     const target = () => document.getElementById('sync-run-detail');
     target()?.scrollIntoView({ block: 'start' });
     if (typeof ResizeObserver === 'undefined' || !document.body) return;
-    // 观察 body：样式/流式内容补全会改变页面高度，此时把目标重新带回视口；稳定后断开。
     const observer = new ResizeObserver(() => target()?.scrollIntoView({ block: 'start' }));
     observer.observe(document.body);
     const stop = window.setTimeout(() => observer.disconnect(), 1500);
@@ -280,16 +266,7 @@ export function SyncControls({
       observer.disconnect();
       window.clearTimeout(stop);
     };
-  }, [selectedRunId, detailOpen]);
-
-  /** 卡片上的「详情」「设置」：打开抽屉对应页签；当前页签再点一次即关闭。 */
-  function togglePanel(nextPanel: Exclude<OpenPanel, null>): void {
-    if (panel === nextPanel) {
-      closeDrawer();
-      return;
-    }
-    setOpenPanel(nextPanel);
-  }
+  }, [selectedRunId, belowOpen]);
 
   function toggleWarehouse(warehouseId: string) {
     setClearConfirm(false);
@@ -444,7 +421,8 @@ export function SyncControls({
   }
 
   return (
-    <div data-testid="sync-controls" id="sync-controls" className={styles.sourceGrid}>
+    <div data-testid="sync-controls" id="sync-controls" className={styles.syncRoot}>
+      <div className={styles.sourceGrid}>
       <section
         className={`${styles.sourceCard} ${styles.cardBigseller}`}
         data-testid="sync-source-row-bigseller"
@@ -466,58 +444,30 @@ export function SyncControls({
 
         <dl className={styles.cardFacts}>
           <div data-testid="sync-source-last-data">
-            <dt>最后成功数据</dt>
+            <dt>最近成功</dt>
             <dd>
-              {lastDataText}
-              {lastDataAlert ? <small>{lastDataAlert}</small> : null}
+              {lastSuccessText}
+              {lastSuccessAlert ? <small>{lastSuccessAlert}</small> : null}
             </dd>
           </div>
           <div data-testid="sync-source-next-plan">
-            <dt>下次计划</dt>
+            <dt>下次同步</dt>
             <dd>{nextRunText}</dd>
           </div>
           <div data-testid="sync-source-pending">
-            <dt>待处理未对应</dt>
-            <dd data-testid="sync-mapping">{formatQuantity(pendingTotal) || '0'}</dd>
+            <dt>待处理</dt>
+            <dd data-testid="sync-mapping">
+              <Link
+                className={styles.factLink}
+                href={buildInventoryListHref({ q: '', warehouse: 'all', market: 'all', page: 1, view: 'warehouse', source: 'overseas' })}
+                data-testid="sync-mapping-link"
+                title="打开商品库存仓库明细，处理未对应的来源 SKU"
+              >
+                {formatQuantity(pendingTotal) || '0'}
+              </Link>
+            </dd>
           </div>
         </dl>
-
-        <div className={styles.cardActions}>
-          <button
-            type="button"
-            className={styles.primaryButton}
-            onClick={requestManualSync}
-            disabled={busy !== null || writeLocked || blockedReason !== null}
-            title={blockedShort ?? '按已保存范围立即同步'}
-            data-testid="sync-manual-button"
-          >
-            {busy === 'manual' ? '正在提交…' : '立即同步'}
-          </button>
-          <button
-            ref={detailToggleRef}
-            type="button"
-            className={styles.secondaryButton}
-            onClick={() => togglePanel('detail')}
-            aria-expanded={detailOpen}
-            aria-controls="sync-source-drawer"
-            data-testid="sync-source-detail-toggle"
-          >
-            详情
-          </button>
-          <span className={styles.actionWrap} data-testid="sync-settings-toggle">
-            <button
-              ref={settingsToggleRef}
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => togglePanel('settings')}
-              aria-expanded={settingsOpen}
-              aria-controls="sync-source-drawer"
-              data-testid="sync-source-settings-toggle"
-            >
-              设置
-            </button>
-          </span>
-        </div>
 
         {healthNotes.length > 0 ? (
           <div data-testid="sync-source-reason">
@@ -545,9 +495,52 @@ export function SyncControls({
               : ''}
           </p>
         ) : null}
+
+        <div className={styles.cardActions}>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={requestManualSync}
+            disabled={busy !== null || writeLocked || blockedReason !== null}
+            title={blockedShort ?? '按已保存范围立即同步'}
+            data-testid="sync-manual-button"
+          >
+            {busy === 'manual' ? '正在提交…' : '立即同步'}
+          </button>
+          <span className={styles.actionWrap} data-testid="sync-settings-toggle">
+            <button
+              ref={settingsToggleRef}
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => setSettingsOpen((open) => !open)}
+              aria-expanded={settingsOpen}
+              aria-controls="sync-source-drawer"
+              data-testid="sync-source-settings-toggle"
+            >
+              设置
+            </button>
+          </span>
+        </div>
       </section>
 
       {domesticCard}
+
+      {shipmentCard}
+      </div>
+
+      {/* R15：任务历史、逐仓结果、原请求核对与来源读取记录统一放在三卡下方，按需展开。 */}
+      <details
+        className={styles.belowPanel}
+        data-testid="sync-below-details"
+        open={belowOpen}
+        onToggle={(event) => setBelowOpen((event.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary>
+          同步记录与来源详情
+          <span className={styles.summaryHint}>任务历史、逐仓结果、原请求核对</span>
+        </summary>
+        <div className={styles.belowBody}>{detailsBelow}</div>
+      </details>
 
       {panel ? (
         <div
@@ -558,21 +551,21 @@ export function SyncControls({
         >
           <aside
             id="sync-source-drawer"
-            className={styles.drawer}
+            className={demoStyles.detailDialog}
             role="dialog"
             aria-modal="true"
-            aria-label={`BigSeller ${detailOpen ? '同步详情' : '自动同步设置'}`}
+            aria-label="BigSeller 自动同步设置"
             onClick={(event) => event.stopPropagation()}
             data-testid="sync-drawer"
           >
-            <header className={styles.drawerHead}>
+            <header className={demoStyles.detailHeader}>
               <div>
-                <h2>BigSeller</h2>
-                <p>{detailOpen ? '同步详情' : '自动同步设置'}</p>
+                <h2 data-slot="dialog-title">BigSeller</h2>
+                <p data-slot="dialog-description">自动同步设置</p>
               </div>
               <button
                 type="button"
-                className={styles.drawerClose}
+                className={demoStyles.iconButton}
                 onClick={closeDrawer}
                 aria-label="关闭"
                 title="关闭"
@@ -582,60 +575,12 @@ export function SyncControls({
               </button>
             </header>
 
-            <div className={styles.drawerTabs} role="tablist" aria-label="来源面板">
-              <button
-                ref={detailTabRef}
-                type="button"
-                role="tab"
-                id="sync-drawer-tab-detail"
-                className={styles.drawerTab}
-                data-active={detailOpen || undefined}
-                aria-selected={detailOpen}
-                aria-controls="sync-source-detail-panel"
-                tabIndex={detailOpen ? 0 : -1}
-                onClick={() => setOpenPanel('detail')}
-                data-testid="sync-drawer-tab-detail"
+            <div className={`${demoStyles.detailBody} ${demoStyles.detailContent}`}>
+              <div
+                id="sync-settings-panel"
+                className={styles.drawerPanel}
+                data-testid="sync-settings"
               >
-                详情
-              </button>
-              <button
-                ref={settingsTabRef}
-                type="button"
-                role="tab"
-                id="sync-drawer-tab-settings"
-                className={styles.drawerTab}
-                data-active={settingsOpen || undefined}
-                aria-selected={settingsOpen}
-                aria-controls="sync-settings-panel"
-                tabIndex={settingsOpen ? 0 : -1}
-                onClick={() => setOpenPanel('settings')}
-                data-testid="sync-drawer-tab-settings"
-              >
-                设置
-              </button>
-            </div>
-
-            <div className={styles.drawerBody}>
-              {detailOpen ? (
-                <div
-                  id="sync-source-detail-panel"
-                  className={styles.drawerPanel}
-                  role="tabpanel"
-                  aria-labelledby="sync-drawer-tab-detail"
-                  data-testid="sync-source-detail-panel"
-                >
-                  <div className={styles.panelInner}>{detailContent}</div>
-                </div>
-              ) : null}
-
-              {settingsOpen ? (
-                <div
-                  id="sync-settings-panel"
-                  className={styles.drawerPanel}
-                  role="tabpanel"
-                  aria-labelledby="sync-drawer-tab-settings"
-                  data-testid="sync-settings"
-                >
                   <div data-testid="sync-source-settings-panel" className={styles.panelInner}>
                     <p className={styles.savedSummary} data-testid="sync-settings-summary">
                       <strong>已保存</strong>
@@ -739,7 +684,6 @@ export function SyncControls({
                     {diagnostics}
                   </div>
                 </div>
-              ) : null}
             </div>
           </aside>
         </div>
