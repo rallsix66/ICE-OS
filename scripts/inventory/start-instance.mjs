@@ -41,6 +41,8 @@ steps.push(step('web', 'scripts/inventory/start-web.mjs', {
   CATALOG_PREVIEW_NEXT_MODE: process.env.CATALOG_PREVIEW_NEXT_MODE ?? 'start',
 }));
 steps.push(step('worker', 'scripts/inventory/start-worker.mjs'));
+// 货票在途定时读取（Node，受限 sync 运行身份）：与库存 worker 并列，互不接管。
+steps.push(step('shipment-auto-reader', 'scripts/shipment/start-worker.mjs'));
 console.log(`--- status: scripts/inventory/status.mjs (exit code is informational; see summary)`);
 const status = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/inventory/status.mjs'), '--run-id', args.runId], {
   cwd: REPO_ROOT,

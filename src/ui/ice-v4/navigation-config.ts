@@ -2,6 +2,7 @@
 export const ICE_V4_ACTIVE_NAV_HREFS = [
   '/dashboard/catalog',
   '/dashboard/inventory',
+  '/dashboard/in-transit',
   '/dashboard/sync',
 ] as const;
 
@@ -27,7 +28,8 @@ export const LEGACY_ROUTE_DISPOSITION = {
   // 旧的三段库存地址安全引导到新的商品库存页；不恢复旧写入链、不补 0。
   '/dashboard/inventory/domestic': { action: 'guidance', target: '/dashboard/inventory', note: '国内库存未接入，不显示 0' },
   '/dashboard/inventory/overseas': { action: 'guidance', target: '/dashboard/inventory', note: '海外仓库存并入商品库存' },
-  '/dashboard/inventory/in-transit': { action: 'guidance', target: '/dashboard/inventory', note: '物流在途未接入' },
+  // SHIPMENT_IN_TRANSIT_V1：物流在途已作为独立入口 /dashboard/in-transit 接入飞书物流情况表。
+  '/dashboard/inventory/in-transit': { action: 'guidance', target: '/dashboard/in-transit', note: '物流在途已接入独立入口' },
   '/dashboard/shipments': { action: 'sealed' },
   '/dashboard/variants': { action: 'sealed' },
   '/dashboard/replenishment': { action: 'sealed' },

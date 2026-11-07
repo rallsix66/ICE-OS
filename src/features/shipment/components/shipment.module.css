@@ -1,0 +1,1932 @@
+/*
+ * 货票与在途 v1 页面样式：沿用现役数据面（工具栏/下拉/状态点/分页）语言，
+ * 这里只补列表表格、来源状态条与详情抽屉自己的部分。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 96px);
+  min-height: 560px;
+  gap: 10px;
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.page > header,
+.page > .sourceBar,
+.page > .toolbarWrap,
+.page > .pageNotice {
+  flex: none;
+}
+
+.pageNotice {
+  margin: 0;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+/* ---------------- 来源状态条 ---------------- */
+
+.sourceBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding: 10px 14px;
+  border: 1px solid var(--ice-ui-line);
+  border-left-width: 3px;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.sourceBar[data-tone='green'] { border-left-color: #3f8f6b; }
+.sourceBar[data-tone='amber'] { border-left-color: #c08a3e; }
+.sourceBar[data-tone='red'] { border-left-color: #b5533f; }
+
+.sourceBarText {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sourceBarText strong {
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sourceBarFail {
+  color: #a4625b;
+}
+
+.sourceBarActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.spinning {
+  animation: shipmentSpin 900ms linear infinite;
+}
+
+@keyframes shipmentSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------------- 工具栏 / 筛选 ---------------- */
+
+.toolbarWrap {
+  display: grid;
+  gap: 8px;
+}
+
+/* ---------------- 表格面板（分页固定在底部） ---------------- */
+
+.panel {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.tableScroll {
+  min-height: 120px;
+  flex: 1 1 auto;
+  overflow: auto;
+  outline: none;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.fixedTable {
+  min-width: 1080px;
+  table-layout: fixed;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--ice-ui-line);
+  background: #f8f9fb;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.table td {
+  position: relative;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f2f5;
+  color: #4c586a;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+  background-color: #fafbfe;
+}
+
+/* 列边界：表头与内容共用同一条竖线。 */
+.table td::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: #eef1f6;
+  content: '';
+  pointer-events: none;
+}
+
+.table td:last-child::after,
+.table .stickyCol::after {
+  display: none;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.stickyCol {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 1px 0 0 var(--ice-ui-line);
+}
+
+.table thead .stickyCol {
+  z-index: 4;
+  background: #f8f9fb;
+}
+
+.table tbody tr:hover td.stickyCol {
+  background-color: #fafbfe;
+}
+
+.cellStrong {
+  display: block;
+  overflow: hidden;
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticketButton {
+  max-width: 100%;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ice-ui-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ticketButton:hover {
+  color: var(--ice-ui-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ticketButton:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.cellSub {
+  display: block;
+  overflow: hidden;
+  margin-top: 1px;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellTruncate {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellMuted {
+  color: var(--ice-ui-faint);
+}
+
+.numCell {
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusCell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statusCellLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ice-ui-text);
+  font-size: 12px;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #9aa3b2;
+}
+
+.statusDot[data-tone='green'] { background: #3f8f6b; }
+.statusDot[data-tone='amber'] { background: #c08a3e; }
+.statusDot[data-tone='red'] { background: #b5533f; }
+.statusDot[data-tone='blue'] { background: #5266d7; }
+/* 第 5 类：已到货待上架（尚未结束在途）。 */
+.statusDot[data-tone='purple'] { background: #7a5cd6; }
+
+/* 多运单：保留原文的换行/分隔，最多显示 2 行。 */
+.waybillsCell {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* 预计到仓（H 原文）：可换行，最多 2 行，完整内容看 title。 */
+.arrivalCell {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* 本次来源未见的历史行：淡化但仍可点开查看历史。 */
+.historicalRow td {
+  background: #fbfbfc;
+  color: #8d98a8;
+}
+
+.historicalRow .cellTruncate,
+.historicalRow .cellStrong {
+  color: #7a8799;
+}
+
+.actionHead,
+.actionCell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.actionCell .button {
+  min-width: 56px;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.pendingChip {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid #efe3c8;
+  border-radius: 999px;
+  background: #fdf9ef;
+  color: #8a5a2a;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* 身份待核：来源编号变化但无法唯一确认原票，醒目但不冒充错误。 */
+.identityChip {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid #f0d9c8;
+  border-radius: 999px;
+  background: #fdf3ee;
+  color: #a4523f;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* 本次来源未见：已退出当前列表，历史保留（不是到货、不是 0）。 */
+.absentChip {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid #dfe4ee;
+  border-radius: 999px;
+  background: #f4f6fa;
+  color: #6b7688;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pagerBar {
+  flex: none;
+  padding: 0 14px;
+  border-top: 1px solid var(--ice-ui-line);
+}
+
+.emptyWrap {
+  padding: 8px 0 18px;
+}
+
+/* ---------------- 货票详情（ICE v4 共用 detailDialog 样式） ---------------- */
+
+.detailBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 42%);
+  animation: shipmentBackdropIn 160ms var(--ice-ui-ease-out);
+}
+
+/* 外框尺寸/圆角/阴影/头部/正文由 demoStyles.detailDialog 提供；这里只保留入场动画。 */
+.detailDialog {
+  outline: none;
+  animation: shipmentDialogIn 160ms var(--ice-ui-ease-out);
+}
+
+.detailTitle {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.detailBody {
+  min-height: 0;
+}
+
+.detailValueInline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.detailValueInline strong {
+  color: var(--ice-ui-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* 字段清单沿用共用 detailList（标签/值两列对齐）；这里只补间距与多行值。 */
+.drawerFacts {
+  margin: 14px 0 18px;
+}
+
+.drawerFacts dd {
+  white-space: pre-wrap;
+}
+
+.drawerSectionTitle {
+  margin: 18px 0 8px;
+}
+
+/* 明细长表在弹窗内自行滚动，表头固定；宽度大于容器时横向滚动。 */
+.drawerTableWrap {
+  max-height: 52vh;
+  overflow: auto;
+  border: 1px solid #e8ecf3;
+  border-radius: 7px;
+}
+
+.itemsTable.drawerTable {
+  min-width: 1060px;
+}
+
+/* 历史明细只有 5 列，不需要按当前明细的宽度撑满。 */
+.itemsTable.drawerTable.historyTable {
+  min-width: 720px;
+}
+
+.drawerTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.drawerTable td {
+  white-space: normal;
+  vertical-align: middle;
+}
+
+.drawerTable .numCell {
+  white-space: nowrap;
+}
+
+.detailClose {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #6f7b8d;
+  cursor: pointer;
+}
+
+.detailClose:hover {
+  background: #f0f2f8;
+  color: var(--ice-ui-text);
+}
+
+.detailClose:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 1px;
+}
+
+.detailStatusLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+}
+
+.detailStatusText {
+  color: #46536a;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* 身份待核 / 本次来源未见说明：醒目但不写成错误或 0。 */
+.identityNotice {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border: 1px solid #f0d9c8;
+  border-radius: 8px;
+  background: #fdf3ee;
+  color: #8a4a37;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.absentNotice {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border: 1px solid #dfe4ee;
+  border-radius: 8px;
+  background: #f4f6fa;
+  color: #5f6b7d;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* 本次来源未见的历史明细：只读、淡化，不与当前明细抢视觉。 */
+.historyTable th {
+  background: #f3f4f7;
+  color: #8d98a8;
+}
+
+.historyTable td {
+  background: #fbfbfc;
+  color: #7a8799;
+}
+
+.historyTable .itemName,
+.historyTable .itemProduct {
+  color: #5f6b7d;
+  font-weight: 500;
+}
+
+.itemsTableWrap {
+  overflow: auto;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+}
+
+.itemsTable {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.itemsTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ice-ui-line);
+  background: #f8f9fb;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.itemsTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f2f5;
+  color: #4c586a;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.itemsTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.itemName {
+  color: var(--ice-ui-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.itemProduct {
+  display: block;
+  color: var(--ice-ui-text);
+  font-weight: 600;
+}
+
+.itemProductSub {
+  display: block;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+}
+
+.itemActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ---------------- 第四轮：明细「规格 / 单位」「单位成本」列 ---------------- */
+
+/* 多出「规格 / 单位」「单位成本」两列，给当前明细表加宽；历史明细表仍用基础宽度。 */
+.itemSpecTable {
+  min-width: 1040px;
+}
+
+/* 已取到采用进货价：数值与商品库列表同文本，突出显示。 */
+.unitCostPriced {
+  display: block;
+  color: var(--ice-ui-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 缺价：明确显示「成本待补充」，不写 0、不冒充已确认货值。 */
+.unitCostMissing {
+  display: block;
+  color: #8a5a2a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 缺价短因（缺价/读取失败），小字说明，不与金额抢视觉。 */
+.unitCostReason {
+  display: block;
+  margin-top: 1px;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+}
+
+.detailNote {
+  margin: 10px 0 0;
+  color: #7a8799;
+  font-size: 12px;
+}
+
+.detailEmpty {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px dashed var(--ice-ui-line);
+  border-radius: 8px;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.detailActionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.detailActionsCenter {
+  justify-content: center;
+}
+
+.inlineError {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border: 1px solid #f2e2df;
+  border-radius: 8px;
+  background: #fcf1ed;
+  color: #a4625b;
+  font-size: 12px;
+}
+
+/* ---------------- 关联商品编辑器 ---------------- */
+
+.assocEditor {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #dfe5ee;
+  border-radius: 10px;
+  background: #fbfcfe;
+  display: grid;
+  gap: 10px;
+}
+
+.assocEditorHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+  color: #3a465a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.assocEditorHead small {
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* 「后续同来源、同品名、同市场沿用此对应」：默认不勾选，勾选时连同通用对应一起保存。 */
+.assocRemember {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: #3a465a;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.assocRemember input {
+  margin: 0;
+}
+
+.assocRemember small {
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+}
+
+.assocResults {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.assocResult {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid #dfe4ee;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ice-ui-text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.assocResult:hover {
+  border-color: #b8c3e8;
+  background: #f7f9ff;
+}
+
+.assocResult[data-selected='true'] {
+  border-color: #4d7fca;
+  background: #eef4ff;
+}
+
+.assocResultCode {
+  flex: none;
+  font-weight: 600;
+}
+
+.assocResultName {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assocResultMeta {
+  flex: none;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+}
+
+.assocCurrent {
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+}
+
+.assocActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.assocEmpty {
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+/* ---------------- 变更记录 ---------------- */
+
+.revisionList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #5b687c;
+  font-size: 12px;
+}
+
+.revisionList li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f2f4f7;
+}
+
+.revisionList li:last-child {
+  border-bottom: 0;
+}
+
+.revisionMeta {
+  color: var(--ice-ui-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 读取失败降级面板 ---------------- */
+
+.failurePanel {
+  display: grid;
+  max-width: 720px;
+  gap: 8px;
+  margin: 12px auto 0;
+  padding: 24px 26px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.failurePanel h1 {
+  margin: 0;
+  color: #233044;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.failurePanel p {
+  margin: 0;
+  color: #667184;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.failurePanelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* ---------------- 动画 ---------------- */
+
+@keyframes shipmentBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shipmentDialogIn {
+  from { opacity: 0.55; transform: translateY(6px) scale(0.995); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detailBackdrop,
+  .detailDialog,
+  .spinning {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .detailBackdrop {
+    padding: 10px;
+  }
+
+  .page {
+    height: auto;
+    min-height: 0;
+  }
+
+  .tableScroll {
+    max-height: 58vh;
+  }
+
+  .detailDrawer {
+    width: 100%;
+  }
+}
+
+/* ---------------- 在途汇总（第七轮） ---------------- */
+
+.page > .summaryPanel {
+  flex: none;
+}
+
+.summaryPanel {
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-left-width: 3px;
+  border-left-color: #4d6f9c;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.summaryHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 18px;
+}
+
+.summaryTitle {
+  margin: 0;
+  color: var(--ice-ui-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.summarySubtitle {
+  margin: 2px 0 0;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryKpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.summaryKpi {
+  display: grid;
+  gap: 0;
+  min-width: 118px;
+}
+
+.summaryKpi span {
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+}
+
+.summaryKpi strong {
+  color: var(--ice-ui-text);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryBody {
+  min-height: 0;
+}
+
+.summaryBody .itemsTableWrap {
+  max-height: 170px;
+  overflow: auto;
+}
+
+.summaryTabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.summaryTab,
+.summaryTabActive {
+  padding: 3px 10px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.summaryTabActive {
+  border-color: #4d6f9c;
+  background: #eef3fa;
+  color: #2f4d73;
+  font-weight: 600;
+}
+
+.summaryTabHint {
+  margin-left: auto;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+}
+
+.summaryTable {
+  width: 100%;
+}
+
+.summaryTable td,
+.summaryTable th {
+  white-space: nowrap;
+}
+
+.summaryTable td:nth-child(1) {
+  white-space: normal;
+}
+
+.summaryProductsTable td:nth-child(1) {
+  min-width: 190px;
+}
+
+.summaryExcludedTable td:nth-child(3) {
+  white-space: normal;
+  min-width: 180px;
+}
+
+.summaryTable .itemProductSub {
+  display: block;
+}
+
+.summaryProductRow {
+  cursor: pointer;
+}
+
+.summaryProductRow:hover {
+  background: #f4f7fb;
+}
+
+.summaryDetailRow > td {
+  padding: 8px 10px 10px;
+  background: #f7f9fc;
+}
+
+.summaryItemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryItemsTable th {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--ice-ui-line);
+  color: var(--ice-ui-muted);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.summaryItemsTable td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #edf0f4;
+  color: var(--ice-ui-text);
+  text-align: left;
+  vertical-align: top;
+}
+
+.summaryItemsTable td:nth-child(2) {
+  white-space: normal;
+  min-width: 150px;
+}
+
+.summarySubhead {
+  margin: 0;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.summaryReasonPending,
+.summaryReasonError {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.summaryReasonPending {
+  background: #fbf1dc;
+  color: #8a5b13;
+}
+
+.summaryReasonError {
+  background: #fbe9e6;
+  color: #9c4335;
+}
+
+/* ---------------- 人工修正在途（第八轮） ---------------- */
+
+/* 列表/详情的人工修正标记：说明该行数量不是原表结论（既不是原表、也不是错误）。 */
+.manualChip {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid #c8d4f0;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2d4a72;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.manualBadge {
+  display: block;
+  margin-top: 3px;
+  padding: 2px 6px;
+  border: 1px solid #d9e2f2;
+  border-radius: 6px;
+  background: #f4f7fd;
+  color: #3f5877;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 待复核：原表出现新的相关到货信息；人工结果仍然生效，只提示人工核对。 */
+.manualReviewChip {
+  display: block;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border: 1px solid #f0d9c8;
+  border-radius: 6px;
+  background: #fdf3ee;
+  color: #a4523f;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 原表改发货量后与人工确认数量矛盾：重确认前不计入货值。 */
+.manualConflictNotice {
+  display: block;
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border: 1px solid #ecc9b4;
+  border-radius: 6px;
+  background: #fdf0e8;
+  color: #8f412f;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 从汇总定位到某条明细：高亮整行，不改变可编辑状态。 */
+.focusedItemRow td {
+  background: #fff8e6;
+}
+
+.focusedItemRow td:first-child {
+  box-shadow: inset 3px 0 0 #c08a3e;
+}
+
+/* 修正在途弹窗：覆盖在详情抽屉之上（抽屉 z 60）。 */
+.manualDialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(20, 30, 45, 0.38);
+}
+
+.manualDialog {
+  display: flex;
+  width: min(560px, 96vw);
+  max-height: 92vh;
+  flex-direction: column;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(24, 36, 54, 0.28);
+  overflow: hidden;
+}
+
+.manualDialog:focus {
+  outline: none;
+}
+
+.manualDialogHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--ice-ui-line);
+}
+
+.manualDialogHead h3 {
+  margin: 0;
+  color: #26364c;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.manualDialogHead p {
+  margin: 3px 0 0;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.manualDialogBody {
+  display: grid;
+  min-height: 0;
+  gap: 12px;
+  padding: 12px 16px;
+  overflow: auto;
+}
+
+.manualCurrent {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 14px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.manualCurrent > div {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.manualCurrent dt {
+  flex: none;
+  color: #7a8799;
+}
+
+.manualCurrent dd {
+  margin: 0;
+  color: #26364c;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.manualFieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.manualFieldset legend {
+  padding: 0;
+  color: #3a465a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.manualRadioList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.manualRadio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid #dfe4ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #3f4b60;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.manualRadio input {
+  accent-color: #5266d7;
+}
+
+.manualRadio[data-selected='true'] {
+  border-color: #8495ed;
+  background: #eef1ff;
+  color: #31449b;
+  font-weight: 600;
+}
+
+.manualField {
+  display: grid;
+  gap: 6px;
+}
+
+.manualLabel {
+  color: #3a465a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.manualSegmented {
+  display: inline-flex;
+  width: fit-content;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #f1f3f8;
+}
+
+.manualSegmentedButton {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #5b687c;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.manualSegmentedButton[aria-pressed='true'] {
+  border-color: var(--ice-ui-line);
+  background: #fff;
+  color: var(--ice-ui-accent-strong);
+  font-weight: 600;
+}
+
+.manualSegmentedButton:disabled {
+  color: #b8bfca;
+  cursor: not-allowed;
+}
+
+.manualHint {
+  color: #8d98a8;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.manualInput {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #dce1e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #26364c;
+  font-size: 13px;
+}
+
+.manualInput:focus-visible {
+  outline: none;
+  border-color: #8495ed;
+  box-shadow: 0 0 0 3px rgba(82, 102, 215, 0.12);
+}
+
+.manualConversion {
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid #e2e9f6;
+  border-radius: 8px;
+  background: #f4f7fd;
+  color: #3f5877;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.manualPreview {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e2e9f6;
+  border-radius: 8px;
+  background: #f7f9ff;
+}
+
+.manualPreview strong {
+  color: #26364c;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.manualFormula {
+  margin: 0;
+  padding-left: 16px;
+  color: #4c586a;
+  font-size: 12px;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.manualError {
+  margin: 0;
+  color: #a4523f;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.manualDialogFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--ice-ui-line);
+}
+
+.manualFootSpacer {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 600px) {
+  .manualCurrent {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manualDialog {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manualDialog,
+  .manualDialogBackdrop {
+    animation: none;
+  }
+}
+
+/* ---------------- 第十二轮：主视图切换 / 货值汇总 / 拆合票复核 ---------------- */
+
+.pageHeadRow {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.viewTabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 8px;
+  background: #f5f7fa;
+}
+
+.viewTab,
+.viewTabActive {
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ice-ui-muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.viewTab:hover {
+  color: var(--ice-ui-text);
+}
+
+.viewTabActive {
+  border-color: var(--ice-ui-line);
+  background: #fff;
+  color: var(--ice-ui-text);
+  font-weight: 600;
+}
+
+.readFailureLine {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid #f1c7c7;
+  border-radius: 8px;
+  background: #fff6f6;
+  color: #a33;
+  font-size: 12px;
+}
+
+.inlineLink {
+  color: #2f5f9e;
+  text-decoration: underline;
+}
+
+.inlineLinkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #2f5f9e;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.valueWrap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px 12px;
+}
+
+.valueKpis {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 24px;
+}
+
+.valueKpi,
+.valueKpiButton {
+  display: grid;
+  gap: 0;
+  min-width: 132px;
+  text-align: left;
+}
+
+.valueKpi span,
+.valueKpiButton span {
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+}
+
+.valueKpi strong,
+.valueKpiButton strong {
+  color: var(--ice-ui-text);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.valueKpiButton {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.valueKpiButton strong {
+  text-decoration: underline;
+  text-decoration-color: #a9bed8;
+}
+
+.valueWrap .itemsTableWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.valueWrap .summaryTabs {
+  flex: none;
+}
+
+.valueTable {
+  width: 100%;
+}
+
+.reviewBar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 6px 10px;
+  border: 1px solid #f0d9a8;
+  border-radius: 8px;
+  background: #fffaf0;
+  font-size: 12px;
+}
+
+.reviewBar[data-tone='error'] {
+  border-color: #f1c7c7;
+  background: #fff6f6;
+  color: #a33;
+}
+
+.reviewLink {
+  color: #8a5b00;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.reviewLink:hover {
+  text-decoration: underline;
+}
+
+.reviewOverride {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviewBarError {
+  color: #a33;
+}
+
+.reviewPanel {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.reviewPanelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reviewPanelHead h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.reviewPanelHead p {
+  margin: 2px 0 0;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+.reviewCard {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 10px;
+}
+
+.reviewCardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 12px;
+}
+
+.reviewCardHead strong {
+  font-size: 14px;
+}
+
+.reviewCardTime {
+  margin-left: auto;
+  color: var(--ice-ui-faint);
+}
+
+.reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reviewSide h3 {
+  margin: 0 0 6px;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reviewTicket {
+  padding: 8px 10px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.reviewTicket + .reviewTicket {
+  margin-top: 6px;
+}
+
+.reviewTicketHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.reviewTicketMeta {
+  margin: 2px 0 0;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+.reviewItems {
+  display: grid;
+  gap: 2px;
+  max-height: 180px;
+  margin: 6px 0 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.reviewItems li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.reviewItems li span:last-child {
+  font-variant-numeric: tabular-nums;
+}
+
+.reviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .reviewGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------- 第十二轮：数据同步里的飞书物流在途来源 ---------------- */
+
+.syncSource {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.syncSourceHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.syncSourceRows {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.syncSourceRows div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 12px;
+}
+
+.syncSourceRows dt {
+  color: var(--ice-ui-faint);
+}
+
+.syncSourceRows dd {
+  margin: 0;
+  color: var(--ice-ui-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.syncSourceFail {
+  color: #a33;
+}
+
+/* ---------------- 第十三轮：工具栏「待复核」弹窗 / 详情本票货值 / 同步卡技术详情 ---------------- */
+
+.reviewCountBadge {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  place-items: center;
+  border-radius: 9px;
+  background: #b45309;
+  color: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.reviewModalBackdrop {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 6vh 16px 24px;
+  overflow: auto;
+  background: rgb(15 23 42 / 42%);
+}
+
+.reviewModal {
+  display: grid;
+  width: min(920px, 100%);
+  max-height: 86vh;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgb(15 23 42 / 22%);
+}
+
+.reviewModalHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reviewModalHead h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.reviewModalHead p {
+  margin: 2px 0 0;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+.reviewModalBody {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.reviewOverrides {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.reviewOverrides h3 {
+  margin: 0;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 已有人工决定：左为决定 + 来源识别（市场/采购单号/运单号），右为恢复按钮。 */
+.reviewOverrideRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.reviewOverrideInfo {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.reviewOverrideInfo strong {
+  color: var(--ice-ui-text);
+  font-weight: 600;
+}
+
+.reviewOverrideMeta {
+  min-width: 0;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.reviewOverrideTime {
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.technicalList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .reviewModal {
+    max-height: 92vh;
+    padding: 12px;
+  }
+}

@@ -21,8 +21,13 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
   const sourcesSrc = fs.readFileSync(SOURCES_PAGE, 'utf8');
   const intakeSrc = fs.readFileSync(INTAKE_PAGE, 'utf8');
 
-  it('一级常驻导航只保留三个业务入口', () => {
-    expect(ICE_V4_ACTIVE_NAV_HREFS).toEqual(['/dashboard/catalog', '/dashboard/inventory', '/dashboard/sync']);
+  it('一级常驻导航保留四个业务入口（含物流在途）', () => {
+    expect(ICE_V4_ACTIVE_NAV_HREFS).toEqual([
+      '/dashboard/catalog',
+      '/dashboard/inventory',
+      '/dashboard/in-transit',
+      '/dashboard/sync',
+    ]);
     for (const href of ICE_V4_ACTIVE_NAV_HREFS) {
       expect(navBlock).toContain(`href: '${href}'`);
     }
@@ -105,11 +110,15 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
   it('登记 legacy 入口处置表（含本包三段旧库存地址的安全引导）', () => {
     expect(LEGACY_ROUTE_DISPOSITION['/dashboard'].target).toBe('/dashboard/catalog');
     expect(LEGACY_PRODUCTS_LIST_HREF).toBe('/dashboard/products');
-    for (const href of ['/dashboard/inventory/domestic', '/dashboard/inventory/overseas', '/dashboard/inventory/in-transit']) {
+    for (const href of ['/dashboard/inventory/domestic', '/dashboard/inventory/overseas']) {
       const disposition = LEGACY_ROUTE_DISPOSITION[href as keyof typeof LEGACY_ROUTE_DISPOSITION] as { action: string; target?: string };
       expect(disposition.action).toBe('guidance');
       expect(disposition.target).toBe('/dashboard/inventory');
     }
+    // SHIPMENT_IN_TRANSIT_V1：物流在途已成为独立入口，旧地址引导到新页面。
+    const inTransit = LEGACY_ROUTE_DISPOSITION['/dashboard/inventory/in-transit'] as { action: string; target?: string };
+    expect(inTransit.action).toBe('guidance');
+    expect(inTransit.target).toBe('/dashboard/in-transit');
     expect(Object.keys(LEGACY_ROUTE_DISPOSITION)).not.toContain('/dashboard/sync');
   });
 });
