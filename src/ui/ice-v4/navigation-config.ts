@@ -1,5 +1,6 @@
 /** 现役 Dashboard 一级常驻导航 href 白名单 — 与 workspace-shell 保持一致，供测试与文档登记。 */
 export const ICE_V4_ACTIVE_NAV_HREFS = [
+  '/dashboard',
   '/dashboard/catalog',
   '/dashboard/inventory',
   '/dashboard/in-transit',
@@ -20,7 +21,7 @@ export const CATALOG_ISSUES_HREF = '/dashboard/catalog/issues';
 
 /** 旧入口处置：重定向或安全引导说明页（仍保留 URL 可达性以便验证，不加载旧业务）。 */
 export const LEGACY_ROUTE_DISPOSITION = {
-  '/dashboard': { action: 'redirect', target: '/dashboard/catalog' },
+  // BUSINESS_OVERVIEW_V1：'/dashboard' 已是现役经营总览首页，不再是重定向入口。
   '/dashboard/products': { action: 'redirect', target: '/dashboard/catalog', note: 'search→q' },
   '/dashboard/products/[id]': { action: 'sealed', note: 'no uuid shape mapping' },
   '/dashboard/products/overview': { action: 'sealed' },

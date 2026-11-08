@@ -43,7 +43,7 @@ import {
   type ShipmentSnapshotRawDto,
 } from './normalize';
 import { buildShipmentProductCard } from './product-card';
-import type { ShipmentMarketSummarySource } from '../summary';
+import type { ShipmentMarketSummarySource, ShipmentMarketSummarySourceItem } from '../summary';
 import { buildShipmentMarketSummary, buildShipmentTicketValue, buildShipmentValueOverview } from '../summary';
 import { buildProductTransit } from '../product-transit';
 
@@ -280,6 +280,29 @@ export async function getShipmentValueOverview(): Promise<ShipmentValueOverviewD
   const raw = await callReadRpc<unknown>(identity, 'catalog.read_shipment_market_summary', ['all']);
   const source = normalizeMarketSummary(raw);
   return buildShipmentValueOverview(source, await loadSummaryCards(identity, source));
+}
+
+/**
+ * 经营总览首页专用：同一份 028 当前明细一次组装「全市场商品汇总 + 市场货值汇总 + 原始明细」，
+ * 供首页计算在途阶段数量/货值/市场分布；口径与在途页完全一致（同一 build* 函数、同一采用进货价）。
+ * 只读，不新增 SQL、不触发来源读取。
+ */
+export async function getShipmentHomeSummary(): Promise<{
+  summary: ShipmentMarketSummaryDto;
+  overview: ShipmentValueOverviewDto;
+  items: ShipmentMarketSummarySourceItem[];
+  latestReadAt: string | null;
+}> {
+  const identity = await requireShipmentAdmin();
+  const raw = await callReadRpc<unknown>(identity, 'catalog.read_shipment_market_summary', ['all']);
+  const source = normalizeMarketSummary(raw);
+  const cards = await loadSummaryCards(identity, source);
+  return {
+    summary: buildShipmentMarketSummary(source, cards),
+    overview: buildShipmentValueOverview(source, cards),
+    items: source.items,
+    latestReadAt: source.latestReadAt,
+  };
 }
 
 /**
