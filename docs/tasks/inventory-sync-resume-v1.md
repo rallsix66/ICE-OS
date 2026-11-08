@@ -231,4 +231,5 @@ python tools\inventory-sync\bigseller_session.py --login --wait-seconds 1800
 ## 11. 交付状态
 
 **独立审查通过（`INVENTORY_SYNC_RESUME_V1_LOCAL_PASS`，阻断 0）**。本包只交付“库存重新真实更新 + 自动计划恢复 + 遗留任务闭环”，
-不代表整个 ICEOS 或其它板块验收；长期运行稳定性、推送/部署与监控不在本包范围。
+不代表整个 ICEOS 或其它板块验收；正式部署、长期运行稳定性与监控不在本包范围。
+代码与文档随 [PR #13](https://github.com/rallsix66/ICE-OS/pull/13) 合并到远程 `master`（未正式部署）。
