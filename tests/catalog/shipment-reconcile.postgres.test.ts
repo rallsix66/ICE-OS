@@ -25,6 +25,27 @@ const ENV_FILE = path.join(INSTANCE, 'env.inventory.json');
 const OUT_DIR = path.join(REPO_ROOT, '.local/shipment-v1-repair-20261101/lead-reconcile');
 const ADMIN_PROFILE_ID = '11111111-1111-4111-8111-111111111101';
 
+type ShipmentListRpc = {
+  total: number;
+  counts: Record<string, number>;
+  includeAbsent: boolean;
+  absentTickets: number;
+  absentItems: number;
+  rows: Array<Record<string, unknown>>;
+};
+
+type ShipmentDetailRpc = {
+  items: unknown[];
+  missingItems: unknown[];
+  shipment: { presentInLatestRead: boolean; identityStatus: string };
+  latestReadAt: string | null;
+};
+
+type ProductLinkRpc = {
+  total: number;
+  rows: Array<{ ticketNo?: string }>;
+};
+
 function readEnv(): { appDbUrl: string; ownerDbUrl: string } {
   const parsed = JSON.parse(fs.readFileSync(ENV_FILE, 'utf8')) as {
     appDbUrl: string;
@@ -188,19 +209,19 @@ describe('shipment real-source read-only reconciliation', () => {
         return result.rows[0]?.result as T;
       };
       try {
-        const list = await rpc<Record<string, any>>(
+        const list = await rpc<ShipmentListRpc>(
           'SELECT catalog.read_shipment_list($1,$2,$3,$4,$5,$6,$7) AS result',
           [null, null, null, null, false, 100, 0],
         );
-        const listAll = await rpc<Record<string, any>>(
+        const listAll = await rpc<ShipmentListRpc>(
           'SELECT catalog.read_shipment_list($1,$2,$3,$4,$5,$6,$7) AS result',
           [null, null, null, null, true, 100, 0],
         );
-        const detail = await rpc<Record<string, any>>(
+        const detail = await rpc<ShipmentDetailRpc>(
           'SELECT catalog.read_shipment_detail($1) AS result', [dbTickets[0].id],
         );
         const associations = dbItems.filter((item) => item.product_id !== null);
-        const productLink = await rpc<Record<string, any>>(
+        const productLink = await rpc<ProductLinkRpc>(
           'SELECT catalog.read_product_shipment_links($1,$2) AS result',
           [associations[0].product_id, 20],
         );
