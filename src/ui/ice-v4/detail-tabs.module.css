@@ -1,0 +1,84 @@
+/*
+ * R15 共用详情页签栏：视觉取自商品库详情既有页签（底部 2px 选中线、12.5px/500）。
+ * 只由 src/ui/ice-v4/detail-tabs.tsx 使用；页签栏本身不滚动，正文才是滚动体。
+ */
+
+.tabBar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 14px;
+  border-bottom: 1px solid #eef0f5;
+  background: #fff;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabBar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 直链页：滚动长文时页签栏仍可见（弹窗内由固定外框保证）。 */
+.tabBar[data-sticky='true'] {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  border-top: 1px solid #eef0f5;
+  box-shadow: 0 6px 14px -12px rgba(23, 37, 64, 0.35);
+  margin-bottom: 2px;
+}
+
+.tab {
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #667a96;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: #2d3f5a;
+}
+
+.tab:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: -3px;
+}
+
+.tabActive {
+  color: #31449b;
+  border-bottom-color: #5266d7;
+  font-weight: 650;
+}
+
+/* 加载占位：形状、字号与可点击页签一致，只是不响应操作。 */
+.tab[aria-disabled='true'] {
+  cursor: default;
+}
+
+.tab[aria-disabled='true']:hover {
+  color: #667a96;
+}
+
+.tabActive[aria-disabled='true']:hover {
+  color: #31449b;
+}
+
+@media (max-width: 700px) {
+  .tabBar {
+    padding: 0 6px;
+  }
+}
+
+@media (max-height: 620px) {
+  .tab {
+    min-height: 34px;
+    padding: 6px 11px;
+  }
+}

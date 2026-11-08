@@ -11,6 +11,7 @@ import {
 
 const ROOT = path.resolve(__dirname, '../..');
 const WORKSPACE_SHELL = path.join(ROOT, 'ui/ice-v4/workspace-shell.tsx');
+const DASHBOARD_HOME = path.join(ROOT, 'app/dashboard/page.tsx');
 const INTAKE_PAGE = path.join(ROOT, 'app/dashboard/catalog/intake/page.tsx');
 const SOURCES_PAGE = path.join(ROOT, 'app/dashboard/catalog/sources/page.tsx');
 const ISSUES_PAGE = path.join(ROOT, 'app/dashboard/catalog/issues/page.tsx');
@@ -18,11 +19,18 @@ const ISSUES_PAGE = path.join(ROOT, 'app/dashboard/catalog/issues/page.tsx');
 describe('ICE v4 导航合同（U7 / R9）', () => {
   const shellSrc = fs.readFileSync(WORKSPACE_SHELL, 'utf8');
   const navBlock = shellSrc.match(/const NAV: NavItem\[\] = \[([\s\S]*?)\n\];/)?.[1] ?? '';
+  const dashboardHomeSrc = fs.readFileSync(DASHBOARD_HOME, 'utf8');
   const sourcesSrc = fs.readFileSync(SOURCES_PAGE, 'utf8');
   const intakeSrc = fs.readFileSync(INTAKE_PAGE, 'utf8');
 
-  it('一级常驻导航只保留三个业务入口', () => {
-    expect(ICE_V4_ACTIVE_NAV_HREFS).toEqual(['/dashboard/catalog', '/dashboard/inventory', '/dashboard/sync']);
+  it('一级常驻导航保留五个业务入口（含经营总览与物流在途）', () => {
+    expect(ICE_V4_ACTIVE_NAV_HREFS).toEqual([
+      '/dashboard',
+      '/dashboard/catalog',
+      '/dashboard/inventory',
+      '/dashboard/in-transit',
+      '/dashboard/sync',
+    ]);
     for (const href of ICE_V4_ACTIVE_NAV_HREFS) {
       expect(navBlock).toContain(`href: '${href}'`);
     }
@@ -103,13 +111,20 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
   });
 
   it('登记 legacy 入口处置表（含本包三段旧库存地址的安全引导）', () => {
-    expect(LEGACY_ROUTE_DISPOSITION['/dashboard'].target).toBe('/dashboard/catalog');
+    // BUSINESS_OVERVIEW_V1：/dashboard 已是现役经营总览首页，不再登记为旧入口重定向。
+    expect(Object.keys(LEGACY_ROUTE_DISPOSITION)).not.toContain('/dashboard');
+    expect(dashboardHomeSrc).toContain('BusinessOverviewPage');
+    expect(dashboardHomeSrc).not.toContain("redirect('/dashboard/catalog')");
     expect(LEGACY_PRODUCTS_LIST_HREF).toBe('/dashboard/products');
-    for (const href of ['/dashboard/inventory/domestic', '/dashboard/inventory/overseas', '/dashboard/inventory/in-transit']) {
+    for (const href of ['/dashboard/inventory/domestic', '/dashboard/inventory/overseas']) {
       const disposition = LEGACY_ROUTE_DISPOSITION[href as keyof typeof LEGACY_ROUTE_DISPOSITION] as { action: string; target?: string };
       expect(disposition.action).toBe('guidance');
       expect(disposition.target).toBe('/dashboard/inventory');
     }
+    // SHIPMENT_IN_TRANSIT_V1：物流在途已成为独立入口，旧地址引导到新页面。
+    const inTransit = LEGACY_ROUTE_DISPOSITION['/dashboard/inventory/in-transit'] as { action: string; target?: string };
+    expect(inTransit.action).toBe('guidance');
+    expect(inTransit.target).toBe('/dashboard/in-transit');
     expect(Object.keys(LEGACY_ROUTE_DISPOSITION)).not.toContain('/dashboard/sync');
   });
 });

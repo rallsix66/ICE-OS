@@ -113,6 +113,33 @@ async function ensureSchema(owner, evidence) {
   const domesticLinksFile = 'db/catalog/023_inventory_domestic.sql';
   const bindingInlineEditFile = 'db/catalog/024_binding_inline_edit.sql';
   const domesticReviewFile = 'db/catalog/025_domestic_review.sql';
+  // 货票与在途管理 v1：新表 + 读写函数（026，幂等；必须晚于 024 的 search_inventory_items_v2）。
+  const shipmentInTransitFile = 'db/catalog/026_shipment_in_transit.sql';
+  // 货票定时读取 + 已确认商品对应复用（027，幂等；必须晚于 026 的 core 函数）。
+  const shipmentAutoReaderFile = 'db/catalog/027_shipment_auto_reader.sql';
+  // 物流在途市场汇总只读投影（028，幂等；必须晚于 026 的当前明细口径）。
+  const shipmentMarketSummaryFile = 'db/catalog/028_shipment_market_summary.sql';
+  // 第八轮「修正在途（人工）+ 逐商品到货口径」（029，幂等；必须晚于 026→027→028：
+  // 替换 ingest core、加人工修正列/历史表/RPC）。
+  const shipmentCorrectionFile = 'db/catalog/029_shipment_in_transit_correction.sql';
+  // 第九轮集中补修（030，幂等；必须晚于 026→027→028→029：
+  // 有效状态用于列表筛选取数、发货量变更与人工修正冲突标记）。
+  const shipmentStatusConflictFile = 'db/catalog/030_shipment_in_transit_status_conflict.sql';
+  // 第十轮商品详情「关联货票」在途数据层（031，只读 RPC，幂等；必须晚于 026→030：
+  // 用最近成功快照 + 有效状态 + 人工数量冲突标记）。
+  const productShipmentTransitFile = 'db/catalog/031_product_shipment_transit.sql';
+  // 第十轮收尾补修（032，幂等；必须晚于 031：同一只读 RPC 改为返回逐条明细 items[]，
+  // 供应用层先逐条算已知/待核再按票合成）。
+  const productTransitItemRowsFile = 'db/catalog/032_product_transit_item_rows.sql';
+  // 第十二轮拆票/合票复核（033，幂等；必须晚于 026→032：复核/人工分组覆盖表与读取、
+  // 决定、恢复、绑定沿用 RPC）。
+  const shipmentGroupingReviewFile = 'db/catalog/033_shipment_grouping_review.sql';
+  // 第十三轮复核收口（034，幂等；必须晚于 033：复核签名按「上次成功快照」去重、
+  // 分组上下文明细带 productId、按明确对应计划沿用原明细绑定）。
+  const shipmentGroupingCarryoverFile = 'db/catalog/034_shipment_grouping_carryover.sql';
+  // 第十四轮拆合票：原始分组相邻读取检测 + 人工确认后才沿用绑定（035，幂等；必须晚于 034：
+  // 给 sync 角色读最近成功原始快照、停用本次复核涉及的覆盖、按复核范围 manual_selected 沿用）。
+  const shipmentGroupingRawFile = 'db/catalog/035_shipment_grouping_raw.sql';
   const applied = [];
   let sqlState;
   const version = Number(before.row?.version ?? 0);
@@ -150,6 +177,16 @@ async function ensureSchema(owner, evidence) {
   applied.push(await applySql(owner, domesticLinksFile));
   applied.push(await applySql(owner, bindingInlineEditFile));
   applied.push(await applySql(owner, domesticReviewFile));
+  applied.push(await applySql(owner, shipmentInTransitFile));
+  applied.push(await applySql(owner, shipmentAutoReaderFile));
+  applied.push(await applySql(owner, shipmentMarketSummaryFile));
+  applied.push(await applySql(owner, shipmentCorrectionFile));
+  applied.push(await applySql(owner, shipmentStatusConflictFile));
+  applied.push(await applySql(owner, productShipmentTransitFile));
+  applied.push(await applySql(owner, productTransitItemRowsFile));
+  applied.push(await applySql(owner, shipmentGroupingReviewFile));
+  applied.push(await applySql(owner, shipmentGroupingCarryoverFile));
+  applied.push(await applySql(owner, shipmentGroupingRawFile));
   const structureSha = hashFile(v6File);
   const functionsSha = hashFile(functionsFile);
   await owner.query(

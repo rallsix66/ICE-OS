@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronRight, Package, Boxes, RefreshCw } from 'lucide-react';
+import { ChevronRight, LayoutDashboard, Package, Boxes, RefreshCw, Truck } from 'lucide-react';
 import { LogoutButton } from '@/app/dashboard/_components/logout-button';
 import styles from './ice-v4.module.css';
 import shellStyles from './shell.module.css';
@@ -15,10 +15,16 @@ type NavItem = {
 };
 
 /**
- * 一级常驻导航：三个业务入口。
+ * 一级常驻导航：经营总览 → 商品库 → 商品库存 → 物流在途 → 数据同步。
  * 数据维护/待处理等内部页面不放进日常界面，URL 仍保留可达。
  */
 const NAV: NavItem[] = [
+  {
+    href: '/dashboard',
+    label: '经营总览',
+    icon: LayoutDashboard,
+    match: (pathname) => pathname === '/dashboard' || pathname.startsWith('/dashboard?'),
+  },
   {
     href: '/dashboard/catalog',
     label: 'ICE 商品库',
@@ -32,6 +38,11 @@ const NAV: NavItem[] = [
     href: '/dashboard/inventory',
     label: '商品库存',
     icon: Boxes,
+  },
+  {
+    href: '/dashboard/in-transit',
+    label: '物流在途',
+    icon: Truck,
   },
   {
     href: '/dashboard/sync',
@@ -61,7 +72,9 @@ function resolveActive(pathname: string, items: NavItem[]) {
 
 /** 面包屑文案：子页面不改一级导航归属，只改当前页标签。 */
 function pageLabel(pathname: string, fallback: string): string {
+  if (pathname === '/dashboard') return '经营总览';
   if (pathname.startsWith('/dashboard/sync')) return '数据同步';
+  if (pathname.startsWith('/dashboard/in-transit')) return '物流在途';
   if (pathname.startsWith('/dashboard/inventory')) return '商品库存';
   if (pathname.startsWith('/dashboard/catalog/issues')) return '待处理';
   if (pathname.startsWith('/dashboard/catalog/intake')) return '持续新品（旧入口）';

@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { openRun, readArgs } from '../catalog/prepare.mjs';
+import { spawnSync } from 'node:child_process';
+import { REPO_ROOT, openRun, readArgs, safeEnv } from '../catalog/prepare.mjs';
 import { verifyFrozenWorkerSource, workerSourceDrift } from './freeze-worker-source.mjs';
 import { pidAlive, verifyWorkerOwnership } from './worker-process-ownership.mjs';
 
@@ -78,6 +79,33 @@ report.workerFrozenSource = frozen.ok
   ? { verified: true, workerScript: frozen.workerScript, snapshotHash: frozen.manifest.snapshotHash }
   : { verified: false, code: frozen.code, message: frozen.message };
 
+// 货票在途定时读取（货票在途后台任务）：独立进程、独立 marker；状态由专用脚本汇总，
+// 这里只嵌入摘要，不改变本脚本原有的库存 worker/网页退出码语义。
+report.shipmentAutoReader = (() => {
+  const result = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/shipment/status.mjs'),
+    '--run-id', args.runId], {
+    cwd: REPO_ROOT,
+    env: safeEnv(),
+    encoding: 'utf8',
+    windowsHide: true,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  if (!result.stdout) {
+    return { ok: false, error: (result.stderr || '').trim().slice(0, 400) || 'no output' };
+  }
+  try {
+    const parsed = JSON.parse(result.stdout);
+    return {
+      ok: result.status === 0,
+      summary: parsed.summary ?? null,
+      readerProcess: parsed.readerProcess ?? null,
+      readerState: parsed.readerState ?? null,
+    };
+  } catch {
+    return { ok: false, error: 'shipment status output is not valid JSON' };
+  }
+})();
+
 if (report.postgres.listening) {
   const { default: pg } = await import('pg');
   // Owner (bootstrap) connection: status is an operator view, the sync role may only call RPCs.
@@ -124,6 +152,10 @@ report.summary = {
   workerOwned,
   workerProblem,
   frozenWorkerSourceOk: report.workerFrozenSource.verified === true,
+  shipmentReaderOwned: report.shipmentAutoReader?.summary?.readerProcessOwned === true,
+  shipmentReaderOnline: report.shipmentAutoReader?.summary?.workerOnline === true,
+  shipmentReaderEnabled: report.shipmentAutoReader?.summary?.enabled ?? null,
+  shipmentReaderIntervalMinutes: report.shipmentAutoReader?.summary?.intervalMinutes ?? null,
 };
 console.log(JSON.stringify(report, null, 2));
 process.exitCode = report.web.listening && report.postgres.listening && (workerProblem === null) ? 0 : 1;

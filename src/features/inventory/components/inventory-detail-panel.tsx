@@ -4,6 +4,8 @@ import { useSyncExternalStore, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Pencil } from 'lucide-react';
 import { Disclosure, StatusDot } from '@/ui/ice-v4/data-surface';
+import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
+import { DetailTabs } from '@/ui/ice-v4/detail-tabs';
 import styles from './inventory.module.css';
 import { StatusPill } from './display';
 import {
@@ -482,7 +484,7 @@ function RowFacts({
         <StatusPill tone={status.tone}>{status.label}</StatusPill>
         <span>{mappingStatusLabel}</span>
       </div>
-      <dl className={styles.factGrid}>
+      <dl className={demoStyles.detailList}>
         <div><dt>实物库存</dt><dd>{quantity.primary}</dd></div>
         <div><dt>{isDomestic ? '可用数（原表）' : '可售库存'}</dt><dd>{quantity.secondary ?? '—'}</dd></div>
         <div><dt>{isDomestic ? '运营云仓可用（原文）' : '订单锁定'}</dt><dd>{isDomestic ? (row.cloudAvailableText ?? '—') : formatQuantityOr(row.orderLocked, '—')}</dd></div>
@@ -503,19 +505,60 @@ function RowFacts({
       ) : null}
       {lastKnown ? <p className={styles.detailNote} data-testid="inventory-row-last-known">{lastKnown}</p> : null}
       {row.note ? <p className={styles.detailNote}>{row.note}</p> : null}
-      {!isDomestic ? (
-        <details className={styles.detailMore}>
-          <summary>来源批次与文件（按需展开）</summary>
-          <dl className={styles.factGrid}>
-            <div><dt>来源</dt><dd>BigSeller 自动读取</dd></div>
-            <div><dt>原始数量文本</dt><dd>{row.rawOnHand ?? '来源未提供'}</dd></div>
-            <div><dt>批次</dt><dd>{row.batchId ?? '—'}</dd></div>
-            <div><dt>原表行号</dt><dd>{row.excelRow ?? '—'}</dd></div>
-            <div><dt>69 编码</dt><dd>{row.gtin ?? '—'}</dd></div>
-            <div><dt>商品资料版本</dt><dd>{row.itemRevision ?? '—'}</dd></div>
-          </dl>
-        </details>
-      ) : null}
+    </div>
+  );
+}
+
+/** 「来源批次」页签：原位置折叠区「来源批次与文件」的原内容，按仓详情只有这一组来源事实。 */
+function RowSourceFacts({ row }: { row: InventoryWarehouseRowDto }) {
+  const isDomestic = row.source === 'domestic';
+  const fields = isDomestic
+    ? [
+      { label: '来源', value: '聚水潭 国内表格快照' },
+      { label: '原表名称', value: row.sourceName ?? row.itemName ?? '原表未注明' },
+      { label: '原表行号', value: row.excelRow ?? '—' },
+      { label: '文件日期', value: row.fileDate ?? '见原表' },
+    ]
+    : [
+      { label: '来源', value: 'BigSeller 自动读取' },
+      { label: '原始数量文本', value: row.rawOnHand ?? '来源未提供' },
+      { label: '批次', value: row.batchId ?? '—' },
+      { label: '原表行号', value: row.excelRow ?? '—' },
+      { label: '69 编码', value: row.gtin ?? '—' },
+      { label: '商品资料版本', value: row.itemRevision ?? '—' },
+    ];
+  return (
+    <div data-testid="inventory-row-source">
+      <dl className={demoStyles.detailList}>
+        {fields.map((field) => (
+          <div key={field.label}><dt>{field.label}</dt><dd>{field.value}</dd></div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+/** 「来源批次」页签（商品汇总详情）：原「最近批次历史」折叠区内容，没有记录时只给一句空态。 */
+function BatchHistory({ history }: { history: InventoryItemDetailDto['history'] }) {
+  if (!history || history.length === 0) {
+    return (
+      <p className={styles.detailNote} data-testid="inventory-detail-history-empty">
+        暂无来源批次记录
+      </p>
+    );
+  }
+  return (
+    <div data-testid="inventory-detail-history">
+      <p className={styles.detailNote}>共 {history.length} 条来源批次记录</p>
+      <ul className={styles.detailHistory}>
+        {history.map((entry, index) => (
+          <li key={`${entry.batchId}-${entry.externalSku}-${index}`}>
+            {timestampOr(entry.observationAt ?? entry.publishedAt, '时间未记录')} · {entry.warehouseName} · {entry.externalSku}
+            {' · 实物 '}{formatQuantityOr(entry.onHand, '—')}
+            {entry.unit ? ` ${entry.unit}` : ''}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -720,6 +763,7 @@ function ProductDetail({
   includeDomestic,
   viewer,
   pendingLocked,
+  section,
 }: {
   detail: InventoryItemDetailDto | null;
   itemError: string | null;
@@ -730,6 +774,8 @@ function ProductDetail({
   includeDomestic: boolean;
   viewer: BindingViewer | null;
   pendingLocked: boolean;
+  /** R15：库存明细｜来源批次两个页签共用同一份详情读取结果。 */
+  section: 'inventory' | 'source';
 }) {
   const includeOverseas = query.source !== 'domestic';
   const totals = detail ? detailTotalsDisplay(detail) : null;
@@ -738,6 +784,18 @@ function ProductDetail({
   const [feedback, setFeedback] = useState<BindingFeedback | null>(null);
   const rows = detail?.warehouses ?? [];
   const history = detail?.history ?? [];
+
+  /* 「来源批次」页签只展示批次历史；读取失败仍按同一错误提示，不冒充空记录。 */
+  if (section === 'source') {
+    if (itemError) {
+      return (
+        <p className={styles.inlineError} data-testid="inventory-detail-error">
+          读取失败：{itemError}
+        </p>
+      );
+    }
+    return <BatchHistory history={history} />;
+  }
 
   function mappingFor(row: InventoryItemWarehouseDto): InventoryItemMappingDto | null {
     const skuKey = row.externalSku.trim().toLowerCase();
@@ -948,19 +1006,6 @@ function ProductDetail({
                   </tbody>
                 </table>
               </div>
-              {history.length > 0 ? (
-                <Disclosure summary="最近批次历史" count={`${history.length} 条`} testId="inventory-detail-history">
-                  <ul className={styles.detailHistory}>
-                    {history.slice(0, 12).map((entry, index) => (
-                      <li key={`${entry.batchId}-${entry.externalSku}-${index}`}>
-                        {timestampOr(entry.observationAt ?? entry.publishedAt, '时间未记录')} · {entry.warehouseName} · {entry.externalSku}
-                        {' · 实物 '}{formatQuantityOr(entry.onHand, '—')}
-                        {entry.unit ? ` ${entry.unit}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </Disclosure>
-              ) : null}
             </>
           ) : null}
         </>
@@ -979,7 +1024,7 @@ function ProductDetail({
   );
 }
 
-/** 唯一的库存详情层：右侧抽屉 + 遮罩；关闭、Esc、浏览器后退都回原列表位置。 */
+/** 唯一的库存详情层：居中的 ICE v4 共用详情弹层；关闭、Esc、浏览器后退都回原列表位置。 */
 export function InventoryDetailPanel({
   target,
   query,
@@ -1013,6 +1058,15 @@ export function InventoryDetailPanel({
   pendingLocked: boolean;
   onClose: () => void;
 }) {
+  /* R15：库存明细｜来源批次两个页签；切目标（换仓行/换商品）回到库存明细。 */
+  const [section, setSection] = useState<'inventory' | 'source'>('inventory');
+  const targetKey = !target ? 'none' : target.kind === 'row' ? `row:${target.row.rowKey}` : `product:${target.itemId}`;
+  const [sectionForTarget, setSectionForTarget] = useState(targetKey);
+  if (sectionForTarget !== targetKey) {
+    /* 目标变了：同一次渲染内复位页签，避免 useEffect 里 setState 造成级联渲染。 */
+    setSectionForTarget(targetKey);
+    setSection('inventory');
+  }
   if (!target) return null;
   const row = target.kind === 'row' ? target.row : null;
   const productLabel = target.kind === 'product' ? target.label : null;
@@ -1027,25 +1081,72 @@ export function InventoryDetailPanel({
       productSublabel ?? itemDetail?.item.iceCode ?? domesticItem?.iceCode ?? '未编号',
       query.source === 'domestic' ? '聚水潭' : '各仓库存',
     ].filter(Boolean).join(' · ');
+  const tabs = [
+    { key: 'inventory', label: '库存明细' },
+    { key: 'source', label: '来源批次' },
+  ] as const;
+  const inventoryPanel = row
+    ? (
+      <RowFacts
+        row={row}
+        binding={sourceBinding}
+        bindingError={sourceBindingError}
+        bindingReady={bindingReady}
+        viewer={viewer}
+        pendingLocked={pendingLocked}
+      />
+    )
+    : (
+      <ProductDetail
+        key={target.kind === 'product' ? target.itemId : 'product'}
+        detail={itemDetail}
+        itemError={itemError}
+        query={query}
+        warehouses={warehouses}
+        domesticRows={domesticRows}
+        includeDomestic={domesticIncluded}
+        viewer={viewer}
+        pendingLocked={pendingLocked}
+        section="inventory"
+      />
+    );
+  /* 来源批次：按仓详情用该行的来源事实；商品汇总详情用该商品最近批次历史（空则一句空态）。 */
+  const sourcePanel = row
+    ? <RowSourceFacts row={row} />
+    : (
+      <ProductDetail
+        key={`${target.kind === 'product' ? target.itemId : 'product'}-source`}
+        detail={itemDetail}
+        itemError={itemError}
+        query={query}
+        warehouses={warehouses}
+        domesticRows={domesticRows}
+        includeDomestic={domesticIncluded}
+        viewer={viewer}
+        pendingLocked={pendingLocked}
+        section="source"
+      />
+    );
   return (
-    <div className={styles.detailBackdrop} role="presentation" onClick={onClose} data-testid="inventory-detail-backdrop">
+    <div className={styles.detailOverlay} role="presentation" onClick={onClose} data-testid="inventory-detail-backdrop">
       <aside
-        className={styles.detailDrawer}
+        className={demoStyles.detailDialog}
         role="dialog"
         aria-modal="true"
         aria-label={`${title} 库存详情`}
         onClick={(event) => event.stopPropagation()}
         data-testid="inventory-detail-dialog"
         data-kind={target.kind}
+        data-section={section}
       >
-        <header className={styles.detailDrawerHead}>
+        <header className={demoStyles.detailHeader}>
           <div>
-            <h2>{title}</h2>
-            <p>{subtitle}</p>
+            <h2 data-slot="dialog-title">{title}</h2>
+            <p data-slot="dialog-description">{subtitle}</p>
           </div>
           <button
             type="button"
-            className={styles.detailClose}
+            className={demoStyles.iconButton}
             onClick={onClose}
             aria-label="关闭"
             title="关闭"
@@ -1054,31 +1155,25 @@ export function InventoryDetailPanel({
             <X size={18} strokeWidth={1.8} aria-hidden />
           </button>
         </header>
-        <div className={styles.detailDrawerBody}>
-          {row
-            ? (
-              <RowFacts
-                row={row}
-                binding={sourceBinding}
-                bindingError={sourceBindingError}
-                bindingReady={bindingReady}
-                viewer={viewer}
-                pendingLocked={pendingLocked}
-              />
-            )
-            : (
-              <ProductDetail
-                key={target.kind === 'product' ? target.itemId : 'product'}
-                detail={itemDetail}
-                itemError={itemError}
-                query={query}
-                warehouses={warehouses}
-                domesticRows={domesticRows}
-                includeDomestic={domesticIncluded}
-                viewer={viewer}
-                pendingLocked={pendingLocked}
-              />
-            )}
+        <DetailTabs
+          tabs={tabs}
+          active={section}
+          onSelect={(key) => setSection(key === 'source' ? 'source' : 'inventory')}
+          ariaLabel="库存详情分区"
+          idPrefix="inventory-detail-tab"
+          panelIdPrefix="inventory-detail-panel"
+          testIdPrefix="inventory-detail-tab"
+        />
+        <div className={`${demoStyles.detailBody} ${demoStyles.detailContent}`}>
+          {section === 'inventory' ? (
+            <div role="tabpanel" id="inventory-detail-panel-inventory" aria-labelledby="inventory-detail-tab-inventory" data-testid="inventory-detail-panel-inventory">
+              {inventoryPanel}
+            </div>
+          ) : (
+            <div role="tabpanel" id="inventory-detail-panel-source" aria-labelledby="inventory-detail-tab-source" data-testid="inventory-detail-panel-source">
+              {sourcePanel}
+            </div>
+          )}
         </div>
       </aside>
     </div>

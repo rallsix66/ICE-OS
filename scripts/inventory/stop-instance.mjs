@@ -22,7 +22,11 @@ function runScript(script) {
 const workerStopped = fs.existsSync(path.join(run.instanceRoot, 'inventory-worker.pid.json'))
   ? runScript('scripts/inventory/stop-worker.mjs')
   : true;
+// 定时读取后台进程（货票在途）与库存 worker 分开停止，互不影响。
+const shipmentReaderStopped = fs.existsSync(path.join(run.instanceRoot, 'shipment-auto-reader.pid.json'))
+  ? runScript('scripts/shipment/stop-worker.mjs')
+  : true;
 const webStopped = runScript('scripts/catalog/stop-local-preview.mjs');
 const pgStopped = runScript('scripts/catalog/stop-catalog-postgres.mjs');
-console.log(JSON.stringify({ runId: args.runId, workerStopped, webStopped, pgStopped, results }, null, 2));
-process.exitCode = workerStopped && webStopped && pgStopped ? 0 : 1;
+console.log(JSON.stringify({ runId: args.runId, workerStopped, shipmentReaderStopped, webStopped, pgStopped, results }, null, 2));
+process.exitCode = workerStopped && shipmentReaderStopped && webStopped && pgStopped ? 0 : 1;

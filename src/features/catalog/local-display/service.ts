@@ -21,6 +21,7 @@ import { buildInventoryCatalogSource, emptyInventoryView, type InventoryCatalogR
 import { buildDetailInventoryProjectionTokenFromRows } from '../shell/catalog-detail-cache';
 import { requireCatalogAdmin } from '../authorization';
 import { loadPreparedBsSampleInventory, type PreparedBsSampleInventory } from '../sources/bs-sample-inventory-adapter';
+import { resolveSpecification } from '../specification';
 
 const BASIS_PATH = 'docs/catalog/local-sample-valuation-basis-20261021.json';
 const NOT_COMPUTED_REASON = '暂未计算';
@@ -41,11 +42,15 @@ export const basisDocumentSha256 = cache(async function basisDocumentSha256(): P
   return createHash('sha256').update(bytes).digest('hex');
 });
 
-function specText(item: CatalogItemDto): string {
-  const spec = item.specification;
-  if (spec.state === 'observed' && spec.meaning === 'value') return spec.raw;
-  if (spec.state === 'observed' && spec.meaning === 'explicit_empty') return '';
-  return '—';
+/**
+ * 列表规格单元格：与详情 `catalogSpecFact` 同一口径（表列优先，规格缺失时从标准名称提取）。
+ * 解析失败是真实错误，列表也显式显示「规格解析失败」，不被名称提取掩盖；
+ * 解析不出规格时返回 ''，由列表组件兜底显示「规格待补」。
+ * 导出仅用于「列表文本 = 详情文本」一致性单测。
+ */
+export function specText(item: CatalogItemDto): string {
+  if (item.specification.state === 'parse_failed') return '规格解析失败';
+  return resolveSpecification({ specification: item.specification, nameCn: item.nameCn }).text;
 }
 
 function rowSlice(line: CatalogInventorySourceLine) {

@@ -1272,79 +1272,22 @@
   border: 0;
 }
 
-.detailBackdrop {
+/* R14：详情统一为 ICE v4 共用 detailDialog（1060px 规则 / 90vh / 居中），
+   本文件只补遮罩与容器，不再维护第二套抽屉外观。 */
+.detailOverlay {
   position: fixed;
   inset: 0;
   z-index: 60;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
   background: rgba(23, 33, 48, 0.34);
   animation: detailBackdropIn 200ms var(--ice-ui-ease-out);
 }
 
-.detailDrawer {
-  display: flex;
-  width: min(820px, 94vw);
-  height: 100%;
-  flex-direction: column;
-  background: #fff;
-  box-shadow: -18px 0 46px rgba(24, 36, 54, 0.22);
-  outline: none;
-  animation: detailDrawerIn 200ms var(--ice-ui-ease-out);
-}
-
-.detailDrawerHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px 12px;
-  border-bottom: 1px solid var(--ice-ui-line);
-}
-
-.detailDrawerHead h2 {
-  margin: 0;
-  color: #26364c;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.detailDrawerHead p {
-  margin: 3px 0 0;
-  color: var(--ice-ui-faint);
-  font-size: 12px;
-}
-
-.detailClose {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  place-items: center;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: #6f7b8d;
-  cursor: pointer;
-  transition: background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
-}
-
-.detailClose:hover {
-  background: #f0f2f8;
-  color: var(--ice-ui-text);
-}
-
-.detailClose:focus-visible {
-  outline: 2px solid #8495ed;
-  outline-offset: 1px;
-}
-
-.detailDrawerBody {
-  min-height: 0;
-  flex: 1;
-  overflow: auto;
-  padding: 14px 18px;
+.detailOverlay > * {
+  margin: auto;
 }
 
 @keyframes detailBackdropIn {
@@ -1352,14 +1295,8 @@
   to { opacity: 1; }
 }
 
-@keyframes detailDrawerIn {
-  from { opacity: 0.6; transform: translateX(24px); }
-  to { opacity: 1; transform: none; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .detailBackdrop,
-  .detailDrawer {
+  .detailOverlay {
     animation: none;
   }
 }
@@ -1631,10 +1568,15 @@
   border-radius: 8px;
 }
 
-.detailTableWrap .table th,
+/* 详情内表格与 ICE v4 共用表格同一行高/字号（表头 11px、正文 12px）。 */
+.detailTableWrap .table th {
+  padding: 11px 20px;
+  font-size: 11px;
+}
+
 .detailTableWrap .table td {
+  padding: 13px 20px;
   font-size: 12px;
-  padding: 7px 10px;
 }
 
 .detailHistory {

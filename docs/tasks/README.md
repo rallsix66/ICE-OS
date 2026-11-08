@@ -2,7 +2,7 @@
 
 本目录按可独立验收的业务结果组织任务，控制范围、依赖和交付标准。完整任务可分内部步骤、跨会话接续完成，不因会话结束或内部步骤完成而重复要求批准。
 
-当前入口为[current-task.md](./current-task.md)。当前 **INVENTORY_SYNC_UI_V1_DOCS_GIT_CLOSED**（功能验收 **INVENTORY_SYNC_UI_V1_LOCAL_PASS**，2026-10-28主审独立复审通过；文档与 Git 收尾同日完成）；[独立报告](../../.local/inventory-sync-ui-tail-independent-20261028/independent-review.md)、[尾项验收说明](./inventory-sync-ui-v1-tail-repair-acceptance.md)、[运行与交接 §0.11](../inventory/inventory-sync-v1.md)。T1–T3已关闭，无剩余功能修复包；历史任务、数据和证据保留，`.local` 与私有输入未入库。
+当前入口为[current-task.md](./current-task.md)。当前 **`BUSINESS_OVERVIEW_V1_LOCAL_PASS`**（经营总览首页：独立复审通过、阻断 0，本包收口，2026-11-07；本机实例 `run-20261026T211500Z-11a22b33`、BUILD `WVI5zfZZV2OfHrEQgUb0j`；[任务包与执行记录](./business-overview-v1.md) §11 补修、§12 独立复审、[补修后独立复审报告](../../.local/business-overview-v1-repair-independent-20261107/independent-review.md)；首轮 NEEDS_FIX [报告](../../.local/business-overview-v1-independent-20261107/independent-review.md) 保留）。上一任务已通过 **`INVENTORY_SYNC_RESUME_V1_LOCAL_PASS`**（恢复 BigSeller 库存持续更新：独立审查通过、阻断 0，2026-11-07，[报告](../../.local/inventory-sync-resume-v1-independent-20261107/independent-review.md)；无业务代码改动）；[任务包与执行记录](./inventory-sync-resume-v1.md)、[库存自动同步运行交接](./inventory-sync-v1-runbook.md)、[业务合同](./inventory-sync-v1.md)。上一板块 **`SHIPMENT_IN_TRANSIT_V1_LOCAL_FINAL`**（物流在途：本机功能验收及文档收尾完成，2026-11-07；基线 `SHIPMENT_IN_TRANSIT_V1_R16_LOCAL_PASS`）保留[最终说明](./shipment-in-transit-v1-final.md)、[运行交接](./shipment-in-transit-v1-runbook.md)、[任务合同](./shipment-in-transit-v1.md)（§23）与[R16 独立报告](../../.local/shipment-v1-r16-independent-20261107/independent-review.md)。远端推送与正式部署：本次版本交付已推送并经 [PR #13](https://github.com/rallsix66/ICE-OS/pull/13) 合并到远程 `master`；正式部署与长期运行验收未完成，历史任务、数据和证据保留，`.local` 与私有输入未入库。
 
 ## 文档层级
 
@@ -10,6 +10,9 @@
 mvp-roadmap.md          长期 Phase 与依赖
 tasks/phase-*.md        每个业务模块的任务顺序
 tasks/current-task.md   当前唯一允许执行的 Task Packet
+tasks/business-overview-v1.md  经营总览首页合同与执行记录（本包已收口 LOCAL_PASS）
+tasks/inventory-sync-resume-v1.md  库存持续更新恢复（执行记录）
+tasks/inventory-sync-v1-runbook.md 库存自动同步运行交接（启停/状态/登录恢复）
 tasks/inventory-sync-ui-v1.md  当前库存双视图与同步界面任务
 tasks/inventory-sync-v1.md  早期库存与自动同步任务记录
 tasks/p0-02/2026-10-15-delivery-rework.md  P0-02 历史返工包

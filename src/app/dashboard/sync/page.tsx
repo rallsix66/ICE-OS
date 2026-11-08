@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { ReadFailurePanel } from '@/features/inventory/components/display';
 import { SyncView } from '@/features/inventory/components/sync-view';
+import { ShipmentSourceNotes, ShipmentSyncSource } from '@/features/shipment/components/shipment-sync-source';
+import { getShipmentGroupingReviews, getShipmentSourceStatus } from '@/features/shipment/server/reads';
 import {
   classifyReadFailure,
   errorMessageOf,
@@ -62,6 +64,16 @@ export default async function SyncPage({
     getInventoryWarehouseStates(identity),
     getInventoryDomesticSnapshot(identity),
   ]);
+  // 第十二轮：飞书物流在途来源（读取状态统一放本页；失败只降级这一块，不影响库存同步）。
+  // 第十四轮：拆票/合票待复核数与同页复核弹窗共用物流在途的同一份读取。
+  const [shipmentSourceSettled, shipmentReviewsSettled] = await Promise.all([
+    getShipmentSourceStatus()
+      .then((value) => ({ ok: true as const, value }))
+      .catch((error: unknown) => ({ ok: false as const, error: errorMessageOf(error) })),
+    getShipmentGroupingReviews()
+      .then((value) => ({ ok: true as const, value }))
+      .catch((error: unknown) => ({ ok: false as const, error: errorMessageOf(error) })),
+  ]);
   if (overviewSettled.status === 'rejected') {
     return (
       <ReadFailurePanel
@@ -98,6 +110,9 @@ export default async function SyncPage({
     }
   }
 
+  const shipmentStatus = shipmentSourceSettled.ok ? shipmentSourceSettled.value : null;
+  const shipmentError = shipmentSourceSettled.ok ? null : shipmentSourceSettled.error;
+
   return (
     <SyncView
       overview={overview}
@@ -108,6 +123,15 @@ export default async function SyncPage({
       runError={runError}
       domesticSnapshot={domesticSnapshot}
       viewer={{ actorId: identity.profileUserId, accountId: overview.account.accountId ?? '' }}
+      shipmentCard={(
+        <ShipmentSyncSource
+          status={shipmentStatus}
+          error={shipmentError}
+          reviews={shipmentReviewsSettled.ok ? shipmentReviewsSettled.value : null}
+          reviewsError={shipmentReviewsSettled.ok ? null : shipmentReviewsSettled.error}
+        />
+      )}
+      sourceNotes={<ShipmentSourceNotes status={shipmentStatus} error={shipmentError} />}
     />
   );
 }
