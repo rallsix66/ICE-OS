@@ -158,7 +158,7 @@ PASS 由独立复审给出，执行方不自行宣布；仅限本机本包，不
 库存 worker（pid 43836、60 分钟计划）与物流在途自动读取（pid 40476、10 分钟计划）。
 提交/推送/部署按实际状态登记：已提交并推送 `codex/ice-v4-planning`，经
 [PR #13](https://github.com/rallsix66/ICE-OS/pull/13) 合并到远程 `master`（合并提交 `b620eb4`）；
-远程 Vercel Production 已随该合并自动部署成功（ref `b620eb4`），本机 3011 未重建、未重启
+远程 Vercel Production 已随 master 更新自动部署成功，本机 3011 未重建、未重启
 （仍为 BUILD `WVI5zfZZV2OfHrEQgUb0j`），未清场。
 
 ## 11. 独立审查补修明细
@@ -210,5 +210,5 @@ WM0026 显示「合计待核对 / 已知小计」、缺口说明列出 4 款已�
 - 未扩大的范围：多日稳定性、完整权限矩阵、200% 缩放、真实服务故障注入与崩溃接管未做；worker 无服务守护、
   国内库存为冻结快照、首页按请求读取等既有边界继续有效，不转为本包新增阻断。
 - 提交/推送/部署：已推送 `codex/ice-v4-planning`，经 [PR #13](https://github.com/rallsix66/ICE-OS/pull/13)
-  合并到远程 `master`（合并提交 `b620eb4`）；远程 Vercel Production 已随合并自动部署成功
-  （ref `b620eb4`），本机 3011 未重建、未重启，未清场；`.local` 与私有输入未入库。
+  合并到远程 `master`（合并提交 `b620eb4`）；远程 Vercel Production 已随 master 更新自动部署成功，
+  本机 3011 未重建、未重启，未清场；`.local` 与私有输入未入库。
