@@ -3,7 +3,12 @@
 更新：2026-11-07（Asia/Shanghai）。适用验收基线 **`SHIPMENT_IN_TRANSIT_V1_R16_LOCAL_PASS`**，收尾状态 **`SHIPMENT_IN_TRANSIT_V1_LOCAL_FINAL`**。
 功能范围见 [最终功能说明](shipment-in-transit-v1-final.md)；逐轮实现与验收见 [任务合同](shipment-in-transit-v1.md)。
 
-> 本交接只记录本机现有实现与命令，**不新增功能、不改运行方式**。当前库存同步 worker 必须保持关闭，因此**不要用整实例启动命令**（`scripts/inventory/start-instance.mjs` 会顺带启动库存 worker）；请按 §4 的分项顺序启动。
+> 本交接只记录本机现有实现与命令，**不新增功能、不改运行方式**。
+> 2026-11-07 更新：库存同步 worker 已按 [INVENTORY_SYNC_RESUME_V1](inventory-sync-resume-v1.md) 恢复运行，
+> “库存 worker 保持关闭”的旧限制已解除。整实例启动命令 `scripts/inventory/start-instance.mjs`
+> 现在会依次启动 PostgreSQL → Web → **库存同步 worker** → 物流在途读取进程，可作为完整恢复命令使用；
+> 只想恢复物流读取时，仍按 §4 第 3 步单独启动。库存同步的启停/状态/登录恢复见
+> [库存自动同步运行交接](inventory-sync-v1-runbook.md)。
 
 ## 1. 实例标识与位置
 
@@ -15,7 +20,7 @@
 | Web / 页面 | http://127.0.0.1:3011；入口 `/dashboard/in-transit`、`/dashboard/catalog`、`/dashboard/inventory`、`/dashboard/sync` |
 | 数据库 | PostgreSQL `127.0.0.1:59345`，库 `iceos_catalog_run_20261026T211500Z_11a22b33`（PG 17，数据目录 `…\instance\pgdata`） |
 | 当前 BUILD | `u1l5K9pzcRXylPrYmnvAc`，源码快照 `04e22de5906c3c36…`（`…\instance\preview-build-ready.json`） |
-| 运行身份 | Web：本机 Node；库存 worker：`inv-worker-59345`（**保持关闭**）；在途读取：`shipment-auto-reader-59345`（受限 `ice_p0_02_sync_runner`） |
+| 运行身份 | Web：本机 Node；库存 worker：`inv-worker-59345`（2026-11-07 起恢复运行，见库存交接）；在途读取：`shipment-auto-reader-59345`（受限 `ice_p0_02_sync_runner`） |
 | 登录 | 账号 `admin@catalog.test`；密码文件 `…\instance\login.local-preview.txt`（不写入仓库） |
 
 配置与状态文件（均在 `…\instance\`，不入 Git）：
@@ -58,7 +63,7 @@ node scripts/inventory/start-web.mjs --run-id run-20261026T211500Z-11a22b33
 node scripts/shipment/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
 ```
 
-**不要**用 `node scripts/inventory/start-instance.mjs --run-id …` 作为当前恢复方式：它会依次启动数据库、Web、**库存 worker**、在途读取进程；库存 worker 目前必须保持关闭。若不慎启动，用 `node scripts/inventory/stop-worker.mjs --run-id run-20261026T211500Z-11a22b33` 停掉并核对状态。
+完整恢复（连库存同步 worker 一起）可直接用 `node scripts/inventory/start-instance.mjs --run-id run-20261026T211500Z-11a22b33`：它依次启动数据库、Web、库存同步 worker、在途读取进程并打印状态。只恢复物流读取时用上面的第 3 步即可；库存同步的启停与登录恢复见[库存自动同步运行交接](inventory-sync-v1-runbook.md)。
 
 若源码有改动需要更新 3011（本轮收尾无功能改动，未重建）：先 `node scripts/catalog/build-preview-workspace.mjs --run-id …`，再 `node scripts/catalog/promote-preview-build.mjs --run-id …`，最后按上面顺序启动。
 
@@ -139,7 +144,7 @@ Get-FileHash ".local\shipment-v1-closeout-20261107\backup\<file>.dump" -Algorith
 
 ## 9. 明确不做 / 注意事项
 
-- **库存同步 worker 保持关闭**：不要通过本板块启停或恢复库存自动同步；那是另外的工作。
+- **库存同步 worker 已恢复运行**（2026-11-07，见[库存自动同步运行交接](inventory-sync-v1-runbook.md)）：它的启停、状态与登录恢复不在本板块，两者互不接管；物流板块的失败不需要停库存 worker。
 - 喜运达轨迹按用户决定暂缓，不在本板块。
 - 本机实例的读取进程无服务守护，机器重启/进程崩溃后需要按 §4 第 3 步手动拉起（状态可查）。
 - 读取进程与手动刷新共用租约；如显示 `skip-busy` 属正常（另一次读取正在进行）。
