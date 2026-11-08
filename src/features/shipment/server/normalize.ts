@@ -992,4 +992,3 @@ export function normalizeSnapshotRaw(value: unknown): ShipmentSnapshotRawDto | n
     collection: record(raw.collection),
   };
 }
-

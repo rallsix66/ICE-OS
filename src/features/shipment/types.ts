@@ -1051,4 +1051,3 @@ export interface ShipmentValueOverviewDto {
   excludedItemCount: number;
   markets: ShipmentValueMarketRowDto[];
 }
-

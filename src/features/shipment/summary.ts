@@ -404,4 +404,3 @@ export function buildShipmentTicketValue(
     itemCount: items.length,
   };
 }
-
