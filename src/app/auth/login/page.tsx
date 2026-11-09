@@ -4,7 +4,7 @@
 // 已登录用户由 middleware 自动重定向到 /dashboard
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,9 +39,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
+      const authClient = createClient();
       const { error: authError } = await withLoginTimeout(
-        supabase.auth.signInWithPassword({ email, password })
+        authClient.auth.signInWithPassword({ email, password })
       );
 
       if (authError) {

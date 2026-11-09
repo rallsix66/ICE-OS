@@ -6,7 +6,18 @@
 > 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 > 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 
-## 当前任务已通过：经营总览首页（BUSINESS_OVERVIEW_V1）（2026-11-07）—— 独立复审通过（本机本包），本包收口
+## 当前任务：退出 Vercel 与 Supabase（PLATFORM_RETIREMENT_V1）（2026-11-08）—— 独立复审通过（本机本包），Git 收口中
+
+状态：**`PLATFORM_RETIREMENT_V1_LOCAL_PASS`**（2026-11-09 独立复审通过，阻断 **0**；[报告](../../.local/platform-retirement-independent-20261109/independent-review.md)；仅限本机本包/当前实例 `run-20261026T211500Z-11a22b33`，Web 3011 / PostgreSQL 59345；PASS 由独立复审给出，执行方不自行宣布）。BUILD **`8Dlf3nPVpGALDoWquDP4A`**。合同与执行记录：[platform-retirement-20261108.md](platform-retirement-20261108.md)。
+
+- **一、验收分层**：**执行方自验**——无 Supabase 环境变量与 SDK 构建通过；全仓标准测试 803/804（唯一失败为既有 Windows 换行 `opt6-production-apply` 基线）；3011 登录/退出/首页/商品库存/物流在途核对；外部退役操作及原始顺序/响应码。**独立复审（2026-11-09，另取证）**——Vercel 项目列表空、原项目 404；Supabase 项目列表空（逐 ref 为权限错误，非 404）；两份 dump 完整离线解码各 59 个表数据段、Storage 为 0；现役代码无 Supabase/Vercel 依赖；BUILD/源码/工作区/manifest/ready 一致（702 源码、423 产物）；3011 login 200、APP/AUTH/SYNC 均连 `127.0.0.1:59345`；真实浏览器 **11/11**、console/pageerror 0、两平台请求 0。复审未改代码、未提交/推送/部署/重启。
+- **二、按报告订正交接**：认证定向测试 **37/37**（`auth` 19 + `proxy` 13 + `login-feedback` 5，退出 0）；`PostgresTokenCache` 只是**保留的既有实现**，现役无实例化消费者，**喜运达业务尚未启用**，本轮未新接；lint **0 error / 16 个既有 warning**，`npm run lint -- --max-warnings 0` **不通过**（零 warning 预算未满足，既有 CI 基线未被本包修复）；**旧 2026-07-18 本机备份仍保留**，Management API 无可下载旧备份不等于本机备份不存在；最终归档为本次两份 dump，已验证可读，**未做恢复演练**；平台当前状态引用独立回读，历史删除顺序与 DELETE 204/200、旧域名 404 等作为执行方记录保留，不把权限错误写成 404。
+- **三、外部退役与代码清理**：Vercel `overseas-inventory`（`prj_zziqelP0J1CMRIHnZhJVSNRBMqPK`）先解除 Git 自动发布关联再删除；Supabase `DIS Project`（`hzlhqyditalumhnxbaim`）与 `DIS Staging`（`hyarhvsjhkjpallbyifn`）恢复后完整逻辑归档再删除。归档在本机 `.local/platform-retirement-20261108/archive/`（两份 dump + SHA-256 + 处置前快照，不入 Git）。认证统一 Better Auth + 本地 PostgreSQL；删除 `src/lib/supabase/`、旧 `auth/callback` 与 `SupabaseTokenCache`，移除 `@supabase/*`、`supabase` CLI、`vercel.json`、Supabase 环境变量与 CI 占位变量；历史 SQL/迁移/报告保留。
+- **四、临时访问凭据处置**：Vercel 令牌自撤销调用 **403**，随后项目/用户 API 也 403，已无可用管理访问能力；Supabase PAT 自助撤销端点均 **404**，仍能认证但可达项目为 **0**，需用户在 Dashboard Access Tokens 撤销；临时数据库密码与 `retire_archive` key 随项目删除失效。本机未持久化令牌，未扩大到其他项目/连接器。详见合同 §7。
+- **五、Git 交付**：按既有授权提交、推送、创建 PR 并合并远程 `master`；PR 链接、合并提交与远程回读在合并后回填本节与 `current-state.md`。继承本包独立验收，只做 Git 交付必要检查，既有 CI 失败如实说明。
+- **六、边界与现场**：正式部署**未完成**（Vercel 已退出）；本机 3011（pid 2420）与两个后台计划继续运行（库存 pid 43836 / 60 分钟，物流读取 pid 40476 / 10 分钟）。未重建数据库、未改商品身份/绑定/同步机制；`.local` 证据与归档不入库。
+
+## 上一任务已通过：经营总览首页（BUSINESS_OVERVIEW_V1）（2026-11-07）—— 独立复审通过（本机本包），本包收口
 
 状态：**`BUSINESS_OVERVIEW_V1_LOCAL_PASS`**（2026-11-07 独立复审通过，阻断 **0**，[报告](../../.local/business-overview-v1-repair-independent-20261107/independent-review.md)；仅限本机本包/当前实例；本机实例 `run-20261026T211500Z-11a22b33`；3011 BUILD `WVI5zfZZV2OfHrEQgUb0j`、源码快照 `5c5a591b68b18be7…`）。PASS 由独立复审给出，执行方不自行宣布。合同与执行记录：[business-overview-v1.md](business-overview-v1.md)（§11 补修明细、§12 独立复审）；首轮 NEEDS_FIX 报告保留在[独立审查](../../.local/business-overview-v1-independent-20261107/independent-review.md)。本包收口，无需再重建或重复业务测试。本机 `.local` 证据目录不入 Git；本节与合同 §12 已完整记录验收结论，远程交接不依赖 `.local`。本次 Git 版本交付经 [PR #13](https://github.com/rallsix66/ICE-OS/pull/13) 合并到远程 `master`。
 

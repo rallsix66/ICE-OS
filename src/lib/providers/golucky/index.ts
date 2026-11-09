@@ -7,7 +7,6 @@
 
 export { GoluckyClient, createGoluckyClient, InMemoryTokenCache } from './client';
 export type { TokenCache, TokenLease, GoluckyClientConfig, FetchFn } from './client';
-export { SupabaseTokenCache } from './token-cache';
 export { PostgresTokenCache } from './postgres-token-cache';
 export { dryRunWaybill, createDryRunClient } from './dry-run';
 export { parseTrackingResponse } from './parse-response';

@@ -80,7 +80,7 @@ export interface GoluckyClientConfig {
   appKey: string;
   appSecret: string;
   timeoutMs?: number;
-  /** Token 缓存实现。生产使用 SupabaseTokenCache，测试使用 InMemoryTokenCache */
+  /** Token 缓存实现。既有实现为 PostgresTokenCache；喜运达业务尚未启用，现役无实例化消费者 */
   tokenCache: TokenCache;
 }
 

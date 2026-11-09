@@ -1,10 +1,11 @@
-// 浏览器端认证客户端 — P0-02 Better Auth 或遗留 Supabase
-import { createBrowserClient } from '@supabase/ssr';
-import type { Database } from '@/types/database';
+'use client';
+
+// Better Auth 浏览器端认证客户端 —— 仅使用本地 PostgreSQL 上的 Better Auth。
+// 旧 Supabase 登录回退已移除；认证统一走 /api/auth/*。
 
 type AuthError = { message: string };
 
-function independentBrowserClient() {
+export function createClient() {
   return {
     auth: {
       async signInWithPassword(credentials: { email: string; password: string }) {
@@ -20,14 +21,14 @@ function independentBrowserClient() {
             const body = (await response.json()) as { message?: string; error?: string };
             message = body.message ?? body.error ?? message;
           } catch {
-            // ignore
+            // ignore non-JSON error bodies
           }
           return { error: { message } as AuthError, data: { user: null, session: null } };
         }
         return { error: null, data: { user: {}, session: {} } };
       },
       async signOut() {
-        /* V3-04：退出必须真正结束服务端会话；Better Auth 需要 JSON 请求体，空 POST 会 415。 */
+        // Better Auth 的 sign-out 需要 JSON 请求体，空 POST 会返回 415。
         const response = await fetch('/api/auth/sign-out', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -40,15 +41,4 @@ function independentBrowserClient() {
       },
     },
   };
-}
-
-export function createClient() {
-  if (process.env.NEXT_PUBLIC_ICE_USE_BETTER_AUTH === 'true') {
-    return independentBrowserClient();
-  }
-
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
 }

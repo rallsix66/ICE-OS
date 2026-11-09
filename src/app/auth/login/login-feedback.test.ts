@@ -23,7 +23,7 @@ describe('LoginPage 登录反馈', () => {
   it('signInWithPassword 使用超时保护包装', () => {
     expect(src).toMatch(/withLoginTimeout\(/);
     expect(src).toMatch(/Promise\.race/);
-    expect(src).toMatch(/supabase\.auth\.signInWithPassword/);
+    expect(src).toMatch(/authClient\.auth\.signInWithPassword/);
     expect(src).toMatch(/new Error\(LOGIN_TIMEOUT_MSG\)/);
   });
 
