@@ -162,7 +162,22 @@ PASS 由独立复审给出，执行方不自行宣布。本结论不代表正式
 本机未发现上述令牌的持久化副本：环境变量不存在，Vercel/Supabase CLI 凭据目录没有本包令牌，`.local` 证据脚本也只在
 运行时从环境变量读取。未新增、未保留可复用的平台凭据。
 
-## 8. Git 交付
+## 8. Git 交付（2026-11-09）
 
-本包在独立复审通过后按既有授权提交、推送、创建 PR 并合并到远程 `master`；PR 链接、合并提交与远程回读结果在合并后
-回填到本节及 `current-task.md` / `current-state.md`。正式部署仍为“未完成”。
+- 提交：`e183660980e443179f874a1cd47e08607ab22cfb`（`chore(platform): 退役 Vercel 与 Supabase 并清理认证依赖`），
+  推送分支 `codex/ice-v4-planning`。
+- PR：[#14](https://github.com/rallsix66/ICE-OS/pull/14)（base `master`，state `MERGED`，合并时间 2026-11-09T01:37:09Z）。
+- 合并提交：`273fbcfb18cc89bf014ca3340238e3fcf147dcec`（Merge pull request #14）。
+- 远程 `master` 回读：合并提交 `273fbcf` 已包含在 `origin/master`；本收口文档提交紧随其后，最终 HEAD 以远程回读为准
+  （本机 `.local` 未跟踪）。
+- CI（不掩盖既有失败）：
+  - `Tests, lint, and build` **失败**：`tests/p0-01/opt6-baseline.test.ts` 的 2 个既有断言
+    （`识别 canonical 单失败基线`、`批准文件指纹与仓库一致`）失败；该失败在合并前 master 已存在，不是本包引入。
+    测试步骤先失败，CI 未继续执行 lint/build。
+  - `PostgreSQL concurrency tests` **失败**：`npm run test:concurrency` 按仓库现状主动
+    `echo "concurrency tests archived…" && exit 1`，是既有 CI 配置行为。
+  - 本包不声称 CI 通过；独立复审的定向 37/37、构建与真实浏览器结论见 §3/§4。
+- 推送后 Vercel 回读：GitHub deployments 最新仍为退役前的 `4d3304d`（vercel[bot]，2026-11-08）；
+  本次 `e183660` / `273fbcf` **没有新增 Vercel deployment**，与“先解除 Git 关联再删除项目”一致。
+  由于 Vercel 临时令牌已不可用（§7），未再做 Vercel 侧部署列表 API 回读。
+- 正式部署仍为“未完成”；本机 3011 与两个后台计划未因 Git 交付重启或清场。
