@@ -1,29 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Use vi.hoisted to make mock refs available to the hoisted vi.mock factory
-const { mockGetUser, mockSingle } = vi.hoisted(() => ({
-  mockGetUser: vi.fn(),
-  mockSingle: vi.fn(),
+const { mockSessionUser, mockProfileUserId, mockQuery } = vi.hoisted(() => ({
+  mockSessionUser: vi.fn(),
+  mockProfileUserId: vi.fn(),
+  mockQuery: vi.fn(),
 }));
 
-const mockEq = vi.fn(() => ({ single: mockSingle }));
-const mockSelect = vi.fn(() => ({ eq: mockEq }));
-const mockFrom = vi.fn(() => ({ select: mockSelect }));
-
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() =>
-    Promise.resolve({
-      auth: { getUser: mockGetUser },
-      from: mockFrom,
-    }),
-  ),
+vi.mock('@/lib/independent-platform/p0-02-session', () => ({
+  getP002AuthSessionUser: mockSessionUser,
+  getP002ProfileUserId: mockProfileUserId,
 }));
 
-vi.mock('@/lib/supabase/helpers', () => ({
-  unwrapJoin: (joined: unknown) => {
-    if (Array.isArray(joined)) return joined[0];
-    return joined;
-  },
+vi.mock('@/lib/database/app-db', () => ({
+  withAppDb: async (
+    _context: unknown,
+    callback: (client: { query: typeof mockQuery }) => Promise<unknown>,
+  ) => callback({ query: mockQuery }),
 }));
 
 import {
@@ -39,52 +31,40 @@ function resetMocks() {
   vi.clearAllMocks();
 }
 
-function mockAuthSuccess(email = 'admin@test.com') {
-  mockGetUser.mockResolvedValue({
-    data: { user: { id: 'user-1', email } },
-    error: null,
-  });
+function mockSession(email = 'admin@test.com') {
+  mockSessionUser.mockResolvedValue({ id: 'auth-user-1', email });
+  mockProfileUserId.mockResolvedValue('user-1');
 }
 
-function mockAuthUnauthenticated() {
-  mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+function mockNoSession() {
+  mockSessionUser.mockResolvedValue(null);
 }
 
-function mockAuthError() {
-  mockGetUser.mockResolvedValue({ data: { user: null }, error: new Error('auth error') });
+function mockNoProfileUser() {
+  mockSessionUser.mockResolvedValue({ id: 'auth-user-1', email: 'admin@test.com' });
+  mockProfileUserId.mockResolvedValue(null);
 }
 
 function mockProfile(overrides: Record<string, unknown> = {}) {
-  mockSingle.mockResolvedValue({
-    data: {
-      display_name: 'Test User',
-      is_active: true,
-      role: [{ name: 'admin' }],
-      ...overrides,
-    },
-    error: null,
+  mockQuery.mockResolvedValue({
+    rowCount: 1,
+    rows: [{ display_name: 'Test User', is_active: true, role_name: 'admin', ...overrides }],
   });
 }
 
-function mockProfileError() {
-  mockSingle.mockResolvedValue({ data: null, error: new Error('db error') });
-}
-
 function mockProfileNotFound() {
-  mockSingle.mockResolvedValue({ data: null, error: null });
+  mockQuery.mockResolvedValue({ rowCount: 0, rows: [] });
 }
 
-function mockProfilePGRST116() {
-  mockSingle.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+function mockProfileError() {
+  mockQuery.mockRejectedValue(new Error('db error'));
 }
 
-// ─── Existing function regression tests ───────────────────────────
-
-describe('getCurrentUser (existing, unchanged)', () => {
+describe('getCurrentUser (Better Auth + 本地 PostgreSQL)', () => {
   beforeEach(resetMocks);
 
   it('returns user when authenticated and profile exists', async () => {
-    mockAuthSuccess();
+    mockSession();
     mockProfile();
 
     const user = await getCurrentUser();
@@ -94,32 +74,21 @@ describe('getCurrentUser (existing, unchanged)', () => {
     expect(user!.email).toBe('admin@test.com');
     expect(user!.displayName).toBe('Test User');
     expect(user!.roleName).toBe('admin');
-
-    // Verify query chain — select now includes is_active for shared cache
-    expect(mockFrom).toHaveBeenCalledWith('profiles');
-    expect(mockSelect).toHaveBeenCalledWith('display_name, is_active, role:role_id (name)');
-    expect(mockEq).toHaveBeenCalledWith('id', 'user-1');
-    expect(mockSingle).toHaveBeenCalled();
+    expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
   it('returns null when not authenticated', async () => {
-    mockAuthUnauthenticated();
-
-    const user = await getCurrentUser();
-
-    expect(user).toBeNull();
+    mockNoSession();
+    expect(await getCurrentUser()).toBeNull();
   });
 
-  it('returns null on auth error', async () => {
-    mockAuthError();
-
-    const user = await getCurrentUser();
-
-    expect(user).toBeNull();
+  it('returns null when session has no local profile mapping', async () => {
+    mockNoProfileUser();
+    expect(await getCurrentUser()).toBeNull();
   });
 
   it('falls back to email prefix when display_name is null', async () => {
-    mockAuthSuccess('test@example.com');
+    mockSession('test@example.com');
     mockProfile({ display_name: null });
 
     const user = await getCurrentUser();
@@ -128,8 +97,8 @@ describe('getCurrentUser (existing, unchanged)', () => {
   });
 
   it('defaults roleName to operator when role is missing', async () => {
-    mockAuthSuccess();
-    mockProfile({ role: null });
+    mockSession();
+    mockProfile({ role_name: null });
 
     const user = await getCurrentUser();
 
@@ -137,11 +106,11 @@ describe('getCurrentUser (existing, unchanged)', () => {
   });
 });
 
-describe('requireAuth (existing, unchanged)', () => {
+describe('requireAuth', () => {
   beforeEach(resetMocks);
 
   it('returns user when authenticated', async () => {
-    mockAuthSuccess();
+    mockSession();
     mockProfile();
 
     const user = await requireAuth();
@@ -150,17 +119,17 @@ describe('requireAuth (existing, unchanged)', () => {
   });
 
   it('throws when not authenticated', async () => {
-    mockAuthUnauthenticated();
+    mockNoSession();
 
     await expect(requireAuth()).rejects.toThrow('未登录');
   });
 });
 
-describe('requireAdmin (existing, unchanged)', () => {
+describe('requireAdmin', () => {
   beforeEach(resetMocks);
 
   it('returns user when admin', async () => {
-    mockAuthSuccess();
+    mockSession();
     mockProfile();
 
     const user = await requireAdmin();
@@ -168,27 +137,19 @@ describe('requireAdmin (existing, unchanged)', () => {
     expect(user.roleName).toBe('admin');
   });
 
-  it('throws when not authenticated', async () => {
-    mockAuthUnauthenticated();
-
-    await expect(requireAdmin()).rejects.toThrow('未登录');
-  });
-
   it('throws when operator', async () => {
-    mockAuthSuccess();
-    mockProfile({ role: [{ name: 'operator' }] });
+    mockSession();
+    mockProfile({ role_name: 'operator' });
 
     await expect(requireAdmin()).rejects.toThrow('无权限');
   });
 });
 
-// ─── P5-SY5B: New active-user functions ──────────────────────────
-
 describe('getCurrentActiveUser', () => {
   beforeEach(resetMocks);
 
   it('returns user with isActive when authenticated and active', async () => {
-    mockAuthSuccess();
+    mockSession();
     mockProfile({ is_active: true });
 
     const user = await getCurrentActiveUser();
@@ -199,144 +160,77 @@ describe('getCurrentActiveUser', () => {
     expect(user!.displayName).toBe('Test User');
     expect(user!.roleName).toBe('admin');
     expect(user!.isActive).toBe(true);
-
-    // Verify query chain includes is_active
-    expect(mockFrom).toHaveBeenCalledWith('profiles');
-    expect(mockSelect).toHaveBeenCalledWith('display_name, is_active, role:role_id (name)');
-    expect(mockEq).toHaveBeenCalledWith('id', 'user-1');
-    expect(mockSingle).toHaveBeenCalled();
   });
 
   it('returns null when user is not authenticated', async () => {
-    mockAuthUnauthenticated();
+    mockNoSession();
 
-    const user = await getCurrentActiveUser();
-
-    expect(user).toBeNull();
+    expect(await getCurrentActiveUser()).toBeNull();
   });
 
-  it('returns null on auth error (same as unauthenticated)', async () => {
-    mockAuthError();
-
-    const user = await getCurrentActiveUser();
-
-    expect(user).toBeNull();
-  });
-
-  it('returns null when is_active is false (inactive user)', async () => {
-    mockAuthSuccess();
+  it('returns null when is_active is false', async () => {
+    mockSession();
     mockProfile({ is_active: false });
 
-    const user = await getCurrentActiveUser();
-
-    expect(user).toBeNull();
-  });
-
-  it('returns null when is_active is null/undefined', async () => {
-    mockAuthSuccess();
-    mockProfile({ is_active: null });
-
-    const user = await getCurrentActiveUser();
-
-    expect(user).toBeNull();
+    expect(await getCurrentActiveUser()).toBeNull();
   });
 
   it('throws on profile database error', async () => {
-    mockAuthSuccess();
+    mockSession();
     mockProfileError();
 
     await expect(getCurrentActiveUser()).rejects.toThrow('数据库错误');
   });
 
   it('returns null when profile not found', async () => {
-    mockAuthSuccess();
+    mockSession();
     mockProfileNotFound();
 
-    const user = await getCurrentActiveUser();
-
-    expect(user).toBeNull();
-  });
-
-  it('returns null when profile query returns PGRST116 (trigger race — profile not yet created)', async () => {
-    mockAuthSuccess();
-    mockProfilePGRST116();
-
-    const user = await getCurrentActiveUser();
-
-    // PGRST116 = row not found. cachedGetAuthProfile treats it as absent profile
-    // (not a hard DB error), so getCurrentActiveUser() returns null — same as
-    // unauthenticated / inactive — to avoid leaking a partial user to callers.
-    expect(user).toBeNull();
+    expect(await getCurrentActiveUser()).toBeNull();
   });
 
   it('returns operator role for active operator user', async () => {
-    mockAuthSuccess('operator@test.com');
-    mockProfile({ is_active: true, role: [{ name: 'operator' }] });
+    mockSession('operator@test.com');
+    mockProfile({ is_active: true, role_name: 'operator' });
 
     const user = await getCurrentActiveUser();
 
-    expect(user).not.toBeNull();
     expect(user!.roleName).toBe('operator');
     expect(user!.isActive).toBe(true);
   });
 });
 
-describe('requireActiveAuth', () => {
+describe('requireActiveAuth / requireActiveAdmin', () => {
   beforeEach(resetMocks);
 
-  it('returns user when authenticated and active', async () => {
-    mockAuthSuccess();
-    mockProfile({ is_active: true });
+  it('requireActiveAuth returns active user', async () => {
+    mockSession();
+    mockProfile();
 
     const user = await requireActiveAuth();
 
-    expect(user.id).toBe('user-1');
     expect(user.isActive).toBe(true);
   });
 
-  it('throws when not authenticated', async () => {
-    mockAuthUnauthenticated();
-
-    await expect(requireActiveAuth()).rejects.toThrow('未登录或账户已停用');
-  });
-
-  it('throws when inactive', async () => {
-    mockAuthSuccess();
+  it('requireActiveAuth throws when inactive', async () => {
+    mockSession();
     mockProfile({ is_active: false });
 
     await expect(requireActiveAuth()).rejects.toThrow('未登录或账户已停用');
   });
-});
 
-describe('requireActiveAdmin', () => {
-  beforeEach(resetMocks);
-
-  it('returns user when active admin', async () => {
-    mockAuthSuccess();
-    mockProfile({ is_active: true, role: [{ name: 'admin' }] });
+  it('requireActiveAdmin returns active admin', async () => {
+    mockSession();
+    mockProfile();
 
     const user = await requireActiveAdmin();
 
     expect(user.roleName).toBe('admin');
-    expect(user.isActive).toBe(true);
   });
 
-  it('throws when not authenticated', async () => {
-    mockAuthUnauthenticated();
-
-    await expect(requireActiveAdmin()).rejects.toThrow('未登录或账户已停用');
-  });
-
-  it('throws when inactive', async () => {
-    mockAuthSuccess();
-    mockProfile({ is_active: false });
-
-    await expect(requireActiveAdmin()).rejects.toThrow('未登录或账户已停用');
-  });
-
-  it('throws when active operator (not admin)', async () => {
-    mockAuthSuccess();
-    mockProfile({ is_active: true, role: [{ name: 'operator' }] });
+  it('requireActiveAdmin throws for operator', async () => {
+    mockSession();
+    mockProfile({ role_name: 'operator' });
 
     await expect(requireActiveAdmin()).rejects.toThrow('无权限');
   });

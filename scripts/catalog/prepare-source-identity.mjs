@@ -49,7 +49,7 @@ export function sourceIdentityArgs(argv = process.argv.slice(2), { fresh = false
   if (fresh) {
     for (const key of Object.keys(process.env)) {
       if ((/(?:DATABASE_URL|CONNECTION_STRING)$/i.test(key) || /^PG(?:HOST|PORT|DATABASE|USER|PASSWORD|SERVICE|SERVICEFILE|PASSFILE|OPTIONS)$/i.test(key) || key === 'P0_02_RUN_ID') && process.env[key]) throw new Error(`N1A_INHERITED_TARGET_DENIED:${key}`);
-      if (/^(?:P0_02|CATALOG|BETTER_AUTH|NEXT_PUBLIC_SUPABASE|SUPABASE).*URL$/i.test(key) && process.env[key]) {
+      if (/^(?:P0_02|CATALOG|BETTER_AUTH).*URL$/i.test(key) && process.env[key]) {
         let inherited;
         try { inherited = new URL(process.env[key]); } catch { throw new Error(`N1A_INHERITED_TARGET_DENIED:${key}`); }
         if (!['127.0.0.1', 'localhost', '[::1]'].includes(inherited.hostname)) throw new Error(`N1A_INHERITED_TARGET_DENIED:${key}`);

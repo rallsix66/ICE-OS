@@ -2,7 +2,7 @@
 
 本目录按可独立验收的业务结果组织任务，控制范围、依赖和交付标准。完整任务可分内部步骤、跨会话接续完成，不因会话结束或内部步骤完成而重复要求批准。
 
-当前入口为[current-task.md](./current-task.md)。当前 **`BUSINESS_OVERVIEW_V1_LOCAL_PASS`**（经营总览首页：独立复审通过、阻断 0，本包收口，2026-11-07；本机实例 `run-20261026T211500Z-11a22b33`、BUILD `WVI5zfZZV2OfHrEQgUb0j`；[任务包与执行记录](./business-overview-v1.md) §11 补修、§12 独立复审、[补修后独立复审报告](../../.local/business-overview-v1-repair-independent-20261107/independent-review.md)；首轮 NEEDS_FIX [报告](../../.local/business-overview-v1-independent-20261107/independent-review.md) 保留）。上一任务已通过 **`INVENTORY_SYNC_RESUME_V1_LOCAL_PASS`**（恢复 BigSeller 库存持续更新：独立审查通过、阻断 0，2026-11-07，[报告](../../.local/inventory-sync-resume-v1-independent-20261107/independent-review.md)；无业务代码改动）；[任务包与执行记录](./inventory-sync-resume-v1.md)、[库存自动同步运行交接](./inventory-sync-v1-runbook.md)、[业务合同](./inventory-sync-v1.md)。上一板块 **`SHIPMENT_IN_TRANSIT_V1_LOCAL_FINAL`**（物流在途：本机功能验收及文档收尾完成，2026-11-07；基线 `SHIPMENT_IN_TRANSIT_V1_R16_LOCAL_PASS`）保留[最终说明](./shipment-in-transit-v1-final.md)、[运行交接](./shipment-in-transit-v1-runbook.md)、[任务合同](./shipment-in-transit-v1.md)（§23）与[R16 独立报告](../../.local/shipment-v1-r16-independent-20261107/independent-review.md)。远端推送与正式部署：本次版本交付已推送并经 [PR #13](https://github.com/rallsix66/ICE-OS/pull/13) 合并到远程 `master`（合并提交 `b620eb4`）；远程 Vercel Production 已随 master 更新自动部署成功，本机 3011 未重建、未重启；正式生产运行验收与长期稳定性未做，历史任务、数据和证据保留，`.local` 与私有输入未入库。
+当前入口为[current-task.md](./current-task.md)。当前 **`PLATFORM_RETIREMENT_V1_LOCAL_PASS`**（退出 Vercel 与 Supabase：2026-11-09 独立复审通过、阻断 0，[报告](../../.local/platform-retirement-independent-20261109/independent-review.md)；仅限本机本包/当前实例；Vercel 项目解除关联并删除、当前列表空/原项目 404；Supabase 两项目完整归档后删除、当前列表空/逐 ref 权限错误而非 404；归档可读但未做恢复演练；认证统一 Better Auth + 本地 PostgreSQL；认证定向 37/37、lint 0 error / 16 个既有 warning、旧 2026-07-18 本机备份保留；正式部署未完成；[任务包与执行记录](./platform-retirement-20261108.md)）。上一任务已通过 **`BUSINESS_OVERVIEW_V1_LOCAL_PASS`**（经营总览首页：独立复审通过、阻断 0，本包收口，2026-11-07；本机实例 `run-20261026T211500Z-11a22b33`、BUILD `WVI5zfZZV2OfHrEQgUb0j`；[任务包与执行记录](./business-overview-v1.md) §11 补修、§12 独立复审、[补修后独立复审报告](../../.local/business-overview-v1-repair-independent-20261107/independent-review.md)；首轮 NEEDS_FIX [报告](../../.local/business-overview-v1-independent-20261107/independent-review.md) 保留）。上一任务已通过 **`INVENTORY_SYNC_RESUME_V1_LOCAL_PASS`**（恢复 BigSeller 库存持续更新：独立审查通过、阻断 0，2026-11-07，[报告](../../.local/inventory-sync-resume-v1-independent-20261107/independent-review.md)；无业务代码改动）；[任务包与执行记录](./inventory-sync-resume-v1.md)、[库存自动同步运行交接](./inventory-sync-v1-runbook.md)、[业务合同](./inventory-sync-v1.md)。上一板块 **`SHIPMENT_IN_TRANSIT_V1_LOCAL_FINAL`**（物流在途：本机功能验收及文档收尾完成，2026-11-07；基线 `SHIPMENT_IN_TRANSIT_V1_R16_LOCAL_PASS`）保留[最终说明](./shipment-in-transit-v1-final.md)、[运行交接](./shipment-in-transit-v1-runbook.md)、[任务合同](./shipment-in-transit-v1.md)（§23）与[R16 独立报告](../../.local/shipment-v1-r16-independent-20261107/independent-review.md)。远端推送与正式部署：上一版本已推送并经 [PR #13](https://github.com/rallsix66/ICE-OS/pull/13) 合并到远程 `master`（合并提交 `b620eb4`）；本包 Git 交付按既有授权提交/推送/PR/合并 `master`，合并结果回填。正式生产运行验收与长期稳定性未做，历史任务、数据和证据保留，`.local` 与私有输入未入库。
 
 ## 文档层级
 
@@ -10,7 +10,8 @@
 mvp-roadmap.md          长期 Phase 与依赖
 tasks/phase-*.md        每个业务模块的任务顺序
 tasks/current-task.md   当前唯一允许执行的 Task Packet
-tasks/business-overview-v1.md  经营总览首页合同与执行记录（本包已收口 LOCAL_PASS）
+tasks/platform-retirement-20261108.md  退出 Vercel 与 Supabase（外部退役、代码清理、运行交接）
+tasks/business-overview-v1.md  经营总览首页合同与执行记录（上一包已收口 LOCAL_PASS）
 tasks/inventory-sync-resume-v1.md  库存持续更新恢复（执行记录）
 tasks/inventory-sync-v1-runbook.md 库存自动同步运行交接（启停/状态/登录恢复）
 tasks/inventory-sync-ui-v1.md  当前库存双视图与同步界面任务

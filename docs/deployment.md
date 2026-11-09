@@ -1,5 +1,11 @@
 # DIS 环境与发布
 
+> **2026-11-08 已退出 Vercel 与 Supabase；2026-11-09 独立复审通过（`PLATFORM_RETIREMENT_V1_LOCAL_PASS`，阻断 0）。** 本文以下环境矩阵、Vercel/Supabase 部署步骤属于历史记录，
+> 不再代表当前运行方式。现役仅本机实例 `run-20261026T211500Z-11a22b33`（Web 3011 / PostgreSQL 59345），
+> 认证为 Better Auth + 本地 PostgreSQL；新版正式部署尚未完成。退役与归档见
+> [platform-retirement-20261108.md](tasks/platform-retirement-20261108.md)，复审报告见
+> [independent-review.md](../.local/platform-retirement-independent-20261109/independent-review.md)。
+
 > 文档导航：[文档树](README.md) · [当前状态](current-state.md) · [架构](architecture.md) · [数据库设计](database-design.md)
 
 ## 环境

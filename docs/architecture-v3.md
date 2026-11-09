@@ -1,5 +1,11 @@
 # ICE v4 目标架构 v3：独立 PostgreSQL 与历史数据能力
 
+> **2026-11-08 平台退役（当前事实）；2026-11-09 独立复审通过 `PLATFORM_RETIREMENT_V1_LOCAL_PASS`（阻断 0）**：Vercel 与 Supabase 已退出，不再作为运行、认证、数据库或部署依赖。
+> 现役认证为 **Better Auth + 本地 PostgreSQL**，数据库为实例 `run-20261026T211500Z-11a22b33` 的 PostgreSQL 59345；
+> Vercel 项目与 Supabase 两个 DIS 项目均已删除，归档与退役记录见
+> [platform-retirement-20261108.md](tasks/platform-retirement-20261108.md)。本文以下历史内容中的
+> Supabase / Vercel 描述仅保留历史设计脉络，不代表现役依赖；正式部署仍未完成。
+
 > 2026-10-13。用户已批准的目标：脱离 Supabase，增加历史模型，不开发复杂分析页面。
 > 状态：架构目标；P0-01 **P0_01_PASS**（Run `run-20261013-r1`）、P0-02 **P0_02_PASS**（Run `run-20261014-r2`），均在虚构实例上完成本地独立平台验收 — 详见 [current-state.md](current-state.md)。生产切换与旧环境删除仍属后续，不在 PASS 登记本轮。
 > 本文取代 [v2](architecture-v2.md) 的平台目标；业务实体沿用 [数据库 v2](database-design-v2.md)，历史扩展以 [历史模型](history-data-model-v1.md) 为准。动态状态只看 [current-state.md](current-state.md)。

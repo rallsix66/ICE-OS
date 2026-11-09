@@ -62,7 +62,7 @@ export function newItemArgs(argv = process.argv.slice(2), { fresh = false } = {}
     for (const [key, value] of Object.entries(process.env)) {
       if (!value) continue;
       if (/(?:DATABASE_URL|CONNECTION_STRING)$/i.test(key) || /^PG(?:HOST|PORT|DATABASE|USER|PASSWORD|SERVICE|SERVICEFILE|PASSFILE|OPTIONS)$/i.test(key) || key === 'P0_02_RUN_ID') throw new Error(`N1C_INHERITED_TARGET_DENIED:${key}`);
-      if (/^(?:P0_02|CATALOG|BETTER_AUTH|NEXT_PUBLIC_SUPABASE|SUPABASE).*URL$/i.test(key)) {
+      if (/^(?:P0_02|CATALOG|BETTER_AUTH).*URL$/i.test(key)) {
         let url; try { url = new URL(value); } catch { throw new Error(`N1C_INHERITED_TARGET_DENIED:${key}`); }
         if (!['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) throw new Error(`N1C_INHERITED_TARGET_DENIED:${key}`);
       }

@@ -64,7 +64,9 @@ export function collectP002SourceHashes() {
     'db/p0-02',
     'scripts/p0-02',
     'src/lib/auth.ts',
-    'src/lib/supabase',
+    'src/lib/auth-client.ts',
+    'src/lib/auth-middleware.ts',
+    'src/app/auth/login',
     'src/proxy.ts',
   ];
   const files = {};

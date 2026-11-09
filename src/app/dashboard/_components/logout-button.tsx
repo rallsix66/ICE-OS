@@ -4,7 +4,7 @@
 // 可访问名称由 aria-label 提供；退出失败必须可见（role=alert），不能静默失败。
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/auth-client';
 import { clearDetailCache } from '@/features/catalog/shell/catalog-detail-cache';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
@@ -20,8 +20,8 @@ export function LogoutButton() {
     setError(null);
     try {
       clearDetailCache();
-      const supabase = createClient();
-      const { error: signOutError } = await supabase.auth.signOut();
+      const authClient = createClient();
+      const { error: signOutError } = await authClient.auth.signOut();
       if (signOutError) throw signOutError;
       router.push('/auth/login');
       router.refresh();

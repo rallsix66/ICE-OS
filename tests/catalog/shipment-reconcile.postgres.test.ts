@@ -252,7 +252,9 @@ describe('shipment real-source read-only reconciliation', () => {
           },
           productLinks: {
             total: productLink.total,
-            ticketNos: productLink.rows.map((row: Record<string, unknown>) => row.ticketNo),
+            ticketNos: productLink.rows
+              .map((row) => row.ticketNo)
+              .filter((ticketNo): ticketNo is string => typeof ticketNo === 'string'),
           },
           identityIndex: identityIndex.length,
         };
