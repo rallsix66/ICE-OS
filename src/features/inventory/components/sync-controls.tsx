@@ -2,22 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Globe2, X } from 'lucide-react';
+import { Globe2, RefreshCw, Settings, X } from 'lucide-react';
 import { Checkbox, SelectMenu } from '@/ui/ice-v4/data-surface';
+import { lockPageScroll } from '@/ui/ice-v4/scroll-lock';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import styles from './sync-view.module.css';
 import { StatusPill } from './display';
 import {
-  buildInventoryListHref,
   buildManualSyncIntent,
   buildSettingsIntent,
   compareStableText,
-  formatQuantity,
   formatTimestamp,
   intervalDisplay,
   manualSyncBlockedReason,
   normalizeIntervalInput,
+  pendingRecoveryKey,
   resolveScopeChange,
   runStatusDisplay,
   scopeDisplay,
@@ -37,6 +36,7 @@ import {
 import { requestManualSyncAction, saveSyncSettingsAction } from '../server/actions';
 import { useDialogFocusTrap } from '@/features/catalog/components/use-dialog-focus-trap';
 import { registerOriginalRequest } from './pending-recovery';
+import { PendingRecoveryPanel } from './pending-recovery';
 import { settlementReleasesLock, settlementTone } from '../settlement';
 
 type MessageTone = 'ok' | 'warn' | 'error';
@@ -59,35 +59,26 @@ export function SyncControls({
   activeRun,
   pendingLocked,
   viewer,
-  selectedRunId,
   lastSuccessText,
   lastSuccessAlert,
-  pendingTotal,
-  detailsBelow,
-  diagnostics,
   domesticCard,
   shipmentCard,
+  productLibraryCard,
 }: {
   overview: InventoryOverviewDto;
   selectedWarehouseIds: string[];
   activeRun: { id: string; statusLabel: string } | null;
   pendingLocked: boolean;
   viewer: LocalViewerIdentity | null;
-  /** 当前 URL 选中的任务 id（?run=）；有值时下方同步记录自动展开。 */
-  selectedRunId: string;
   /** 最近一次成功批次时间（逐仓最后完整成功批次取最新）；没有成功批次时为「尚无成功记录」。 */
   lastSuccessText: string;
   lastSuccessAlert: string | null;
-  /** 待处理对应总数（来源 SKU × 仓库；未计入商品合计）。 */
-  pendingTotal: number;
-  /** 三张卡下方的同步记录（原请求核对/逐仓结果/任务历史/来源读取记录；服务端渲染）。 */
-  detailsBelow: ReactNode;
-  /** 设置面板内的后台诊断（服务端渲染的 <details>）。 */
-  diagnostics: ReactNode;
   /** 聚水潭来源卡片（服务端渲染；只读快照，不提供立即同步）。 */
   domesticCard: ReactNode;
   /** 飞书 · 物流在途来源卡片（服务端渲染；读取状态统一在本页）。 */
   shipmentCard: ReactNode;
+  /** 商品库更新卡（真实差异 + 待人工确认 + 采用记录收进弹窗）。 */
+  productLibraryCard: ReactNode;
 }) {
   const router = useRouter();
   const saved = intervalDisplay(overview.settings.intervalMinutes);
@@ -100,21 +91,12 @@ export function SyncControls({
   const [clearConfirm, setClearConfirm] = useState(false);
   const [busy, setBusy] = useState<null | 'save' | 'manual'>(null);
   const [message, setMessage] = useState<{ text: string; tone: MessageTone } | null>(null);
-  /** R15：卡片下方同步记录按需展开；有待核对原请求或 URL 选中任务时默认展开。 */
-  const [belowOpen, setBelowOpen] = useState(Boolean(overview.pendingAction) || Boolean(selectedRunId));
   /** 设置弹窗：明确空范围时自动打开方便恢复；用户关闭后不再自动打开。 */
   const [settingsOpen, setSettingsOpen] = useState(scope.empty);
   // R2 v4：本地保留的“结果未知”原请求也计入写锁（服务端 pending 之外的浏览器副本）。
   const local = useSyncExternalStore(subscribeLocalUnknown, getLocalUnknownSnapshot, getLocalUnknownServerSnapshot);
-  const localRequestId = local?.requestId ?? null;
   const writeLocked = pendingLocked || Boolean(local);
   const localOwner = local ? localUnknownOwnerCheck(local, viewer) : { trusted: true, reason: null };
-  /** 本地出现「结果未知」原请求时自动展开下方同步记录（同一次渲染内调整，避免 effect 里 setState）。 */
-  const [belowOpenForRequest, setBelowOpenForRequest] = useState<string | null>(localRequestId);
-  if (localRequestId && belowOpenForRequest !== localRequestId) {
-    setBelowOpenForRequest(localRequestId);
-    setBelowOpen(true);
-  }
   /** 设置弹窗与卡片触发按钮：打开后焦点进弹窗，关闭后回到触发按钮。 */
   const settingsToggleRef = useRef<HTMLButtonElement | null>(null);
 
@@ -228,11 +210,10 @@ export function SyncControls({
       closeDrawer();
     };
     window.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
+    const releaseScroll = lockPageScroll();
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      document.documentElement.style.overflow = previousOverflow;
+      releaseScroll();
     };
   }, [panel, closeDrawer]);
 
@@ -249,24 +230,6 @@ export function SyncControls({
     }
     document.getElementById('sync-drawer-close')?.focus();
   }, [panel]);
-
-  /* URL 选中任务（?run=）时展开下方同步记录，并把该任务详情带入当前视口（只定位首次）。 */
-  const locatedSelectedRunRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!selectedRunId || !belowOpen) return;
-    if (locatedSelectedRunRef.current === selectedRunId) return;
-    locatedSelectedRunRef.current = selectedRunId;
-    const target = () => document.getElementById('sync-run-detail');
-    target()?.scrollIntoView({ block: 'start' });
-    if (typeof ResizeObserver === 'undefined' || !document.body) return;
-    const observer = new ResizeObserver(() => target()?.scrollIntoView({ block: 'start' }));
-    observer.observe(document.body);
-    const stop = window.setTimeout(() => observer.disconnect(), 1500);
-    return () => {
-      observer.disconnect();
-      window.clearTimeout(stop);
-    };
-  }, [selectedRunId, belowOpen]);
 
   function toggleWarehouse(warehouseId: string) {
     setClearConfirm(false);
@@ -422,6 +385,14 @@ export function SyncControls({
 
   return (
     <div data-testid="sync-controls" id="sync-controls" className={styles.syncRoot}>
+      {/* 原请求待核对是写锁恢复入口；只在真实存在待核对原请求时出现，不占日常首屏。 */}
+      {overview.pendingAction ? (
+        <PendingRecoveryPanel
+          key={pendingRecoveryKey(overview.pendingAction)}
+          pending={overview.pendingAction}
+          viewer={viewer}
+        />
+      ) : null}
       <div className={styles.sourceGrid}>
       <section
         className={`${styles.sourceCard} ${styles.cardBigseller}`}
@@ -434,8 +405,8 @@ export function SyncControls({
             <Globe2 size={18} strokeWidth={1.8} />
           </span>
           <div className={styles.cardIdentity}>
-            <h2>BigSeller</h2>
-            <span className={styles.cardPurpose}>海外库存</span>
+            <h2>海外库存</h2>
+            <span className={styles.cardPurpose}>BigSeller · 自动同步</span>
           </div>
           <div className={styles.cardStatus} data-testid="sync-source-status">
             <StatusPill tone={statusTone}>{statusLabel}</StatusPill>
@@ -453,19 +424,6 @@ export function SyncControls({
           <div data-testid="sync-source-next-plan">
             <dt>下次同步</dt>
             <dd>{nextRunText}</dd>
-          </div>
-          <div data-testid="sync-source-pending">
-            <dt>待处理</dt>
-            <dd data-testid="sync-mapping">
-              <Link
-                className={styles.factLink}
-                href={buildInventoryListHref({ q: '', warehouse: 'all', market: 'all', page: 1, view: 'warehouse', source: 'overseas' })}
-                data-testid="sync-mapping-link"
-                title="打开商品库存仓库明细，处理未对应的来源 SKU"
-              >
-                {formatQuantity(pendingTotal) || '0'}
-              </Link>
-            </dd>
           </div>
         </dl>
 
@@ -505,6 +463,7 @@ export function SyncControls({
             title={blockedShort ?? '按已保存范围立即同步'}
             data-testid="sync-manual-button"
           >
+            <RefreshCw size={14} aria-hidden />
             {busy === 'manual' ? '正在提交…' : '立即同步'}
           </button>
           <span className={styles.actionWrap} data-testid="sync-settings-toggle">
@@ -517,7 +476,8 @@ export function SyncControls({
               aria-controls="sync-source-drawer"
               data-testid="sync-source-settings-toggle"
             >
-              设置
+              <Settings size={14} aria-hidden />
+              同步设置
             </button>
           </span>
         </div>
@@ -526,21 +486,9 @@ export function SyncControls({
       {domesticCard}
 
       {shipmentCard}
-      </div>
 
-      {/* R15：任务历史、逐仓结果、原请求核对与来源读取记录统一放在三卡下方，按需展开。 */}
-      <details
-        className={styles.belowPanel}
-        data-testid="sync-below-details"
-        open={belowOpen}
-        onToggle={(event) => setBelowOpen((event.currentTarget as HTMLDetailsElement).open)}
-      >
-        <summary>
-          同步记录与来源详情
-          <span className={styles.summaryHint}>任务历史、逐仓结果、原请求核对</span>
-        </summary>
-        <div className={styles.belowBody}>{detailsBelow}</div>
-      </details>
+      {productLibraryCard}
+      </div>
 
       {panel ? (
         <div
@@ -680,8 +628,6 @@ export function SyncControls({
                             : '保存设置'}
                       </button>
                     </div>
-
-                    {diagnostics}
                   </div>
                 </div>
             </div>

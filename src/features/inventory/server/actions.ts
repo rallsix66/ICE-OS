@@ -40,12 +40,20 @@ import {
 } from '../settlement';
 import {
   getInventoryPendingActions,
+  getInventorySyncOverview,
   getItemBindings,
   getSourceBinding,
   requireInventoryAdmin,
   searchInventoryTargetItems,
   searchWarehouseSourceItems,
 } from './reads';
+import { getInventoryPendingBindingCount, getInventoryPendingBindings } from './pending-bindings';
+import type {
+  PendingBindingCandidate,
+  PendingBindingPriorBinding,
+  PendingBindingsReadResult,
+} from '../pending-bindings';
+import { buildPendingBindingCandidates } from '../pending-bindings';
 
 /**
  * /dashboard/sync 与 /dashboard/inventory 的服务端动作（修复包 v2）。
@@ -1667,3 +1675,115 @@ export async function replaceInventoryMappingAction(input: {
  * 读取辅助：概览（供页面在动作后刷新；也导出给服务端页面复用）
  * ------------------------------------------------------------------ */
 
+
+/* ------------------------------------------------------------------ *
+ * 商品库存「待处理」弹窗：完整清单懒加载 + 同 SKU 其他仓已确认绑定
+ * ------------------------------------------------------------------ */
+
+/**
+ * 打开「待处理」弹窗时再读取完整清单（保持参与仓过滤；失败由弹窗重试）。
+ * 首屏只流式读取数量，不再阻塞仓库明细/商品汇总的切换。
+ */
+export async function getInventoryPendingBindingsAction(): Promise<{
+  ok: boolean;
+  data: PendingBindingsReadResult | null;
+  message: string | null;
+}> {
+  try {
+    const identity = await requireInventoryAdmin();
+    const overview = await getInventorySyncOverview(identity);
+    const data = await getInventoryPendingBindings(identity, overview.scope.warehouseIds);
+    return {
+      ok: data.state === 'ok',
+      data,
+      message: data.state === 'ok' ? null : data.error,
+    };
+  } catch (error) {
+    const info = classifyActionError(error);
+    return { ok: false, data: null, message: info.message };
+  }
+}
+
+/**
+ * 工具栏「待处理」徽标数量：客户端首屏渲染后再读，避免把这 5 页队列读取塞进
+ * 「仓库明细 / 商品汇总」切换的关键路径；口径与弹窗、经营总览完全一致。
+ */
+export async function getInventoryPendingBindingCountAction(): Promise<
+  { state: 'ok'; count: number } | { state: 'read_failed' }
+> {
+  try {
+    const identity = await requireInventoryAdmin();
+    const overview = await getInventorySyncOverview(identity);
+    const result = await getInventoryPendingBindingCount(identity, overview.scope.warehouseIds);
+    return result.state === 'ok' ? { state: 'ok', count: result.count } : { state: 'read_failed' };
+  } catch {
+    return { state: 'read_failed' };
+  }
+}
+
+/**
+ * 同一来源 SKU 在其他仓已 confirmed 的绑定 → **每款商品一个候选项**：
+ * 品名/货号/条码/规格、曾选过它的仓、各仓已登记的库存单位（一致时可直接沿用，缺/不一致时要求填写）。
+ * 只读；用于弹窗里让人一眼看出该选哪款，不自动套用。
+ */
+export async function getSkuWarehousePriorBindingsAction(input: {
+  externalSku?: unknown;
+}): Promise<{ ok: boolean; candidates: PendingBindingCandidate[]; message: string }> {
+  try {
+    const identity = await requireInventoryAdmin();
+    const externalSku = readString(input?.externalSku, 200);
+    if (!externalSku) return { ok: false, candidates: [], message: '缺少来源 SKU；请刷新后重试。' };
+    const overview = await getInventorySyncOverview(identity);
+    const warehouses = (overview.warehouses ?? []).filter((warehouse) => Boolean(warehouse.id));
+    const settled = await Promise.allSettled(warehouses.map(async (warehouse): Promise<PendingBindingPriorBinding | null> => {
+      const binding = await getSourceBinding(identity, warehouse.id, externalSku);
+      if (!binding || !binding.mapping || binding.mapping.status !== 'confirmed') return null;
+      return {
+        warehouseId: warehouse.id,
+        warehouseName: binding.warehouseName || warehouse.name,
+        market: binding.market ?? warehouse.market ?? null,
+        itemId: binding.mapping.itemId,
+        iceCode: binding.mapping.iceCode,
+        nameCn: binding.mapping.nameCn,
+        unit: binding.unit ?? null,
+        specification: null,
+        gtin: null,
+      };
+    }));
+    const priors = settled
+      .filter((entry): entry is PromiseFulfilledResult<PendingBindingPriorBinding | null> => entry.status === 'fulfilled')
+      .map((entry) => entry.value)
+      .filter((entry): entry is PendingBindingPriorBinding => entry !== null);
+    // 补目标商品的条码/规格（按货号精确匹配）：读不到就留 null，不猜、也不挡住选择。
+    const distinctItemIds = [...new Set(priors.map((prior) => prior.itemId))];
+    await Promise.all(distinctItemIds.map(async (itemId) => {
+      const prior = priors.find((entry) => entry.itemId === itemId);
+      const term = (prior?.iceCode ?? '').trim() || (prior?.nameCn ?? '').trim();
+      if (!term) return;
+      try {
+        const rows = await searchInventoryTargetItems(identity, term, 10);
+        const match = rows.find((row) => row.itemId === itemId);
+        if (!match) return;
+        for (const entry of priors.filter((item) => item.itemId === itemId)) {
+          entry.specification = match.specification ?? null;
+          entry.gtin = match.gtin ?? null;
+          if (!entry.unit) entry.unit = match.unit ?? null;
+        }
+      } catch {
+        // 身份读取失败只影响差异展示；候选本身仍可人工确认。
+      }
+    }));
+    const candidates = buildPendingBindingCandidates(priors);
+    const warehouseCount = candidates.reduce((total, candidate) => total + candidate.warehouses.length, 0);
+    return {
+      ok: true,
+      candidates,
+      message: candidates.length > 0
+        ? `同 SKU 在其他仓有 ${warehouseCount} 条已确认绑定，涉及 ${candidates.length} 款商品；请按品名/货号与差异确认要选哪一款。`
+        : '同 SKU 在其他仓没有已确认绑定；请搜索并选择商品。',
+    };
+  } catch (error) {
+    const info = classifyActionError(error);
+    return { ok: false, candidates: [], message: info.message };
+  }
+}

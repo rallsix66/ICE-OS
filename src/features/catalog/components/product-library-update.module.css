@@ -1,0 +1,549 @@
+/*
+ * 商品库更新卡与三页签弹窗的局部样式。
+ * 卡片沿用数据同步页来源卡（sync-view.module.css）；弹窗外框沿用 ICE 共用 detailDialog。
+ */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(23, 33, 48, 0.34);
+  animation: backdropIn 160ms var(--ice-ui-ease-out);
+}
+
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.factButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+  text-decoration-color: #c9d0e0;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.factButton:hover {
+  color: var(--ice-ui-accent-strong);
+  text-decoration-color: currentColor;
+}
+
+.cardMessage {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ---------- 本次更新 ---------- */
+
+/* 数据库实际回执：完成/部分完成/拒绝/失败各用自己的语气，不把缺失数量补成 0。 */
+.receiptBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid #cfe6db;
+  border-radius: 7px;
+  background: #edf6f1;
+  color: #2c705b;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.receiptBox svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.receiptBox[data-tone='warn'] {
+  border-color: #ecd9b4;
+  background: #fdf7ec;
+  color: #7a5a1b;
+}
+
+.receiptBox[data-tone='error'] {
+  border-color: #efd9d6;
+  background: #fdf6f5;
+  color: #8d3a35;
+}
+
+.receiptBody {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.receiptBody strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.receiptBody p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.receiptCounts {
+  font-variant-numeric: tabular-nums;
+}
+
+.receiptHint {
+  opacity: 0.9;
+}
+
+.successBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid #cfe6db;
+  border-radius: 7px;
+  background: #edf6f1;
+  color: #2c705b;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.successBox svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.batchLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-bottom: 16px;
+  color: #344154;
+  font-size: 13px;
+}
+
+.batchLine strong {
+  font-weight: 600;
+}
+
+.batchLine span {
+  color: #6b778b;
+  font-size: 12px;
+}
+
+.summaryRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin-bottom: 18px;
+}
+
+.summaryRow div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.summaryRow b {
+  color: #273244;
+  font-size: 23px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryRow span {
+  color: #6b778b;
+  font-size: 12px;
+}
+
+.sourceAlert {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid #ecd9b4;
+  border-radius: 7px;
+  background: #fdf7ec;
+  color: #7a5a1b;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.sourceAlert p {
+  margin: 0 0 4px;
+}
+
+.sourceAlert ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.sourceAlert li span {
+  font-weight: 600;
+}
+
+.changeList {
+  border-top: 1px solid #e6eaf1;
+}
+
+.changeItem {
+  padding: 16px 0;
+  border-bottom: 1px solid #e6eaf1;
+}
+
+.changeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.changeHead strong {
+  color: #273244;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.changeCode {
+  color: #6b778b;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diffRow {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 18px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.diffLabel {
+  color: #6b778b;
+  font-size: 12px;
+}
+
+.oldValue {
+  color: #6b778b;
+  overflow-wrap: anywhere;
+}
+
+.newValue {
+  justify-self: start;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #eeedfc;
+  color: #4d4ac0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.unit {
+  color: #98a2b2;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.emptyBox {
+  padding: 6px 0 10px;
+}
+
+.emptyText {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.emptyMeta {
+  margin: 8px 0 0;
+  color: #6b778b;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.modalMessage {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 7px;
+  background: #f8f9fc;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---------- 待人工确认 ---------- */
+
+.issueList {
+  display: grid;
+  gap: 0;
+}
+
+.issue {
+  padding: 0 0 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #e6eaf1;
+}
+
+.issue:last-child {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.issueHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 6px;
+}
+
+.issueHead strong {
+  color: #273244;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.issueReason {
+  margin: 0;
+  color: #273244;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.issueDiff {
+  display: grid;
+  gap: 2px;
+  margin: 7px 0 0;
+  padding: 0;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.7;
+  list-style: none;
+}
+
+.issueAction {
+  display: grid;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.issueButtons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.codeDiff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.codeDiff > span:first-child {
+  color: #6b778b;
+  font-size: 12px;
+}
+
+.choiceBox {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 7px;
+  background: #f5f6f8;
+}
+
+.choiceRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.choiceRow input {
+  accent-color: var(--ice-ui-accent);
+}
+
+.issueMessage {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---------- 采用记录 ---------- */
+
+.historyList {
+  display: grid;
+  gap: 0;
+}
+
+.historyItem {
+  padding: 16px 0;
+  border-bottom: 1px solid #e6eaf1;
+}
+
+.historyItem:first-child {
+  padding-top: 0;
+}
+
+.historyItem header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+
+.historyItem strong {
+  color: #273244;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.historyItem header span {
+  color: #6b778b;
+  font-size: 12px;
+}
+
+.historyItem p {
+  margin: 6px 0 0;
+  color: #6b778b;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---------- 底部 ---------- */
+
+.footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 26px;
+  border-top: 1px solid #e9ecf2;
+  background: #fafbfe;
+}
+
+.footerNote {
+  margin: 0;
+  color: #6b778b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.footerActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.primaryButton,
+.secondaryButton,
+.secondaryLink {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: var(--ice-ui-radius-sm);
+  font-size: 13px;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid var(--ice-ui-accent);
+  background: var(--ice-ui-accent);
+  color: #fff;
+  font-weight: 550;
+}
+
+.primaryButton:hover:not(:disabled) {
+  border-color: var(--ice-ui-accent-strong);
+  background: var(--ice-ui-accent-strong);
+}
+
+.secondaryButton,
+.secondaryLink {
+  border: 1px solid var(--ice-ui-line);
+  background: #fff;
+  color: #4b5a70;
+}
+
+.secondaryButton:hover:not(:disabled),
+.secondaryLink:hover {
+  border-color: #c9d0e0;
+  background: #f7f8fc;
+  color: var(--ice-ui-text);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.secondaryLink:focus-visible,
+.factButton:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .backdrop {
+    padding: 12px;
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .footerActions {
+    justify-content: flex-end;
+  }
+
+  .diffRow {
+    grid-template-columns: 76px minmax(0, 1fr) 14px minmax(0, 1fr);
+  }
+
+  .unit {
+    grid-column: 2 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation: none;
+  }
+}

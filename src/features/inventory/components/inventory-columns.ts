@@ -43,7 +43,7 @@ export function summaryTableColumns(input: {
       : []),
     ...marketColumns.map((column) => ({
       key: column.key,
-      label: column.market === null ? '未知仓' : column.label,
+      label: column.market === null ? '市场待确认' : column.label,
       numeric: true,
       width: '6.5%',
     })),

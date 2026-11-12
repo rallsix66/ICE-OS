@@ -40,13 +40,22 @@ export function buildHomeHref(state: Partial<HomeQueryState>): string {
   return qs ? `/dashboard?${qs}` : '/dashboard';
 }
 
+/** 需要处理事项的动作：跳转 / 当场打开复核弹窗 / 就地展开缺价清单。 */
+export type HomePendingAction = 'link' | 'review' | 'missing-cost';
+
 export interface HomePendingItem {
   key: string;
+  /** 业务分类：库存待对应 / 物流待复核 / 在途未计入 / 商品资料 / 同步状态。 */
+  category: string;
   title: string;
   detail: string;
-  /** 明确数量（与目标页同一口径）；null = 状态类事项，没有可计数量。 */
-  count: number | null;
+  /** 该事项自己的数量文本（如「141 条」「7 项」「2 款」）；null = 状态类事项，没有可计数量（不写 0）。 */
+  countLabel: string | null;
   href: string;
+  /** 明确动作：跳转目标页 / 当场复核 / 就地展开清单。 */
+  action: HomePendingAction;
+  /** 动作按钮文字（按业务写明，不用「处理 →」）。 */
+  actionLabel: string;
 }
 
 /** 金额展示：保留原始小数位，仅给整数部分加千分位；null 不显示 0。 */

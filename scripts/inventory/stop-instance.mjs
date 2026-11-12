@@ -26,7 +26,11 @@ const workerStopped = fs.existsSync(path.join(run.instanceRoot, 'inventory-worke
 const shipmentReaderStopped = fs.existsSync(path.join(run.instanceRoot, 'shipment-auto-reader.pid.json'))
   ? runScript('scripts/shipment/stop-worker.mjs')
   : true;
+// 飞书商品来源只读定时读取进程（与库存 worker、货票读取互不影响）。
+const productSourceReaderStopped = fs.existsSync(path.join(run.instanceRoot, 'product-source-reader.pid.json'))
+  ? runScript('scripts/catalog/feishu-source/stop-worker.mjs')
+  : true;
 const webStopped = runScript('scripts/catalog/stop-local-preview.mjs');
 const pgStopped = runScript('scripts/catalog/stop-catalog-postgres.mjs');
-console.log(JSON.stringify({ runId: args.runId, workerStopped, shipmentReaderStopped, webStopped, pgStopped, results }, null, 2));
-process.exitCode = workerStopped && shipmentReaderStopped && webStopped && pgStopped ? 0 : 1;
+console.log(JSON.stringify({ runId: args.runId, workerStopped, shipmentReaderStopped, productSourceReaderStopped, webStopped, pgStopped, results }, null, 2));
+process.exitCode = workerStopped && shipmentReaderStopped && productSourceReaderStopped && webStopped && pgStopped ? 0 : 1;

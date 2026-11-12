@@ -20,7 +20,9 @@ import {
   PLAN_CONTRACT,
   PRODUCT_SOURCE_FIELD_KEYS,
   REASON_TEXT,
+  SOURCE_FIELD_UPDATE,
   codeSourceKey,
+  type AdoptableFieldKey,
   type BatchArtifact,
   type BuildPlanInput,
   type FieldGroupKey,
@@ -32,7 +34,10 @@ import {
   type PlanCounts,
   type PlanFieldAdoption,
   type PlanFieldChange,
+  type PlanFieldDecision,
+  type PlanFieldInterpretation,
   type PlanIssue,
+  type FieldInterpretationRule,
   type ProductSourceBatchAmountRow,
   type ProductSourceBatchPayload,
   type ProductSourceBatchRow,
@@ -57,7 +62,14 @@ import {
   type SuspectedCodeCandidate,
 } from './anomaly';
 import { diffItem, isUnitUnconfirmedField, type FieldDiff, type ItemDiff } from './diff';
-import { fieldObservationFromSource, localRawOf, normalizeCellText } from './normalize';
+import {
+  fieldObservationFromSource,
+  interpretFieldCell,
+  localRawOf,
+  normalizeCellText,
+  normalizeIdentityName,
+  classifyFieldCell,
+} from './normalize';
 import { resolveHeaderMapping } from './headers';
 import { computeRowsSha256 } from './reader';
 import { sourceIceCode } from './grouping';
@@ -74,6 +86,124 @@ export const ZERO_COUNTS: PlanCounts = {
 interface ParsedFieldIssue {
   issue: PlanIssue;
   reasonCode: ProductSourceReasonCode;
+}
+
+/** Human decisions for one item, already reduced to the fields they concern. */
+interface ItemFieldDecisions {
+  deferred: Set<string>;
+  overrides: Map<string, string>;
+}
+
+const NO_FIELD_DECISIONS: ItemFieldDecisions = { deferred: new Set(), overrides: new Map() };
+
+function fieldDecisionsByItem(decisions: readonly PlanFieldDecision[]): Map<string, ItemFieldDecisions> {
+  const map = new Map<string, ItemFieldDecisions>();
+  for (const decision of decisions) {
+    const entry = map.get(decision.itemId) ?? { deferred: new Set<string>(), overrides: new Map<string, string>() };
+    if (decision.action === 'defer') entry.deferred.add(decision.fieldKey);
+    else if (decision.valueRaw !== null && normalizeCellText(decision.valueRaw) !== '') {
+      entry.overrides.set(decision.fieldKey, normalizeCellText(decision.valueRaw));
+    }
+    map.set(decision.itemId, entry);
+  }
+  return map;
+}
+
+/**
+ * Apply a confirmed manual value (e.g. unitWeight=0.05 read from the O column)
+ * on top of the merged source fields. The original raw stays in the evidence
+ * batch; only the interpreted cell used for diff/write changes.
+ */
+function withFieldOverrides(
+  logical: Record<string, SourceCell> | null,
+  decisions: ItemFieldDecisions,
+): Record<string, SourceCell> | null {
+  if (!logical || decisions.overrides.size === 0) return logical;
+  const result: Record<string, SourceCell> = { ...logical };
+  for (const [fieldKey, value] of decisions.overrides) {
+    result[fieldKey] = classifyFieldCell(fieldKey as (typeof ADOPTABLE_FIELD_KEYS)[number], value);
+  }
+  return result;
+}
+
+function isDeferred(decisions: ItemFieldDecisions, fieldKey: string): boolean {
+  return decisions.deferred.has(fieldKey);
+}
+
+type ItemFieldInterpretations = ReadonlyMap<AdoptableFieldKey, FieldInterpretationRule>;
+
+const NO_FIELD_INTERPRETATIONS: ItemFieldInterpretations = new Map();
+
+/** itemId -> (fieldKey -> rule). Rules are item+field scoped, never global. */
+function interpretationsByItem(
+  interpretations: readonly PlanFieldInterpretation[],
+): Map<string, Map<AdoptableFieldKey, FieldInterpretationRule>> {
+  const map = new Map<string, Map<AdoptableFieldKey, FieldInterpretationRule>>();
+  for (const interpretation of interpretations) {
+    if (!(ADOPTABLE_FIELD_KEYS as readonly string[]).includes(interpretation.fieldKey)) continue;
+    const entry = map.get(interpretation.itemId) ?? new Map<AdoptableFieldKey, FieldInterpretationRule>();
+    entry.set(interpretation.fieldKey, interpretation.rule);
+    map.set(interpretation.itemId, entry);
+  }
+  return map;
+}
+
+/**
+ * Apply the registered source-column interpretations on top of the merged source
+ * fields (after any 人工口径 override). Only interpretable cells are replaced;
+ * failed interpretations leave the raw cell in place so review still happens.
+ */
+function applyFieldInterpretations(
+  logical: Record<string, SourceCell>,
+  interpretations: ItemFieldInterpretations,
+): { logical: Record<string, SourceCell>; confirmed: Set<AdoptableFieldKey> } {
+  if (interpretations.size === 0) return { logical, confirmed: new Set<AdoptableFieldKey>() };
+  const result: Record<string, SourceCell> = { ...logical };
+  const confirmed = new Set<AdoptableFieldKey>();
+  for (const [fieldKey, rule] of interpretations) {
+    const cell = result[fieldKey];
+    if (!cell) continue;
+    const interpreted = interpretFieldCell(fieldKey, cell, rule);
+    if (!interpreted) continue;
+    result[fieldKey] = interpreted.cell;
+    if (interpreted.unitConfirmed) confirmed.add(fieldKey);
+  }
+  return { logical: result, confirmed };
+}
+
+/**
+ * A confirmed manual value must WIN over the local value for exactly this
+ * item+field (e.g. local currently holds the unusable raw "0.05/件\\n24.45/箱"
+ * and the human confirmed 0.05 kg). Normal diff rules would keep the local
+ * value when it differs, so the forced update is applied here, before
+ * writeFields/adoptions/issues are derived.
+ */
+function applyOverrideToDiff(
+  itemDiff: ItemDiff,
+  decisions: ItemFieldDecisions,
+  logical: Record<string, SourceCell>,
+): void {
+  if (decisions.overrides.size === 0) return;
+  for (const fieldKey of decisions.overrides.keys()) {
+    const field = itemDiff.fields.find((candidate) => candidate.fieldKey === fieldKey);
+    const cell = logical[fieldKey];
+    if (!field || !cell || cell.state !== 'observed') continue;
+    field.outcome = 'update';
+    field.adopt = true;
+    field.write = true;
+    field.afterRaw = normalizeCellText(cell.raw);
+    field.issue = null;
+    field.reasonCode = SOURCE_FIELD_UPDATE;
+    field.note = '按人工确认口径采用该值';
+  }
+  itemDiff.issues = itemDiff.fields.flatMap((field) =>
+    field.issue === null ? [] : [{ kind: field.issue, fieldKey: field.fieldKey }]);
+  itemDiff.hasReview = itemDiff.issues.length > 0 || itemDiff.blockedGroups.length > 0;
+}
+
+function issueFieldKey(issue: PlanIssue): string | null {
+  const value = issue.detail.fieldKey;
+  return typeof value === 'string' ? value : null;
 }
 
 function parseFailedIssues(evaluation: SourceRowEvaluation): ParsedFieldIssue[] {
@@ -135,11 +265,11 @@ function adoptionOf(field: FieldDiff): PlanFieldAdoption | null {
   };
 }
 
-function changeOf(field: FieldDiff): PlanFieldChange {
+function changeOf(field: FieldDiff, unitConfirmed = false): PlanFieldChange {
   const kind: PlanChangeKind =
     field.outcome === 'initial_adopt'
       ? 'initial_baseline'
-      : isUnitUnconfirmedField(field.fieldKey)
+      : isUnitUnconfirmedField(field.fieldKey) && !unitConfirmed
         ? 'unit_unconfirmed'
         : 'update';
   return {
@@ -339,7 +469,9 @@ export function buildPlan(input: BuildPlanInput): ProductSourcePlan {
     };
   }
 
-  const evaluations = input.evaluations ?? evaluateSourceRows(snapshot);
+  const evaluations = input.evaluations ?? evaluateSourceRows(snapshot, input.duplicateDecisions ?? []);
+  const fieldDecisions = fieldDecisionsByItem(input.fieldDecisions ?? []);
+  const fieldInterpretations = interpretationsByItem(input.fieldInterpretations ?? []);
   const itemById = new Map<string, PlanBoundItem>();
   for (const item of input.items) itemById.set(item.itemId, item);
   const itemByCode = new Map<string, PlanBoundItem>();
@@ -428,6 +560,7 @@ export function buildPlan(input: BuildPlanInput): ProductSourcePlan {
                 detail: {
                   code: evaluation.iceCode,
                   rows: evaluation.rowNumbers,
+                  decisionStale: evaluation.decisionStale === true,
                   fields: evaluation.conflicts.map((conflict) => ({
                     fieldKey: conflict.fieldKey,
                     values: conflict.values.map((value) => ({
@@ -465,6 +598,8 @@ export function buildPlan(input: BuildPlanInput): ProductSourcePlan {
           parsedIssues: parsed,
           snapshotKey: snapshot.snapshotKey,
           expectedRevision: expectedRevisionOf(input, boundItem),
+          decisions: fieldDecisions.get(boundItem.itemId) ?? NO_FIELD_DECISIONS,
+          interpretations: fieldInterpretations.get(boundItem.itemId) ?? NO_FIELD_INTERPRETATIONS,
         }),
       );
       continue;
@@ -538,19 +673,31 @@ function findIdentityHint(
   nameCn: string | null,
   barcode: string | null,
   candidates: readonly IdentityCandidate[],
-): { itemId: string; itemIceCode: string | null; matchedBy: 'nameCn' | 'barcode' } | null {
-  const normalizedName = nameCn === null ? null : normalizeCellText(nameCn).toLowerCase();
+): { itemId: string; itemIceCode: string | null; matchedItemName: string; matchedBy: 'nameCn' | 'normalizedName' | 'barcode' } | null {
   const normalizedBarcode = barcode === null ? null : normalizeCellText(barcode);
   for (const candidate of candidates) {
     const candidateBarcode = candidate.barcode === null ? null : normalizeCellText(candidate.barcode);
     if (normalizedBarcode !== null && normalizedBarcode !== '' && candidateBarcode === normalizedBarcode) {
-      return { itemId: candidate.itemId, itemIceCode: candidate.iceCode, matchedBy: 'barcode' };
+      return { itemId: candidate.itemId, itemIceCode: candidate.iceCode, matchedItemName: candidate.nameCn, matchedBy: 'barcode' };
     }
   }
-  if (normalizedName !== null && normalizedName !== '') {
-    for (const candidate of candidates) {
-      if (normalizeCellText(candidate.nameCn).toLowerCase() === normalizedName) {
-        return { itemId: candidate.itemId, itemIceCode: candidate.iceCode, matchedBy: 'nameCn' };
+  if (nameCn !== null) {
+    const exactName = normalizeCellText(nameCn).toLowerCase();
+    if (exactName !== '') {
+      for (const candidate of candidates) {
+        if (normalizeCellText(candidate.nameCn).toLowerCase() === exactName) {
+          return { itemId: candidate.itemId, itemIceCode: candidate.iceCode, matchedItemName: candidate.nameCn, matchedBy: 'nameCn' };
+        }
+      }
+    }
+    // Whitespace-only differences (e.g. WM0131 "...精华水 150ml" vs local
+    // "...精华水150ml") are still only a review hint: never create, never bind.
+    const normalizedName = normalizeIdentityName(nameCn);
+    if (normalizedName !== '') {
+      for (const candidate of candidates) {
+        if (normalizeIdentityName(candidate.nameCn) === normalizedName) {
+          return { itemId: candidate.itemId, itemIceCode: candidate.iceCode, matchedItemName: candidate.nameCn, matchedBy: 'normalizedName' };
+        }
       }
     }
   }
@@ -586,6 +733,10 @@ function planUnboundCode(
       matchedUncoded ? 'MISSING_CODE_CANDIDATE' : 'SUSPECTED_CODE_CHANGE',
       {
         ...base,
+        // A name/barcode relationship to an existing UNCODED item is only a
+        // review candidate: attach the item so the issue carries its current
+        // revision, but never create/bind automatically.
+        itemId: matchedUncoded ? identityHint.itemId : null,
         nameCn: logicalName,
         issues: [
           {
@@ -593,6 +744,7 @@ function planUnboundCode(
             detail: {
               rows: evaluation.rowNumbers,
               matchedItemId: identityHint.itemId,
+              matchedItemName: identityHint.matchedItemName,
               matchedBy: identityHint.matchedBy,
               matchedItemCode: identityHint.itemIceCode,
               sourceCode: evaluation.iceCode,
@@ -698,6 +850,7 @@ function planMissingCodeRow(
   const candidate = nameCn === null ? null : matchUncodedItemByName(nameCn, [...uncodedItems]);
   const extraIssues = parsedIssues.map((entry) => entry.issue);
   if (candidate) {
+    const matchedBy = normalizeCellText(candidate.nameCn) === normalizeCellText(nameCn ?? '') ? 'nameCn' : 'normalizedName';
     return baseResult(evaluation.sourceKey, 'needs_review', 'MISSING_CODE_CANDIDATE', {
       itemId: candidate.itemId,
       rowNumbers: evaluation.rowNumbers,
@@ -705,7 +858,16 @@ function planMissingCodeRow(
       issues: [
         {
           kind: 'missing_code_candidate',
-          detail: { rows: evaluation.rowNumbers, nameCn, candidateItemId: candidate.itemId },
+          detail: {
+            rows: evaluation.rowNumbers,
+            nameCn,
+            candidateItemId: candidate.itemId,
+            matchedItemId: candidate.itemId,
+            matchedItemName: candidate.nameCn,
+            matchedBy,
+            matchedItemCode: null,
+            sourceCode: null,
+          },
         },
         ...extraIssues,
       ],
@@ -725,10 +887,12 @@ function planBoundItem(context: {
   parsedIssues: ParsedFieldIssue[];
   snapshotKey: string;
   expectedRevision: number;
+  decisions: ItemFieldDecisions;
+  interpretations: ItemFieldInterpretations;
 }): ProductSourcePlanResult {
-  const { item, evaluation, adoptions, parsedIssues, snapshotKey, expectedRevision } = context;
-  const logical = evaluation.logicalFields;
-  if (!logical) {
+  const { item, evaluation, adoptions, parsedIssues, snapshotKey, expectedRevision, decisions, interpretations } = context;
+  const overridden = withFieldOverrides(evaluation.logicalFields, decisions);
+  if (!overridden) {
     return baseResult(evaluation.sourceKey, 'failed', 'SNAPSHOT_INVALID', {
       iceCode: evaluation.iceCode,
       itemId: item.itemId,
@@ -736,24 +900,55 @@ function planBoundItem(context: {
       issues: [{ kind: 'snapshot_invalid', detail: { code: 'SNAPSHOT_ROW_INVALID', rows: evaluation.rowNumbers } }],
     });
   }
+  // Registered interpretation rules run AFTER overrides and only for this item+field.
+  const { logical, confirmed: interpretedConfirmed } = applyFieldInterpretations(overridden, interpretations);
   const localFields = withLocalName(item);
-  const itemDiff = diffItem({ sourceFields: logical, localFields, adoptions });
-  const hasParseIssues = parsedIssues.length > 0;
-  const hasReview = itemDiff.hasReview || hasParseIssues;
-  const changes = itemDiff.writeFields.map(changeOf);
-  const adoptionsOut = itemDiff.adoptedFields
-    .map(adoptionOf)
+  const confirmedUnits = new Set<AdoptableFieldKey>([
+    ...[...decisions.overrides.keys()].filter((key): key is AdoptableFieldKey =>
+      (ADOPTABLE_FIELD_KEYS as readonly string[]).includes(key)),
+    ...interpretedConfirmed,
+  ]);
+  const isConfirmedUnit = (fieldKey: AdoptableFieldKey): boolean =>
+    decisions.overrides.has(fieldKey) || interpretedConfirmed.has(fieldKey);
+  const itemDiff = diffItem({ sourceFields: logical, localFields, adoptions, confirmedUnitFields: confirmedUnits });
+  applyOverrideToDiff(itemDiff, decisions, logical);
+  // Deferred fields keep the local value: no write, no adoption, no repeated prompt.
+  // Overridden/interpreted fields are already valid cells and participate normally.
+  const writeFields = itemDiff.fields.filter((field) => field.write && !isDeferred(decisions, field.fieldKey));
+  const adoptedFields = itemDiff.fields.filter((field) => field.adopt && !isDeferred(decisions, field.fieldKey));
+  const changes = writeFields.map((field) => changeOf(field, isConfirmedUnit(field.fieldKey)));
+  const adoptionsOut = adoptedFields
+    .map((field) => {
+      const adoption = adoptionOf(field);
+      // A human-confirmed 口径 or a registered interpretation confirms the unit
+      // for exactly this item+field.
+      return adoption && isConfirmedUnit(field.fieldKey)
+        ? { ...adoption, unitState: 'confirmed' as const }
+        : adoption;
+    })
     .filter((adoption): adoption is PlanFieldAdoption => adoption !== null);
+  const visibleParsed = parsedIssues.filter((entry) => {
+    const fieldKey = issueFieldKey(entry.issue);
+    return fieldKey === null
+      || (!isDeferred(decisions, fieldKey)
+        && !decisions.overrides.has(fieldKey)
+        && !interpretedConfirmed.has(fieldKey as AdoptableFieldKey));
+  });
+  const visibleDiffIssues = itemDiffIssues(itemDiff, evaluation).filter((issue) => {
+    const fieldKey = issueFieldKey(issue);
+    return fieldKey === null || !isDeferred(decisions, fieldKey);
+  });
+  const issues = [...visibleParsed.map((entry) => entry.issue), ...visibleDiffIssues];
+  const hasReview = issues.length > 0;
   const nextFields =
-    changes.length > 0
-      ? overlayFields(localFields, itemDiff.writeFields, snapshotKey, evaluation.rowNumbers)
+    writeFields.length > 0
+      ? overlayFields(localFields, writeFields, snapshotKey, evaluation.rowNumbers)
       : null;
-  const issues = [...parsedIssues.map((entry) => entry.issue), ...itemDiffIssues(itemDiff, evaluation)];
   const nameCn =
     (nextFields?.nameCn && nextFields.nameCn.state === 'observed' ? nextFields.nameCn.raw : null) ?? item.nameCn;
 
   if (hasReview) {
-    return baseResult(evaluation.sourceKey, 'needs_review', reviewReasonCode(itemDiff, parsedIssues), {
+    return baseResult(evaluation.sourceKey, 'needs_review', reviewReasonCode(itemDiff, visibleParsed), {
       iceCode: evaluation.iceCode,
       itemId: item.itemId,
       nameCn,
@@ -766,7 +961,7 @@ function planBoundItem(context: {
     });
   }
   if (changes.length > 0) {
-    const initial = itemDiff.writeFields.every((field) => field.outcome === 'initial_adopt');
+    const initial = writeFields.every((field) => field.outcome === 'initial_adopt');
     return baseResult(evaluation.sourceKey, 'update', initial ? 'INITIAL_SOURCE_BASELINE' : 'SOURCE_FIELD_UPDATE', {
       iceCode: evaluation.iceCode,
       itemId: item.itemId,
@@ -906,6 +1101,9 @@ export function buildBatchPayload(input: {
     isBusinessRow: row.isBusinessRow,
     iceCode: row.isBusinessRow ? sourceIceCode(row) : null,
     cells: publicCells(row.cells),
+    // Normalized (non-restricted) fields are stored too, so the review workflow
+    // can show/choose the actual rows without re-reading the local snapshot.
+    fields: row.fields,
     // Original snapshot row hash is kept as evidence even though the public cells
     // map is redacted at the boundary.
     rowSha256: row.rowSha256,

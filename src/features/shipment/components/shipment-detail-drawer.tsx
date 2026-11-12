@@ -9,6 +9,7 @@ import surface from '@/ui/ice-v4/data-surface.module.css';
 import { DetailTabs } from '@/ui/ice-v4/detail-tabs';
 import styles from './shipment.module.css';
 import {
+  associationSavedNotice,
   changedFieldsText,
   formatQuantity,
   formatQuantityOr,
@@ -32,6 +33,7 @@ import type { ShipmentDetailDto, ShipmentDetailItemDto } from '../types';
 import { ShipmentAssociationEditor } from './association-editor';
 import { ShipmentManualCorrectionDialog } from './shipment-manual-correction-dialog';
 import { restoreShipmentItemSourceJudgement } from '../server/actions';
+import { lockPageScroll } from '@/ui/ice-v4/scroll-lock';
 
 function manualResultErrorText(result: { errorCode: string | null; errorMessage: string | null }): string {
   const code = result.errorCode ?? '';
@@ -71,6 +73,8 @@ export function ShipmentDetailDrawer({
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [editingItemId, setEditingItemId] = useState('');
+  /** 关联保存后的结果提示（已关联商品 + 该条实际去向）。 */
+  const [assocNotice, setAssocNotice] = useState('');
   const [correctingItemId, setCorrectingItemId] = useState('');
   const [restoreItemId, setRestoreItemId] = useState('');
   const [rowError, setRowError] = useState('');
@@ -102,11 +106,11 @@ export function ShipmentDetailDrawer({
       }
     };
     window.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
+    // 用共享 lockPageScroll：补滚动条宽度（避免整页横向跳动）、支持嵌套、关闭后回到原滚动位置。
+    const releaseScrollLock = lockPageScroll();
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      document.documentElement.style.overflow = previousOverflow;
+      releaseScrollLock();
     };
   }, [onClose, correctingItemId]);
 
@@ -473,13 +477,24 @@ export function ShipmentDetailDrawer({
                 <p className={styles.manualError} role="alert" data-testid="shipment-manual-row-error">{rowError}</p>
               ) : null}
 
+              {assocNotice ? (
+                <p className={styles.manualSaved} role="status" data-testid="shipment-assoc-saved-notice">{assocNotice}</p>
+              ) : null}
+
               {editingItem ? (
                 <ShipmentAssociationEditor
                   key={editingItem.itemId}
-                  item={editingItem}
+                  item={{
+                    itemId: editingItem.itemId,
+                    shipmentId: shipment?.shipmentId ?? null,
+                    productNameRaw: editingItem.productNameRaw,
+                    product: editingItem.product,
+                    revision: editingItem.revision,
+                  }}
                   onCancel={() => setEditingItemId('')}
-                  onSaved={() => {
+                  onSaved={(payload) => {
                     setEditingItemId('');
+                    setAssocNotice(associationSavedNotice(payload));
                     router.refresh();
                   }}
                 />

@@ -8,6 +8,7 @@ import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import { DetailTabs } from '@/ui/ice-v4/detail-tabs';
 import styles from './inventory.module.css';
 import { StatusPill } from './display';
+import { marketLabel } from '@/features/overview/markets';
 import {
   buildConfirmMappingsIntent,
   detailTotalsDisplay,
@@ -172,7 +173,7 @@ function BindingEditor({
     <div className={styles.mappingEditor} data-testid="inventory-binding-editor">
       <p className={styles.fieldHint} data-testid="inventory-binding-context">
         固定来源：{viewer?.accountLabel ? `${viewer.accountLabel} · ` : ''}{warehouseName}
-        {market ? ` · 市场 ${market}` : ''}
+        {market ? ` · 市场 ${marketLabel(market)}` : ''}
         {' · 原 SKU '}
         <strong>{externalSku}</strong>
         {currentItemLabel ? ` · 当前绑定 ${currentItemLabel}` : ' · 未绑定商品'}
@@ -477,7 +478,7 @@ function RowFacts({
         {title.subtitle}
         <span className={styles.detailSub}>
           {row.warehouseName}
-          {row.market ? ` · 市场 ${row.market}` : isDomestic ? '' : ' · 市场待确认'}
+          {row.market ? ` · 市场 ${marketLabel(row.market)}` : isDomestic ? '' : ' · 市场待确认'}
         </span>
       </p>
       <div className={styles.detailStatusLine}>

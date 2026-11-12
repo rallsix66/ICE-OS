@@ -18,7 +18,9 @@ import {
   PRODUCT_SOURCE_FIELD_KEYS,
   SOURCE_FORMULA_ERROR,
   SOURCE_VALUE_NOT_NUMERIC,
+  decodeImageCell,
   isNumericFieldKey,
+  type FieldInterpretationRule,
   type ProductSourceFieldKey,
   type SourceCell,
 } from './contract';
@@ -35,6 +37,17 @@ export function isSourceFormulaError(raw: string): boolean {
 /** Outer whitespace only; internal text (including line breaks) is preserved. */
 export function normalizeCellText(raw: string): string {
   return raw.replace(/\u00a0/g, ' ').trim();
+}
+
+/**
+ * Identity comparison text for product names: lower-cased with ALL whitespace
+ * removed (spaces, full-width spaces, tabs, line breaks). Used only as a review
+ * hint (空格差异), never for automatic merge/bind: e.g. WM0131
+ * "ICE LERSKIN 烟酰胺提亮精华水 150ml" vs the existing
+ * "ICE LERSKIN 烟酰胺提亮精华水150ml".
+ */
+export function normalizeIdentityName(raw: string): string {
+  return normalizeCellText(raw).toLowerCase().replace(/\s/gu, '');
 }
 
 export function parseNumericValue(raw: string): number | null {
@@ -112,6 +125,9 @@ export function areSameValue(fieldKey: ProductSourceFieldKey, left: string | nul
 /** Classify one mapped source cell. Restricted amount columns never reach here. */
 export function classifyFieldCell(fieldKey: ProductSourceFieldKey, raw: string): SourceCell {
   if (fieldKey === 'imageRef') {
+    // 飞书开放接口可读出图片引用（embed-image → fileToken/宽高）。它只作来源证据：
+    // imageRef 不在可采纳字段白名单内，不写商品字段、不进入差异计划。
+    if (decodeImageCell(raw)) return { raw, state: 'observed', meaning: 'value' };
     return { raw: '', state: 'not_read', reason: IMAGE_NOT_READ_BY_SNAPSHOT };
   }
   const text = normalizeCellText(raw);
@@ -123,6 +139,43 @@ export function classifyFieldCell(fieldKey: ProductSourceFieldKey, raw: string):
     if (parseNumericValue(text) === null) return { raw: text, state: 'parse_failed', reason: SOURCE_VALUE_NOT_NUMERIC };
   }
   return { raw: text, state: 'observed', meaning: 'value' };
+}
+
+/** First "number/件" fragment in raw text (e.g. "0.05/件\n24.45/箱" → 0.05). */
+const UNIT_WEIGHT_PER_UNIT_FRAGMENT = /(-?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][-+]?\d+)?)\s*\/\s*件/u;
+
+/**
+ * Apply one registered source-column interpretation to a mapped cell.
+ *
+ * The rule is item+field scoped by the caller; this function only explains the
+ * raw cell. It never invents a value: when a clean value cannot be derived it
+ * returns null and the normal rules (including review) keep applying.
+ */
+export function interpretFieldCell(
+  fieldKey: ProductSourceFieldKey,
+  cell: SourceCell,
+  rule: FieldInterpretationRule,
+): { cell: SourceCell; unitConfirmed: boolean } | null {
+  if (rule === 'unit_weight_per_unit_fragment') {
+    if (fieldKey !== 'unitWeight') return null;
+    // The raw cell is typically parse_failed (SOURCE_VALUE_NOT_NUMERIC) because
+    // numeric parsing rejects "0.05/件\n24.45/箱"; the fragment is still readable.
+    if (cell.state !== 'observed' && cell.state !== 'parse_failed') return null;
+    if (cell.state === 'parse_failed' && cell.reason === SOURCE_FORMULA_ERROR) return null;
+    const text = normalizeCellText(cell.raw);
+    if (text === '') return null;
+    if (parseNumericValue(text) !== null) return { cell, unitConfirmed: true };
+    const fragment = text.match(UNIT_WEIGHT_PER_UNIT_FRAGMENT)?.[1];
+    if (fragment === undefined) return null;
+    const interpreted = classifyFieldCell('unitWeight', fragment);
+    if (interpreted.state !== 'observed') return null;
+    return { cell: interpreted, unitConfirmed: true };
+  }
+  if (rule === 'confirmed_source_value') {
+    if (fieldKey !== 'cartonWeight' || cell.state !== 'observed') return null;
+    return { cell, unitConfirmed: true };
+  }
+  return null;
 }
 
 /** Build the mapped field map for one source row from its cells. */

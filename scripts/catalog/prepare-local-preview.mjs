@@ -14,6 +14,11 @@ const LOCAL_SQL = [
   'db/catalog/012_local_display_table_rls.sql',
   'db/catalog/013_baseline_amounts_batch.sql',
   'db/catalog/015_product_source_sync.sql',
+  'db/catalog/036_product_source_review_flow.sql',
+  'db/catalog/037_product_source_interpretation.sql',
+  'db/catalog/038_shipment_association_history.sql',
+  'db/catalog/039_shipment_association_rule_preview.sql',
+  'db/catalog/040_shipment_association_rule_impact.sql',
 ];
 
 async function applyCatalogSql(run) {

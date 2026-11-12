@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PageHeading } from '@/ui/ice-v4/data-surface';
+import { PendingEntry } from '@/ui/ice-v4/pending-entry';
 import { useTableControls } from '@/ui/ice-v4/table-tools';
 import styles from './shipment.module.css';
 import {
@@ -15,10 +16,12 @@ import {
   type ShipmentQueryState,
 } from '../model';
 import type {
+  ShipmentAssociationSuggestionDto,
   ShipmentDetailDto,
   ShipmentGroupingReviewsDto,
   ShipmentListDto,
   ShipmentMarketSummaryDto,
+  ShipmentValueMarketDetailDto,
   ShipmentValueOverviewDto,
 } from '../types';
 import { ShipmentDetailDrawer } from './shipment-detail-drawer';
@@ -43,9 +46,10 @@ export function InTransitView({
   detail,
   detailError,
   marketSummary,
-  marketSummaryError,
   valueOverview,
-  valueOverviewError,
+  valueDetails,
+  valueError,
+  associationSuggestions,
   groupingReviews,
   groupingReviewsError,
 }: {
@@ -53,10 +57,15 @@ export function InTransitView({
   list: ShipmentListDto;
   detail: ShipmentDetailDto | null;
   detailError: string | null;
+  /** 选中单个市场时的完整汇总（含逐商品明细）；全部市场时为 null。 */
   marketSummary: ShipmentMarketSummaryDto | null;
-  marketSummaryError: string | null;
   valueOverview: ShipmentValueOverviewDto | null;
-  valueOverviewError: string | null;
+  /** 各市场的就地展开数据（商品构成 + 未计入明细）。 */
+  valueDetails: ShipmentValueMarketDetailDto[] | null;
+  /** 货值汇总读取失败原因（一个读取链，失败即整块降级，不伪造 0）。 */
+  valueError: string | null;
+  /** 未关联明细 itemId → 同市场同品名可选商品建议。 */
+  associationSuggestions: Record<string, ShipmentAssociationSuggestionDto[]> | null;
   groupingReviews: ShipmentGroupingReviewsDto | null;
   groupingReviewsError: string | null;
 }) {
@@ -66,6 +75,8 @@ export function InTransitView({
   const lastTriggerRef = useRef<HTMLElement | null>(null);
   const pushedRef = useRef(false);
   const wasOpenRef = useRef(false);
+  /** 快速关闭（URL 还没带上 ticket）时先把列表地址 replace 上去，等 in-flight push 落地后再次收起。 */
+  const suppressPushRef = useRef(false);
   const restoreRef = useRef<{ tableTop: number; windowY: number } | null>(null);
   const [pendingTicket, setPendingTicket] = useState('');
 
@@ -77,6 +88,14 @@ export function InTransitView({
     }
   }, [pendingTicket, query.ticket]);
 
+  // 快速关闭时 push 可能晚于关闭落地：URL 一旦带上 ticket 立即收回列表地址，
+  // 避免“关掉详情却回到上一页（例如商品库）”并让展开市场/滚动位置丢失。
+  useEffect(() => {
+    if (!suppressPushRef.current || !query.ticket) return;
+    suppressPushRef.current = false;
+    router.replace(buildShipmentListHref(query), { scroll: false });
+  }, [query, router]);
+
   /** 关闭详情后把列表滚动位置放回打开前（焦点回焦会让原按钮滚进视野）。 */
   const restoreScroll = useCallback(() => {
     const saved = restoreRef.current;
@@ -87,10 +106,9 @@ export function InTransitView({
   }, []);
 
   const openTicket = useCallback((shipmentId: string, trigger: HTMLElement | null, itemId?: string) => {
-    if (query.view !== 'value') {
-      const table = document.querySelector<HTMLElement>('[data-testid="shipment-table-scroll"]');
-      restoreRef.current = { tableTop: table?.scrollTop ?? 0, windowY: window.scrollY };
-    }
+    // 列表与货值汇总都要恢复：窗口滚动位置两边都记；表格内部滚动只有列表视图有。
+    const table = document.querySelector<HTMLElement>('[data-testid="shipment-table-scroll"]');
+    restoreRef.current = { tableTop: table?.scrollTop ?? 0, windowY: window.scrollY };
     lastTriggerRef.current = trigger ?? null;
     pushedRef.current = true;
     setPendingTicket(shipmentId);
@@ -101,10 +119,15 @@ export function InTransitView({
     const trigger = lastTriggerRef.current;
     lastTriggerRef.current = null;
     setPendingTicket('');
-    if (pushedRef.current) {
+    if (pushedRef.current && query.ticket) {
+      // 地址已经是详情：正常回退到打开前的列表地址（保留市场筛选与视图）。
       pushedRef.current = false;
       router.back();
     } else {
+      // 地址还没提交（快速关闭）：用列表地址替换当前项，绝不 back 到上一页；
+      // 若 in-flight 的 push 之后才落地，交给上面的 effect 再收回。
+      suppressPushRef.current = pushedRef.current;
+      pushedRef.current = false;
       router.replace(buildShipmentListHref(query), { scroll: false });
     }
     if (trigger) {
@@ -165,24 +188,7 @@ export function InTransitView({
     <div className={styles.page} data-testid="in-transit-page">
       <div className={styles.pageHeadRow}>
         <PageHeading title="物流在途" />
-        <nav className={styles.viewTabs} aria-label="在途主视图" data-testid="shipment-view-tabs">
-          <Link
-            href={viewHref('list')}
-            className={valueView ? styles.viewTab : styles.viewTabActive}
-            data-active={valueView ? 'false' : 'true'}
-            data-testid="shipment-view-list"
-          >
-            货票列表
-          </Link>
-          <Link
-            href={viewHref('value')}
-            className={valueView ? styles.viewTabActive : styles.viewTab}
-            data-active={valueView ? 'true' : 'false'}
-            data-testid="shipment-view-value"
-          >
-            货值汇总
-          </Link>
-        </nav>
+        <ViewTabs view={valueView ? 'value' : 'list'} hrefFor={viewHref} />
       </div>
 
       <ShipmentLiveRefresh stamp={shipmentLiveStamp(list.sourceStatus)} />
@@ -203,29 +209,43 @@ export function InTransitView({
           <ShipmentGroupingReviewEntry
             reviews={groupingReviews}
             error={groupingReviewsError}
+            variant="custom"
+            trigger={(openModal, pendingCount) => (
+              <PendingEntry
+                count={pendingCount}
+                state={groupingReviews ? 'ok' : 'failed'}
+                onOpen={openModal}
+                testId="shipment-pending-open"
+              />
+            )}
           />
         )}
       />
 
       {valueView ? (
-        <ShipmentValueView
-          query={query}
-          overview={valueOverview}
-          overviewError={valueOverviewError}
-          summary={marketSummary}
-          summaryError={marketSummaryError}
-          onOpenTicket={(shipmentId, itemId) => openTicket(shipmentId, null, itemId)}
-          hrefForMarket={(market) => buildShipmentListHref({ ...query, view: 'value', market, page: 1 })}
-        />
+        <div id="shipment-panel-value" role="tabpanel" aria-label="货值汇总">
+          <ShipmentValueView
+            query={query}
+            overview={valueOverview}
+            details={valueDetails}
+            summary={marketSummary}
+            suggestions={associationSuggestions}
+            error={valueError}
+            initialExcludedOpen={query.excludedOpen}
+            onOpenTicket={(shipmentId, itemId) => openTicket(shipmentId, null, itemId)}
+          />
+        </div>
       ) : (
-        <ShipmentTable
-          query={query}
-          page={list}
-          columns={columns}
-          controls={controls}
-          onOpen={openTicket}
-          footer={<ShipmentPagination query={query} total={list.total} limit={list.limit} page={query.page} />}
-        />
+        <div id="shipment-panel-list" role="tabpanel" aria-label="货票列表">
+          <ShipmentTable
+            query={query}
+            page={list}
+            columns={columns}
+            controls={controls}
+            onOpen={openTicket}
+            footer={<ShipmentPagination query={query} total={list.total} limit={list.limit} page={query.page} />}
+          />
+        </div>
       )}
 
       {drawerOpen ? (
@@ -237,6 +257,78 @@ export function InTransitView({
           onClose={closeTicket}
         />
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * 主视图页签：选中态明确（aria-selected + 高亮样式），方向键/Home/End 可切换。
+ * 仍用链接导航（保留可点击地址与前进后退），但按 WAI-ARIA tabs 语义标注。
+ */
+function ViewTabs({
+  view,
+  hrefFor,
+}: {
+  view: 'list' | 'value';
+  hrefFor: (view: 'list' | 'value') => string;
+}) {
+  const router = useRouter();
+  const listRef = useRef<HTMLAnchorElement | null>(null);
+  const valueRef = useRef<HTMLAnchorElement | null>(null);
+  const focusTab = (target: 'list' | 'value') => {
+    window.requestAnimationFrame(() => {
+      (target === 'list' ? listRef : valueRef).current?.focus();
+    });
+  };
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const target = event.key === 'ArrowRight' || event.key === 'End'
+      ? 'value'
+      : event.key === 'ArrowLeft' || event.key === 'Home'
+        ? 'list'
+        : null;
+    if (target === null) return;
+    event.preventDefault();
+    if (target === view) {
+      focusTab(target);
+      return;
+    }
+    router.push(hrefFor(target), { scroll: false });
+    focusTab(target);
+  };
+  return (
+    <div
+      className={styles.viewTabs}
+      role="tablist"
+      aria-label="在途主视图"
+      data-testid="shipment-view-tabs"
+      onKeyDown={onKeyDown}
+    >
+      <Link
+        ref={listRef}
+        href={hrefFor('list')}
+        role="tab"
+        aria-selected={view === 'list'}
+        aria-controls="shipment-panel-list"
+        tabIndex={view === 'list' ? 0 : -1}
+        className={view === 'list' ? styles.viewTabActive : styles.viewTab}
+        data-active={view === 'list'}
+        data-testid="shipment-view-list"
+      >
+        货票列表
+      </Link>
+      <Link
+        ref={valueRef}
+        href={hrefFor('value')}
+        role="tab"
+        aria-selected={view === 'value'}
+        aria-controls="shipment-panel-value"
+        tabIndex={view === 'value' ? 0 : -1}
+        className={view === 'value' ? styles.viewTabActive : styles.viewTab}
+        data-active={view === 'value'}
+        data-testid="shipment-view-value"
+      >
+        货值汇总
+      </Link>
     </div>
   );
 }

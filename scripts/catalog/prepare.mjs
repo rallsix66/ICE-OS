@@ -45,7 +45,9 @@ export function newEvidence(root, label) {
 }
 export function safeEnv(extra = {}) {
   const env = {};
-  const allowed = /^(PATH|Path|PATHEXT|SystemRoot|SYSTEMROOT|TEMP|TMP|USERPROFILE|HOMEDRIVE|HOMEPATH|COMPUTERNAME|NUMBER_OF_PROCESSORS|OS|PROCESSOR_ARCHITECTURE|WINDIR|ComSpec|APPDATA|LOCALAPPDATA|USERNAME|USERDOMAIN|SESSIONNAME|ProgramFiles|ProgramFiles\(x86\)|ProgramW6432|CommonProgramFiles|CommonProgramFiles\(x86\)|CommonProgramW6432|CI|TERM|FORCE_COLOR|NO_COLOR)$/;
+  // 平台变量 + 运行位置覆盖项。覆盖项在 Windows 上默认不存在，加入白名单不改变现行为；
+  // 经 start-instance/start-web 嵌套启动时配置才能传到子进程（见 docs/deploy 审计 A7）。
+  const allowed = /^(PATH|Path|PATHEXT|SystemRoot|SYSTEMROOT|TEMP|TMP|TMPDIR|USERPROFILE|HOMEDRIVE|HOMEPATH|HOME|COMPUTERNAME|NUMBER_OF_PROCESSORS|OS|PROCESSOR_ARCHITECTURE|WINDIR|ComSpec|APPDATA|LOCALAPPDATA|USERNAME|USERDOMAIN|SESSIONNAME|ProgramFiles|ProgramFiles\(x86\)|ProgramW6432|CommonProgramFiles|CommonProgramFiles\(x86\)|CommonProgramW6432|CI|TERM|FORCE_COLOR|NO_COLOR|LANG|LC_ALL|LC_CTYPE|ICEOS_PG_BIN_DIR|ICEOS_PYTHON_BIN|SHIPMENT_LARK_CLI_RUNNER|SHIPMENT_FEISHU_URL|BIGSELLER_CHROME_PATH|INVENTORY_BS_REPO_ROOT|INVENTORY_BS_PROFILE_DIR|INVENTORY_BS_EVIDENCE_ROOT|INVENTORY_BS_HEADLESS|INVENTORY_PREVIEW_PORT|CATALOG_PREVIEW_PORT|CATALOG_PREVIEW_NEXT_MODE)$/;
   for (const [key, value] of Object.entries(process.env)) if (allowed.test(key)) env[key] = value;
   return { ...env, NEXT_TELEMETRY_DISABLED: '1', ...extra };
 }

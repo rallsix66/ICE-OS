@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { FilterChip, SearchField, SelectMenu } from '@/ui/ice-v4/data-surface';
 import surface from '@/ui/ice-v4/data-surface.module.css';
 import { ColumnsMenu, type TableColumn, type TableControls } from '@/ui/ice-v4/table-tools';
 import styles from './inventory.module.css';
-import { buildInventoryListHref, UNKNOWN_MARKET_TOKEN, type InventoryQueryState } from '../model';
+import { buildInventoryListHref, marketScopeLabel, type InventoryQueryState } from '../model';
 import type { InventoryWarehouseDto } from '../types';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -28,6 +28,7 @@ export function InventoryFilterBar({
   columns,
   controls,
   total,
+  pendingEntry,
 }: {
   query: InventoryQueryState;
   warehouses: InventoryWarehouseDto[];
@@ -36,6 +37,8 @@ export function InventoryFilterBar({
   controls: TableControls;
   /** 当前筛选范围的总条数（null = 尚未读取）。 */
   total: number | null;
+  /** 「待处理」入口（服务端 Suspense 流式计数 + 弹窗懒加载），保持在工具栏最后。 */
+  pendingEntry: ReactNode;
 }) {
   const router = useRouter();
   const [term, setTerm] = useState(query.q);
@@ -86,7 +89,7 @@ export function InventoryFilterBar({
   if (!domesticScope && query.market !== 'all') {
     chips.push({
       key: 'market',
-      label: query.market === UNKNOWN_MARKET_TOKEN ? '未知仓' : query.market,
+      label: marketScopeLabel(query.market) || '市场待确认',
       href: buildInventoryListHref({ q: query.q, warehouse: query.warehouse, market: 'all', view: query.view, source: query.source, page: 1, ...sortParams }),
     });
   }
@@ -218,6 +221,7 @@ export function InventoryFilterBar({
         >
           清空
         </button>
+        {pendingEntry}
         <span className={surface.count} data-testid="inventory-counts">
           {total === null ? '' : `共 ${total} 条`}
         </span>

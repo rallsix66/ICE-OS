@@ -47,6 +47,104 @@
   line-height: 1.7;
 }
 
+/* ---------- 数据同步页：来源摘要与面板入口 ---------- */
+
+.syncCard {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: var(--ice-ui-radius);
+  background: #fff;
+  scroll-margin-top: 16px;
+}
+
+.syncHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 14px;
+  min-width: 0;
+}
+
+.syncTitle {
+  margin: 0;
+  color: var(--ice-ui-text);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.syncNote {
+  margin: 2px 0 0;
+  color: #79828f;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.syncFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 18px;
+  min-width: 0;
+  margin: 0;
+}
+
+.syncFacts > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.syncFacts dt {
+  color: #79828f;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.syncFacts dd {
+  margin: 0;
+  color: #344154;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.syncActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.syncLink {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid #dce1e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #5266d7;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 150ms var(--ice-ui-ease-out), background 150ms var(--ice-ui-ease-out);
+}
+
+.syncLink:hover {
+  border-color: #c9d0e0;
+  background: #f7f8fc;
+}
+
+.syncPanelMount {
+  min-width: 0;
+  padding-top: 4px;
+  border-top: 1px dashed #e4e8ef;
+}
+
 /* ---------- 最近批次计数 ---------- */
 
 .countsGrid {
@@ -219,6 +317,20 @@
   border-left: 3px solid #c99a45;
   border-radius: 8px;
   background: #fdf9f1;
+  scroll-margin-top: 84px;
+}
+
+.issueItem:focus-visible {
+  outline: 3px solid #8495ed;
+  outline-offset: 3px;
+}
+
+/* 从「待处理」定位到本条事项时只做视觉提示，不改变任何处理状态。 */
+.issueItemFocused {
+  border-color: #b9c5f2;
+  border-left-color: #7b8ce0;
+  background: #f6f8ff;
+  box-shadow: 0 0 0 3px rgba(132, 149, 237, 0.16);
 }
 
 .issueHead {
@@ -283,6 +395,296 @@
   font: inherit;
   font-size: 12px;
 }
+
+/* ---------- 人工核对：同号多行差异对照 ---------- */
+
+.compareWrap {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e7dfcf;
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.compareTitle {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.staleNotice {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #efd9d6;
+  border-left: 3px solid #c0554f;
+  border-radius: 7px;
+  background: #fdf6f5;
+  color: #8d3a35;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.savedChoice {
+  margin: 0;
+  color: #4a5a92;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.compareScroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #eef0f3;
+  border-radius: 7px;
+  background: #fff;
+  -webkit-overflow-scrolling: touch;
+}
+
+.compareTable {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+  color: #3c4859;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.compareTable th,
+.compareTable td {
+  padding: 7px 10px;
+  border-right: 1px solid #f4f5f8;
+  border-bottom: 1px solid #f0f1f4;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.compareTable thead th {
+  background: #f7f8fc;
+  color: #5e6a7a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.compareTable tbody th {
+  color: #5e6a7a;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.compareTable tr:last-child th,
+.compareTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.compareTable th:last-child,
+.compareTable td:last-child {
+  border-right: 0;
+}
+
+.compareValue {
+  color: #273244;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 两份资料不一致的值：给需要人工判断的单元格轻微琥珀色底，避免整表等权噪声。 */
+.compareValueDiff {
+  background: #fffbf1;
+  color: #7a5a1b;
+  font-weight: 600;
+}
+
+.compareValueEmpty {
+  color: #a7aeb9;
+}
+
+.compareChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px 4px;
+  border: 1px dashed #dce1e8;
+  border-radius: 7px;
+}
+
+.compareChoices legend {
+  padding: 0 4px;
+  color: #5e6a7a;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.compareChoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #344154;
+  font-size: 12px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.compareChoice input {
+  margin: 0;
+}
+
+/* ---------- 人工核对：字段级决定与人工补号 ---------- */
+
+.fieldBlock,
+.pendingCodeBlock {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.fieldSummary {
+  margin: 0;
+  color: #344154;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.hintNote {
+  margin: 0;
+  color: #79828f;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.manualStatus {
+  margin: 0;
+  color: #5e6a7a;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.pendingCodeNotice {
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid #ecd9b4;
+  border-left: 3px solid #c99a45;
+  border-radius: 6px;
+  background: #fdf7ec;
+  color: #7a5a1b;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* 最新来源已读到正式货号：直接显示「未填写 → 来源货号」，不要求再次输入。 */
+.pendingCodeDiff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #344154;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.pendingCodeDiff > span:first-child {
+  color: #6b778b;
+  font-size: 12px;
+}
+
+.pendingCodeOld {
+  color: #6b778b;
+}
+
+.pendingCodeNew {
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #eeedfc;
+  color: #4d4ac0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 人工核对：缺货号候选关系确认 ---------- */
+
+.relationBlock {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #dbe3f0;
+  border-left: 3px solid #6f86b8;
+  border-radius: 8px;
+  background: #f8faff;
+}
+
+.relationTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.relationWarning {
+  margin: 0;
+  color: #8a6420;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 已登记的人工决定 ---------- */
+
+.decisionList {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decisionItem {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.decisionItem > button {
+  justify-self: start;
+}
+
+.decisionTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.decisionMeta {
+  margin: 0;
+  color: #79828f;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
 
 /* ---------- 批次历史 ---------- */
 
@@ -391,5 +793,13 @@
 
   .resolveField > input {
     min-width: 160px;
+  }
+
+  .compareWrap {
+    padding: 8px;
+  }
+
+  .compareTable {
+    min-width: 340px;
   }
 }

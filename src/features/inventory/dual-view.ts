@@ -22,6 +22,7 @@ import type {
 } from './types';
 import type { InventoryQueryState } from './model';
 import { compareStableText, UNKNOWN_MARKET_TOKEN } from './model';
+import { marketLabel } from '@/features/overview/markets';
 import { multiplyMoneyByQuantity, parseMoney, parseQuantity } from '@/features/catalog/local-display/decimal';
 
 /** 估算货值用的成本映射：itemId → 当前采用单位成本（人民币字符串，不含运费）。 */
@@ -586,7 +587,7 @@ export function summaryMarketColumns(input: {
     for (const cell of input.marketCells) if (cell.market) markets.add(cell.market);
   }
   const columns: Array<{ key: string; label: string; market: string | null }> = [...markets].sort(compareStableText)
-    .map((market) => ({ key: `market-${market}`, label: market, market }));
+    .map((market) => ({ key: `market-${market}`, label: marketLabel(market), market }));
   const hasUnknown = input.marketCells.some((cell) => cell.market === null);
   if (hasUnknown) columns.push({ key: 'market-unknown', label: '市场待确认', market: null });
   return columns;

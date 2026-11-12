@@ -190,12 +190,12 @@ export function ShipmentFilterBar({
             ariaLabel="市场筛选"
             testId="shipment-market-filter"
           />
+          {reviewEntry ?? null}
           <span className={surface.count} data-testid="shipment-counts">
             {compactCountText !== undefined
               ? compactCountText
               : counts ? `共 ${counts.total} 票` : ''}
           </span>
-          {reviewEntry ?? null}
         </div>
       </section>
     );
@@ -250,10 +250,10 @@ export function ShipmentFilterBar({
         >
           清空
         </button>
+        {reviewEntry ?? null}
         <span className={surface.count} data-testid="shipment-counts">
           {counts ? `共 ${counts.total} 票` : ''}
         </span>
-        {reviewEntry ?? null}
       </div>
       {chips.length > 0 ? (
         <div className={surface.chips} data-testid="shipment-filter-chips">

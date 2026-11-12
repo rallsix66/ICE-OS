@@ -1085,6 +1085,11 @@ export function CatalogDetail({
           </span>
         </p>
       </div>
+      {brushPending ? (
+        <p className={styles.brushPendingNote} data-testid="catalog-detail-brush-note">
+          两款刷子历史资料当时分别保留，是否同款尚未确认；确认方式待业务定义，当前只在商品详情查看。
+        </p>
+      ) : null}
       <dl className={styles.overviewGrid}>
         <OverviewCard label="国内库存" fact={domesticFact} testId="catalog-overview-domestic" />
         <OverviewCard label="BigSeller 库存" fact={overviewInventory} testId="catalog-overview-overseas" />
@@ -1254,7 +1259,7 @@ export function CatalogDetail({
           <dl className={styles.identityGrid} data-testid="catalog-material-details">
             <MaterialRow label="中文产品名称" testId="catalog-material-name">{item.nameCn}</MaterialRow>
             <MaterialRow label="公司货号（ICE）" testId="catalog-material-ice-code">{item.iceCode ?? '待补货号'}</MaterialRow>
-            <MaterialRow label="69编码（字符串）" testId="catalog-material-barcode"><span className={styles.codeCell}>{barcodeBusiness}</span></MaterialRow>
+            <MaterialRow label={CATALOG_FIELD_LABELS.barcode} testId="catalog-material-barcode"><span className={styles.codeCell}>{barcodeBusiness}</span></MaterialRow>
             {optionalFieldRow(item.fields.englishName).show && (
               <MaterialRow label="英文名称" testId="catalog-material-english-name">{optionalFieldRow(item.fields.englishName).value}</MaterialRow>
             )}

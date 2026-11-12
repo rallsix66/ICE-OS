@@ -1,0 +1,253 @@
+.entry {
+  display: inline-flex;
+  height: var(--ice-ui-control);
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 8px;
+  background: #fff;
+  color: #4b5a70;
+  font-size: 13px;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 150ms var(--ice-ui-ease-out), background 150ms var(--ice-ui-ease-out);
+}
+
+.entry:hover {
+  border-color: #c9d0e0;
+  background: #f7f8fc;
+  color: var(--ice-ui-text);
+}
+
+.entry:focus-visible {
+  outline: 2px solid var(--ice-ui-accent);
+  outline-offset: 2px;
+}
+
+.entry > svg {
+  flex: none;
+  color: #7c8798;
+}
+
+.badge {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f6ece8;
+  color: #9c5a42;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.failure {
+  color: #a37e45;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* ---------- 整页居中弹窗（与物流复核弹窗同一视觉语言） ---------- */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: hidden;
+  background: rgba(20, 28, 42, 0.42);
+}
+
+.dialog {
+  display: flex;
+  max-height: 88dvh;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgba(20, 28, 42, 0.24);
+}
+
+.dialogHead {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 13px 20px;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.dialogTitle {
+  margin: 0;
+  color: var(--ice-ui-text);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.dialogSub {
+  margin: 3px 0 0;
+  color: #8d98a8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.dialogClose {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: #8d98a8;
+  cursor: pointer;
+}
+
+.dialogClose:hover {
+  background: #f2f4f8;
+  color: var(--ice-ui-text);
+}
+
+.dialogBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0 8px;
+}
+
+.dialogEmpty {
+  padding: 26px 16px;
+  color: #a37e45;
+  font-size: 13px;
+  text-align: center;
+}
+
+.dialogEmpty p {
+  margin: 0 0 10px;
+}
+
+.emptyText {
+  margin: 0;
+  padding: 32px 16px;
+  color: #8d98a8;
+  font-size: 13px;
+  text-align: center;
+}
+
+.retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #6b7ba4;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.group {
+  padding: 10px 0 4px;
+  border-bottom: 1px solid #f1f3f7;
+}
+
+.group:last-child {
+  border-bottom: 0;
+}
+
+.groupHead {
+  padding: 0 20px 6px;
+}
+
+.groupHead h3 {
+  margin: 0;
+  color: var(--ice-ui-text);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.groupHead p {
+  margin: 2px 0 0;
+  color: #8d98a8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.groupItems {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 20px;
+}
+
+.item:hover {
+  background: #f8f9fc;
+}
+
+.itemInfo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.itemTitle {
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.itemDetail {
+  color: #6b7789;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.itemMeta {
+  color: #8d98a8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.itemAction {
+  flex: none;
+  padding-top: 1px;
+}
+
+.itemAction a,
+.itemAction button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ice-ui-accent);
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.itemAction a:hover,
+.itemAction button:hover {
+  text-decoration: underline;
+}

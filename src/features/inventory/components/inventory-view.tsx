@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { PageHeading } from '@/ui/ice-v4/data-surface';
 import { useTableControls } from '@/ui/ice-v4/table-tools';
 import styles from './inventory.module.css';
@@ -53,6 +54,7 @@ export function InventoryView({
   itemDetail,
   itemError,
   pending,
+  pendingEntry,
   viewer,
   sourceBinding,
   sourceBindingError,
@@ -73,6 +75,8 @@ export function InventoryView({
   itemError: string | null;
   /** 最近未完成原请求（服务端）；本地未知记录由恢复面板自行读取。 */
   pending: InventoryPendingActionDto | null;
+  /** 工具栏「待处理」入口（服务端 <Suspense> 流式计数 + 弹窗懒加载清单）。 */
+  pendingEntry: ReactNode;
   /** 当前会话身份：恢复记录归属校验与绑定写入登记。 */
   viewer: LocalViewerIdentity | null;
   /** 当前打开仓库行的固定来源绑定（服务端读取）。 */
@@ -157,6 +161,7 @@ export function InventoryView({
         columns={activeColumns}
         controls={activeControls}
         total={page?.total ?? null}
+        pendingEntry={pendingEntry}
       />
 
       {scopeEmpty || failedCount > 0 ? (

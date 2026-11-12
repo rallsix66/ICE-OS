@@ -161,7 +161,7 @@ export function ProductSummaryTable({
                 {marketColumns.map((column) => controls.isVisible(column.key) ? (
                   <SortableTh key={column.key} column={columnOf(columns, column.key)} controls={controls} sort={sort} onSort={handleSort} className={styles.numericHead} sticky>
                     <span data-testid={`inventory-market-column-${column.market ?? 'unknown'}`}>
-                      {column.market === null ? '未知仓' : column.label}
+                      {column.market === null ? '市场待确认' : column.label}
                     </span>
                   </SortableTh>
                 ) : null)}

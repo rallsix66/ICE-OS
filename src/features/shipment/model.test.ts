@@ -4,6 +4,7 @@ import {
   UNKNOWN_MARKET_TOKEN,
   absentSummaryText,
   arrivalColumnText,
+  associationSavedNotice,
   buildShipmentDetailHref,
   buildShipmentListHref,
   changedFieldsText,
@@ -90,7 +91,14 @@ describe('parseShipmentSearchParams', () => {
       ticket: '',
       item: '',
       review: false,
+      excludedOpen: false,
     });
+  });
+
+  it('excluded=open 时首次打开即展开未计入明细（经营总览直达）', () => {
+    expect(parseShipmentSearchParams(new URLSearchParams('view=value&excluded=open')).excludedOpen).toBe(true);
+    expect(parseShipmentSearchParams(new URLSearchParams('excluded=1')).excludedOpen).toBe(true);
+    expect(parseShipmentSearchParams(new URLSearchParams('excluded=closed')).excludedOpen).toBe(false);
   });
 
   it('item 只接受 UUID（来源汇总点进明细用），非法值丢弃', () => {
@@ -502,6 +510,85 @@ describe('分页', () => {
     expect(shipmentPageRange(120, 20, 2)).toMatchObject({ from: 21, to: 40, page: 2, pageCount: 6 });
     expect(shipmentPageRange(120, 20, 99)).toMatchObject({ from: 101, to: 120, page: 6 });
     expect(shipmentPageNumbers(4, 10)).toEqual([1, 2, 3, 4, 5, 6, 'gap', 10]);
+  });
+});
+
+describe('关联保存回执文案（清除 + 本条去向 + 沿用规则/另关联条数）', () => {
+  const basePayload = {
+    cleared: false,
+    productLabel: 'WM0075 · 唇膏 201',
+    outcome: { state: 'counted' as const, label: '已计入货值' },
+    ruleRequested: false,
+    mappingSaved: false,
+    mappingNote: null,
+    ruleAdoptedCount: 0,
+  };
+
+  it('清除关联：固定写「已清除本条明细的商品关联。」', () => {
+    expect(associationSavedNotice({ ...basePayload, cleared: true }))
+      .toBe('已清除本条明细的商品关联。');
+  });
+
+  it('关联且已计入货值、只用于本票：写清货号·品名、本条去向与规则未保存', () => {
+    expect(associationSavedNotice(basePayload))
+      .toBe('已关联「WM0075 · 唇膏 201」；已计入货值。只用于本票，未保存沿用规则。');
+  });
+
+  it('关联且仍缺进货价 / 数量待核：分别写清本条实际去向', () => {
+    expect(associationSavedNotice({
+      ...basePayload,
+      outcome: { state: 'price_missing', label: '仍缺进货价' },
+    })).toBe('已关联「WM0075 · 唇膏 201」；仍缺进货价，暂未计入货值。只用于本票，未保存沿用规则。');
+    expect(associationSavedNotice({
+      ...basePayload,
+      outcome: { state: 'quantity_pending', label: '数量待核' },
+    })).toBe('已关联「WM0075 · 唇膏 201」；数量待核，暂未计入货值。只用于本票，未保存沿用规则。');
+  });
+
+  it('读不到本条去向：只说已刷新，不猜结果', () => {
+    expect(associationSavedNotice({ ...basePayload, outcome: null }))
+      .toBe('已关联「WM0075 · 唇膏 201」；货值汇总与未计入数量已刷新。只用于本票，未保存沿用规则。');
+  });
+
+  it('没有商品标签：以「已关联商品；」开头', () => {
+    expect(associationSavedNotice({ ...basePayload, productLabel: null }))
+      .toBe('已关联商品；已计入货值。只用于本票，未保存沿用规则。');
+  });
+
+  it('保存沿用规则：另起一句写规则与本次按规则另外关联条数', () => {
+    expect(associationSavedNotice({
+      ...basePayload,
+      ruleRequested: true,
+      mappingSaved: true,
+      ruleAdoptedCount: 3,
+    })).toBe('已关联「WM0075 · 唇膏 201」；已计入货值。'
+      + '已保存「以后同市场同品名沿用」规则；本次按这条规则另外关联 3 条。');
+  });
+
+  it('保存沿用规则但本次另外关联 0 条：仍写 0 条（取数据库回执，不省略）', () => {
+    expect(associationSavedNotice({
+      ...basePayload,
+      ruleRequested: true,
+      mappingSaved: true,
+      ruleAdoptedCount: 0,
+    })).toBe('已关联「WM0075 · 唇膏 201」；已计入货值。'
+      + '已保存「以后同市场同品名沿用」规则；本次按这条规则另外关联 0 条。');
+  });
+
+  it('沿用规则未保存：写明 mappingNote；没有说明时回落到「市场未提供」', () => {
+    expect(associationSavedNotice({
+      ...basePayload,
+      ruleRequested: true,
+      mappingSaved: false,
+      mappingNote: '市场未提供，未保存通用对应',
+    })).toBe('已关联「WM0075 · 唇膏 201」；已计入货值。'
+      + '未保存沿用规则（市场未提供，未保存通用对应）。');
+    expect(associationSavedNotice({
+      ...basePayload,
+      ruleRequested: true,
+      mappingSaved: false,
+      mappingNote: null,
+    })).toBe('已关联「WM0075 · 唇膏 201」；已计入货值。未保存沿用规则（市场未提供）。');
   });
 });
 

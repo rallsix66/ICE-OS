@@ -41,6 +41,7 @@ import type {
   InventoryWarehouseRowDto,
   InventoryWarehouseSummaryDto,
 } from './types';
+import { marketLabel } from '@/features/overview/markets';
 
 export type Tone = 'neutral' | 'green' | 'amber' | 'red' | 'blue';
 
@@ -637,6 +638,8 @@ export interface InventoryQueryState {
   sort: InventorySortKey;
   /** 排序方向（URL 参数 dir）。 */
   sortDir: InventorySortDir;
+  /** 经营总览「查看待绑定商品」直达：pending=open 时挂载后自动打开待处理弹窗。 */
+  pending: 'open' | null;
 }
 
 export type InventorySortDir = 'asc' | 'desc';
@@ -703,6 +706,7 @@ export const DEFAULT_INVENTORY_QUERY: InventoryQueryState = {
   allWarehouses: false,
   sort: '',
   sortDir: 'asc',
+  pending: null,
 };
 
 export function parseInventoryView(raw: string | null | undefined): InventoryViewMode {
@@ -743,6 +747,7 @@ export function parseInventorySearchParams(params: URLSearchParams): InventoryQu
     allWarehouses,
     sort: parseInventorySortKey(params.get('sort')),
     sortDir: parseInventorySortDir(params.get('dir')),
+    pending: params.get('pending') === 'open' ? 'open' : null,
   };
 }
 
@@ -834,7 +839,7 @@ export function inventoryScopeLabel(input: {
 }): string {
   if (input.scopeMode === 'all') return '视角：全仓（显式切换，不沿用列表筛选）';
   const parts: string[] = [];
-  if (input.market && input.market !== 'all') parts.push(`市场 ${input.market}`);
+  if (input.market && input.market !== 'all') parts.push(`市场 ${marketLabel(input.market === UNKNOWN_MARKET_TOKEN ? null : input.market)}`);
   if (input.warehouseName) parts.push(`仓库 ${input.warehouseName}`);
   return parts.length > 0 ? `视角：沿用列表筛选（${parts.join(' / ')}）` : '视角：沿用列表筛选（全部仓库）';
 }
@@ -862,6 +867,9 @@ export function marketOptionLabel(option: InventoryMarketOptionDto): string {
 /**
  * 市场展示：多个已知市场给集合，未知仓单独提示；单市场筛选保留该市场。
  * 不把跨多市场写成“市场待确认”，也不猜未知市场值。
+ *
+ * 注意：这里保留服务端市场代码（内部纯逻辑/旧调用方的基线）；页面可见的市场文案
+ * 由 `marketLabel` 在各渲染点转成中文，避免把显示映射耦合进排序/筛选逻辑。
  */
 export function marketsDisplay(
   markets: string[] | null | undefined,
@@ -2465,7 +2473,7 @@ export function marketCellQuantity(cell: Pick<InventoryProductMarketCellDto, 'on
 }
 
 export function marketCellLabel(cell: Pick<InventoryProductMarketCellDto, 'market'>): string {
-  return cell.market ?? '市场待确认';
+  return marketLabel(cell.market);
 }
 
 export function domesticCellQuantity(cell: InventoryProductDomesticCellDto | null): string {
@@ -2490,7 +2498,7 @@ export function isUnknownMarketToken(value: string | null | undefined): boolean 
 /** 市场范围短标签（市场下拉已删除，只在有国家下钻时显示一个可清除标签）。 */
 export function marketScopeLabel(market: string): string {
   if (market === 'all') return '';
-  return market === UNKNOWN_MARKET_TOKEN ? '市场待确认（未知仓）' : `市场 ${market}`;
+  return market === UNKNOWN_MARKET_TOKEN ? '市场待确认（未知仓）' : `市场 ${marketLabel(market)}`;
 }
 
 /**

@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { ReadFailurePanel } from '@/features/inventory/components/display';
 import { InventoryView } from '@/features/inventory/components/inventory-view';
+import { InventoryPendingEntry } from '@/features/inventory/components/inventory-pending-entry';
 import { domesticIncludedInScope, mergeProductSummary, mergeWarehouseRowsPage } from '@/features/inventory/dual-view';
 import {
   classifyReadFailure,
   errorMessageOf,
   parseInventorySearchParams,
+  pendingBlocksWrites,
 } from '@/features/inventory/model';
 import {
   getInventoryItem,
@@ -143,6 +145,18 @@ export default async function InventoryPage({
   }
 
   const overview: InventoryOverviewDto | null = overviewSettled.status === 'fulfilled' ? overviewSettled.value : null;
+
+  // 「待处理」入口不再在此同步读清单或计数：徽标数量由客户端挂载后异步读取，
+  // 完整清单由弹窗打开时懒加载。这样切换「仓库明细 / 商品汇总」时先看到视图和数据，
+  // 不会为 5 页队列读取（约 1s）等待。
+  const pendingEntry = (
+    <InventoryPendingEntry
+      viewer={{ actorId: identity.profileUserId, accountId: overview?.account.accountId ?? '' }}
+      pendingLocked={pendingBlocksWrites(overview?.pendingAction ?? null)}
+      autoOpen={query.pending === 'open'}
+    />
+  );
+
   const domestic: InventoryDomesticSnapshotDto | null = domesticSettled.status === 'fulfilled' ? domesticSettled.value : null;
   const overseasRows: InventoryWarehouseRowsDto | null = warehouseSettled.status === 'fulfilled' ? warehouseSettled.value : null;
   const productSummary: InventoryProductSummaryDto | null = summarySettled.status === 'fulfilled' ? summarySettled.value : null;
@@ -235,6 +249,7 @@ export default async function InventoryPage({
       itemDetail={itemDetail}
       itemError={itemError}
       pending={overview?.pendingAction ?? null}
+      pendingEntry={pendingEntry}
       viewer={viewer}
       sourceBinding={sourceBinding}
       sourceBindingError={sourceBindingError}

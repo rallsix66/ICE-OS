@@ -19,7 +19,7 @@ export const revalidate = 0;
  * 飞书商品来源（本地模拟）面板：独立于旧“来源核实”模块的启用状态挂载在本页下方。
  * 读取失败/无权限时给中文降级说明（不显示数量、不当作 0 条），不伪造空批次。
  */
-async function FeishuProductSourceSection() {
+async function FeishuProductSourceSection({ focusIssueId }: { focusIssueId?: string }) {
   let dto: ProductSourcePanelDto | null = null;
   let reason: 'forbidden' | 'read_failed' = 'read_failed';
   try {
@@ -28,7 +28,13 @@ async function FeishuProductSourceSection() {
     const message = error instanceof Error ? error.message : '';
     reason = /无权|权限|停用|登录|FORBIDDEN|DENIED|42501/i.test(message) ? 'forbidden' : 'read_failed';
   }
-  return dto ? <ProductSourcePanel dto={dto} /> : <ProductSourcePanelFallback reason={reason} />;
+  return (
+    <div id="product-source" data-testid="catalog-product-source-section">
+      {dto
+        ? <ProductSourcePanel dto={dto} focusIssueId={focusIssueId ?? null} />
+        : <ProductSourcePanelFallback reason={reason} />}
+    </div>
+  );
 }
 
 const UUID = /^[a-f\d-]{36}$/i;
@@ -54,13 +60,14 @@ function uuidOf(value: string | string[] | undefined): string | undefined {
 export default async function SourceIdentityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ scope?: string; item?: string; from?: string; record?: string }>;
+  searchParams: Promise<{ scope?: string; item?: string; from?: string; record?: string; issue?: string }>;
 }) {
-  const { scope, item, from, record } = await searchParams;
+  const { scope, item, from, record, issue } = await searchParams;
   const rawScope = typeof scope === 'string' ? scope : undefined;
   const scopeId = uuidOf(scope);
   const itemId = uuidOf(item);
   const recordId = uuidOf(record);
+  const focusIssueId = uuidOf(issue);
   // 安全返回点：只接受站内 /dashboard/ 相对路径，拒绝协议相对地址、反斜杠与外部 URL。
   const returnHref = safeInternalReturnHref(from);
   const backHref = returnHref ?? '/dashboard/catalog';
@@ -109,7 +116,7 @@ export default async function SourceIdentityPage({
           itemId={itemId}
           focusRecordId={recordId && (locatedRecord || locatedLink) ? recordId : undefined}
         />
-        <FeishuProductSourceSection />
+        <FeishuProductSourceSection focusIssueId={focusIssueId} />
       </main>
     );
   }
@@ -126,7 +133,7 @@ export default async function SourceIdentityPage({
         returnHref={returnHref}
       />
       <div className={panelStyles.pageMount}>
-        <FeishuProductSourceSection />
+        <FeishuProductSourceSection focusIssueId={focusIssueId} />
       </div>
     </>
   );

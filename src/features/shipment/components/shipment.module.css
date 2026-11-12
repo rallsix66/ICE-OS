@@ -1417,6 +1417,18 @@
   line-height: 1.6;
 }
 
+/* 关联保存后的结果提示：先写「已关联商品」，再写该条实际去向。 */
+.manualSaved {
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid #cfe3d8;
+  border-radius: 8px;
+  background: #f1f8f4;
+  color: #2f6b4f;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .manualDialogFoot {
   display: flex;
   flex-wrap: wrap;
@@ -1809,15 +1821,24 @@
   line-height: 1;
 }
 
+/* 工具栏入口里的「N 项」：与卡片信息栏同一套可点击下划线语义。 */
+.reviewCountText {
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+  text-decoration-color: #c9d0e0;
+  text-underline-offset: 3px;
+}
+
 .reviewModalBackdrop {
   position: fixed;
   z-index: 60;
   inset: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 6vh 16px 24px;
-  overflow: auto;
+  padding: 16px;
+  overflow: hidden;
   background: rgb(15 23 42 / 42%);
 }
 
@@ -1825,6 +1846,7 @@
   display: grid;
   width: min(920px, 100%);
   max-height: 86vh;
+  max-height: 86dvh;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   overflow: hidden;
@@ -1837,6 +1859,7 @@
 
 .reviewModalHead {
   display: flex;
+  flex: 0 0 auto;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -1859,7 +1882,41 @@
   gap: 10px;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
+}
+
+/* 每条复核的第一句：市场、采购单/运单、上次/本次票数。 */
+.reviewSummary {
+  margin: 0;
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.reviewNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid #cfe6db;
+  border-radius: 8px;
+  background: #edf6f1;
+  color: #2c705b;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.reviewNotice svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.reviewNotice[data-tone='warn'] {
+  border-color: #ecd9b4;
+  background: #fdf7ec;
+  color: #7a5a1b;
 }
 
 .reviewOverrides {
@@ -1925,8 +1982,310 @@
 }
 
 @media (max-width: 900px) {
+  .reviewModalBackdrop {
+    padding: 10px;
+  }
+
   .reviewModal {
     max-height: 92vh;
+    max-height: 92dvh;
     padding: 12px;
   }
+
+  .reviewGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+
+/* ------------------------------------------------------------------ *
+ * 第十七轮：页签选中态 / 货值汇总市场就地展开 / 未计入明细 / 现场关联
+ * ------------------------------------------------------------------ */
+
+.viewTab,
+.viewTabActive {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.viewTab {
+  color: var(--ice-ui-muted);
+  background: transparent;
+}
+
+.viewTab:hover {
+  color: var(--ice-ui-text);
+  background: #ffffff;
+}
+
+.viewTabActive {
+  color: var(--ice-ui-text);
+  background: #ffffff;
+  border-color: var(--ice-ui-line);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.viewTab:focus-visible,
+.viewTabActive:focus-visible {
+  outline: 2px solid #5266d7;
+  outline-offset: 1px;
+}
+
+.valueKpiButton {
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.valueKpiButton:hover {
+  border-color: #c3cede;
+  background: #f8fafc;
+}
+
+.valueKpiButton small {
+  font-size: 11px;
+  color: var(--ice-ui-muted);
+}
+
+.valueKpiButton:focus-visible {
+  outline: 2px solid #5266d7;
+  outline-offset: 1px;
+}
+
+.valueMarketToggle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.valueMarketToggle:hover .valueMarketName {
+  color: #3b5bdb;
+  text-decoration: underline;
+}
+
+.valueMarketToggle:focus-visible {
+  outline: 2px solid #5266d7;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.valueMarketName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ice-ui-text);
+}
+
+.valueMarketHint {
+  font-size: 11px;
+  color: var(--ice-ui-muted);
+}
+
+.valueExpandRow > td {
+  padding: 0 !important;
+  background: #f8fafc;
+}
+
+.valueExpand {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 14px;
+}
+
+.valueExpandKpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-size: 12px;
+  color: #3a465a;
+}
+
+.valueExpandKpis strong {
+  font-size: 13px;
+  color: var(--ice-ui-text);
+}
+
+.valueExpandSection h4 {
+  margin: 2px 0 6px;
+  font-size: 13px;
+  color: var(--ice-ui-text);
+}
+
+.valueProductTable td:first-child {
+  min-width: 220px;
+}
+
+.valueExcludedSection {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.valueSectionHead {
+  display: grid;
+  gap: 2px;
+}
+
+.valueSectionHead h3 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ice-ui-text);
+}
+
+.valueSectionHead p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ice-ui-muted);
+}
+
+.valueItemActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.valueEditorRow > td {
+  padding: 0 !important;
+  background: #fbfcfe;
+}
+
+.valueEditorRow .assocEditor {
+  margin: 8px 10px 12px;
+}
+
+.valueSavedNotice {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid #cfe8da;
+  border-radius: 8px;
+  background: #f1faf4;
+  color: #2f6b4f;
+  font-size: 12px;
+}
+
+.valueMuted {
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+}
+
+.assocSuggestions {
+  display: grid;
+  gap: 6px;
+}
+
+.assocSuggestionsTitle {
+  font-size: 12px;
+  color: #3a465a;
+}
+
+.assocSuggestionList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assocSuggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  padding: 6px 10px;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 12px;
+  color: #273244;
+  text-align: left;
+  cursor: pointer;
+}
+
+.assocSuggestion:hover {
+  border-color: #b9c6dc;
+}
+
+.assocSuggestion[data-selected='true'] {
+  border-color: #5266d7;
+  background: #eef1fe;
+}
+
+.assocSuggestion strong {
+  font-size: 13px;
+  color: #1f2b3d;
+}
+
+.assocSuggestion small {
+  font-size: 11px;
+  color: #6b7a90;
+}
+
+.assocScope {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.assocScopeLegend {
+  padding: 0 4px;
+  font-size: 12px;
+  color: #3a465a;
+}
+
+/* 039：保存「以后同市场同品名也沿用」前的影响预告（当前命中 + 以后新到明细）。 */
+.assocRulePreview {
+  margin: 0 4px 2px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f4f7fc;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #3a465a;
+}
+
+.assocScopeOption {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 3px 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #273244;
+  cursor: pointer;
+}
+
+.assocScopeOption[data-selected='true'] {
+  background: #eef2ff;
+}
+
+.assocScopeOption input {
+  margin-top: 3px;
+}
+
+.assocScopeOption span {
+  display: grid;
+  gap: 1px;
+}
+
+.assocScopeOption small {
+  font-size: 11px;
+  color: #6b7a90;
 }

@@ -961,6 +961,13 @@
   gap: 8px;
 }
 
+/* 「待处理」弹层里的待绑定清单：行样式由共用 PendingItem 提供，这里只做列表复位。 */
+.pendingBindingList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .pageStatus {
   margin: 0;
   color: var(--ice-ui-faint);
@@ -1681,4 +1688,282 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+/* ------------------------------------------------------------------ *
+ * 「待处理」按来源 SKU 分组 + 弹窗内绑定（2026-11-11）
+ * ------------------------------------------------------------------ */
+
+/* Suspense 占位：与共用「待处理」按钮同高，不显示假数字。 */
+.pendingEntryLoading {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+.pendingPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.pendingPanelHint {
+  margin: 0;
+  color: #7a8799;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.pendingPanelError {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #f2ded9;
+  border-radius: 8px;
+  background: #fcf2ef;
+  color: #8a4a3f;
+  font-size: 12px;
+}
+
+.pendingGroupList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pendingGroup {
+  padding: 10px 12px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.pendingGroupHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pendingGroupTitle {
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pendingGroupMeta {
+  margin: 4px 0 0;
+  color: #6f7b8d;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.pendingWarehouseFact {
+  color: #46536a;
+}
+
+.pendingGroupBody {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--ice-ui-line);
+}
+
+.pendingSection {
+  display: grid;
+  gap: 6px;
+}
+
+.pendingSectionTitle {
+  margin: 0;
+  color: #46536a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pendingQuickPicks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 快捷候选/其他仓已绑定：带边框与浅底，可点选；商品名保持正文样式。 */
+.pendingQuickPick {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #d7dfea;
+  border-radius: 7px;
+  background: #f8fafd;
+  color: #26364c;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pendingQuickPick:hover:not(:disabled) {
+  border-color: #9fb6d8;
+  background: #eef4ff;
+}
+
+.pendingQuickPick:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pendingQuickPickMeta {
+  color: #7a8799;
+  font-size: 11px;
+}
+
+.pendingCandidateList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pendingCandidate {
+  padding: 8px 10px;
+  border: 1px solid #e2e7f4;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.pendingCandidate[data-selected='true'] {
+  border-color: #4d7fca;
+  background: #eef4ff;
+}
+
+.pendingCandidateHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pendingCandidateHead strong {
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pendingCandidate p {
+  margin: 3px 0 0;
+  color: #53617a;
+  font-size: 12px;
+}
+
+/* 多个候选的差异行：浅黄底 + 侧边线 + 文字标注，不只靠颜色。 */
+.pendingDiff {
+  padding: 3px 8px;
+  border-left: 3px solid #d9a43b;
+  border-radius: 4px;
+  background: #fdf8ea;
+  color: #6b5320 !important;
+}
+
+.pendingDiffTag {
+  margin-left: 6px;
+  color: #8a6a1f;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 同 SKU 多款候选的「实际差异」：正常正文条目，不靠颜色区分。 */
+.pendingDifferences {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding-left: 16px;
+  color: #53617a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.pendingSelected {
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid #e2e7f4;
+  border-radius: 8px;
+  background: #f7f9fe;
+  color: #26364c;
+  font-size: 12px;
+}
+
+.pendingWarehouseList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pendingWarehouseChoice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid #eef0f4;
+  border-radius: 7px;
+  background: #fbfcfe;
+  color: #46536a;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pendingDetails {
+  padding: 8px 10px;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.pendingDetails summary {
+  color: #46536a;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pendingActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pendingMessage {
+  margin: 0;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: #f4f7fc;
+  color: #46536a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.pendingMessage[data-tone='error'] {
+  border: 1px solid #f2ded9;
+  background: #fcf2ef;
+  color: #8a4a3f;
+}
+
+.pendingMessage[data-tone='warn'] {
+  border: 1px solid #efe3c8;
+  background: #fdf9ef;
+  color: #7a5a13;
+}
+
+.pendingMessage[data-tone='ok'] {
+  border: 1px solid #dcebe2;
+  background: #f4faf7;
+  color: #2f6b4f;
 }

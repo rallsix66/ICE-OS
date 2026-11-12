@@ -574,6 +574,8 @@ export interface ShipmentSummaryItemDto {
   ticketNo: string;
   purchaseOrder: string | null;
   waybillsText: string | null;
+  /** 来源市场原值；null = 来源未提供国家（汇总/未计入列表显示用）。 */
+  market?: string | null;
   productNameRaw: string;
   /** 绑定商品卡片；未关联为 null。金额沿用商品库现有采用进货价口径。 */
   product: ShipmentLinkedProductDto | null;
@@ -825,10 +827,73 @@ export interface ShipmentAssociationResultDto {
   errorMessage: string | null;
   /** 勾选「后续沿用」时是否保存了通用对应（清除关联/未勾选/市场未知时为 false）。 */
   mappingSaved?: boolean;
-  /** 保存对应后本次自动采用到其他未关联明细的条数。 */
+  /** 保存对应后本次自动采用到其他未关联明细的条数（全部规则合计，仅诊断用）。 */
   adoptedCount?: number;
+  /** 本次**这条规则**实际另外影响（关联/改关联）的明细条数（页面回执只用这个数）。 */
+  ruleAdoptedCount?: number;
   /** 未保存通用对应的原因（例如市场未提供）。 */
   mappingNote?: string | null;
+  /**
+   * 保存后按该条明细的实际结果给出的去向（与货值汇总同一口径）：
+   * counted=已计入货值；price_missing=仍缺进货价；quantity_pending=数量待核。
+   * 读不到明细时为 null，页面不猜。
+   */
+  outcome?: ShipmentAssociationOutcomeDto | null;
+}
+
+/** 关联保存后该条明细的实际去向（页面据此写「已计入货值 / 仍缺进货价 / 数量待核」）。 */
+export interface ShipmentAssociationOutcomeDto {
+  state: 'counted' | 'price_missing' | 'quantity_pending';
+  label: string;
+}
+
+/**
+ * 关联编辑器保存成功后交给父组件的完整回执：
+ * 本条明细的实际去向 + 「沿用规则」是否保存 + 本次按已保存规则另外关联了几条（取数据库回执）。
+ */
+export interface ShipmentAssociationSavedPayloadDto {
+  /** true = 清除关联（save(null)）。 */
+  cleared: boolean;
+  /** 关联商品标签「货号 · 品名」；清除或没有标签时为 null。 */
+  productLabel: string | null;
+  /** 本条明细保存后的实际去向；读不到为 null（页面不猜）。 */
+  outcome: ShipmentAssociationOutcomeDto | null;
+  /** 本次是否选择「以后同市场同品名也沿用」。 */
+  ruleRequested: boolean;
+  /** 数据库是否真的保存了沿用规则。 */
+  mappingSaved: boolean;
+  /** 未保存沿用规则的原因（例如市场未提供）。 */
+  mappingNote: string | null;
+  /** 本次按已保存规则另外关联的条数（数据库 ruleAdoptedCount，只算本条规则）。 */
+  ruleAdoptedCount: number;
+}
+
+/**
+ * 「以后同市场同品名也沿用」规则的影响预告（039 只读函数）：
+ * 选中商品、选择沿用范围之前，先告诉用户当前会命中多少明细、以后新到的明细也会自动匹配。
+ * 命中条件与 027 catalog.shipment_mapping_apply_core 完全一致（只读，不写库）。
+ */
+export interface ShipmentAssociationRulePreviewDto {
+  ok: boolean;
+  itemId: string;
+  /** 目标明细所在票的市场；null = 市场未提供（不能保存沿用规则）。 */
+  market: string | null;
+  nameNorm: string | null;
+  productNameRaw: string | null;
+  /** 预告按哪个所选商品计算；null = 未选商品（旧入口/读取失败）。 */
+  selectedProductId?: string | null;
+  /** 当前会被这条规则命中的其他明细数（= unboundCount + reassignCount）。 */
+  matchingCount: number;
+  /** 命中明细涉及的票数。 */
+  ticketCount: number;
+  /** 样例票号（最多 3 个）。 */
+  sampleTickets: string[];
+  /** 命中里当前未关联的明细数（保存规则后会被关联）。 */
+  unboundCount: number;
+  /** 命中里当前按品名自动匹配、保存规则后会改关联的明细数。 */
+  reassignCount: number;
+  /** 补充说明（市场未提供 / 明细不存在等）；正常为 null。 */
+  note: string | null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1050,4 +1115,68 @@ export interface ShipmentValueOverviewDto {
   pricedItemCount: number;
   excludedItemCount: number;
   markets: ShipmentValueMarketRowDto[];
+}
+
+/* ------------------------------------------------------------------ *
+ * 货值汇总「按市场就地展开」+ 未计入明细现场关联（第十七轮）
+ * ------------------------------------------------------------------ */
+
+/** 展开区里的商品构成一行（只要聚合，不重复带逐条明细，避免整页传输过大）。 */
+export interface ShipmentValueProductRowDto {
+  productId: string;
+  iceCode: string | null;
+  nameCn: string | null;
+  specificationText: string;
+  unitText: string | null;
+  unitCost: ShipmentLinkedProductDto['unitCost'];
+  remainingQuantity: number;
+  itemCount: number;
+  ticketCount: number;
+  valueCny: string | null;
+  quantityPendingCount: number;
+  reviewPendingCount: number;
+  unpricedItemCount: number;
+}
+
+/** 未关联明细的可选商品建议：同市场、同规范化品名在其它明细里已确认过的商品。 */
+export interface ShipmentAssociationSuggestionDto {
+  productId: string;
+  iceCode: string | null;
+  nameCn: string | null;
+  /** 其它明细里出现的次数（排序依据：多在前，其次货号）。 */
+  count: number;
+  /**
+   * 依据：manual = 旧票上人工确认过（association_method='manual_selected'，有记录可查）；
+   * current = 当前明细里同市场同品名已确认。页面据此写「人工确认过」或「已确认 N 次」。
+   */
+  basis?: 'manual' | 'current';
+  /** 人工确认所在的旧票号（例如 POKNZX027378）；仅 manual 有值。 */
+  ticketNo?: string | null;
+  /** 人工确认时间（展示到分钟）；仅 manual 有值。 */
+  recordedAt?: string | null;
+}
+
+/** 某个市场的就地展开数据（公开口径与既有汇总一致：剩余在途 × 采用进货价）。 */
+export interface ShipmentValueMarketDetailDto {
+  market: string | null;
+  unknownMarket: boolean;
+  ticketCount: number;
+  itemCount: number;
+  totalValueCny: string | null;
+  pricedItemCount: number;
+  excludedItemCount: number;
+  products: ShipmentValueProductRowDto[];
+  /** 该市场未计入货值的明细（每条带原因，可打开原票；未关联的可现场关联）。 */
+  excludedItems: ShipmentSummaryItemDto[];
+}
+
+/** 货值汇总页一次读取的全部数据（一个 028 读 + 一份商品卡片）。 */
+export interface ShipmentValuePageDto {
+  overview: ShipmentValueOverviewDto;
+  /** 全部市场的展开数据，顺序与 overview.markets 一致。 */
+  markets: ShipmentValueMarketDetailDto[];
+  /** 选中单个市场时的完整汇总（含逐商品明细，可打开原票）。 */
+  selected: ShipmentMarketSummaryDto | null;
+  /** 未关联明细 itemId → 可选商品建议（无建议时不出现该 key）。 */
+  suggestions: Record<string, ShipmentAssociationSuggestionDto[]>;
 }

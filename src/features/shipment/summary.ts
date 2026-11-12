@@ -13,6 +13,7 @@
 
 import { formatMoney, multiplyMoneyByQuantity, parseMoney } from '@/features/catalog/local-display/decimal';
 import type {
+  ShipmentAssociationSuggestionDto,
   ShipmentAssociationStatus,
   ShipmentDetailItemDto,
   ShipmentLinkedProductDto,
@@ -24,9 +25,12 @@ import type {
   ShipmentSummaryItemDto,
   ShipmentSummaryProductDto,
   ShipmentTicketValueDto,
+  ShipmentValueMarketDetailDto,
   ShipmentValueMarketRowDto,
   ShipmentValueOverviewDto,
+  ShipmentValueProductRowDto,
 } from './types';
+import { normalizeProductName } from './server/parse';
 
 /** 028 返回的一条当前明细（已归一化）。 */
 export interface ShipmentMarketSummarySourceItem {
@@ -117,6 +121,7 @@ function summaryItem(
       ticketNo: item.ticketNo,
       purchaseOrder: item.purchaseOrder,
       waybillsText: item.waybillsText,
+      market: item.market,
       productNameRaw: item.productNameRaw,
       product: card,
       shippedQuantity: item.shippedQuantity,
@@ -369,6 +374,169 @@ export function buildShipmentValueOverview(
       priceMissingItemCount: row.priceMissingItemCount,
     })),
   };
+}
+
+function compareValueRows(
+  a: { scaled: bigint | null; market: string | null },
+  b: { scaled: bigint | null; market: string | null },
+): number {
+  if (a.scaled !== null && b.scaled !== null && a.scaled !== b.scaled) return a.scaled > b.scaled ? -1 : 1;
+  if (a.scaled === null && b.scaled !== null) return 1;
+  if (a.scaled !== null && b.scaled === null) return -1;
+  return (a.market ?? '未提供').localeCompare(b.market ?? '未提供', 'zh-Hans-CN');
+}
+
+/** 市场分组键：来源未提供国家用 '__unknown__' 哨兵（与页面市场筛选一致）。 */
+export function shipmentMarketGroupKey(item: Pick<ShipmentMarketSummarySourceItem, 'market'>): string {
+  return item.market === null ? '__unknown__' : item.market;
+}
+
+interface MarketSourceGroup {
+  market: string | null;
+  unknownMarket: boolean;
+  ticketCount: number;
+  items: ShipmentMarketSummarySourceItem[];
+}
+
+function groupSourceByMarket(source: ShipmentMarketSummarySource): Map<string, MarketSourceGroup> {
+  const groups = new Map<string, MarketSourceGroup>();
+  for (const item of source.items) {
+    const key = shipmentMarketGroupKey(item);
+    let group = groups.get(key);
+    if (!group) {
+      group = { market: item.market === null ? null : item.market, unknownMarket: item.market === null, ticketCount: 0, items: [] };
+      groups.set(key, group);
+    }
+    group.items.push(item);
+  }
+  return groups;
+}
+
+function ticketCountOf(items: readonly ShipmentMarketSummarySourceItem[]): number {
+  return new Set(items.map((item) => item.shipmentId)).size;
+}
+
+function toValueProductRow(product: ShipmentSummaryProductDto): ShipmentValueProductRowDto {
+  return {
+    productId: product.productId,
+    iceCode: product.iceCode,
+    nameCn: product.nameCn,
+    specificationText: product.specificationText,
+    unitText: product.unitText,
+    unitCost: product.unitCost,
+    remainingQuantity: product.remainingQuantity,
+    itemCount: product.itemCount,
+    ticketCount: product.ticketCount,
+    valueCny: product.valueCny,
+    quantityPendingCount: product.quantityPendingCount,
+    reviewPendingCount: product.reviewPendingCount,
+    unpricedItemCount: product.unpricedItemCount,
+  };
+}
+
+/**
+ * 货值汇总「按市场就地展开」的数据：与 buildShipmentValueOverview 同源同口径，
+ * 每个市场额外返回商品构成（聚合，不带逐条明细）和未计入明细（可打开原票/现场关联）。
+ * 排序与「全部市场」表一致（能算出的货值大在前，其次市场名），页面可按顺序一一对应。
+ */
+export function buildShipmentValueMarketDetails(
+  source: ShipmentMarketSummarySource,
+  cards: ReadonlyMap<string, ShipmentLinkedProductDto>,
+): ShipmentValueMarketDetailDto[] {
+  const rows = [...groupSourceByMarket(source).values()].map((group) => {
+    const summary = buildShipmentMarketSummary({
+      market: group.market,
+      unknownMarket: group.unknownMarket,
+      latestReadAt: source.latestReadAt,
+      snapshotId: source.snapshotId,
+      ticketCount: ticketCountOf(group.items),
+      itemCount: group.items.length,
+      items: group.items,
+    }, cards);
+    return {
+      scaled: summary.totalValueCny === null ? null : parseMoney(summary.totalValueCny),
+      detail: {
+        market: summary.market,
+        unknownMarket: summary.unknownMarket,
+        ticketCount: summary.ticketCount,
+        itemCount: summary.itemCount,
+        totalValueCny: summary.totalValueCny,
+        pricedItemCount: summary.pricedItemCount,
+        excludedItemCount: summary.excludedItemCount,
+        products: summary.products.map(toValueProductRow),
+        excludedItems: summary.excludedItems,
+      } satisfies ShipmentValueMarketDetailDto,
+    };
+  });
+  rows.sort((a, b) => compareValueRows(
+    { scaled: a.scaled, market: a.detail.market },
+    { scaled: b.scaled, market: b.detail.market },
+  ));
+  return rows.map((row) => row.detail);
+}
+
+/**
+ * 单个市场的完整汇总（含逐商品明细，可打开原票）：从同一份「全部市场」028 结果里切出该市场，
+ * 口径与 getShipmentMarketSummary(market) 完全一致；未知市场用 '__unknown__'。
+ */
+export function buildShipmentMarketSummaryFor(
+  source: ShipmentMarketSummarySource,
+  cards: ReadonlyMap<string, ShipmentLinkedProductDto>,
+  marketToken: string,
+): ShipmentMarketSummaryDto {
+  const unknown = marketToken === '__unknown__';
+  const items = source.items.filter((item) => (unknown ? item.market === null : item.market === marketToken));
+  return buildShipmentMarketSummary({
+    market: unknown ? null : marketToken,
+    unknownMarket: unknown,
+    latestReadAt: source.latestReadAt,
+    snapshotId: source.snapshotId,
+    ticketCount: ticketCountOf(items),
+    itemCount: items.length,
+    items,
+  }, cards);
+}
+
+/**
+ * 未关联明细的可选商品建议（不新增 SQL、不读对应表）：
+ * 从同一份当前明细里找「同市场 + 同规范化品名」的其它明细已经关联的商品，按出现次数、
+ * 货号排序，最多 3 个；来源市场为空的明细不参与（人工对应映射要求市场非空）。
+ *
+ * 说明：`catalog.shipment_product_mapping` 里历史确认过、但当前明细里已不存在的对应，
+ * 应用角色没有该表读取权限（027 明确 REVOKE），因此本轮只能给「当前明细里可见」的建议；
+ * 需要读对应表时要另加只读 RPC（本轮禁止改 SQL，已在 impl 文档登记）。
+ */
+export function buildShipmentAssociationSuggestions(
+  source: ShipmentMarketSummarySource,
+  cards: ReadonlyMap<string, ShipmentLinkedProductDto>,
+): Record<string, ShipmentAssociationSuggestionDto[]> {
+  const peers = new Map<string, Map<string, number>>();
+  for (const item of source.items) {
+    const market = item.market === null || item.market.trim() === '' ? null : item.market;
+    if (item.productId === null || market === null) continue;
+    const key = `${market}\u0000${normalizeProductName(item.productNameRaw)}`;
+    const bucket = peers.get(key) ?? new Map<string, number>();
+    bucket.set(item.productId, (bucket.get(item.productId) ?? 0) + 1);
+    peers.set(key, bucket);
+  }
+  const suggestions: Record<string, ShipmentAssociationSuggestionDto[]> = {};
+  for (const item of source.items) {
+    if (item.productId !== null) continue;
+    const market = item.market === null || item.market.trim() === '' ? null : item.market;
+    if (market === null) continue;
+    const bucket = peers.get(`${market}\u0000${normalizeProductName(item.productNameRaw)}`);
+    if (!bucket) continue;
+    const rows = [...bucket.entries()]
+      .map(([productId, count]): ShipmentAssociationSuggestionDto => {
+        const card = cards.get(productId) ?? null;
+        return { productId, iceCode: card?.iceCode ?? null, nameCn: card?.nameCn ?? null, count };
+      })
+      .sort((a, b) => b.count - a.count
+        || (a.iceCode ?? '').localeCompare(b.iceCode ?? '', 'zh-Hans-CN')
+        || a.productId.localeCompare(b.productId));
+    if (rows.length > 0) suggestions[item.itemId] = rows.slice(0, 3);
+  }
+  return suggestions;
 }
 
 /**

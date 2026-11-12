@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { ReadFailurePanel } from '@/features/inventory/components/display';
 import { SyncView } from '@/features/inventory/components/sync-view';
-import { ShipmentSourceNotes, ShipmentSyncSource } from '@/features/shipment/components/shipment-sync-source';
+import { ShipmentSyncSource } from '@/features/shipment/components/shipment-sync-source';
 import { getShipmentGroupingReviews, getShipmentSourceStatus } from '@/features/shipment/server/reads';
 import {
   classifyReadFailure,
@@ -10,21 +10,22 @@ import {
 } from '@/features/inventory/model';
 import {
   getInventorySyncOverview,
-  getInventorySyncRun,
   getInventoryWarehouseStates,
   requireInventoryAdmin,
 } from '@/features/inventory/server/reads';
 import { getInventoryDomesticSnapshot } from '@/features/inventory/server/domestic-reads';
+import { ProductLibraryUpdate } from '@/features/catalog/components/product-library-update';
+import { getProductSourcePanel } from '@/features/catalog/product-source/service';
+import type { ProductSourcePanelDto } from '@/features/catalog/product-source/panel-types';
 import type {
   InventoryDomesticSnapshotDto,
   InventoryOverviewDto,
-  InventoryRunDetailDto,
   InventoryWarehouseReadStateV2Dto,
 } from '@/features/inventory/types';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-export const metadata: Metadata = { title: '数据同步 · BigSeller' };
+export const metadata: Metadata = { title: '数据同步' };
 
 /** 服务端 searchParams（可能为数组）→ URLSearchParams。 */
 function toUrlSearchParams(sp: Record<string, string | string[] | undefined>): URLSearchParams {
@@ -96,22 +97,24 @@ export default async function SyncPage({
     ? domesticSettled.value
     : null;
 
-  // 只有显式 ?run= 才读取历史任务详情；日常首屏不额外读任务详情。
-  let runDetail: InventoryRunDetailDto | null = null;
-  let runError: string | null = null;
-  if (query.run) {
-    try {
-      runDetail = await getInventorySyncRun(identity, query.run);
-    } catch (error) {
-      const notFound = /INVENTORY_RUN_NOT_FOUND/.test(errorMessageOf(error));
-      if (!notFound) {
-        runError = classifyReadFailure(error) === 'forbidden' ? '当前账号无权读取该任务' : '网络或后台异常';
-      }
-    }
-  }
-
+  // 只有显式 ?run= 时保留参数兼容，但首页不再渲染任务历史/逐仓诊断。
   const shipmentStatus = shipmentSourceSettled.ok ? shipmentSourceSettled.value : null;
   const shipmentError = shipmentSourceSettled.ok ? null : shipmentSourceSettled.error;
+
+  // 飞书商品资料来源（日常入口）：读取状态/计划/待应用结果 + 复用现有面板与动作。
+  // 读取失败只降级这一块，不影响库存同步与物流在途来源；不显示 0、不伪造空批次。
+  let productSourceDto: ProductSourcePanelDto | null = null;
+  let productSourceReason: 'forbidden' | 'read_failed' = 'read_failed';
+  try {
+    productSourceDto = await getProductSourcePanel();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    productSourceReason = /无权|权限|停用|登录|FORBIDDEN|DENIED|42501/i.test(message) ? 'forbidden' : 'read_failed';
+  }
+
+  // 本轮：四张来源卡不再承载「待处理」入口，卡片只保留来源状态与来源操作；
+  // 待处理统一在各自业务页（商品库存 / 物流在途 / 商品库）里处理，避免同一事项两套入口。
+  const shipmentReviews = shipmentReviewsSettled.ok ? shipmentReviewsSettled.value : null;
 
   return (
     <SyncView
@@ -119,19 +122,23 @@ export default async function SyncPage({
       query={query}
       warehouseStates={warehouseStates}
       warehouseStatesError={warehouseStatesError}
-      runDetail={runDetail}
-      runError={runError}
       domesticSnapshot={domesticSnapshot}
       viewer={{ actorId: identity.profileUserId, accountId: overview.account.accountId ?? '' }}
       shipmentCard={(
         <ShipmentSyncSource
           status={shipmentStatus}
           error={shipmentError}
-          reviews={shipmentReviewsSettled.ok ? shipmentReviewsSettled.value : null}
+          reviews={shipmentReviews}
           reviewsError={shipmentReviewsSettled.ok ? null : shipmentReviewsSettled.error}
         />
       )}
-      sourceNotes={<ShipmentSourceNotes status={shipmentStatus} error={shipmentError} />}
+      productLibraryCard={(
+        <ProductLibraryUpdate
+          dto={productSourceDto}
+          fallbackReason={productSourceReason}
+          initialPanel={sp.panel === 'product-update'}
+        />
+      )}
     />
   );
 }

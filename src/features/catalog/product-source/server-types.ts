@@ -5,6 +5,7 @@
  * 页面 DTO 由 service.ts 生成（中文、无 UUID/JSON）。
  */
 import type { FieldObservation } from '../types';
+import type { SourceCell } from './contract';
 
 export type SourceOrigin = 'real_capture' | 'local_simulation';
 export type ApplyAction = 'update' | 'create' | 'unchanged' | 'needs_review' | 'failed';
@@ -35,6 +36,8 @@ export interface SourceBatchRowInput {
   iceCode: string | null;
   /** 列字母 → 原文。公共行的受限价格列已按表头映射剔除，只进入受控表。 */
   cells: Record<string, string>;
+  /** 规范化后的非受限字段（人工核对/同号选择用）。 */
+  fields?: Record<string, unknown>;
   rowSha256: string;
 }
 
@@ -109,6 +112,8 @@ export interface SourcePlanResult {
   nextFields: Record<string, FieldObservation> | null;
   nameCn: string | null;
   createCode: string | null;
+  /** 回执结果中该商品实际写入后的修订号；needs_review 且已部分写入时也非 null。 */
+  itemRevision?: number | null;
   issues: SourceIssueInput[];
   missing: boolean;
 }
@@ -145,8 +150,74 @@ export interface SourceIssueRecord {
   nameCn: string | null;
   kind: string;
   detail: Record<string, unknown>;
-  reviewState: 'open' | 'resolved' | 'ignored';
+  reviewState: 'open' | 'resolved' | 'ignored' | 'superseded';
+  scope: 'batch' | 'item';
+  itemId: string | null;
+  itemRevision: number | null;
   rows: number[];
+}
+
+/** 036 只读投影：当前生效（state='active'）的字段级人工决定。 */
+export interface SourceFieldDecisionRecord {
+  decisionId: string;
+  itemId: string;
+  iceCode: string | null;
+  nameCn: string | null;
+  fieldKey: string;
+  action: 'defer' | 'override' | 'interpret';
+  /** Only for action=interpret: the registered source-column interpretation rule. */
+  rule: string | null;
+  valueRaw: string | null;
+  reason: string;
+  note: string | null;
+  state: string;
+  decidedAt: string;
+}
+
+/** 036 只读投影：当前生效（state='active'）的同号多行人工选择。 */
+export interface SourceDuplicateDecisionRecord {
+  decisionId: string;
+  iceCode: string;
+  itemId: string | null;
+  nameCn: string | null;
+  chosenRowNumber: number | null;
+  /** 选择当时该来源行的业务字段（fieldKey → SourceCell），只用于页面展示已选内容。 */
+  chosenFields: Record<string, SourceCell>;
+  comparison: Record<string, unknown>;
+  state: string;
+  decidedAt: string;
+  note: string | null;
+}
+
+export interface SourceManualDecisionsRaw {
+  fieldDecisions: SourceFieldDecisionRecord[];
+  duplicateDecisions: SourceDuplicateDecisionRecord[];
+}
+
+/**
+ * 人工决定动作的服务端上下文：只用于校验事项/来源行并按内容指纹落库，
+ * 不进入页面 DTO（UUID/哈希不得上屏）。
+ */
+export interface SourceIssueRowContext {
+  rowNumber: number;
+  rowSha256: string | null;
+  /** 批次落库的公共列（限制价格列已剔除）。 */
+  cells: Record<string, string>;
+  fields: Record<string, SourceCell>;
+}
+
+export interface SourceIssueDecisionContext {
+  issueId: string;
+  batchId: string;
+  snapshotKey: string;
+  sourceKey: string;
+  issueKind: string;
+  itemId: string | null;
+  detail: Record<string, unknown>;
+  reviewState: 'open' | 'resolved' | 'ignored' | 'superseded';
+  /** 批次采集信息（含 headers；历史批次 rows.fields 为空时据此重建行字段）。 */
+  collection: Record<string, unknown>;
+  rows: SourceIssueRowContext[];
 }
 
 export interface SourceOverviewRaw {

@@ -1,14 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import surface from '@/ui/ice-v4/data-surface.module.css';
+import syncStyles from '@/features/inventory/components/sync-view.module.css';
+import { useDialogFocusTrap } from '@/features/catalog/components/use-dialog-focus-trap';
+import { lockPageScroll } from '@/ui/ice-v4/scroll-lock';
 import styles from './shipment.module.css';
 import {
   resolveShipmentGroupingReview,
   restoreShipmentGroupingJudgement,
 } from '../server/actions';
+import {
+  GROUPING_DECISION_LABELS,
+  buildLocalOverride,
+  decisionSavedText,
+  groupingOverrideTitle,
+  groupingReviewSummary,
+  mergeActiveOverrides,
+} from '../grouping-review-summary';
 import type {
   ShipmentGroupingActiveOverrideDto,
   ShipmentGroupingDecision,
@@ -19,10 +31,6 @@ import type {
 
 function kindText(kind: 'split' | 'merge'): string {
   return kind === 'split' ? '疑似拆票' : '疑似合票';
-}
-
-function kindHint(kind: 'split' | 'merge'): string {
-  return kind === 'split' ? '上次一票，本次分成两票' : '上次两票，本次合成一票';
 }
 
 /**
@@ -65,54 +73,131 @@ function TicketCard({ side }: { side: ShipmentGroupingReviewTicketSide }) {
 }
 
 /**
- * 工具栏「待复核」入口 + 本页弹窗（第十三轮）。
+ * 「待复核」入口 + 复核弹窗（同步卡 / 物流在途页共用同一组件）。
  *
- * - 待确认数量只算 pending 拆合票事项；没有待办时按钮仍可打开，查看/恢复已有人工决定；
- * - 弹窗并排显示上次与本次的单号、商品、数量，四个结论与「恢复按飞书判断」都在弹窗内；
- * - 弹窗只是本页浮层，不写 URL：关闭后市场、筛选、页码和列表位置保持原样。
+ * - count = 同步卡信息栏里的「N 项」；toolbar = 物流在途页工具栏按钮（兼容保留）；
+ *   custom = 由调用方用 render prop 提供入口（例如统一「待处理」按钮），
+ *   组件仍负责弹窗与数据，trigger 收到的 openModal 就是打开同一个整页居中弹窗。
+ * - 弹窗相对整个浏览器视口居中，遮罩覆盖整页，标题与关闭按钮固定，正文独立滚动；
+ * - 每条先用一句话说明市场、采购单/运单、上次/本次票数，下面并排显示两侧单号、商品、数量；
+ * - 保存「仍然分开 / 仍是一票」（会写人工覆盖）后，立即在同一弹窗的「已有人工决定」区
+ *   加入该行，可直接点「恢复按飞书判断」；保存/恢复后都刷新待复核数量与已有人工决定；
+ * - 保存后说明实际采用的结论（不写死票数）；若决定已保存但货票分组更新失败，两个结果都写清楚；
+ * - 关闭不写 URL，恢复打开前的滚动位置并把焦点还给入口。
  */
 export function ShipmentGroupingReviewEntry({
   reviews,
   error,
+  variant = 'toolbar',
+  trigger,
 }: {
   reviews: ShipmentGroupingReviewsDto | null;
   error: string | null;
+  variant?: 'count' | 'toolbar' | 'custom';
+  /** variant='custom' 时的入口渲染器：openModal 打开同一个复核弹窗，pendingCount 为待复核数。 */
+  trigger?: (openModal: () => void, pendingCount: number) => ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [actionError, setActionError] = useState('');
+  const [notice, setNotice] = useState<{ text: string; tone: 'ok' | 'warn' } | null>(null);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+  /** 本次会话刚保存、尚未随服务端 props 刷新回来的「已有人工决定」行。 */
+  const [localOverrides, setLocalOverrides] = useState<ShipmentGroupingActiveOverrideDto[]>([]);
+  /** 已「恢复按飞书判断」的 reviewId：立即隐藏对应行，不用等刷新。 */
+  const [restoredIds, setRestoredIds] = useState<string[]>([]);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
-  const pending = reviews?.pending ?? [];
-  const overrides = reviews?.activeOverrides ?? [];
+  const scrollRef = useRef(0);
+  const pending = (reviews?.pending ?? []).filter((review) => !savedIds.includes(review.id));
+  // 服务端 props 的 activeOverrides 与本地新增行按 reviewId 去重；已恢复的立即隐藏。
+  const overrides = mergeActiveOverrides(reviews?.activeOverrides ?? [], localOverrides, restoredIds);
+  const localReviewIds = new Set(localOverrides.map((override) => override.reviewId));
+
+  useDialogFocusTrap(open, '#shipment-review-dialog');
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setActionError('');
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    // 打开瞬间记录滚动位置与真正聚焦的入口（custom 入口拿不到 ref，用 activeElement 兜底）。
+    scrollRef.current = window.scrollY;
+    const triggerElement = triggerRef.current
+      ?? (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null);
     closeRef.current?.focus();
-    const previousOverflow = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
+    // 共享滚动锁：补滚动条宽度、支持与详情抽屉嵌套；释放时回到打开前位置。
+    const releaseScrollLock = lockPageScroll();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      setOpen(false);
+      close();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      document.documentElement.style.overflow = previousOverflow;
+      releaseScrollLock();
+      const top = scrollRef.current;
+      requestAnimationFrame(() => {
+        window.scrollTo({ top, left: window.scrollX, behavior: 'auto' });
+        triggerElement?.focus({ preventScroll: true });
+      });
     };
-  }, [open]);
+  }, [open, close]);
+
+  function openModal() {
+    setActionError('');
+    setNotice(null);
+    setOpen(true);
+  }
+
+  /** 保存「仍然分开 / 仍是一票」后立即生成人工决定行；接受飞书原分组返回 null。 */
+  function rememberOverride(review: ShipmentGroupingReviewDto, decision: ShipmentGroupingDecision) {
+    const row = buildLocalOverride(review, decision, new Date());
+    if (!row) return;
+    setLocalOverrides((current) => [row, ...current.filter((override) => override.reviewId !== row.reviewId)]);
+  }
+
+  /** 恢复成功后：本地行立即移除，服务端行按 reviewId 立即隐藏。 */
+  function forgetOverride(reviewId: string) {
+    setLocalOverrides((current) => current.filter((override) => override.reviewId !== reviewId));
+    setRestoredIds((current) => (current.includes(reviewId) ? current : [...current, reviewId]));
+  }
 
   async function decide(review: ShipmentGroupingReviewDto, decision: ShipmentGroupingDecision) {
-    if (busyId) return;
+    if (busyId || savedIds.includes(review.id)) return;
     setBusyId(review.id);
     setActionError('');
+    setNotice(null);
     try {
       const result = await resolveShipmentGroupingReview({ reviewId: review.id, decision });
+      const actual = result.decision ?? decision;
       if (!result.ok) {
+        if (result.errorCode === 'SHIPMENT_GROUPING_REINGEST_FAILED') {
+          // 决定已写入，只是货票分组重新入库失败：两个结果都说明，避免用户重复确认。
+          setSavedIds((current) => [...current, review.id]);
+          rememberOverride(review, actual);
+          setNotice({
+            tone: 'warn',
+            text: `${decisionSavedText(actual)}；但货票分组更新失败：${result.errorMessage ?? '原因未返回'}。待复核数量已刷新；请不要重复确认，可稍后刷新来源或重试。`,
+          });
+          router.refresh();
+          return;
+        }
         setActionError(result.errorMessage ?? '保存失败，请刷新后重试');
         return;
       }
+      setSavedIds((current) => [...current, review.id]);
+      rememberOverride(review, actual);
+      setNotice({
+        tone: 'ok',
+        text: `${decisionSavedText(actual)}；待复核数量已刷新。`,
+      });
       router.refresh();
     } catch {
       setActionError('保存失败：网络或传输异常');
@@ -122,15 +207,29 @@ export function ShipmentGroupingReviewEntry({
   }
 
   async function restore(reviewId: string) {
+    // 恢复不能被 savedIds 阻挡：刚保存的决定行要能当场撤销。
     if (busyId) return;
     setBusyId(reviewId);
     setActionError('');
+    setNotice(null);
     try {
       const result = await restoreShipmentGroupingJudgement(reviewId, null);
       if (!result.ok) {
+        if (result.errorCode === 'SHIPMENT_GROUPING_REINGEST_FAILED') {
+          // 覆盖已停用，只是分组重新入库失败：行照常移除，两个结果都说明。
+          forgetOverride(reviewId);
+          setNotice({
+            tone: 'warn',
+            text: `已恢复按飞书判断；但货票分组更新失败：${result.errorMessage ?? '原因未返回'}。待复核数量已刷新；请不要重复确认，可稍后刷新来源或重试。`,
+          });
+          router.refresh();
+          return;
+        }
         setActionError(result.errorMessage ?? '恢复失败');
         return;
       }
+      forgetOverride(reviewId);
+      setNotice({ tone: 'ok', text: '已恢复按飞书判断；待复核数量已刷新。' });
       router.refresh();
     } catch {
       setActionError('恢复失败：网络或传输异常');
@@ -139,29 +238,46 @@ export function ShipmentGroupingReviewEntry({
     }
   }
 
+  const entry = variant === 'custom' && trigger ? trigger(openModal, pending.length) : variant === 'count' ? (
+    <button
+      type="button"
+      ref={triggerRef}
+      className={syncStyles.factButton}
+      onClick={openModal}
+      data-testid="shipment-review-open"
+      aria-haspopup="dialog"
+      title="打开物流在途待复核"
+    >
+      {reviews ? `${pending.length} 项` : '—'}
+    </button>
+  ) : (
+    <button
+      type="button"
+      ref={triggerRef}
+      className={surface.button}
+      onClick={openModal}
+      data-testid="shipment-review-open"
+      aria-haspopup="dialog"
+    >
+      待复核
+      <span className={styles.reviewCountText} data-testid="shipment-review-count">{pending.length} 项</span>
+    </button>
+  );
+
   return (
     <>
-      <button
-        type="button"
-        className={surface.button}
-        onClick={() => setOpen(true)}
-        data-testid="shipment-review-open"
-        aria-haspopup="dialog"
-      >
-        待复核
-        {pending.length > 0 ? (
-          <span className={styles.reviewCountBadge} data-testid="shipment-review-count">{pending.length}</span>
-        ) : null}
-      </button>
+      {entry}
 
-      {open ? (
+      {open && typeof document !== 'undefined' ? createPortal((
         <div
           className={styles.reviewModalBackdrop}
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setOpen(false);
+            if (event.target === event.currentTarget) close();
           }}
+          data-testid="shipment-review-backdrop"
         >
           <section
+            id="shipment-review-dialog"
             className={styles.reviewModal}
             role="dialog"
             aria-modal="true"
@@ -170,14 +286,16 @@ export function ShipmentGroupingReviewEntry({
           >
             <header className={styles.reviewModalHead}>
               <div>
-                <h2 id="shipment-review-modal-title">拆票 / 合票复核</h2>
-                <p>{pending.length > 0 ? `待确认 ${pending.length} 项` : '没有待复核'}</p>
+                <h2 id="shipment-review-modal-title">物流在途待复核</h2>
+                <p data-testid="shipment-review-subtitle">
+                  {pending.length > 0 ? `待复核 ${pending.length} 项 · 上次与本次对照` : '没有待复核'}
+                </p>
               </div>
               <button
                 type="button"
                 ref={closeRef}
                 className={styles.detailClose}
-                onClick={() => setOpen(false)}
+                onClick={close}
                 aria-label="关闭复核"
                 data-testid="shipment-review-close"
               >
@@ -185,116 +303,142 @@ export function ShipmentGroupingReviewEntry({
               </button>
             </header>
 
-            {error ? (
-              <p className={styles.inlineError} role="alert" data-testid="shipment-review-error">
-                待复核读取失败：{error}
-              </p>
-            ) : !reviews ? (
-              <p className={styles.detailEmpty}>读取中</p>
-            ) : (
-              <div className={styles.reviewModalBody}>
-                {actionError ? <p className={styles.inlineError} role="alert">{actionError}</p> : null}
-                {pending.length === 0 ? (
-                  <p className={styles.detailEmpty} data-testid="shipment-review-empty">没有待复核</p>
-                ) : pending.map((review) => {
-                  const decisions: Array<{ key: ShipmentGroupingDecision; label: string }> = review.kind === 'split'
-                    ? [{ key: 'keep_one', label: '仍是一票' }, { key: 'split_confirmed', label: '确实拆开' }]
-                    : [{ key: 'merge_confirmed', label: '确实合成一票' }, { key: 'keep_separate', label: '仍然分开' }];
-                  return (
-                    <article
-                      key={review.id}
-                      className={styles.reviewCard}
-                      data-testid="shipment-review-card"
-                      data-review-id={review.id}
-                      data-kind={review.kind}
-                    >
-                      <div className={styles.reviewCardHead}>
-                        <strong>{kindText(review.kind)}</strong>
-                        <span>{kindHint(review.kind)}</span>
-                        {review.createdAt ? (
-                          <span className={styles.reviewCardTime}>
-                            {review.createdAt.slice(0, 16).replace('T', ' ')}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className={styles.reviewGrid}>
-                        <div className={styles.reviewSide} data-testid="shipment-review-previous">
-                          <h3>上次怎么分</h3>
-                          {review.evidence.previous.tickets.map((ticket) => (
-                            <TicketCard key={ticket.ticketKey} side={ticket} />
-                          ))}
-                        </div>
-                        <div className={styles.reviewSide} data-testid="shipment-review-current">
-                          <h3>本次怎么分</h3>
-                          {review.evidence.current.tickets.map((ticket) => (
-                            <TicketCard key={ticket.ticketKey} side={ticket} />
-                          ))}
-                        </div>
-                      </div>
-                      <div className={styles.reviewActions}>
-                        {decisions.map((entry, index) => (
-                          <button
-                            key={entry.key}
-                            type="button"
-                            className={index === 0
-                              ? `${surface.button} ${surface.buttonSmall}`
-                              : `${surface.buttonGhost} ${surface.buttonSmall}`}
-                            onClick={() => void decide(review, entry.key)}
-                            disabled={busyId === review.id}
-                            data-testid={`shipment-review-decide-${entry.key}`}
-                          >
-                            {entry.label}
-                          </button>
-                        ))}
-                      </div>
-                    </article>
-                  );
-                })}
+            <div className={styles.reviewModalBody}>
+              {notice ? (
+                <p
+                  className={styles.reviewNotice}
+                  data-tone={notice.tone}
+                  role="status"
+                  data-testid="shipment-review-notice"
+                >
+                  {notice.tone === 'ok' ? <CheckCircle2 size={15} aria-hidden /> : <AlertTriangle size={15} aria-hidden />}
+                  <span>{notice.text}</span>
+                </p>
+              ) : null}
 
-                {overrides.length > 0 ? (
-                  <section className={styles.reviewOverrides} data-testid="shipment-review-overrides">
-                    <h3>已有人工决定</h3>
-                    {overrides.map((override) => {
-                      const decidedText = override.reviewKind === 'split' ? '按一票处理' : '按分开处理';
-                      return (
-                        <div
-                          key={override.id}
-                          className={styles.reviewOverrideRow}
-                          data-testid="shipment-review-override"
-                          data-market={override.market ?? ''}
-                          data-ticket-no={override.ticketNo ?? ''}
-                          data-waybills={override.waybillsText ?? ''}
-                        >
-                          <div className={styles.reviewOverrideInfo}>
-                            <strong>{decidedText}</strong>
-                            <span className={styles.reviewOverrideMeta} data-testid="shipment-review-override-ticket">
-                              {overrideTicketText(override)}
+              {actionError ? (
+                <p className={styles.inlineError} role="alert" data-testid="shipment-review-action-error">
+                  {actionError}
+                </p>
+              ) : null}
+
+              {error ? (
+                <p className={styles.inlineError} role="alert" data-testid="shipment-review-error">
+                  待复核读取失败：{error}
+                </p>
+              ) : !reviews ? (
+                <p className={styles.detailEmpty}>读取中</p>
+              ) : (
+                <>
+                  {pending.length === 0 ? (
+                    <p className={styles.detailEmpty} data-testid="shipment-review-empty">没有待复核</p>
+                  ) : pending.map((review) => {
+                    const summary = groupingReviewSummary(review);
+                    const decisions: Array<{ key: ShipmentGroupingDecision; label: string }> = review.kind === 'split'
+                      ? [{ key: 'keep_one', label: GROUPING_DECISION_LABELS.keep_one }, { key: 'split_confirmed', label: GROUPING_DECISION_LABELS.split_confirmed }]
+                      : [{ key: 'merge_confirmed', label: GROUPING_DECISION_LABELS.merge_confirmed }, { key: 'keep_separate', label: GROUPING_DECISION_LABELS.keep_separate }];
+                    return (
+                      <article
+                        key={review.id}
+                        className={styles.reviewCard}
+                        data-testid="shipment-review-card"
+                        data-review-id={review.id}
+                        data-kind={review.kind}
+                      >
+                        <div className={styles.reviewCardHead}>
+                          <strong>{kindText(review.kind)}</strong>
+                          {review.createdAt ? (
+                            <span className={styles.reviewCardTime}>
+                              {review.createdAt.slice(0, 16).replace('T', ' ')}
                             </span>
-                            {override.createdAt ? (
-                              <span className={styles.reviewOverrideTime}>
-                                {override.createdAt.slice(0, 16).replace('T', ' ')}
-                              </span>
-                            ) : null}
-                          </div>
-                          <button
-                            type="button"
-                            className={`${surface.buttonGhost} ${surface.buttonSmall}`}
-                            onClick={() => void restore(override.reviewId)}
-                            disabled={busyId === override.reviewId}
-                            data-testid="shipment-review-restore"
-                          >
-                            {busyId === override.reviewId ? '恢复中' : '恢复按飞书判断'}
-                          </button>
+                          ) : null}
                         </div>
-                      );
-                    })}
-                  </section>
-                ) : null}
-              </div>
-            )}
+                        <p className={styles.reviewSummary} data-testid="shipment-review-summary">
+                          {summary.text}
+                        </p>
+                        <div className={styles.reviewGrid}>
+                          <div className={styles.reviewSide} data-testid="shipment-review-previous">
+                            <h3>上次（{summary.previousCount} 票）</h3>
+                            {review.evidence.previous.tickets.map((ticket) => (
+                              <TicketCard key={ticket.ticketKey} side={ticket} />
+                            ))}
+                          </div>
+                          <div className={styles.reviewSide} data-testid="shipment-review-current">
+                            <h3>本次（{summary.currentCount} 票）</h3>
+                            {review.evidence.current.tickets.map((ticket) => (
+                              <TicketCard key={ticket.ticketKey} side={ticket} />
+                            ))}
+                          </div>
+                        </div>
+                        <div className={styles.reviewActions}>
+                          {decisions.map((entry, index) => (
+                            <button
+                              key={entry.key}
+                              type="button"
+                              className={index === 0
+                                ? `${surface.button} ${surface.buttonSmall}`
+                                : `${surface.buttonGhost} ${surface.buttonSmall}`}
+                              onClick={() => void decide(review, entry.key)}
+                              disabled={busyId === review.id || savedIds.includes(review.id)}
+                              data-testid={`shipment-review-decide-${entry.key}`}
+                            >
+                              {entry.label}
+                            </button>
+                          ))}
+                        </div>
+                      </article>
+                    );
+                  })}
+
+                  {overrides.length > 0 ? (
+                    <section className={styles.reviewOverrides} data-testid="shipment-review-overrides">
+                      <h3>已有人工决定</h3>
+                      {overrides.map((override) => {
+                        const isLocal = localReviewIds.has(override.reviewId) && !(reviews?.activeOverrides ?? [])
+                          .some((server) => server.reviewId === override.reviewId);
+                        return (
+                          <div
+                            key={override.id}
+                            className={styles.reviewOverrideRow}
+                            data-testid="shipment-review-override"
+                            data-review-id={override.reviewId}
+                            data-decision={override.decision ?? ''}
+                            data-source={isLocal ? 'local' : 'server'}
+                            data-market={override.market ?? ''}
+                            data-ticket-no={override.ticketNo ?? ''}
+                            data-waybills={override.waybillsText ?? ''}
+                          >
+                            <div className={styles.reviewOverrideInfo}>
+                              <strong>{groupingOverrideTitle(override)}</strong>
+                              <span className={styles.reviewOverrideMeta} data-testid="shipment-review-override-ticket">
+                                {overrideTicketText(override)}
+                              </span>
+                              {override.createdAt ? (
+                                <span className={styles.reviewOverrideTime}>
+                                  {override.createdAt.slice(0, 16).replace('T', ' ')}
+                                </span>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              className={`${surface.buttonGhost} ${surface.buttonSmall}`}
+                              onClick={() => void restore(override.reviewId)}
+                              disabled={busyId === override.reviewId}
+                              data-testid="shipment-review-restore"
+                            >
+                              {busyId === override.reviewId ? '恢复中' : '恢复按飞书判断'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </section>
+                  ) : null}
+                </>
+              )}
+            </div>
           </section>
         </div>
-      ) : null}
+      ), document.body) : null}
     </>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import type { CatalogListClientPayload } from '../local-display/list-client-types';
-import type { CatalogIssueToolbarModel } from '../issues/types';
+import type { CatalogPendingPreview } from '../issues/service';
 import type { CatalogDetailCacheContext } from './catalog-detail-cache';
 import { CatalogDetailDialog } from '../components/catalog-detail-dialog';
 import { CatalogProductsPage } from './catalog-products-page';
@@ -15,7 +15,8 @@ export function CatalogShell({
   auxiliaryErrors,
   initialUrl,
   cacheContext,
-  issues = null,
+  pendingPreview = null,
+  autoOpenPending = false,
 }: {
   payload: CatalogListClientPayload | null;
   displayStatus: 'loaded' | 'not_imported' | 'read_failed' | 'forbidden';
@@ -24,8 +25,10 @@ export function CatalogShell({
   auxiliaryErrors: string[];
   initialUrl: CatalogUrlState;
   cacheContext: CatalogDetailCacheContext;
-  /** 只读待处理索引的工具栏投影；null 表示未接线/不可用，列表只显示安静入口。 */
-  issues?: CatalogIssueToolbarModel;
+  /** 待处理索引的只读投影（弹窗内容）；null = 未接线/不可用，入口显示读取失败。 */
+  pendingPreview?: CatalogPendingPreview | null;
+  /** /dashboard/catalog?pending=open：首屏自动打开待处理弹窗一次（不新增历史记录）。 */
+  autoOpenPending?: boolean;
 }) {
   const url = useCatalogUrlState(initialUrl);
   return (
@@ -37,7 +40,8 @@ export function CatalogShell({
         itemCount={itemCount}
         auxiliaryErrors={auxiliaryErrors}
         url={url}
-        issues={issues}
+        issuesPreview={pendingPreview}
+        autoOpenPending={autoOpenPending}
       />
       <CatalogDetailDialog payload={payload} url={url} cacheContext={cacheContext} />
     </>

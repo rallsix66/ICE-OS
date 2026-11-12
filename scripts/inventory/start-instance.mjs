@@ -43,6 +43,15 @@ steps.push(step('web', 'scripts/inventory/start-web.mjs', {
 steps.push(step('worker', 'scripts/inventory/start-worker.mjs'));
 // 货票在途定时读取（Node，受限 sync 运行身份）：与库存 worker 并列，互不接管。
 steps.push(step('shipment-auto-reader', 'scripts/shipment/start-worker.mjs'));
+// 飞书商品来源只读定时读取（Node，只写快照与状态，不连库、不应用批次）。
+steps.push(step('product-source-reader', 'scripts/catalog/feishu-source/start-worker.mjs', {
+  ...(process.env.PRODUCT_SOURCE_LARK_CLI_RUNNER
+    ? { PRODUCT_SOURCE_LARK_CLI_RUNNER: process.env.PRODUCT_SOURCE_LARK_CLI_RUNNER }
+    : {}),
+  ...(process.env.PRODUCT_SOURCE_READER_INTERVAL_MINUTES
+    ? { PRODUCT_SOURCE_READER_INTERVAL_MINUTES: process.env.PRODUCT_SOURCE_READER_INTERVAL_MINUTES }
+    : {}),
+}));
 console.log(`--- status: scripts/inventory/status.mjs (exit code is informational; see summary)`);
 const status = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/inventory/status.mjs'), '--run-id', args.runId], {
   cwd: REPO_ROOT,
@@ -53,5 +62,5 @@ const status = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/invent
 });
 if (status.stdout) process.stdout.write(status.stdout);
 if (status.stderr) process.stderr.write(status.stderr);
-console.log(`started order: postgres -> web(${inventoryEnv.webPort}) -> worker -> status; status exit=${status.status}`);
+console.log(`started order: postgres -> web(${inventoryEnv.webPort}) -> worker -> shipment-auto-reader -> product-source-reader -> status; status exit=${status.status}`);
 process.exitCode = status.status === 0 ? 0 : 1;

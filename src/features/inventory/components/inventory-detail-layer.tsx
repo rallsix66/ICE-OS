@@ -18,6 +18,7 @@ import type {
 import type { InventoryDetailTarget } from './detail-context';
 import { InventoryDetailContext } from './detail-context';
 import { InventoryDetailPanel } from './inventory-detail-panel';
+import { lockPageScroll } from '@/ui/ice-v4/scroll-lock';
 
 function initialTargetOf(
   query: InventoryQueryState,
@@ -182,7 +183,7 @@ export function InventoryDetailLayer({
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  // Esc 关闭 + 打开时锁背景滚动。
+  // Esc 关闭 + 打开时锁背景滚动（统一 lockPageScroll：补滚动条宽度，关闭后回原滚动位置）。
   useEffect(() => {
     if (!target) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -192,11 +193,10 @@ export function InventoryDetailLayer({
       }
     };
     window.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
+    const releaseScroll = lockPageScroll();
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      document.documentElement.style.overflow = previousOverflow;
+      releaseScroll();
     };
   }, [target, close]);
 

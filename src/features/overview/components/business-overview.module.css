@@ -37,6 +37,12 @@
   text-decoration: none;
 }
 
+/* 页头只保留「查看商品库存」次要入口：统一成工具栏控件高度。 */
+.headActionTall {
+  height: var(--ice-ui-control);
+  font-size: 13px;
+}
+
 .timeBar {
   display: flex;
   flex-wrap: wrap;
@@ -64,7 +70,7 @@
 
 .statStrip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -103,12 +109,6 @@
   color: #8a94a1;
   font-size: 11px;
   font-weight: 500;
-}
-
-.statMeta {
-  color: #98a2b2;
-  font-size: 11px;
-  line-height: 1.5;
 }
 
 .stages {
@@ -247,22 +247,6 @@
   line-height: 1.6;
 }
 
-.stageNote {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: -2px 0 0;
-  color: #7a8493;
-  font-size: 11px;
-  line-height: 1.7;
-}
-
-.stageNote svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: #b0b8c6;
-}
-
 .twoColumns {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
@@ -298,23 +282,6 @@
   margin: 2px 0 0;
   color: #98a2b2;
   font-size: 11px;
-}
-
-.panelHint {
-  color: #98a2b2;
-  font-size: 11px;
-}
-
-.badge {
-  display: inline-flex;
-  height: 22px;
-  align-items: center;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: #fdf6e8;
-  color: #8a5a12;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .panelFoot {
@@ -423,9 +390,10 @@
 }
 
 .pendingItem {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 10px;
   padding: 9px 0;
   border-bottom: 1px solid #f2f4f7;
 }
@@ -445,7 +413,6 @@
 
 .pendingInfo {
   min-width: 0;
-  flex: 1;
 }
 
 .pendingInfo h3 {
@@ -463,21 +430,76 @@
   line-height: 1.6;
 }
 
-.pendingGo {
-  display: inline-flex;
+.missingCostList {
+  grid-column: 1 / -1;
+  margin: 4px 0 0 17px;
+  padding: 8px 10px;
+  border: 1px solid #f0ecdf;
+  border-radius: 8px;
+  background: #fffdf7;
+}
+
+.missingCostList ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.missingCostList li {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 3px;
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: #4057c0;
+  gap: 6px 10px;
+}
+
+.missingCostName {
+  min-width: 0;
+  flex: 1 1 200px;
+  color: #344154;
   font-size: 11.5px;
-  font-weight: 550;
-  text-decoration: none;
+}
+
+.missingCostQty {
+  margin-left: auto;
+  color: #6b7789;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.pendingGo:hover {
-  text-decoration: underline;
+#home-pending {
+  scroll-margin-top: 16px;
+}
+
+.pendingTags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.pendingCategory {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #f2f4f8;
+  color: #6b7789;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.pendingCount {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #f6ece8;
+  color: #9c5a42;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
 }
 
 .valuation {
@@ -567,6 +589,19 @@
   border-top: 1px solid #f0f2f5;
   color: #98a2b2;
   font-size: 11px;
+}
+
+/* 首页底部唯一的估值说明入口：文字链接，不是按钮。 */
+.valuationLink {
+  justify-self: start;
+  color: #4057c0;
+  font-size: 11.5px;
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.valuationLink:hover {
+  text-decoration: underline;
 }
 
 .searchRow {
@@ -724,13 +759,6 @@
 
 .pageDisabled {
   color: #b6bdc9;
-}
-
-.footerNote {
-  margin: 0;
-  color: #a0a8b5;
-  font-size: 11px;
-  line-height: 1.7;
 }
 
 .srOnly {

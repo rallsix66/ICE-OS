@@ -67,7 +67,7 @@ export function ProductDetail({ data, productId, role, showAmounts: amountOverri
             </div>
             <dl className={styles.identityGrid}>
               <div><dt>公司货号</dt><dd>{product.code}</dd></div>
-              <div><dt>69编码（字符串）</dt><dd className={styles.codeCell}>{product.barcode}</dd></div>
+              <div><dt>商品条码</dt><dd className={styles.codeCell}>{product.barcode}</dd></div>
               <div><dt>外贸中文名称</dt><dd>{product.foreignName}</dd></div>
               <div><dt>外贸英文名称</dt><dd>{product.englishName}</dd></div>
               <div><dt>规格 / 单位</dt><dd>{product.specification} / {product.unit}</dd></div>

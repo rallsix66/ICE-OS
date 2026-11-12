@@ -1,5 +1,9 @@
 # 飞书商品来源接入 v1（本地模拟读取 + 统一处理链）
 
+> 2026-11-10 更新：真实飞书读取 + 只读定时读取 + 商品资料采用已实现并在本机现役实例实测，
+> 见 [飞书商品资料真实持续更新 v1](../tasks/feishu-product-source-real-v1.md)。本文以下内容是
+> 2026-10-25 的本地模拟接入历史记录，处理链与字段规则仍有效；“不接真实飞书 API”的状态已被新任务更新。
+
 状态：`FS_CATALOG_SIM_LOCAL_PASS`（主审独立验收通过 2026-10-25；三项定向补修见 §4A；收尾摘要见 [feishu-product-source-v1-closeout.md](./feishu-product-source-v1-closeout.md)）。本包只在独立本地实例内演练，不接真实飞书 API、不写回飞书原表、不修改现役 126 商品与 BS 530 行。**通过范围仅限本地模拟接入**，不代表真实 API 接通、生产启用、旧 UI/性能延期项或整个 ICEOS 全面通过。
 
 ## 1. 来源与真实快照
@@ -83,6 +87,12 @@
 | 恢复链 | 已知部分失败只补做父批次 failed sourceKey，新批次 `retry_of_batch_id` 关联父批次，成功商品不再进入计划；提交结果未知时用提交前保存的原 requestId + intent + 完整载荷重提，返回原回执，不因重新生成计划报冲突。页面动作返回结构化 `outcomeUnknown`（仅未知提交，不与确定失败混同），组件保留原 requestId/操作信息并锁住新操作，核对成功后再解除 | 并发失败 1 项 + 成功项批次 partial；UI“补做失败商品”生成 retry 批次，仅含 `code:LS101501`，失败项修订恢复、成功项 `LS101274` revision 不变；原请求 draft 重放回执与首次一致；重建计划的新 intent 被 `CATALOG_REQUEST_CONFLICT` 拒绝（证明必须用保留的原意图）；浏览器响应丢失演练中原请求保留、按钮禁用、核对沿用同一 requestId 取得原回执后恢复 |
 | 金额隔离 | 公共来源行按 `collection.headers` 表头文字定位价格列并剔除，不依赖固定 I/J/Y；私有金额改语义键 `costPrice/operatingPrice/shippingPrice`，列重排后仍按表头对应 | 原列序：公共行 28 列、无 I/J/Y 价格键、无来自受限列的意外值（6 处同一行其他列数值与价格数字巧合，已核对同列来源一致）、私有 130 行金额与来源映射 0 差异；列重排（价格列 L/M/N、I/J/Y 普通文本）：公共行无价格、I/J/Y 普通值保留 100 行、私有 403 行语义金额 0 差异；`overview`/`itemState`/回执无价格值或语义金额键 |
 
+## 4B. 2026-11-10 补修（037：按来源列解释 / 名称空格关系）
+
+- **按来源列解释只对登记的商品+字段生效，不是全局规则**。`product_source_field_decision` 支持 `action='interpret'` + `rule`；LS101501 登记：`unitWeight=unit_weight_per_unit_fragment`（O 列 `0.05/件`，忽略同格 `24.45/箱`）、`cartonWeight=confirmed_source_value`（T 列 24.15，确认单位）。来源值变化时按普通三方差异识别（同值不新增修订、本地人工修改仍按原冲突规则），不写死固定值。
+- **名称仅空格不同只提示人工确认关系，不自动建档/绑定**：`normalizeIdentityName` 去空白后比较；WM0131 来源名与现有无货号商品命中时进入 `needs_review / MISSING_CODE_CANDIDATE`，预览与待核对卡片提示人工确认，确认后才经 `assign_product_source_code` 补号（保留原 UUID/历史/在途），并关闭 batch 级候选事项。
+- 12:10 含工厂 `#REF!` 的快照仍未采用；上述解释/关系提示均可在无写入的只读预览中看到。
+
 ## 5. 隔离实例与复现
 
 修复轮独立实例：`run-20261025T053500Z-f5a00007`（独立 PostgreSQL 实例/数据库端口 59883；预览 3022；BUILD 与构建源哈希以 `<run>/instance/preview-build-ready.json` 和 `repair-20261025/guards.json` 为准，构建源哈希与当前仓库一致、drift=false），不触碰现役 3011 预览与其数据库。
@@ -120,7 +130,7 @@ $env:CATALOG_PREVIEW_PORT='3022'; node scripts/catalog/start-local-preview.mjs -
 - 未开通飞书 API，未验证真实 API 的权限、分页、限流、token；本轮“真实快照”为匿名只读网页复制。
 - spreadsheet_token / sheet_id 来自用户确认，未由 API 独立复核。
 - 图片列在文本剪贴板中没有内容，图片内容与对象存储未核验。
-- 外箱尺寸/重量/体积单位未在来源表头明确，按“保留原值＋待确认、永不自动采用（含本地为空/新品）”处理，未做换算。
+- 外箱尺寸/重量/体积单位未在来源表头明确，按“保留原值＋待确认、永不自动采用（含本地为空/新品）”处理，未做换算；唯一例外是商品+字段级登记的“按来源列解释”口径（见 §4B），不推广到其他商品/字段。
 - 真实 200% 缩放、浏览器兼容矩阵未做；本地模拟变化不是飞书侧真实修改。
 - 价格为原表序与一次合成列重排两种验证；合成价格只用于隔离测试，未使用真实价格做展示。
 - 本包不开发库存同步、物流、估值、费用分摊，不改变现役 126 商品与 BS/JST 对应。
