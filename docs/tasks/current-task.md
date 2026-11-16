@@ -6,7 +6,18 @@
 > 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 > 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 
-## 当前任务：海外库存历史快照查询（2026-11-16）—— 已完成（独立差异复核 PASS、阻断 0）
+## 当前任务：操作记录 v1（2026-11-16）—— 执行方自验完成，待独立复核
+
+状态：**执行方自验完成，未宣布 PASS**（最终结论由审查方给出）。仅限现役实例 `run-20261026T211500Z-11a22b33`（3011/59345）；最终 BUILD **`dO1NCoaNmTLVIYJJM-s0S`**（源码快照 `0f9a0adbc02a5ab8…`）。合同与执行记录：[operations-log-v1.md](operations-log-v1.md)；证据 `.local/catalog/operations-log-20261116/`（`verify.json`、截图、`apply-042*.json`）。
+
+- **一、入口**：一级导航新增「操作记录」→ `/dashboard/operations`（`workspace-shell.tsx`、`navigation-config.ts` 同步登记）。列表按时间倒序、50 条/页，默认显示 时间 / 记录账号 / 业务对象 / 动作 / 结果；展开显示已保存依据（批次回执与逐字段前后值、换绑原商品→现商品、人工修正前后状态与数量、分合票决定与票面）。
+- **二、三类记录**：商品资料 147（来源采用 3 条按批次、补货号 3、来源行选择 4（均已撤销）、字段人工口径 9、历史修订/首版 128）；库存对应 100（确认 90、换绑 5、国内复核 5；重核/停用/原 SKU 替换本机 0 条、路径已覆盖）；物流 113（人工关联 90、清除关联 15、人工修正 3、恢复按原表 2、分合票决定 3；撤销分组本机 0 条）。
+- **三、只读查询**：`db/catalog/042_operation_records.sql` 只新增 `catalog.read_operation_records(text,uuid,timestamptz,timestamptz,text,int,int)`；`apply-042` rollback **28/28**、commit **28/28**；标准准备链（`prepare-instance.mjs` / `prepare-local-preview.mjs`）已接入。
+- **四、口径与未保存**：来源采用一条批次结果，批内商品修订只在展开里；物流同一次保存合并一条。历史未保存的：重核/停用/撤销分组无记录、字段覆盖前本地值、首版前值、分组具体操作人、inventory_audit 理由/请求号、物流关联请求号；页面显示「未保存/未提供」，记录账号不等于具体操作人。
+- **五、验证**：现役页面 **26/26**（三类样例与数据库逐字段核对、类别/账号/日期/关键词/分页/越界、无结果、日期反向、读取失败与恢复、商品/货票/批次入口返回保留筛选与页码、console 0）；总数 360 与独立重算一致；定向单测 **48/48**；`npm test` **942/943**（唯一既有 opt6 换行基线）；`tsc` 仅既有 BEST 5、改动文件 eslint 0、`git diff --check` 0。
+- **六、边界**：现役零业务写入；未启动后台 worker；未改飞书与各模块写入链；未提交/推送/部署；README 的 BUILD 行带本包之外的 Mac 部署准备改动，按要求保留未提交。
+
+## 上一任务：海外库存历史快照查询（2026-11-16）—— 已完成（独立差异复核 PASS、阻断 0）
 
 状态：**已完成（2026-11-16 收口）、独立差异复核 PASS、阻断 0**（PASS 由独立复核给出，执行方不自行宣布；最终报告 [independent-review-r3.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review-r3.md)）。仅限现役实例 `run-20261026T211500Z-11a22b33`（3011/59345）；最终 BUILD **`S1prE-Z5-Gb9BRJNwaKIT`**（源码快照 `f19186de20ab2a3f…`）。合同与执行记录：[inventory-snapshot-v1.md](inventory-snapshot-v1.md)；首轮/二轮复核报告 [independent-review.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review.md)（首轮）与 [independent-review-r2.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review-r2.md)（二轮）；证据 `.local/catalog/inventory-snapshot-20261116/`。
 

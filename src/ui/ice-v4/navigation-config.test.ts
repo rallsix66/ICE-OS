@@ -23,12 +23,13 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
   const sourcesSrc = fs.readFileSync(SOURCES_PAGE, 'utf8');
   const intakeSrc = fs.readFileSync(INTAKE_PAGE, 'utf8');
 
-  it('一级常驻导航保留五个业务入口（含经营总览与物流在途）', () => {
+  it('一级常驻导航保留六个业务入口（含物流在途与操作记录）', () => {
     expect(ICE_V4_ACTIVE_NAV_HREFS).toEqual([
       '/dashboard',
       '/dashboard/catalog',
       '/dashboard/inventory',
       '/dashboard/in-transit',
+      '/dashboard/operations',
       '/dashboard/sync',
     ]);
     for (const href of ICE_V4_ACTIVE_NAV_HREFS) {
