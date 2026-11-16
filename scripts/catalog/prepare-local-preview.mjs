@@ -16,9 +16,28 @@ const LOCAL_SQL = [
   'db/catalog/015_product_source_sync.sql',
   'db/catalog/036_product_source_review_flow.sql',
   'db/catalog/037_product_source_interpretation.sql',
-  'db/catalog/038_shipment_association_history.sql',
-  'db/catalog/039_shipment_association_rule_preview.sql',
-  'db/catalog/040_shipment_association_rule_impact.sql',
+];
+
+// 依赖 016-035 的表/函数的目录 SQL（先物流在途、再历史快照）。catalog-only 预览还没有这些表时跳过，
+// 由 prepare-instance 在 016-035 之后按顺序安装；已含表的实例重跑预览会就地补齐，避免版本分叉。
+// 顺序不能提前：038-040 的 DECLARE 直接引用 catalog.shipment_item，041 引用 inventory_batch。
+const DEPENDENT_SQL = [
+  {
+    path: 'db/catalog/038_shipment_association_history.sql',
+    requires: ['catalog.shipment_item', 'catalog.shipment_source_snapshot'],
+  },
+  {
+    path: 'db/catalog/039_shipment_association_rule_preview.sql',
+    requires: ['catalog.shipment_item'],
+  },
+  {
+    path: 'db/catalog/040_shipment_association_rule_impact.sql',
+    requires: ['catalog.shipment_item'],
+  },
+  {
+    path: 'db/catalog/041_inventory_snapshot_reads.sql',
+    requires: ['catalog.inventory_batch', 'catalog.inventory_batch_row'],
+  },
 ];
 
 async function applyCatalogSql(run) {
@@ -28,6 +47,7 @@ async function applyCatalogSql(run) {
   const owner = new pg.Client({ connectionString: ownerUrl });
   await owner.connect();
   const applied = [];
+  const skipped = [];
   try {
     for (const relative of LOCAL_SQL) {
       const file = path.join(REPO_ROOT, relative);
@@ -36,10 +56,25 @@ async function applyCatalogSql(run) {
       await owner.query('RESET ROLE; RESET ALL');
       applied.push({ path: relative, sha256: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') });
     }
+    for (const entry of DEPENDENT_SQL) {
+      const missing = [];
+      for (const table of entry.requires) {
+        const present = (await owner.query('SELECT to_regclass($1) IS NOT NULL AS present', [table])).rows[0]?.present === true;
+        if (!present) missing.push(table);
+      }
+      if (missing.length > 0) {
+        skipped.push({ path: entry.path, missing, reason: 'required tables are created later by prepare-instance (016-035)' });
+        continue;
+      }
+      const file = path.join(REPO_ROOT, entry.path);
+      await owner.query(fs.readFileSync(file, 'utf8'));
+      await owner.query('RESET ROLE; RESET ALL');
+      applied.push({ path: entry.path, sha256: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') });
+    }
   } finally {
     await owner.end();
   }
-  return applied;
+  return { applied, skipped };
 }
 
 export async function prepareLocalPreview(argv = process.argv.slice(2)) {
@@ -47,7 +82,8 @@ export async function prepareLocalPreview(argv = process.argv.slice(2)) {
   const evidenceDir = newEvidence(args.root, 'prepare-local-preview');
   runCommand(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/prepare.mjs'), '--run-id', args.runId], { env: safeEnv(), evidenceDir, name: 'catalog-base-prepare' });
   const run = openRun(args);
-  const applied = await applyCatalogSql(run);
+  const sqlResult = await applyCatalogSql(run);
+  const applied = sqlResult.applied;
   const instance = JSON.parse(fs.readFileSync(path.join(run.instanceRoot, 'catalog-instance.json'), 'utf8'));
   const ownerUrl = `postgres://${instance.bootstrapUser}:${instance.bootstrapPassword}@${instance.host}:${instance.port}/${instance.dbName}`;
   const { default: pg } = await import('pg');
@@ -59,7 +95,11 @@ export async function prepareLocalPreview(argv = process.argv.slice(2)) {
   } finally {
     await owner.end();
   }
-  writeJson(path.join(evidenceDir, 'local-display-sql.json'), { applied, runId: args.runId });
+  writeJson(path.join(evidenceDir, 'local-display-sql.json'), {
+    applied: sqlResult.applied,
+    skipped: sqlResult.skipped,
+    runId: args.runId,
+  });
   const env = safeEnv({
     ...run.env,
     CATALOG_RUN_ROOT: run.root,

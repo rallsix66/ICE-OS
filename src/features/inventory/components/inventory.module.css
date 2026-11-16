@@ -1967,3 +1967,243 @@
   background: #f4faf7;
   color: #2f6b4f;
 }
+
+/* ------------------------------------------------------------------ *
+ * 海外库存历史快照（041 只读）
+ * 左侧已发布批次列表（时间倒序）+ 右侧单批明细；与库存页共用面板/表格/分页语言。
+ * ------------------------------------------------------------------ */
+
+.snapshotWrap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.snapshotLayout {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 0;
+}
+
+.snapshotBatchPanel,
+.snapshotDetailPanel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.snapshotBatchPanel {
+  display: flex;
+  flex-direction: column;
+}
+
+.snapshotDetailPanel {
+  display: flex;
+  flex-direction: column;
+}
+
+.snapshotDetailPanel .snapshotSummary,
+.snapshotDetailPanel .pagerBar,
+.snapshotDetailPanel > .inlineError {
+  flex: none;
+}
+
+.snapshotDetailPanel .tableScroll {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 120px;
+}
+
+.snapshotBatchPanel .panelBar strong {
+  color: #344154;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.snapshotBatchList {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 4px;
+  max-height: none;
+  min-height: 0;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+}
+
+.snapshotBatchItem {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  transition: background 150ms var(--ice-ui-ease-out), border-color 150ms var(--ice-ui-ease-out);
+}
+
+.snapshotBatchItem:hover {
+  background: #f7f9fc;
+}
+
+.snapshotBatchItem:focus-visible {
+  outline: 2px solid var(--ice-ui-accent-strong);
+  outline-offset: 1px;
+}
+
+.snapshotBatchItem strong {
+  color: #344154;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshotBatchItem small {
+  color: #8d98a8;
+  font-size: 11.5px;
+}
+
+.snapshotBatchItemActive,
+.snapshotBatchItemActive:hover {
+  border-color: var(--ice-ui-line);
+  background: #fff;
+  box-shadow: inset 3px 0 0 var(--ice-ui-accent-strong);
+}
+
+.snapshotNote {
+  margin: 0;
+  padding: 0 14px 12px;
+  color: #8d98a8;
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.snapshotBatchPanel > .snapshotNote {
+  flex: none;
+  padding: 0 14px 8px;
+}
+
+.snapshotNote a {
+  margin-left: 4px;
+  color: var(--ice-ui-accent-strong);
+}
+
+/* 批次列表分页：固定在批次面板底部，列表本身滚动。 */
+.snapshotBatchFooter {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid var(--ice-ui-line);
+  color: #8d98a8;
+  font-size: 11.5px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshotBatchPager {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.snapshotBatchPage {
+  color: #344154;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshotEmpty {
+  padding: 8px 14px 16px;
+}
+
+.snapshotSummary {
+  border-bottom: 1px solid var(--ice-ui-line);
+  background: #fbfcfe;
+}
+
+.snapshotSummary dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.snapshotSummary dt {
+  color: #8d98a8;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.snapshotSummary dd {
+  margin: 2px 0 0;
+  color: #233044;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.snapshotSummary dd small {
+  display: block;
+  margin-top: 2px;
+  color: #8d98a8;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.snapshotTable {
+  min-width: 820px;
+}
+
+.snapshotTable td:not(:nth-child(2)) {
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  /* 窄屏快照按内容自然增长：批次列表在上、明细在下，避免固定视口把表格压到几行。 */
+  .pageSnapshot {
+    height: auto;
+    min-height: 0;
+  }
+
+  .snapshotLayout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .snapshotBatchPanel {
+    height: auto;
+  }
+
+  .snapshotBatchList {
+    max-height: 260px;
+  }
+
+  .snapshotDetailPanel {
+    height: auto;
+  }
+
+  .snapshotDetailPanel .tableScroll {
+    max-height: min(60vh, 620px);
+  }
+}
+
+@media (max-width: 760px) {
+  .snapshotSummary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

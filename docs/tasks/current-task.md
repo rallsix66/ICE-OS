@@ -6,7 +6,17 @@
 > 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 > 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 
-## 当前任务：飞书工厂资料修好提示 + 物流按所选商品预告（2026-11-12 第四轮）—— 已完成（独立差异复核 PASS、阻断 0）
+## 当前任务：海外库存历史快照查询（2026-11-16）—— 已完成（独立差异复核 PASS、阻断 0）
+
+状态：**已完成（2026-11-16 收口）、独立差异复核 PASS、阻断 0**（PASS 由独立复核给出，执行方不自行宣布；最终报告 [independent-review-r3.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review-r3.md)）。仅限现役实例 `run-20261026T211500Z-11a22b33`（3011/59345）；最终 BUILD **`S1prE-Z5-Gb9BRJNwaKIT`**（源码快照 `f19186de20ab2a3f…`）。合同与执行记录：[inventory-snapshot-v1.md](inventory-snapshot-v1.md)；首轮/二轮复核报告 [independent-review.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review.md)（首轮）与 [independent-review-r2.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review-r2.md)（二轮）；证据 `.local/catalog/inventory-snapshot-20261116/`。
+
+- **一、B1 分页状态（本轮唯一改动）**：`snapBPage` 改为 **0 = 未指定**（按所选批次所在页自动定位）、**≥1 = 明确停留该页**；明确页（含第 1 页）才写 URL，未指定不写。第 61 批直链自动到 2/4，点「更新批次」回到 1/4 且详情仍是第 61 批。新增 `snapshotViewedBatchId()`：列表翻页/明细分页/搜索都带「服务端实际读取的 batchId」（URL `snapBatch` 只作回退），默认最新时翻列表不再把右侧换成该页第一批；只有点批次或切仓才换选择。未指定批次时详情始终最新，切仓链接由新仓自动定位。
+- **二、复核验证**：独立复核在 3011 自写探针实点，7 项集中检查全部通过、console/pageerror 0：第 61 批直链 2/4→「更新批次」回 1/4 且详情仍是该批；默认最新翻到 2/4 再回 1/4 详情不变，链接补齐真实 batchId；第 2 页点第 62 批才换详情且 `snapQ` 保留；明细分页沿用当前批次；返回库存保留 q/warehouse/source/view。执行方自验分页状态 **10/10** + 上一轮 B1 直接链接/坏批次/切仓 **11/11**、单测 **15/15**；`tsc` 仅既有 BEST 5、改动文件 eslint 0、`git diff --check` 0。B2、210 批场景、布局与 26 项真实使用链证据沿用。
+- **三、前两轮已修复内容**：B1 完整历史可达（50 条/页、超 200 可选择、明确批次独立读取并核对所属仓、坏批次不显示其他数量）；B2 041 接入标准准备链（`prepare-instance.mjs` 016–035 后安装 038–041，`prepare-local-preview.mjs` 依赖表未建记录 skipped）并修正 038–040 早于 026 的顺序缺口；041 两个只读函数 rollback **28/28**、commit **27/27**。
+- **四、真实例子**：仓库 DEE-龙仔厝（ICE专属）`4d6821a7-...` 共 186 批；第 61 批 `8fea3893…`（2026-11-10 04:22）搜索 `780103214237` 为 0/0/0、单位「未提供」；第 62 批 `4d742296…`（03:22）点击后才换详情；最新批 `13dd11d1…`（2026-11-12 16:22）搜索 `6974674957332` 为 139,887/723/139,164。
+- **五、边界**：现役零业务写入；未启动库存/物流/飞书后台 worker（最新批次停在 2026-11-12 16:22）；快照搜索只按来源 SKU；本包 Git 交付（分支/PR/合并）见最终交付记录。
+
+## 上一任务：飞书工厂资料修好提示 + 物流按所选商品预告（2026-11-12 第四轮）—— 已完成（独立差异复核 PASS、阻断 0）
 
 状态：**已完成（2026-11-12 收口）、独立差异复核 PASS、阻断 0**（PASS 只能由独立复核给出，执行方不自行宣布；报告 [independent-review.md](../../.local/catalog/ux-round-20261112b/reviewer/independent-review.md)，复核人自建独立克隆库 **21/21**）。执行方自验：现役 3011 只读 **8/8**、克隆库 **22/22**、`040` 应用回读 **17/17**。仅限现役实例 `run-20261026T211500Z-11a22b33`（3011/59345）；最终 BUILD **`9RzzfQJdK9-030EksOfPl`**（源码快照 `aef3e7f705463f7e…`）。合同与执行记录：[real-usage-round4-20261112.md](real-usage-round4-20261112.md)；证据 `.local/catalog/ux-round-20261112b/`。
 
