@@ -94,12 +94,15 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
     expect(intakeSrc).toContain('getCatalogItemLabel');
   });
 
-  it('待处理索引不是导航项，由列表工具栏进入', () => {
+  it('待处理完整页不是导航项，由列表工具栏/弹窗进入，且与弹窗同一份数据', () => {
     expect(CATALOG_ISSUES_HREF).toBe('/dashboard/catalog/issues');
     expect(fs.existsSync(ISSUES_PAGE)).toBe(true);
     expect(ICE_V4_ACTIVE_NAV_HREFS).not.toContain(CATALOG_ISSUES_HREF);
     expect(shellSrc).not.toContain(`href="${CATALOG_ISSUES_HREF}"`);
-    expect(fs.readFileSync(ISSUES_PAGE, 'utf8')).toContain('getCatalogIssueIndex');
+    // 旧索引入口已接到现有处理界面：不再渲染只读索引，而是与弹窗同一份可处理清单。
+    const issuesSrc = fs.readFileSync(ISSUES_PAGE, 'utf8');
+    expect(issuesSrc).toContain('getCatalogIssuePendingPreview');
+    expect(issuesSrc).not.toContain('buildCatalogIssueIndex');
   });
 
   it('workspace-shell 侧栏不含仍未开放的封存经营模块入口', () => {

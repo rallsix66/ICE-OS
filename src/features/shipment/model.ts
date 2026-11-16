@@ -14,6 +14,7 @@
  */
 
 import type {
+  ShipmentAssociationSavedPayloadDto,
   ShipmentDetailItemDto,
   ShipmentListCountsDto,
   ShipmentListRowDto,
@@ -773,10 +774,38 @@ export interface ShipmentQueryState {
   item: string;
   /** 打开拆票/合票复核面板（URL review=1）。 */
   review: boolean;
+  /** 货值汇总首次打开即展开「未计入」明细（URL excluded=open；经营总览直达用）。 */
+  excludedOpen: boolean;
 }
 
 export type ShipmentView = 'list' | 'value';
 
+/**
+ * 关联保存后的提示（货值汇总全市场/单市场、货票详情抽屉共用同一套文案）：
+ * - 清除：固定「已清除本条明细的商品关联。」；
+ * - 关联：先写清本条实际去向（已计入货值 / 仍缺进货价 / 数量待核 / 只刷新汇总），
+ *   再另起一句写清沿用规则是否保存、以及本次按已保存规则另外关联了几条（取数据库回执）。
+ * 结果由服务端保存后按同一口径回读；读不到时只说已刷新，不猜。
+ */
+export function associationSavedNotice(payload: ShipmentAssociationSavedPayloadDto): string {
+  if (payload.cleared) return '已清除本条明细的商品关联。';
+  const label = (payload.productLabel ?? '').trim();
+  const prefix = label !== '' ? `已关联「${label}」；` : '已关联商品；';
+  const outcome = payload.outcome;
+  const target = outcome?.state === 'counted'
+    ? '已计入货值。'
+    : outcome?.state === 'price_missing'
+      ? '仍缺进货价，暂未计入货值。'
+      : outcome?.state === 'quantity_pending'
+        ? '数量待核，暂未计入货值。'
+        : '货值汇总与未计入数量已刷新。';
+  const rule = payload.ruleRequested
+    ? payload.mappingSaved
+      ? `已保存「以后同市场同品名沿用」规则；本次按这条规则另外关联 ${payload.ruleAdoptedCount} 条。`
+      : `未保存沿用规则（${payload.mappingNote ?? '市场未提供'}）。`
+    : '只用于本票，未保存沿用规则。';
+  return `${prefix}${target}${rule}`;
+}
 export const DEFAULT_SHIPMENT_QUERY: ShipmentQueryState = {
   view: 'list',
   market: SHIPMENT_MARKET_ALL,
@@ -789,6 +818,7 @@ export const DEFAULT_SHIPMENT_QUERY: ShipmentQueryState = {
   ticket: '',
   item: '',
   review: false,
+  excludedOpen: false,
 };
 
 export function parseShipmentView(raw: string | null | undefined): ShipmentView {
@@ -814,6 +844,8 @@ export function parseShipmentSearchParams(params: URLSearchParams): ShipmentQuer
     ticket: isUuid(rawTicket) ? rawTicket : '',
     item: isUuid(rawItem) ? rawItem : '',
     review: ['1', 'true', 'yes'].includes((params.get('review') ?? '').trim().toLowerCase()),
+    // 经营总览「查看未计入货票」→ ?view=value&excluded=open：第一次打开就展开具体明细。
+    excludedOpen: ['open', '1', 'true'].includes((params.get('excluded') ?? '').trim().toLowerCase()),
   };
 }
 

@@ -1,0 +1,392 @@
+/* 商品库「待处理」弹窗内容样式（弹窗壳、遮罩与滚动由共用 PendingEntry 提供）。
+   沿用 ICE 商品库既有视觉：白底、浅灰边框、靛蓝主操作；商品名/货号/数字保持正文样式。 */
+
+.panelBody {
+  display: grid;
+  gap: 14px;
+  padding: 8px 20px 16px;
+}
+
+.intro {
+  margin: 0;
+  color: #6b7789;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.result {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid #c9e2d5;
+  border-left: 3px solid #3f8f68;
+  border-radius: 8px;
+  background: #eef8f2;
+  color: #267451;
+  font-size: 12.5px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  margin: 0;
+  padding: 18px 12px;
+  border: 1px dashed #d7dce5;
+  border-radius: 10px;
+  color: #4f5b6d;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid #e0e4ea;
+  border-radius: 11px;
+  background: #fff;
+  scroll-margin: 12px;
+}
+
+.card[data-pending-kind='duplicate_code_inconsistent'] {
+  border-color: #dbe3f0;
+}
+
+.card:focus-visible {
+  outline: 2px solid #5266d7;
+  outline-offset: 2px;
+}
+
+.identity {
+  margin: 0;
+  color: #273244;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.index {
+  color: #8d98a8;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.sep {
+  color: #a7aeb9;
+  font-weight: 400;
+}
+
+.question {
+  margin: 0;
+  color: #3c4859;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+.candidateCode {
+  margin: 0;
+  color: #3c4859;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.candidateCode strong {
+  color: #273244;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.interactive {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.option {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #dce1e8;
+  border-radius: 9px;
+  background: #fbfcfe;
+  color: #344154;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.6;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms var(--ice-ui-ease-out), background 150ms var(--ice-ui-ease-out);
+}
+
+.option:hover:not(:disabled) {
+  border-color: #b9c3d6;
+  background: #f6f8fc;
+}
+
+.option:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 1px;
+}
+
+.option:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.optionActive {
+  border-color: #5266d7;
+  background: #f2f4ff;
+  box-shadow: inset 0 0 0 1px #5266d7;
+}
+
+.optionHead {
+  color: #273244;
+  font-weight: 600;
+}
+
+.optionFields {
+  display: grid;
+  gap: 2px;
+}
+
+.optionField {
+  color: #5e6a7a;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #5266d7;
+  border-radius: 8px;
+  background: #5266d7;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms var(--ice-ui-ease-out), border-color 150ms var(--ice-ui-ease-out);
+}
+
+.primaryButton:hover:not(:disabled) {
+  border-color: #4458c2;
+  background: #4458c2;
+}
+
+.primaryButton:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+}
+
+.primaryButton:disabled {
+  border-color: #b9c3d6;
+  background: #b9c3d6;
+  cursor: not-allowed;
+}
+
+.secondaryLink {
+  color: #5266d7;
+  font-size: 12.5px;
+  line-height: 1.6;
+  text-decoration: none;
+}
+
+.secondaryLink:hover {
+  text-decoration: underline;
+}
+
+.secondaryLink:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.error {
+  margin: 0;
+  color: #8d3a35;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  margin: 0;
+  color: #8d98a8;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.readOnly {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.reason {
+  margin: 0;
+  color: #3c4859;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.differences {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 18px;
+  color: #5e6a7a;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+/* ---------- 飞书原表「生产工厂」公式错误（合并一条，可展开明细） ---------- */
+
+.formula {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.formulaDetails {
+  min-width: 0;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.formulaSummary {
+  padding: 8px 11px;
+  color: #5266d7;
+  font-size: 12.5px;
+  line-height: 1.6;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.formulaSummary:hover {
+  text-decoration: underline;
+}
+
+.formulaSummary:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.formulaTableWrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border-top: 1px solid #eef0f3;
+  -webkit-overflow-scrolling: touch;
+}
+
+.formulaTable {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  color: #3c4859;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.formulaTable th,
+.formulaTable td {
+  padding: 6px 10px;
+  border-right: 1px solid #f4f5f8;
+  border-bottom: 1px solid #f0f1f4;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.formulaTable thead th {
+  background: #f7f8fc;
+  color: #5e6a7a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.formulaTable tbody td:nth-child(1),
+.formulaTable tbody td:nth-child(3) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.formulaTable tbody td:last-child {
+  color: #8d3a35;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.formulaTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.formulaTable th:last-child,
+.formulaTable td:last-child {
+  border-right: 0;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 6px;
+  border-top: 1px solid #eef1f6;
+}
+
+.footerLink {
+  color: #5266d7;
+  font-size: 12.5px;
+  line-height: 1.6;
+  text-decoration: none;
+}
+
+.footerLink:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .panelBody {
+    padding: 6px 12px 12px;
+  }
+
+  .options {
+    grid-template-columns: 1fr;
+  }
+
+  .formulaTable {
+    min-width: 420px;
+  }
+}

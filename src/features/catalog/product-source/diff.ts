@@ -95,6 +95,12 @@ export interface FieldDiffInput {
   local: FieldObservation | undefined;
   /** Adoption row of this item+field, when one exists. */
   base: PlanAdoptionRow | undefined;
+  /**
+   * A human-confirmed unit/口径 for exactly this item+field (e.g. LS101501
+   * unitWeight read as 0.05 kg from the O column). Only then may an otherwise
+   * unconfirmed-unit field be adopted/written.
+   */
+  unitConfirmed?: boolean;
 }
 
 const UNIT_UNCONFIRMED_FIELD_KEYS: ReadonlySet<ProductSourceFieldKey> = new Set(
@@ -159,7 +165,7 @@ export function diffField(input: FieldDiffInput): FieldDiff {
   // - local == source → no-op, no issue, no adoption;
   // - local empty OR different (with non-empty source) → keep local, issue
   //   unit_unconfirmed; the source raw is retained in the issue detail.
-  if (isUnitUnconfirmedField(fieldKey)) {
+  if (isUnitUnconfirmedField(fieldKey) && !input.unitConfirmed) {
     if (sourceRaw === '' || (localRaw !== null && areSameFieldValue(fieldKey, localRaw, sourceRaw))) {
       return {
         ...baseResult,
@@ -275,6 +281,8 @@ export function diffItem(input: {
   localFields: Record<string, FieldObservation>;
   /** Adoption rows for this item only. */
   adoptions: readonly PlanAdoptionRow[];
+  /** Fields whose unit/口径 was explicitly confirmed by a human for this item. */
+  confirmedUnitFields?: ReadonlySet<AdoptableFieldKey>;
 }): ItemDiff {
   const adoptionByField = new Map<ProductSourceFieldKey, PlanAdoptionRow>();
   for (const adoption of input.adoptions) adoptionByField.set(adoption.fieldKey, adoption);
@@ -292,6 +300,7 @@ export function diffItem(input: {
         source,
         local: input.localFields[fieldKey],
         base: adoptionByField.get(fieldKey),
+        unitConfirmed: input.confirmedUnitFields?.has(fieldKey) === true,
       }),
     );
   }

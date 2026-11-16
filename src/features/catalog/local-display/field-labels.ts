@@ -20,7 +20,7 @@ export const CATALOG_FIELD_LABELS: Record<string, string> = {
   factory: '生产工厂',
   packaging: '包装（原字段，含义未定义）',
   cartonQuantity: '装箱数量',
-  barcode: '69编码（字符串）',
+  barcode: '商品条码',
   imageRef: '图片引用',
   vendorRecordId: '供应商记录编号',
   length: '单产品长（cm）',

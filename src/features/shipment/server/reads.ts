@@ -8,6 +8,7 @@ import type {
   ProductShipmentLinksDto,
   ProductShipmentTransitDto,
   ShipmentAutoReaderStatusDto,
+  ShipmentAssociationRulePreviewDto,
   ShipmentDetailDto,
   ShipmentGroupingContextDto,
   ShipmentGroupingReviewDto,
@@ -20,10 +21,13 @@ import type {
   ShipmentSourceStatusDto,
   ShipmentStatusClass,
   ShipmentValueOverviewDto,
+  ShipmentValuePageDto,
 } from '../types';
 import {
   mergeManualDetail,
   mergeManualListRows,
+  normalizeAssociationHistory,
+  normalizeAssociationRulePreview,
   normalizeAutoReaderStatus,
   normalizeDetail,
   normalizeGroupingContext,
@@ -39,12 +43,22 @@ import {
   normalizeProductTransit,
   normalizeSnapshotRaw,
   normalizeSourceStatus,
+  type ShipmentAssociationHistoryRow,
   type ShipmentManualIndex,
   type ShipmentSnapshotRawDto,
 } from './normalize';
 import { buildShipmentProductCard } from './product-card';
+import { normalizeProductName } from './parse';
 import type { ShipmentMarketSummarySource, ShipmentMarketSummarySourceItem } from '../summary';
-import { buildShipmentMarketSummary, buildShipmentTicketValue, buildShipmentValueOverview } from '../summary';
+import {
+  buildShipmentAssociationSuggestions,
+  buildShipmentMarketSummary,
+  buildShipmentMarketSummaryFor,
+  buildShipmentTicketValue,
+  buildShipmentValueMarketDetails,
+  buildShipmentValueOverview,
+} from '../summary';
+import type { ShipmentAssociationSuggestionDto } from '../types';
 import { buildProductTransit } from '../product-transit';
 
 /**
@@ -283,6 +297,120 @@ export async function getShipmentValueOverview(): Promise<ShipmentValueOverviewD
 }
 
 /**
+ * 货值汇总页（第十七轮）：一个 028「全部市场」读取 + 一份商品卡片，同时产出
+ * - 顶部「全部市场」汇总；
+ * - 每个市场的就地展开数据（商品构成 + 未计入明细，含原因/货票/商品）；
+ * - 选中单个市场时的完整汇总（含逐商品明细）；
+ * - 未关联明细的同市场同品名商品建议。
+ * 页面点市场不再跳转/整页刷新；展开与关联保存后由 router.refresh() 重取同一份数据。
+ */
+/**
+ * 未关联明细的建议 = 当前明细里同市场同品名已确认（既有） + **旧票上人工确认过**的商品（038）。
+ *
+ * 旧票建议带 `basis='manual'` 与旧票号/确认时间（来自 association_method='manual_selected'
+ * 的真实人工选择记录），因此页面能写「旧单 POKNZX027378 上人工确认过」而不只是次数。
+ * 同一商品合并为一条（旧票依据优先）；038 读取失败只降级建议，不影响货值汇总本身。
+ */
+async function buildValuePageSuggestions(
+  identity: DbIdentity,
+  source: ShipmentMarketSummarySource,
+  cards: ReadonlyMap<string, ShipmentLinkedProductDto>,
+): Promise<Record<string, ShipmentAssociationSuggestionDto[]>> {
+  const base = buildShipmentAssociationSuggestions(source, cards);
+  const unbound = source.items.filter((item) => (
+    item.productId === null && typeof item.market === 'string' && item.market.trim() !== ''
+  ));
+  if (unbound.length === 0) return base;
+  const pairs: Array<{ market: string; nameNorm: string }> = [];
+  const seenPairs = new Set<string>();
+  for (const item of unbound) {
+    const market = (item.market ?? '').trim();
+    const nameNorm = normalizeProductName(item.productNameRaw);
+    if (!market || !nameNorm) continue;
+    const key = `${market}\u0000${nameNorm}`;
+    if (seenPairs.has(key)) continue;
+    seenPairs.add(key);
+    pairs.push({ market, nameNorm });
+  }
+  if (pairs.length === 0) return base;
+  let history: ShipmentAssociationHistoryRow[] = [];
+  try {
+    const raw = await callReadRpc<unknown>(identity, 'catalog.read_shipment_association_history', [JSON.stringify(pairs)]);
+    history = normalizeAssociationHistory(raw);
+  } catch {
+    // 旧票人工记录读取失败：只丢这一层建议，页面仍可用当前明细建议与搜索。
+    return base;
+  }
+  if (history.length === 0) return base;
+  const historyByKey = new Map<string, ShipmentAssociationHistoryRow[]>();
+  for (const row of history) {
+    const key = `${row.market}\u0000${row.nameNorm}`;
+    const bucket = historyByKey.get(key) ?? [];
+    bucket.push(row);
+    historyByKey.set(key, bucket);
+  }
+  const merged: Record<string, ShipmentAssociationSuggestionDto[]> = { ...base };
+  for (const item of unbound) {
+    const market = (item.market ?? '').trim();
+    const rows = historyByKey.get(`${market}\u0000${normalizeProductName(item.productNameRaw)}`);
+    if (!rows || rows.length === 0) continue;
+    const combined = new Map<string, ShipmentAssociationSuggestionDto>();
+    for (const suggestion of merged[item.itemId] ?? []) {
+      combined.set(suggestion.productId, { ...suggestion, basis: suggestion.basis ?? 'current' });
+    }
+    for (const row of rows) {
+      const existing = combined.get(row.productId);
+      combined.set(row.productId, {
+        productId: row.productId,
+        iceCode: row.iceCode ?? existing?.iceCode ?? null,
+        nameCn: row.nameCn ?? existing?.nameCn ?? null,
+        count: Math.max(existing?.count ?? 0, row.confirmations),
+        basis: 'manual',
+        ticketNo: row.ticketNo,
+        recordedAt: row.recordedAt,
+      });
+    }
+    merged[item.itemId] = [...combined.values()]
+      .sort((left, right) => (
+        (right.basis === 'manual' ? 1 : 0) - (left.basis === 'manual' ? 1 : 0)
+        || right.count - left.count
+        || (left.iceCode ?? '').localeCompare(right.iceCode ?? '', 'zh-Hans-CN')
+      ))
+      .slice(0, 3);
+  }
+  return merged;
+}
+
+export async function getShipmentValuePage(selectedMarket: string): Promise<ShipmentValuePageDto> {
+  const identity = await requireShipmentAdmin();
+  const raw = await callReadRpc<unknown>(identity, 'catalog.read_shipment_market_summary', ['all']);
+  const source = normalizeMarketSummary(raw);
+  const cards = await loadSummaryCards(identity, source);
+  return {
+    overview: buildShipmentValueOverview(source, cards),
+    markets: buildShipmentValueMarketDetails(source, cards),
+    selected: selectedMarket === 'all' || selectedMarket.trim() === ''
+      ? null
+      : buildShipmentMarketSummaryFor(source, cards, selectedMarket),
+    suggestions: await buildValuePageSuggestions(identity, source, cards),
+  };
+}
+
+/**
+ * 货值汇总/未计入列表里现场关联商品时用：明细当前关联版本（乐观并发）。
+ * 只读 026 详情，找不到该明细返回 null（由动作返回结构化错误）。
+ */
+export async function getShipmentItemRevision(shipmentId: string, itemId: string): Promise<number | null> {
+  const identity = await requireShipmentAdmin();
+  const raw = await callReadRpc<unknown>(identity, 'catalog.read_shipment_detail', [shipmentId]);
+  const detail = normalizeDetail(raw);
+  if (!detail) return null;
+  // 只有当前明细可以关联（本次来源未见的历史明细不提供关联入口）。
+  const item = detail.items.find((row) => row.itemId === itemId) ?? null;
+  return item ? item.revision : null;
+}
+
+/**
  * 经营总览首页专用：同一份 028 当前明细一次组装「全市场商品汇总 + 市场货值汇总 + 原始明细」，
  * 供首页计算在途阶段数量/货值/市场分布；口径与在途页完全一致（同一 build* 函数、同一采用进货价）。
  * 只读，不新增 SQL、不触发来源读取。
@@ -347,6 +475,34 @@ export async function searchProductsForShipment(q: string, limit = 10): Promise<
     Math.max(1, Math.min(Math.trunc(limit) || 10, 20)),
   ]);
   return normalizeProductSearch(raw);
+}
+
+/**
+ * 040 只读：保存「以后同市场同品名也沿用」规则前的影响预告，按**当前所选商品**计算。
+ *
+ * 与 027 catalog.shipment_mapping_apply_core 同一命中条件，但：
+ * - 已关联到所选商品的其他明细不再改动，计 0 条；
+ * - 「将改关联」只统计会改成所选商品的明细。
+ * 只读；失败由调用方静默降级。
+ */
+export async function getShipmentAssociationRulePreview(
+  itemId: string,
+  productId: string,
+): Promise<ShipmentAssociationRulePreviewDto | null> {
+  const id = typeof itemId === 'string' ? itemId.trim() : '';
+  const product = typeof productId === 'string' ? productId.trim() : '';
+  if (!isUuid(id) || !isUuid(product)) return null;
+  const identity = await requireShipmentAdmin();
+  const raw = await callReadRpc<unknown>(
+    identity,
+    'catalog.read_shipment_association_rule_preview_for_product',
+    [id, product],
+  );
+  return normalizeAssociationRulePreview(raw);
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
 }
 
 /**

@@ -106,6 +106,32 @@ report.shipmentAutoReader = (() => {
   }
 })();
 
+// 飞书商品来源只读定时读取：独立进程、独立 marker、只写快照与状态；这里只嵌入摘要。
+report.productSourceReader = (() => {
+  const result = spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts/catalog/feishu-source/status.mjs'),
+    '--run-id', args.runId], {
+    cwd: REPO_ROOT,
+    env: safeEnv(),
+    encoding: 'utf8',
+    windowsHide: true,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  if (!result.stdout) {
+    return { ok: false, error: (result.stderr || '').trim().slice(0, 400) || 'no output' };
+  }
+  try {
+    const parsed = JSON.parse(result.stdout);
+    return {
+      ok: result.status === 0,
+      summary: parsed.summary ?? null,
+      readerProcess: parsed.readerProcess ?? null,
+      readerStatus: parsed.readerStatus ?? null,
+    };
+  } catch {
+    return { ok: false, error: 'product source status output is not valid JSON' };
+  }
+})();
+
 if (report.postgres.listening) {
   const { default: pg } = await import('pg');
   // Owner (bootstrap) connection: status is an operator view, the sync role may only call RPCs.
@@ -156,6 +182,10 @@ report.summary = {
   shipmentReaderOnline: report.shipmentAutoReader?.summary?.workerOnline === true,
   shipmentReaderEnabled: report.shipmentAutoReader?.summary?.enabled ?? null,
   shipmentReaderIntervalMinutes: report.shipmentAutoReader?.summary?.intervalMinutes ?? null,
+  productSourceReaderOwned: report.productSourceReader?.summary?.readerProcessOwned === true,
+  productSourceReaderLastResult: report.productSourceReader?.summary?.lastResult ?? null,
+  productSourceReaderBusinessRows: report.productSourceReader?.summary?.businessRows ?? null,
+  productSourceReaderNextRunAt: report.productSourceReader?.summary?.nextRunAt ?? null,
 };
 console.log(JSON.stringify(report, null, 2));
 process.exitCode = report.web.listening && report.postgres.listening && (workerProblem === null) ? 0 : 1;

@@ -14,22 +14,24 @@
 
 /* ---------- 来源卡片网格 ---------- */
 
-/* R15：三张卡 + 下方同步记录纵向排列；记录区不再占用卡片弹层。 */
+/* ---------- 来源卡片网格 ---------- */
+
 .syncRoot {
   display: grid;
   gap: 12px;
   min-width: 0;
 }
 
+/* 桌面 2×2 四张来源卡：海外库存 / 国内库存 / 物流在途 / 商品库更新。 */
 .sourceGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   gap: 12px;
   min-width: 0;
 }
 
-/* 桌面：BigSeller 左、聚水潭中、飞书物流在途右；详情/设置面板固定在卡片下方。 */
+/* 桌面：第一行海外库存、国内库存；第二行物流在途、商品库更新。 */
 .cardBigseller {
   grid-column: 1;
   grid-row: 1;
@@ -41,9 +43,14 @@
 }
 
 .cardFeishu {
-  grid-column: 3;
-  grid-row: 1;
+  grid-column: 1;
+  grid-row: 2;
   scroll-margin-top: 16px;
+}
+
+.cardProduct {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .sourceCard {
@@ -179,6 +186,40 @@
   outline-offset: 2px;
 }
 
+/* 待处理数量统一成可点击的「N 项」：四张卡用同一套下划线/悬停反馈。 */
+.factButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+  text-decoration-color: #c9d0e0;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.factButton:hover {
+  color: var(--ice-ui-accent-strong);
+  text-decoration-color: currentColor;
+}
+
+.factButton:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+}
+
+/* 信息栏里的补充事实（例如国内库存的原文件日期/条数），保持中性色。 */
+.factSub {
+  display: block;
+  margin-top: 2px;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
 .cardActions {
   display: flex;
   flex-wrap: wrap;
@@ -283,16 +324,25 @@
   min-height: 34px;
   align-items: center;
   justify-content: center;
-  padding: 7px 14px;
+  gap: 6px;
+  padding: 7px 13px;
   border: 1px solid var(--ice-ui-accent);
   border-radius: var(--ice-ui-radius-sm);
   background: var(--ice-ui-accent);
   color: #fff;
   font-size: 13px;
   font-weight: 550;
+  line-height: 1.2;
+  text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
   transition: border-color 150ms var(--ice-ui-ease-out), background 150ms var(--ice-ui-ease-out);
+}
+
+.primaryButton svg,
+.secondaryButton svg,
+.sourceLink svg {
+  flex: 0 0 auto;
 }
 
 .primaryButton:hover:not(:disabled) {
@@ -310,12 +360,15 @@
   min-height: 34px;
   align-items: center;
   justify-content: center;
-  padding: 7px 12px;
+  gap: 6px;
+  padding: 7px 13px;
   border: 1px solid var(--ice-ui-line);
   border-radius: var(--ice-ui-radius-sm);
   background: #fff;
   color: #4b5a70;
   font-size: 13px;
+  line-height: 1.2;
+  text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
   transition: border-color 150ms var(--ice-ui-ease-out), background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
@@ -336,12 +389,15 @@
   display: inline-flex;
   min-height: 34px;
   align-items: center;
-  padding: 7px 12px;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 13px;
   border: 1px solid var(--ice-ui-line);
   border-radius: var(--ice-ui-radius-sm);
   background: #fff;
   color: #4b5a70;
   font-size: 13px;
+  line-height: 1.2;
   text-decoration: none;
   white-space: nowrap;
   transition: border-color 150ms var(--ice-ui-ease-out), background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
@@ -842,17 +898,6 @@
   line-height: 1.7;
 }
 
-@media (max-width: 1100px) {
-  .sourceGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .cardFeishu {
-    grid-column: 1;
-    grid-row: 2;
-  }
-}
-
 /* ---------- 窄屏：卡片一列；抽屉在移动端全宽 ---------- */
 
 @media (max-width: 980px) {
@@ -874,8 +919,12 @@
     order: 3;
   }
 
-  .statusMessage {
+  .cardProduct {
     order: 4;
+  }
+
+  .statusMessage {
+    order: 5;
   }
 }
 

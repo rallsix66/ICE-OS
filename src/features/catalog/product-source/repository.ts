@@ -1,10 +1,14 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { withAppDb, type DbIdentity } from '@/lib/database/app-db';
+import { SOURCE_PROFILE_KEY, type SourceCell } from './contract';
 import type {
   ApplyReceipt,
   SourceBatchInput,
+  SourceIssueDecisionContext,
+  SourceIssueRowContext,
   SourceItemStateRaw,
+  SourceManualDecisionsRaw,
   SourceOverviewRaw,
   SourcePlanInput,
   SourceProfileInput,
@@ -85,7 +89,7 @@ export const productSourceRepository = {
     try {
       return await withAppDb(identity, async (client) => {
         const result = await client.query<{ result: ApplyReceipt }>(
-          'SELECT catalog.apply_product_source_batch($1,$2,$3::jsonb,$4::jsonb,$5::jsonb) AS result',
+          'SELECT catalog.apply_product_source_batch_v2($1,$2,$3::jsonb,$4::jsonb,$5::jsonb) AS result',
           [requestId, intent, JSON.stringify(profile), JSON.stringify(batch), JSON.stringify(plan)],
         );
         return result.rows[0]!.result;
@@ -136,6 +140,151 @@ export const productSourceRepository = {
       const result = await client.query<{ result: unknown }>(
         'SELECT catalog.assign_product_source_code($1,$2,$3,$4,$5,$6,$7) AS result',
         [requestId, intent, itemId, expectedRevision, code, reason, evidence],
+      );
+      return result.rows[0]!.result;
+    });
+  },
+  /** 036：当前生效的字段级决定 + 同号多行选择（只读）。 */
+  manualDecisions(identity: DbIdentity, profileKey: string): Promise<SourceManualDecisionsRaw> {
+    return withAppDb(identity, async (client) => {
+      const result = await client.query<{ result: SourceManualDecisionsRaw | null }>(
+        'SELECT catalog.read_product_source_manual_decisions($1) AS result',
+        [profileKey],
+      );
+      const value = result.rows[0]?.result;
+      return {
+        fieldDecisions: Array.isArray(value?.fieldDecisions) ? value.fieldDecisions : [],
+        duplicateDecisions: Array.isArray(value?.duplicateDecisions) ? value.duplicateDecisions : [],
+      };
+    });
+  },
+  /**
+   * 036 人工决定动作的只读上下文：事项本身 + 同批次同货号全部未删除来源行。
+   * 行号/哈希/字段只在服务端用于校验与内容指纹，不进入页面 DTO。
+   */
+  issueDecisionContext(identity: DbIdentity, issueId: string): Promise<SourceIssueDecisionContext | null> {
+    return withAppDb(identity, async (client) => {
+      const result = await client.query<{
+        id: string;
+        batch_id: string;
+        snapshot_key: string;
+        source_key: string;
+        issue_kind: string;
+        item_id: string | null;
+        detail: Record<string, unknown> | null;
+        review_state: SourceIssueDecisionContext['reviewState'];
+        collection: Record<string, unknown> | null;
+        rows: Array<{
+          rowNumber: number;
+          rowSha256: string | null;
+          cells: Record<string, string> | null;
+          fields: Record<string, SourceCell> | null;
+        }> | null;
+      }>(
+        `SELECT i.id, i.batch_id, b.snapshot_key, b.collection, i.source_key, i.issue_kind, i.item_id,
+                i.detail, i.review_state,
+                (SELECT jsonb_agg(jsonb_build_object(
+                          'rowNumber', r.row_number,
+                          'rowSha256', r.row_sha256,
+                          'cells', r.cells,
+                          'fields', r.fields) ORDER BY r.row_number)
+                 FROM catalog.product_source_row r
+                 WHERE r.batch_id = i.batch_id
+                   AND r.is_empty = false
+                   AND i.source_key LIKE 'code:%'
+                   AND r.ice_code_raw = split_part(i.source_key, ':', 2)) AS rows
+         FROM catalog.product_source_issue i
+         JOIN catalog.product_source_batch b ON b.id = i.batch_id
+         JOIN catalog.product_source_profile p ON p.id = b.profile_id
+         WHERE i.id = $1 AND p.profile_key = $2`,
+        [issueId, SOURCE_PROFILE_KEY],
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      return {
+        issueId: row.id,
+        batchId: row.batch_id,
+        snapshotKey: row.snapshot_key,
+        sourceKey: row.source_key,
+        issueKind: row.issue_kind,
+        itemId: row.item_id,
+        detail: row.detail ?? {},
+        reviewState: row.review_state,
+        collection: row.collection ?? {},
+        rows: (row.rows ?? []).map((entry) => ({
+          rowNumber: Number(entry.rowNumber),
+          rowSha256: entry.rowSha256 ?? null,
+          cells: (entry.cells ?? {}) as Record<string, string>,
+          fields: (entry.fields ?? {}) as Record<string, SourceCell>,
+        })) satisfies SourceIssueRowContext[],
+      };
+    });
+  },
+  /** 036：登记字段级“暂不处理/人工口径”（登记后由数据库关闭当前同类事项）。 */
+  async setFieldDecision(
+    identity: DbIdentity,
+    requestId: string,
+    issueId: string,
+    action: 'defer' | 'override',
+    value: string | null,
+    reason: string,
+    note: string | null,
+  ): Promise<unknown> {
+    const actionName = action === 'defer' ? 'defer_source_field' : 'override_source_field';
+    const intent = sourceIntent(identity, actionName, { issueId, action, value, reason, note });
+    return withAppDb(identity, async (client) => {
+      const result = await client.query<{ result: unknown }>(
+        'SELECT catalog.set_product_source_field_decision($1,$2,$3,$4,$5,$6,$7) AS result',
+        [requestId, intent, issueId, action, value, reason, note],
+      );
+      return result.rows[0]!.result;
+    });
+  },
+  /** 036：恢复字段级决定（下次读取/应用重新提示）。 */
+  async revokeFieldDecision(identity: DbIdentity, requestId: string, decisionId: string, note: string | null): Promise<unknown> {
+    const intent = sourceIntent(identity, 'restore_source_field', { decisionId, note });
+    return withAppDb(identity, async (client) => {
+      const result = await client.query<{ result: unknown }>(
+        'SELECT catalog.revoke_product_source_field_decision($1,$2,$3,$4) AS result',
+        [requestId, intent, decisionId, note],
+      );
+      return result.rows[0]!.result;
+    });
+  },
+  /** 036：保存同号多行人工选择（按内容指纹沿用，不按行号）。 */
+  async decideDuplicate(
+    identity: DbIdentity,
+    requestId: string,
+    issueId: string,
+    chosenRowNumber: number,
+    chosenRowSha256: string,
+    basisSha256: string,
+    evidenceRowSha256: string | null,
+    note: string | null,
+  ): Promise<unknown> {
+    const intent = sourceIntent(identity, 'decide_duplicate_source_row', {
+      issueId,
+      chosenRowNumber,
+      chosenRowSha256,
+      basisSha256,
+      evidenceRowSha256,
+      note,
+    });
+    return withAppDb(identity, async (client) => {
+      const result = await client.query<{ result: unknown }>(
+        'SELECT catalog.decide_product_source_duplicate_row($1,$2,$3,$4,$5,$6,$7,$8) AS result',
+        [requestId, intent, issueId, chosenRowNumber, chosenRowSha256, basisSha256, evidenceRowSha256, note],
+      );
+      return result.rows[0]!.result;
+    });
+  },
+  /** 036：撤销同号多行人工选择（下次读取/应用重新提示）。 */
+  async revokeDuplicateDecision(identity: DbIdentity, requestId: string, decisionId: string, note: string | null): Promise<unknown> {
+    const intent = sourceIntent(identity, 'restore_duplicate_source_decision', { decisionId, note });
+    return withAppDb(identity, async (client) => {
+      const result = await client.query<{ result: unknown }>(
+        'SELECT catalog.revoke_product_source_duplicate_decision($1,$2,$3,$4) AS result',
+        [requestId, intent, decisionId, note],
       );
       return result.rows[0]!.result;
     });

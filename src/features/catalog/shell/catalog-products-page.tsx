@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, Package, RefreshCw } from 'lucide-react';
 import {
@@ -10,6 +9,7 @@ import {
   SearchField,
   SelectMenu,
 } from '@/ui/ice-v4/data-surface';
+import { CatalogPendingEntry } from './catalog-pending-entry';
 import {
   ColumnsMenu,
   SortableTh,
@@ -22,7 +22,7 @@ import type { CatalogListClientPayload, CatalogListClientRow } from '../local-di
 import { clientRowAsDisplayRow } from '../local-display/list-client-types';
 import { applyWarehouseScopeToDisplayRow } from '../local-display/client-scope';
 import { formatAdoptedUnitCostCell, pageEntries } from '../local-display/list-row-display';
-import type { CatalogIssueToolbarModel } from '../issues/types';
+import type { CatalogPendingPreview } from '../issues/service';
 import type { useCatalogUrlState } from './use-catalog-url-state';
 import styles from './catalog-list.module.css';
 
@@ -110,34 +110,24 @@ function inventoryHint(row: CatalogListClientRow, warehouse: string, displayStat
   return `${inventory.coveredWarehouseCount} / ${inventory.scopeWarehouseCount} 仓有当前库存`;
 }
 
-/** 待处理入口：普通按钮 + 小数字徽标；读取失败可重试；无权不制造警报。 */
+/**
+ * 待处理入口：与其余四个主页面共用同一按钮（`PendingEntry`），整块可点。
+ * 点击打开整页居中弹窗，直接列出商品、需要核对的原因与操作；
+ * 数量与待处理索引一致；读取失败显示「读取失败」，可重试。
+ */
 function IssueToolbarEntry({
-  issues,
+  preview,
   retrying,
   onRetry,
+  autoOpen,
 }: {
-  issues: CatalogIssueToolbarModel | undefined;
+  preview: CatalogPendingPreview | null;
   retrying: boolean;
   onRetry: () => void;
+  /** /dashboard/catalog?pending=open：自动打开一次待处理弹窗。 */
+  autoOpen?: boolean;
 }) {
-  if (issues?.state === 'read_failed') {
-    return (
-      <span className={styles.issueFailed} role="status">
-        待处理读取失败
-        <button type="button" className={styles.issueRetry} onClick={onRetry} disabled={retrying} aria-label="重新读取待处理">
-          {retrying ? '重试中' : '重试'}
-        </button>
-      </span>
-    );
-  }
-  return (
-    <Link className={styles.issueEntry} href="/dashboard/catalog/issues">
-      待处理
-      {issues?.state === 'ok' && issues.issueCount > 0 ? (
-        <span className={styles.issueCountBadge}>{issues.issueCount}</span>
-      ) : null}
-    </Link>
-  );
+  return <CatalogPendingEntry preview={preview} retrying={retrying} onRetry={onRetry} autoOpen={autoOpen} />;
 }
 
 export function CatalogProductsPage({
@@ -146,7 +136,8 @@ export function CatalogProductsPage({
   displayError,
   itemCount,
   auxiliaryErrors = [],
-  issues,
+  issuesPreview,
+  autoOpenPending = false,
   url,
 }: {
   payload: CatalogListClientPayload | null;
@@ -154,7 +145,9 @@ export function CatalogProductsPage({
   displayError: string | null;
   itemCount: number;
   auxiliaryErrors?: string[];
-  issues?: CatalogIssueToolbarModel;
+  issuesPreview?: CatalogPendingPreview | null;
+  /** /dashboard/catalog?pending=open：首屏自动打开待处理弹窗一次。 */
+  autoOpenPending?: boolean;
   url: UrlApi;
 }) {
   const { q: query, warehouse, page, setQuery, setWarehouse, setPage, normalizePage, resetFilters, openDetail } = url;
@@ -327,7 +320,12 @@ export function CatalogProductsPage({
         >
           清空
         </button>
-        <IssueToolbarEntry issues={issues} retrying={retrying} onRetry={retry} />
+        <IssueToolbarEntry
+          preview={issuesPreview ?? null}
+          retrying={retrying}
+          onRetry={retry}
+          autoOpen={autoOpenPending}
+        />
         <span className={sharedStyles.count} data-testid="catalog-counts">
           {filtered.length === itemCount ? `共 ${filtered.length} 款` : `共 ${filtered.length} / ${itemCount} 款`}
         </span>

@@ -3,12 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileSpreadsheet, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowRight, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import syncStyles from '@/features/inventory/components/sync-view.module.css';
 import demoStyles from '@/ui/ice-v4/ice-v4.module.css';
 import { StatusPill } from '@/features/inventory/components/display';
 import type { Tone } from '@/features/inventory/model';
-import { ShipmentGroupingReviewEntry } from './shipment-grouping-review';
 import { formatTimestamp, shipmentFailureReason } from '../model';
 import type {
   ShipmentGroupingReviewsDto,
@@ -18,25 +17,25 @@ import type {
 import { refreshShipmentSource } from '../server/actions';
 
 /**
- * 「数据同步」里的飞书 · 物流在途来源卡（第十五轮：去掉卡片「详情」）。
+ * 「数据同步」里的飞书 · 物流在途来源卡（第十七轮：来源卡只保留来源状态与来源操作）。
  *
- * - 与 BigSeller、聚水潭同一网格/等高：主区域字段顺序固定「最近成功 / 下次同步 / 待处理」；
+ * - 与 BigSeller、聚水潭同一网格/等高：主区域字段固定「最近成功 / 下次同步」；
  * - 卡片不再有「详情」按钮或展开区；最近尝试、自动读取、技术错误统一放在三卡下方的同步记录里；
- * - 失败在卡片上只显示一句简短原因；
- * - 待处理 = 当前拆票/合票待复核数，点击打开与物流在途页相同的复核弹窗（同一组件）；
+ * - 「待处理」入口已从来源卡移除（拆票/合票复核统一在物流在途页工具栏处理），
+ *   这里只保留「立即同步」「查看物流在途」两个来源操作；
  * - 刷新来源仍是唯一写动作，读取状态统一在本页；库存同步 worker 不在这里启停。
+ *
+ * 兼容说明：调用方（数据同步页）仍可传 reviews/reviewsError，本卡不再渲染，也不再读取它们。
  */
 export function ShipmentSyncSource({
   status,
   error,
-  reviews,
-  reviewsError,
 }: {
   status: ShipmentSourceStatusDto | null;
   error: string | null;
-  /** 拆票/合票待复核数据（服务端读取；null = 未读到）。 */
-  reviews: ShipmentGroupingReviewsDto | null;
-  reviewsError: string | null;
+  /** 保留兼容：待处理行已删除，本轮不再使用。 */
+  reviews?: ShipmentGroupingReviewsDto | null;
+  reviewsError?: string | null;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -108,8 +107,8 @@ export function ShipmentSyncSource({
           <FileSpreadsheet size={18} strokeWidth={1.8} />
         </span>
         <div className={syncStyles.cardIdentity}>
-          <h2>飞书</h2>
-          <span className={syncStyles.cardPurpose}>物流在途</span>
+          <h2>物流在途</h2>
+          <span className={syncStyles.cardPurpose}>飞书物流表 · 自动读取</span>
         </div>
         <div className={syncStyles.cardStatus} data-testid="sync-shipment-status">
           <StatusPill tone={tone}>{label}</StatusPill>
@@ -124,12 +123,6 @@ export function ShipmentSyncSource({
         <div data-testid="sync-shipment-next">
           <dt>下次同步</dt>
           <dd>{nextPlanText}</dd>
-        </div>
-        <div data-testid="sync-shipment-pending">
-          <dt>待处理</dt>
-          <dd>
-            <ShipmentGroupingReviewEntry reviews={reviews} error={reviewsError} />
-          </dd>
         </div>
       </dl>
 
@@ -147,10 +140,11 @@ export function ShipmentSyncSource({
           disabled={pending}
           data-testid="sync-shipment-refresh"
         >
-          {pending ? <Loader2 size={14} aria-hidden /> : <RefreshCw size={14} aria-hidden />}
-          {pending ? '正在读取' : '刷新来源'}
+          <RefreshCw size={14} aria-hidden />
+          {pending ? '正在读取' : '立即同步'}
         </button>
-        <Link className={syncStyles.sourceLink} href="/dashboard/in-transit" data-testid="sync-shipment-open">
+        <Link className={syncStyles.secondaryButton} href="/dashboard/in-transit" data-testid="sync-shipment-open">
+          <ArrowRight size={14} aria-hidden />
           查看物流在途
         </Link>
       </div>

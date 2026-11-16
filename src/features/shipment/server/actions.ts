@@ -11,7 +11,9 @@ import {
   type IngestShipmentSnapshot,
   type ProductSearchRowDto,
   type ProductShipmentTransitDto,
+  type ShipmentAssociationOutcomeDto,
   type ShipmentAssociationResultDto,
+  type ShipmentAssociationRulePreviewDto,
   type ShipmentGroupingDecision,
   type ShipmentGroupingResolveResultDto,
   type ShipmentGroupingReviewDto,
@@ -25,9 +27,12 @@ import { readShipmentSource } from './source';
 import {
   getLatestShipmentSnapshotRaw,
   getProductShipmentInTransit,
+  getShipmentAssociationRulePreview,
+  getShipmentDetail,
   getShipmentGroupingContext,
   getShipmentGroupingReview,
   getShipmentIdentityIndex,
+  getShipmentItemRevision,
   getShipmentLiveStamp,
   requireShipmentAdmin,
   searchProductsForShipment as searchProductsRead,
@@ -144,12 +149,35 @@ export async function refreshShipmentSource(): Promise<ShipmentRefreshResultDto>
 
 export interface AssociateShipmentItemInput {
   itemId: string;
-  /** null = 清除关联。 */
   productId: string | null;
   expectedRevision: number;
   reason: string | null;
   /** 勾选「后续同来源、同品名、同市场沿用此对应」；默认不勾选 = 只改这一条。 */
   rememberMapping?: boolean;
+  /** 所属票（用于保存后按该条明细的实际结果回写「已计入货值/仍缺进货价/数量待核」）。 */
+  shipmentId?: string | null;
+}
+
+/** 保存关联后按明细的实际结果给出去向（与货值汇总同一口径；读不到返回 null，不猜）。 */
+async function associationOutcome(
+  shipmentId: string | null | undefined,
+  itemId: string,
+): Promise<ShipmentAssociationOutcomeDto | null> {
+  if (!shipmentId || !UUID_PATTERN.test(shipmentId)) return null;
+  try {
+    const detail = await getShipmentDetail(shipmentId);
+    const item = detail?.items.find((row) => row.itemId === itemId) ?? null;
+    if (!item) return null;
+    if (item.remainingState !== 'known' || typeof item.remainingQuantity !== 'number') {
+      return { state: 'quantity_pending', label: '数量待核' };
+    }
+    if (!item.product || item.product.unitCost.state !== 'priced') {
+      return { state: 'price_missing', label: '仍缺进货价' };
+    }
+    return { state: 'counted', label: '已计入货值' };
+  } catch {
+    return null;
+  }
 }
 
 /** 设置/清除明细的商品关联；版本冲突等业务拒绝以结构化 errorCode 返回，不抛异常。 */
@@ -191,7 +219,11 @@ export async function associateShipmentItem(
       reason === '' ? null : reason,
     ]);
   revalidatePath(IN_TRANSIT_PATH);
-  return normalizeAssociationResult(raw);
+  const result = normalizeAssociationResult(raw);
+  if (!result.ok || result.productId === null) return result;
+  // 保存成功后按该条明细的实际结果回写去向：已计入货值 / 仍缺进货价 / 数量待核。
+  const outcome = await associationOutcome(input.shipmentId, result.itemId);
+  return outcome ? { ...result, outcome } : result;
 }
 
 /** 关联编辑下拉/搜索：只读的商品主档搜索（与 reads.getShipmentList 同一鉴权）。 */
@@ -200,6 +232,79 @@ export async function searchProductsForShipment(
   limit = 10,
 ): Promise<ProductSearchRowDto[]> {
   return searchProductsRead(typeof q === 'string' ? q : '', limit);
+}
+
+/**
+ * 关联编辑器「沿用规则」影响预告（040 只读，按当前所选商品）：
+ * 已关联到所选商品的其他明细计 0 条；失败静默降级为 null（不影响编辑与保存）。
+ */
+export async function previewShipmentAssociationRule(
+  itemId: string,
+  productId: string,
+): Promise<ShipmentAssociationRulePreviewDto | null> {
+  const id = typeof itemId === 'string' ? itemId.trim() : '';
+  const product = typeof productId === 'string' ? productId.trim() : '';
+  if (!UUID_PATTERN.test(id) || !UUID_PATTERN.test(product)) return null;
+  try {
+    return await getShipmentAssociationRulePreview(id, product);
+  } catch {
+    return null;
+  }
+}
+
+export interface AssociateShipmentItemFromValueInput {
+  shipmentId: string;
+  itemId: string;
+  /** null = 清除关联。 */
+  productId: string | null;
+  reason?: string | null;
+  /** 勾选「以后同市场同品名也沿用」；默认 false = 只用于本票。 */
+  rememberMapping?: boolean;
+}
+
+/**
+ * 货值汇总/未计入列表里的现场关联（第十七轮）：
+ * 汇总 DTO 不带明细 revision，保存前先用 026 只读详情读取当前 revision，再复用
+ * associateShipmentItem 的同一套校验/写入口（不新增写函数、不新增 SQL）。
+ */
+export async function associateShipmentItemFromValue(
+  input: AssociateShipmentItemFromValueInput,
+): Promise<ShipmentAssociationResultDto> {
+  const shipmentId = typeof input.shipmentId === 'string' ? input.shipmentId.trim() : '';
+  const itemId = typeof input.itemId === 'string' ? input.itemId.trim() : '';
+  const productId = typeof input.productId === 'string' ? input.productId.trim() : null;
+  if (!UUID_PATTERN.test(shipmentId) || !UUID_PATTERN.test(itemId)
+    || (productId !== null && !UUID_PATTERN.test(productId))) {
+    return {
+      ok: false,
+      itemId,
+      productId,
+      associationStatus: 'none',
+      revision: 0,
+      errorCode: 'SHIPMENT_INVALID_INPUT',
+      errorMessage: '关联参数不完整或格式错误',
+    };
+  }
+  const revision = await getShipmentItemRevision(shipmentId, itemId);
+  if (revision === null) {
+    return {
+      ok: false,
+      itemId,
+      productId,
+      associationStatus: 'none',
+      revision: 0,
+      errorCode: 'SHIPMENT_ITEM_NOT_FOUND',
+      errorMessage: '这条在途明细已不在当前读取结果里，请刷新后重试',
+    };
+  }
+  return associateShipmentItem({
+    itemId,
+    productId,
+    expectedRevision: revision,
+    reason: input.reason ?? '手动关联',
+    rememberMapping: input.rememberMapping === true,
+    shipmentId,
+  });
 }
 
 /**

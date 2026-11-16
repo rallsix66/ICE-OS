@@ -38,6 +38,8 @@ import {
   type PlanAdoptionRow,
   type PlanBinding,
   type PlanBoundItem,
+  type PlanDuplicateDecision,
+  type PlanFieldInterpretation,
   type ProductSourcePlan,
   type SourceRow,
   type SourceSnapshot,
@@ -52,14 +54,18 @@ import {
   areSameFieldValue,
   buildRowFields,
   classifyFieldCell,
+  interpretFieldCell,
   isSourceFormulaError,
   normalizeCellText,
+  normalizeIdentityName,
 } from '@/features/catalog/product-source/normalize';
 import { groupByCodeMap, groupSourceRows } from '@/features/catalog/product-source/grouping';
 import {
+  detectSuspectedCodeChange,
+  duplicateBasisSha256,
   evaluateSourceRows,
   matchUncodedItemByName,
-  detectSuspectedCodeChange,
+  rowBusinessSha256,
 } from '@/features/catalog/product-source/anomaly';
 import { diffField, diffItem } from '@/features/catalog/product-source/diff';
 import {
@@ -1615,5 +1621,256 @@ describe('build scripts', () => {
       rmSync(outDir, { recursive: true, force: true });
       rmSync(fixtureDir, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Manual review flow (2026-11-10): duplicate-row choice, field deferral, 人工口径
+// ---------------------------------------------------------------------------
+
+function duplicateGroupOf(code: string) {
+  const group = groupSourceRows(fixture).codeGroups.find((candidate) => candidate.code === code);
+  if (!group) throw new Error(`TEST_GROUP_NOT_FOUND:${code}`);
+  return group;
+}
+
+describe('manual review flow (duplicate choice / field deferral / override)', () => {
+  it('uses a saved duplicate-row choice without relying on worksheet row numbers', () => {
+    const group = duplicateGroupOf('WM0069');
+    const chosen = group.rows.find((row) => row.fields.barcode?.state === 'observed')!;
+    const decision: PlanDuplicateDecision = {
+      iceCode: 'WM0069',
+      chosenRowSha256: rowBusinessSha256(chosen.fields),
+      basisSha256: duplicateBasisSha256(group.rows),
+    };
+    const plan = planWith(fixture, baseline().state, { duplicateDecisions: [decision] });
+    const result = plan.results.find((candidate) => candidate.sourceKey === codeSourceKey('WM0069'))!;
+    expect(result.issues.some((issue) => issue.kind === 'duplicate_code_inconsistent')).toBe(false);
+    expect(result.reasonCode).not.toBe('DUPLICATE_CODE_INCONSISTENT');
+  });
+
+  it('re-opens the duplicate review when the source group changes (new material conflict)', () => {
+    const group = duplicateGroupOf('WM0069');
+    const chosen = group.rows.find((row) => row.fields.barcode?.state === 'observed')!;
+    const decision: PlanDuplicateDecision = {
+      iceCode: 'WM0069',
+      chosenRowSha256: rowBusinessSha256(chosen.fields),
+      basisSha256: duplicateBasisSha256(group.rows),
+    };
+    const changed = duplicateRowWith(fixture, 'WM0069', { fields: { barcode: '9999999999999' } });
+    const plan = planWith(changed, baseline().state, { duplicateDecisions: [decision] });
+    const result = plan.results.find((candidate) => candidate.sourceKey === codeSourceKey('WM0069'))!;
+    expect(result.action).toBe('needs_review');
+    const issue = result.issues.find((candidate) => candidate.kind === 'duplicate_code_inconsistent');
+    expect(issue).toBeTruthy();
+    expect(issue?.detail.decisionStale).toBe(true);
+  });
+
+  it('content fingerprint ignores row numbers but not business values', () => {
+    const group = duplicateGroupOf('WM0069');
+    const row = group.rows[0]!;
+    const moved = { ...row, rowNumber: row.rowNumber + 1000 };
+    expect(rowBusinessSha256(moved.fields)).toBe(rowBusinessSha256(row.fields));
+    const changedFields = { ...row.fields, nameCn: { raw: '不同名称', state: 'observed' as const, meaning: 'value' as const } };
+    expect(rowBusinessSha256(changedFields)).not.toBe(rowBusinessSha256(row.fields));
+  });
+
+  it('a field-level deferral keeps the local value and stops the repeated issue', () => {
+    const state = baseline().state;
+    const itemId = 'item-LS101302';
+    const deferredState: CatalogState = {
+      ...state,
+      items: state.items.map((item) => item.itemId === itemId
+        ? { ...item, fields: { ...item.fields, shippingDays: observed('30') } }
+        : item),
+    };
+    const plan = planWith(fixture, deferredState, {
+      fieldDecisions: [{ itemId, fieldKey: 'shippingDays', action: 'defer', valueRaw: null }],
+    });
+    const result = plan.results.find((candidate) => candidate.sourceKey === codeSourceKey('LS101302'))!;
+    expect(result.issues.some((issue) => issue.detail.fieldKey === 'shippingDays')).toBe(false);
+    expect(result.changes.some((change) => change.fieldKey === 'shippingDays')).toBe(false);
+  });
+
+  it('a confirmed manual value is applied for exactly that item field (LS101501 unitWeight=0.05)', () => {
+    const base = baseline().state;
+    const itemId = 'item-LS101501';
+    const state = clampState(base, itemId, {
+      ...(base.items.find((item) => item.itemId === itemId)?.fields ?? {}),
+      unitWeight: observed('0.05/件\n24.45/箱'),
+    });
+    const plan = planWith(fixture, state, {
+      fieldDecisions: [{ itemId, fieldKey: 'unitWeight', action: 'override', valueRaw: '0.05' }],
+    });
+    const result = plan.results.find((candidate) => candidate.sourceKey === codeSourceKey('LS101501'))!;
+    const change = result.changes.find((candidate) => candidate.fieldKey === 'unitWeight');
+    expect(change?.beforeRaw).toBe('0.05/件\n24.45/箱');
+    expect(change?.afterRaw).toBe('0.05');
+    expect(result.issues.some((issue) => issue.detail.fieldKey === 'unitWeight')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2026-11-10 follow-up: whitespace-only name hints + registered source-column
+// interpretation rules (unitWeight 「0.05/件」 / cartonWeight confirmed value)
+// ---------------------------------------------------------------------------
+
+describe('identity name hints and registered source-column interpretation', () => {
+  const LS_ITEM = 'item-LS101501';
+
+  /** Local fields that already equal every unconfirmed-unit source value, so the
+   *  only review-relevant field left is unitWeight/cartonWeight. */
+  function localWeightState(state: CatalogState, unitWeightRaw: string): CatalogState {
+    const current = state.items.find((item) => item.itemId === LS_ITEM)?.fields ?? {};
+    return clampState(state, LS_ITEM, {
+      ...current,
+      unitWeight: observed(unitWeightRaw),
+      cartonLength: observed('53.5'),
+      cartonWidth: observed('28.5'),
+      cartonHeight: observed('29.3'),
+      cartonWeight: observed('24.15'),
+      cartonVolume: observed('0.044675175'),
+      unitVolume: observed('0.000078378'),
+    });
+  }
+
+  const unitWeightInterpretation: PlanFieldInterpretation[] = [
+    { itemId: LS_ITEM, fieldKey: 'unitWeight', rule: 'unit_weight_per_unit_fragment' },
+  ];
+
+  function lsResult(plan: ProductSourcePlan) {
+    return plan.results.find((candidate) => candidate.sourceKey === codeSourceKey('LS101501'))!;
+  }
+
+  it('normalizes identity names across ASCII/full-width whitespace and case only', () => {
+    expect(normalizeIdentityName('ICE LERSKIN 烟酰胺提亮精华水 150ml'))
+      .toBe(normalizeIdentityName('ice lerskin\u3000烟酰胺提亮精华水150ml'));
+    expect(normalizeIdentityName('  A B  ')).toBe('ab');
+    expect(normalizeIdentityName('名称')).not.toBe(normalizeIdentityName('名称2'));
+  });
+
+  it('flags a whitespace-only suspected code change as a normalizedName hint only', () => {
+    const candidate = {
+      itemId: 'item-WM0072',
+      iceCode: 'WM0072',
+      nameCn: 'ICE LERSKIN 护发精油 (桂花) 80ml-橙色-泰国特供版',
+      barcode: '757577983006',
+      adoptionNameCn: null,
+      adoptionBarcode: null,
+    };
+    const match = detectSuspectedCodeChange({
+      iceCode: 'WM9009',
+      logicalFields: {
+        ...evaluationByCode.get('WM0072')!.logicalFields!,
+        barcode: emptyCell(),
+        nameCn: sourceCell('ICE LERSKIN 护发精油(桂花) 80ml-橙色-泰国特供版'),
+      },
+      candidates: [candidate],
+    });
+    expect(match).toEqual({ suspected: true, matchedItemId: 'item-WM0072', matchedBy: 'normalizedName' });
+  });
+
+  it('matches a coded WM0131 row to an existing uncoded item by normalized name (no create)', () => {
+    const withSpace = 'ICE LERSKIN 烟酰胺提亮精华水 150ml';
+    const withoutSpace = 'ICE LERSKIN 烟酰胺提亮精华水150ml';
+    const baseState = makeCatalogState();
+    const state: CatalogState = {
+      ...baseState,
+      items: [
+        ...baseState.items,
+        { itemId: 'item-wm0131-uncoded', revision: 3, iceCode: null, nameCn: withoutSpace, fields: {} },
+      ],
+    };
+    const renamed = renameCode(
+      changeRowsOfCode(
+        changeRowsOfCode(fixture, 'WM0072', 'nameCn', withSpace),
+        'WM0072',
+        'barcode',
+        '',
+      ),
+      'WM0072',
+      'WM0131',
+    );
+    const plan = planWith(renamed, state);
+    const result = plan.results.find((candidate) => candidate.sourceKey === codeSourceKey('WM0131'));
+    expect(result?.action).toBe('needs_review');
+    expect(result?.reasonCode).toBe('MISSING_CODE_CANDIDATE');
+    expect(result?.itemId).toBe('item-wm0131-uncoded');
+    expect(result?.createCode).toBeNull();
+    expect(plan.results.some((candidate) => candidate.action === 'create')).toBe(false);
+    const issue = result?.issues.find((candidate) => candidate.kind === 'missing_code_candidate');
+    expect(issue?.detail).toMatchObject({
+      matchedItemId: 'item-wm0131-uncoded',
+      matchedItemName: withoutSpace,
+      matchedBy: 'normalizedName',
+      matchedItemCode: null,
+      sourceCode: 'WM0131',
+    });
+  });
+
+  it('interprets the unitWeight 「0.05/件」 fragment and stays unchanged when equal to base/local', () => {
+    const state = withAdoption(localWeightState(baseline().state, '0.05'), LS_ITEM, 'unitWeight', '0.05');
+    const plan = planWith(fixture, state, { fieldInterpretations: unitWeightInterpretation });
+    const result = lsResult(plan);
+    expect(result.action).toBe('unchanged');
+    expect(result.reasonCode).toBe('SOURCE_UNCHANGED');
+    expect(result.changes).toHaveLength(0);
+    expect(result.expectedRevision).toBeNull();
+    expect(result.nextFields).toBeNull();
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it('updates from the interpreted unitWeight fragment when the source value changes', () => {
+    const source = changeRowsOfCode(fixture, 'LS101501', 'unitWeight', '0.06/件\n24.45/箱');
+    const state = withAdoption(localWeightState(baseline().state, '0.05'), LS_ITEM, 'unitWeight', '0.05');
+    const plan = planWith(source, state, { fieldInterpretations: unitWeightInterpretation });
+    const result = lsResult(plan);
+    expect(result.action).toBe('update');
+    expect(result.expectedRevision).not.toBeNull();
+    const change = result.changes.find((candidate) => candidate.fieldKey === 'unitWeight');
+    expect(change?.afterRaw).toBe('0.06');
+    const adoption = result.adoptions.find((candidate) => candidate.fieldKey === 'unitWeight');
+    expect(adoption).toMatchObject({ raw: '0.06', unitState: 'confirmed' });
+  });
+
+  it('keeps the local manual value and reports FIELD_CONFLICT when local, base and interpreted source differ', () => {
+    const source = changeRowsOfCode(fixture, 'LS101501', 'unitWeight', '0.06/件\n24.45/箱');
+    const state = withAdoption(localWeightState(baseline().state, '0.055'), LS_ITEM, 'unitWeight', '0.05');
+    const plan = planWith(source, state, { fieldInterpretations: unitWeightInterpretation });
+    const result = lsResult(plan);
+    expect(result.action).toBe('needs_review');
+    expect(result.reasonCode).toBe('FIELD_CONFLICT');
+    expect(result.nextFields).toBeNull();
+    expect(result.changes.some((candidate) => candidate.fieldKey === 'unitWeight')).toBe(false);
+    expect(result.issues.some((issue) => issue.kind === 'field_conflict' && issue.detail.fieldKey === 'unitWeight')).toBe(true);
+  });
+
+  it('confirms the cartonWeight source value (T column 24.15) and its unit without a write', () => {
+    const state = localWeightState(baseline().state, '0.05');
+    const plan = planWith(fixture, state, {
+      fieldInterpretations: [
+        ...unitWeightInterpretation,
+        { itemId: LS_ITEM, fieldKey: 'cartonWeight', rule: 'confirmed_source_value' },
+      ],
+    });
+    const result = lsResult(plan);
+    expect(result.action).toBe('unchanged');
+    expect(result.changes).toHaveLength(0);
+    expect(result.nextFields).toBeNull();
+    const adoption = result.adoptions.find((candidate) => candidate.fieldKey === 'cartonWeight');
+    expect(adoption).toMatchObject({ raw: '24.15', unitState: 'confirmed' });
+  });
+
+  it('returns null when an interpretation cannot derive a clean value', () => {
+    expect(interpretFieldCell('unitWeight', classifyFieldCell('unitWeight', '0.05/件\n24.45/箱'), 'unit_weight_per_unit_fragment'))
+      .toEqual({ cell: { raw: '0.05', state: 'observed', meaning: 'value' }, unitConfirmed: true });
+    expect(interpretFieldCell('unitWeight', classifyFieldCell('unitWeight', '0.05'), 'unit_weight_per_unit_fragment'))
+      .toEqual({ cell: { raw: '0.05', state: 'observed', meaning: 'value' }, unitConfirmed: true });
+    expect(interpretFieldCell('unitWeight', classifyFieldCell('unitWeight', '24.45/箱'), 'unit_weight_per_unit_fragment')).toBeNull();
+    expect(interpretFieldCell('unitWeight', classifyFieldCell('unitWeight', '#N/A'), 'unit_weight_per_unit_fragment')).toBeNull();
+    expect(interpretFieldCell('unitWeight', classifyFieldCell('unitWeight', ''), 'unit_weight_per_unit_fragment')).toBeNull();
+    expect(interpretFieldCell('cartonWeight', classifyFieldCell('cartonWeight', '24.15'), 'confirmed_source_value'))
+      .toEqual({ cell: { raw: '24.15', state: 'observed', meaning: 'value' }, unitConfirmed: true });
+    expect(interpretFieldCell('cartonWeight', classifyFieldCell('cartonWeight', '#REF!'), 'confirmed_source_value')).toBeNull();
   });
 });

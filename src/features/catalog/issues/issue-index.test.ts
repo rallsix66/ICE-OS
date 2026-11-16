@@ -3,6 +3,7 @@ import {
   buildCatalogIssueIndex,
   buildCatalogIssueToolbarModel,
   buildCatalogIssues,
+  buildCatalogPendingItems,
   catalogDetailHref,
   countIssuesByKind,
   countIssuesForItem,
@@ -10,6 +11,7 @@ import {
   intakeObservationHref,
   intakeScopeHref,
   isEmptyIssueIndex,
+  issueKindLabel,
   legacySourceHref,
   sourceRecordHref,
   sourceScopeHref,
@@ -117,7 +119,7 @@ const FROM_QUERY = `from=${encodeURIComponent(ISSUES_RETURN_HREF)}`;
 const TECHNICAL_TOKEN = /catalog_|decision_evidence|source_scope|source_record|product_observation|pending_confirmation|review_required|needs_review|unresolved|N1A|N1C|fixture|schema|migration|ice_code|item_revision/i;
 
 function businessText(issue: CatalogIssue): string {
-  return [issue.summary, issue.stateLabel, issue.actionNote, issue.closureNote, issue.permissionLabel].join(' ');
+  return [issue.summary, issue.reason, ...issue.differences, issue.stateLabel, issue.actionNote, issue.closureNote, issue.permissionLabel].join(' ');
 }
 
 describe('待处理问题索引 — 现役商品库事实与能力真值', () => {
@@ -192,7 +194,7 @@ describe('待处理问题索引 — 现役商品库事实与能力真值', () =>
     expect(issues[0]!.kind).toBe('new_item_missing_code');
   });
 
-  it('按种类计数（全部 7 类都有明确 0）与按商品计数可复核', () => {
+  it('按种类计数（所有种类都有明确 0）与按商品计数可复核', () => {
     expect(countIssuesByKind(issues)).toEqual({
       new_item_missing_code: 1,
       brush_pending: 2,
@@ -201,6 +203,10 @@ describe('待处理问题索引 — 现役商品库事实与能力真值', () =>
       source_identity_suspended: 0,
       new_item_review: 0,
       new_item_pending_association: 0,
+      product_source_review: 0,
+      source_formula_errors: 0,
+      source_formula_fixed: 0,
+      source_formula_unreadable: 0,
     });
     expect(countIssuesForItem(issues, ITEM_A)).toBe(2);
     expect(countIssuesForItem(issues, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc')).toBe(0);
@@ -281,6 +287,236 @@ describe('待处理问题索引 — 既有模块状态（能力真值）', () =>
   });
 });
 
+const PS_ISSUE_DUPLICATE = '99999999-1111-4999-8999-999999999991';
+const PS_ISSUE_MISSING = '99999999-2222-4999-8999-999999999992';
+
+const PRODUCT_SOURCE_FACTS: CatalogIssueFacts = {
+  uncodedNewItems: [],
+  brushPending: [],
+  moduleFacts: {
+    productSource: {
+      sourceLabel: 'ICE产品库 · Sheet1',
+      sourceHref: 'https://example.feishu.cn/wiki/demo',
+      issues: [
+        {
+          issueId: PS_ISSUE_DUPLICATE,
+          iceCode: 'WM0069',
+          nameCn: '测试护发精油',
+          kind: 'duplicate_code_inconsistent',
+          kindLabel: '同号多行不一致',
+          itemId: ITEM_A,
+          rows: [63, 128],
+          fieldLabels: ['商品条码'],
+          duplicate: {
+            fields: [{
+              fieldLabel: '商品条码',
+              values: [
+                { rowNumber: 63, value: '', empty: true },
+                { rowNumber: 128, value: '757577407380', empty: false },
+              ],
+            }],
+          },
+        },
+        {
+          issueId: PS_ISSUE_MISSING,
+          iceCode: null,
+          nameCn: null,
+          kind: 'missing_code',
+          kindLabel: '来源缺码',
+          itemId: null,
+          rows: [122],
+          fieldLabels: [],
+        },
+      ],
+    },
+  },
+};
+
+describe('待处理问题索引 — 飞书商品资料来源待核对', () => {
+  const issues = buildCatalogIssues(PRODUCT_SOURCE_FACTS);
+
+  it('一条 open 来源事项一条待办，可定位货号、问题字段与来源行', () => {
+    expect(issues).toHaveLength(2);
+    expect(issues.every((issue) => issue.kind === 'product_source_review')).toBe(true);
+    expect(issues.every((issue) => issue.module === 'product_source')).toBe(true);
+    const duplicate = issues.find((issue) => issue.key === `product_source_review:${PS_ISSUE_DUPLICATE}`)!;
+    expect(duplicate.itemId).toBe(ITEM_A);
+    expect(duplicate.iceCode).toBe('WM0069');
+    expect(duplicate.detail?.rows).toEqual([63, 128]);
+    expect(duplicate.detail?.fieldLabels).toEqual(['商品条码']);
+    expect(duplicate.detail?.productHref).toBe(`/dashboard/catalog?detail=${ITEM_A}&${FROM_QUERY}`);
+    expect(duplicate.detail?.sourceHref).toBe('https://example.feishu.cn/wiki/demo');
+    expect(duplicate.detail?.fixGuidance).toContain('重新读取');
+    expect(duplicate.detail?.fixGuidance).toContain('应用本批');
+    expect(duplicate.action).toBe('available');
+    expect(duplicate.actionHref).toContain('/dashboard/catalog/sources');
+    expect(duplicate.actionHref).toContain('#product-source');
+    expect(duplicate.actionHref).toContain(FROM_QUERY);
+  });
+
+  it('「标记已处理」只关闭事项；不把事项写成已修改商品', () => {
+    for (const issue of issues) {
+      expect(issue.stateLabel).toBe('待核对');
+      expect(issue.detail?.resolveNote).toContain('不改写商品资料');
+      expect(issue.actionNote).toContain('标记已处理');
+      expect(issue.actionNote).toContain('不改写商品资料');
+      expect(issue.closureNote).toContain('标记已处理');
+      expect(issue.closureNote).not.toContain('已修改商品');
+    }
+  });
+
+  it('来源缺码项没有商品入口，仍给飞书原表与重新读取步骤', () => {
+    const missing = issues.find((issue) => issue.key === `product_source_review:${PS_ISSUE_MISSING}`)!;
+    expect(missing.itemId).toBeNull();
+    expect(missing.detail?.rows).toEqual([122]);
+    expect(missing.detail?.fieldLabels).toEqual([]);
+    expect(missing.detail?.productHref).toBeNull();
+    expect(missing.summary).toContain('来源缺码');
+    expect(missing.detail?.fixGuidance).toContain('飞书原表');
+    expect(missing.detail?.fixGuidance).toContain('重新读取');
+  });
+
+  it('来源事项的业务文案同样不含内部标记', () => {
+    for (const issue of issues) {
+      expect(businessText(issue)).not.toMatch(TECHNICAL_TOKEN);
+      expect(issue.detail?.fixGuidance ?? '').not.toMatch(TECHNICAL_TOKEN);
+      expect(issue.detail?.resolveNote ?? '').not.toMatch(TECHNICAL_TOKEN);
+    }
+  });
+
+  it('计数：事项数 2、去重商品 1、未关联事项 1', () => {
+    const index = buildCatalogIssueIndex(PRODUCT_SOURCE_FACTS, COVERAGE, '2026-11-10T02:00:00.000Z');
+    if (index.state !== 'ok') throw new Error('unreachable');
+    expect(index.issueCount).toBe(2);
+    expect(index.itemCount).toBe(1);
+    expect(index.unlinkedCount).toBe(1);
+  });
+});
+
+describe('待处理问题索引 — 直接原因、差异与具体动作', () => {
+  const issues = buildCatalogIssues(PRODUCT_SOURCE_FACTS);
+  const duplicate = issues.find((issue) => issue.key === `product_source_review:${PS_ISSUE_DUPLICATE}`)!;
+
+  it('同号多行：原因讲清“同号两行、条码不一致、选择采用行”，差异逐行默认可见', () => {
+    expect(duplicate.reason).toBe('同一货号有两行，商品条码不一致，请选择以后采用哪行资料。');
+    expect(duplicate.differences).toEqual(['第63行：未填写；第128行：757577407380。']);
+    expect(duplicate.actionLabel).toBe('选择采用行');
+    expect(duplicate.actionHref).toContain(`issue=${PS_ISSUE_DUPLICATE}`);
+    expect(duplicate.actionHref).toContain(`#product-source-issue-${PS_ISSUE_DUPLICATE}`);
+    expect(duplicate.referenceLabel).toBeNull();
+  });
+
+  it('同号多行：行号与差异值来自事项数据，不写死示例', () => {
+    const changed = buildCatalogIssues({
+      uncodedNewItems: [],
+      brushPending: [],
+      moduleFacts: {
+        productSource: {
+          sourceLabel: 'ICE产品库 · Sheet1',
+          sourceHref: null,
+          issues: [{
+            ...PRODUCT_SOURCE_FACTS.moduleFacts!.productSource!.issues[0]!,
+            rows: [166, 208],
+            duplicate: {
+              fields: [{
+                fieldLabel: '商品条码',
+                values: [
+                  { rowNumber: 166, value: '', empty: true },
+                  { rowNumber: 208, value: '6900000000012', empty: false },
+                ],
+              }],
+            },
+          }],
+        },
+      },
+    });
+    expect(changed[0]!.reason).toContain('同一货号有两行');
+    expect(changed[0]!.differences).toEqual(['第166行：未填写；第208行：6900000000012。']);
+  });
+
+  it('商品级缺货号：原因说明尚无正式货号，按钮为“确认并补货号”并定位本事项', () => {
+    const missingItem = buildCatalogIssues({
+      uncodedNewItems: [],
+      brushPending: [],
+      moduleFacts: {
+        productSource: {
+          sourceLabel: 'ICE产品库 · Sheet1',
+          sourceHref: 'https://example.feishu.cn/wiki/demo',
+          issues: [{
+            issueId: PS_ISSUE_MISSING,
+            iceCode: null,
+            nameCn: 'ICE LERSKIN 烟酰胺提亮精华水150ml',
+            kind: 'missing_code',
+            kindLabel: '来源缺码',
+            itemId: ITEM_B,
+            rows: [],
+            fieldLabels: ['正式货号'],
+            duplicate: null,
+            pendingCode: true,
+          }],
+        },
+      },
+    });
+    expect(missingItem[0]!.reason).toBe('该商品尚无正式货号，需要人工确认后补录。');
+    expect(missingItem[0]!.differences).toEqual([]);
+    expect(missingItem[0]!.actionLabel).toBe('确认并补货号');
+    expect(missingItem[0]!.actionHref).toContain(`issue=${PS_ISSUE_MISSING}`);
+    expect(missingItem[0]!.actionHref).toContain(`#product-source-issue-${PS_ISSUE_MISSING}`);
+  });
+
+  it('商品级缺货号：最新来源已读到候选货号时直接显示未填写→来源货号，按钮为“确认采用此货号”', () => {
+    const missingItem = buildCatalogIssues({
+      uncodedNewItems: [],
+      brushPending: [],
+      moduleFacts: {
+        productSource: {
+          sourceLabel: 'ICE产品库 · Sheet1',
+          sourceHref: 'https://example.feishu.cn/wiki/demo',
+          issues: [{
+            issueId: PS_ISSUE_MISSING,
+            iceCode: null,
+            nameCn: 'ICE LERSKIN 烟酰胺提亮精华水150ml',
+            kind: 'missing_code',
+            kindLabel: '来源缺码',
+            itemId: ITEM_B,
+            rows: [],
+            fieldLabels: ['正式货号'],
+            duplicate: null,
+            pendingCode: true,
+            sourceCodeCandidate: {
+              sourceCode: 'WM0131',
+              rowNumbers: [134],
+              capturedAtDisplay: '今天 12:10',
+            },
+          }],
+        },
+      },
+    });
+    expect(missingItem[0]!.reason).toBe('飞书已补充货号 WM0131，请确认用于这款商品。');
+    expect(missingItem[0]!.differences).toEqual(['正式货号：未填写 → WM0131']);
+    expect(missingItem[0]!.actionLabel).toBe('确认采用此货号');
+  });
+
+  it('刷子历史事项：一句话讲清两款分别保留、是否同款未确认，入口为“查看资料”', () => {
+    const brush = buildCatalogIssues(MODULE_FACTS).filter((issue) => issue.kind === 'brush_pending');
+    expect(brush).toHaveLength(2);
+    for (const issue of brush) {
+      expect(issue.reason).toBe('测试新品甲 与 WM0002 暂按两款分别保留，是否同款尚未确认。');
+      expect(issue.actionLabel).toBe('查看资料');
+      expect(issue.referenceLabel).toBe('查看资料');
+      expect(issue.referenceHref).toContain('/dashboard/catalog?detail=');
+    }
+  });
+
+  it('所有事项都有可直接展示的原因和动作文案，不再使用统一的“去处理”', () => {
+    for (const issue of buildCatalogIssues(MODULE_FACTS)) {
+      expect(issue.reason.trim().length).toBeGreaterThan(0);
+      expect(issue.actionLabel.trim().length).toBeGreaterThan(0);
+      expect(issue.actionLabel).not.toBe('去处理');
+    }
+  });
+});
+
 describe('处理后的索引变化（派生只依赖当前事实）', () => {
   it('补录货号/恢复记录/完成分类/完成关联后，对应事项从索引消失', () => {
     const before = buildCatalogIssues(MODULE_FACTS);
@@ -346,9 +582,20 @@ describe('待处理问题索引 — 计数口径与空态', () => {
     expect(isEmptyIssueIndex(oneUnlinked)).toBe(false);
   });
 
-  it('工具栏投影：有计数才给计数，失败给重试提示，无权限不给计数', () => {
+  it('工具栏投影：与可处理清单同一口径（不含刷子历史），失败给重试提示，无权限不给计数', () => {
     const okIndex = buildCatalogIssueIndex(CORE_FACTS, COVERAGE, '2026-10-23T07:31:00.000Z');
-    expect(buildCatalogIssueToolbarModel(okIndex)).toEqual({ state: 'ok', issueCount: 3, itemCount: 2 });
+    if (okIndex.state !== 'ok') throw new Error('unreachable');
+    // CORE_FACTS = 1 条新品缺货号 + 2 条刷子历史；刷子历史只在商品详情查看，不计入总览/徽标。
+    expect(buildCatalogIssueToolbarModel(okIndex)).toEqual({
+      state: 'ok',
+      issueCount: buildCatalogPendingItems(okIndex.items).length,
+      itemCount: 1,
+    });
+    expect(buildCatalogIssueToolbarModel(okIndex)).toEqual({ state: 'ok', issueCount: 1, itemCount: 1 });
+    // 快照派生的合并事项（飞书原表生产工厂公式错误）通过 extraItemCount 追加，与大徽标/弹窗行数一致。
+    expect(buildCatalogIssueToolbarModel(okIndex, 1)).toEqual({ state: 'ok', issueCount: 2, itemCount: 1 });
+    expect(buildCatalogIssueToolbarModel(okIndex, 0)).toEqual({ state: 'ok', issueCount: 1, itemCount: 1 });
+    expect(buildCatalogIssueToolbarModel(okIndex, -5)).toEqual({ state: 'ok', issueCount: 1, itemCount: 1 });
     expect(buildCatalogIssueToolbarModel({
       state: 'read_failed',
       error: '读取失败（网络、传输或环境异常），可重试。',
@@ -356,6 +603,10 @@ describe('待处理问题索引 — 计数口径与空态', () => {
     })).toEqual({ state: 'read_failed', message: '读取失败（网络、传输或环境异常），可重试。' });
     expect(buildCatalogIssueToolbarModel({ state: 'forbidden', error: '账号没有访问权限，或所请求的待处理索引不存在。' }))
       .toEqual({ state: 'forbidden' });
+  });
+
+  it('合并事项「飞书原表生产工厂公式错误」有中文标签（不写技术键名）', () => {
+    expect(issueKindLabel('source_formula_errors')).toBe('飞书原表生产工厂公式错误');
   });
 });
 

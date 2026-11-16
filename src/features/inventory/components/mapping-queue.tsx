@@ -36,6 +36,7 @@ import {
   type LocalViewerIdentity,
 } from '../client-pending';
 import { registerOriginalRequest } from './pending-recovery';
+import { marketLabel } from '@/features/overview/markets';
 import { settlementReleasesLock, settlementTone } from '../settlement';
 type Message = { text: string; tone: 'ok' | 'warn' | 'error' };
 
@@ -385,7 +386,7 @@ export function MappingQueue({
                     <div className={styles.queueMeta}>
                       <span data-testid="sync-mapping-warehouse">
                         来源仓库：{item.warehouseName}
-                        {item.market ? `（市场 ${item.market}）` : '（市场待确认）'}
+                        {item.market ? `（市场 ${marketLabel(item.market)}）` : '（市场待确认）'}
                       </span>
                       <span>本次出现 {item.rowCount} 行{item.rowCount === 0 ? '（候选记录，尚未在导出中见到）' : ''}</span>
                       <span>最近出现：{timestampOr(item.latestRunAt, '暂无记录')}</span>

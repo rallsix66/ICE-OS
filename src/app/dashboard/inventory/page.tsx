@@ -1,15 +1,21 @@
 import type { Metadata } from 'next';
 import { ReadFailurePanel } from '@/features/inventory/components/display';
 import { InventoryView } from '@/features/inventory/components/inventory-view';
+import { InventoryPendingEntry } from '@/features/inventory/components/inventory-pending-entry';
 import { domesticIncludedInScope, mergeProductSummary, mergeWarehouseRowsPage } from '@/features/inventory/dual-view';
 import {
   classifyReadFailure,
   errorMessageOf,
+  INVENTORY_SNAPSHOT_BATCH_PAGE_SIZE,
+  INVENTORY_SNAPSHOT_PAGE_SIZE,
   parseInventorySearchParams,
+  pendingBlocksWrites,
 } from '@/features/inventory/model';
 import {
   getInventoryItem,
   getInventoryProductSummary,
+  getInventorySnapshotBatches,
+  getInventorySnapshotRows,
   getInventorySyncOverview,
   getInventoryWarehouseRows,
   getSourceBinding,
@@ -24,6 +30,8 @@ import type {
   InventoryItemDetailDto,
   InventoryOverviewDto,
   InventoryProductSummaryDto,
+  InventorySnapshotBatchesDto,
+  InventorySnapshotRowsDto,
   InventoryWarehouseRowDto,
   InventoryWarehouseRowsDto,
   SourceBindingDto,
@@ -87,7 +95,7 @@ export default async function InventoryPage({
     amountAllowed = false;
   }
   const inventoryCostMap: Record<string, string> = {};
-  if (amountAllowed) {
+  if (amountAllowed && !query.snapshot) {
     try {
       const batch = await catalogRepository.baselineAmountsMap(identity);
       for (const [itemId, financial] of batch) {
@@ -105,10 +113,10 @@ export default async function InventoryPage({
   const marketFilter = domesticScope ? 'all' : query.market;
 
   const [warehouseSettled, summarySettled, domesticSettled, overviewSettled] = await Promise.allSettled([
-    query.view === 'warehouse'
+    query.view === 'warehouse' && !query.snapshot
       ? getInventoryWarehouseRows(identity, { q: query.q, warehouse: warehouseFilter, market: marketFilter })
       : Promise.resolve(null),
-    query.view === 'product'
+    query.view === 'product' && !query.snapshot
       // 商品汇总在服务端按完整筛选范围计算；这里取全量后与国内快照合并，再统一切页。
       ? getInventoryProductSummary(identity, {
         q: query.q,
@@ -118,7 +126,8 @@ export default async function InventoryPage({
         offset: 0,
       })
       : Promise.resolve(null),
-    getInventoryDomesticSnapshot(identity),
+    // 历史快照只读已发布批次，不合并国内冻结快照，也不影响当前库存视图。
+    query.snapshot ? Promise.resolve(null) : getInventoryDomesticSnapshot(identity),
     getInventorySyncOverview(identity),
   ]);
 
@@ -143,6 +152,122 @@ export default async function InventoryPage({
   }
 
   const overview: InventoryOverviewDto | null = overviewSettled.status === 'fulfilled' ? overviewSettled.value : null;
+
+  // 历史快照：只读选定海外仓的已发布批次；默认该仓最新批次。
+  // 明确 snapBatch 时独立读取这一批并核对所属仓，不依赖它是否落在当前批次列表页；
+  // 不存在/仓库不一致时不返回其他批次的数量，由页面给出明确提示。
+  // 该视图不读当前库存列表/国内冻结快照，也不会改写它们的筛选。
+  const snapshotWarehouses = (overview?.warehouses ?? []).filter((warehouse) => warehouse.status === 'confirmed');
+  const requestedSnapshotWarehouse = snapshotWarehouses.find((warehouse) => warehouse.id === query.snapWarehouse) ?? null;
+  let snapshotWarehouseId = requestedSnapshotWarehouse?.id ?? '';
+  let snapshotBatches: InventorySnapshotBatchesDto | null = null;
+  let snapshotDetailResult: InventorySnapshotRowsDto | null = null;
+  let snapshotBatchPage = query.snapBPage > 0 ? query.snapBPage : 1;
+  let snapshotBatchesError: string | null = null;
+  let snapshotDetailError: string | null = null;
+  let snapshotBatchNotice: {
+    kind: 'not_found' | 'warehouse_mismatch' | 'no_account';
+    batchWarehouseId: string;
+    batchWarehouseName: string;
+    observationAt: string;
+  } | null = null;
+  if (query.snapshot) {
+    if (!overview) {
+      snapshotBatchesError = '仓库清单读取失败';
+    } else {
+      if (query.snapBatch) {
+        try {
+          const detail = await getInventorySnapshotRows(identity, {
+            // 直链只有批次编号时 warehouseId=null：只校验账号归属，再由批次自身确定仓库。
+            warehouseId: requestedSnapshotWarehouse?.id ?? null,
+            batchId: query.snapBatch,
+            search: query.snapQ,
+            page: query.snapPage,
+            limit: INVENTORY_SNAPSHOT_PAGE_SIZE,
+          });
+          snapshotDetailResult = detail.ok ? detail : null;
+          if (!detail.ok) {
+            snapshotBatchNotice = {
+              kind: detail.status === 'warehouse_mismatch' || detail.status === 'no_account'
+                ? detail.status
+                : 'not_found',
+              batchWarehouseId: detail.batchWarehouseId ?? '',
+              batchWarehouseName: detail.batchWarehouseName ?? '',
+              observationAt: detail.batchObservationAt ?? '',
+            };
+          }
+          if (detail.ok && detail.batch) snapshotWarehouseId = detail.batch.warehouseId;
+        } catch (error) {
+          snapshotDetailError = shortFailure(error) ?? '明细读取失败';
+        }
+      }
+      if (!snapshotWarehouseId) snapshotWarehouseId = snapshotWarehouses[0]?.id ?? '';
+      if (snapshotWarehouseId) {
+        // 直链批次不在第一批次页时，列表翻到它所在页：页面选择与直链看到的是同一批。
+        const rankPage = snapshotDetailResult?.batchRank
+          ? Math.ceil(snapshotDetailResult.batchRank / INVENTORY_SNAPSHOT_BATCH_PAGE_SIZE)
+          : 1;
+        // 未指定列表页（snapBPage=0）才按所选批次所在页自动定位；
+        // 显式第 1 页（用户点“更新批次”）必须回到第 1 页，不能再次被批次位置拉回。
+        const requestedBatchPage = query.snapBPage > 0 ? query.snapBPage : rankPage;
+        try {
+          snapshotBatches = await getInventorySnapshotBatches(identity, {
+            warehouseId: snapshotWarehouseId,
+            page: requestedBatchPage,
+            limit: INVENTORY_SNAPSHOT_BATCH_PAGE_SIZE,
+          });
+          // 服务端会把超出末页的偏移回退到最后一页，页码以返回的 offset 为准。
+          snapshotBatchPage = Math.floor(snapshotBatches.offset / Math.max(1, snapshotBatches.limit)) + 1;
+        } catch (error) {
+          snapshotBatchesError = shortFailure(error) ?? '批次读取失败';
+        }
+        if (!query.snapBatch) {
+          // 未指定批次 = 默认最新批次；列表翻到更早页只影响左栏，不换右侧详情。
+          let latestBatchId = snapshotBatches?.batches[0]?.batchId ?? '';
+          let newestResolved = true;
+          if (snapshotBatchPage > 1) {
+            try {
+              const newest = await getInventorySnapshotBatches(identity, {
+                warehouseId: snapshotWarehouseId,
+                page: 1,
+                limit: 1,
+              });
+              latestBatchId = newest.batches[0]?.batchId ?? '';
+            } catch (error) {
+              newestResolved = false;
+              snapshotDetailError = shortFailure(error) ?? '明细读取失败';
+            }
+          }
+          if (newestResolved && latestBatchId) {
+            try {
+              const detail = await getInventorySnapshotRows(identity, {
+                warehouseId: snapshotWarehouseId,
+                batchId: latestBatchId,
+                search: query.snapQ,
+                page: query.snapPage,
+                limit: INVENTORY_SNAPSHOT_PAGE_SIZE,
+              });
+              snapshotDetailResult = detail.ok ? detail : null;
+            } catch (error) {
+              snapshotDetailError = shortFailure(error) ?? '明细读取失败';
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 「待处理」入口不再在此同步读清单或计数：徽标数量由客户端挂载后异步读取，
+  // 完整清单由弹窗打开时懒加载。这样切换「仓库明细 / 商品汇总」时先看到视图和数据，
+  // 不会为 5 页队列读取（约 1s）等待。
+  const pendingEntry = (
+    <InventoryPendingEntry
+      viewer={{ actorId: identity.profileUserId, accountId: overview?.account.accountId ?? '' }}
+      pendingLocked={pendingBlocksWrites(overview?.pendingAction ?? null)}
+      autoOpen={query.pending === 'open'}
+    />
+  );
+
   const domestic: InventoryDomesticSnapshotDto | null = domesticSettled.status === 'fulfilled' ? domesticSettled.value : null;
   const overseasRows: InventoryWarehouseRowsDto | null = warehouseSettled.status === 'fulfilled' ? warehouseSettled.value : null;
   const productSummary: InventoryProductSummaryDto | null = summarySettled.status === 'fulfilled' ? summarySettled.value : null;
@@ -235,12 +360,24 @@ export default async function InventoryPage({
       itemDetail={itemDetail}
       itemError={itemError}
       pending={overview?.pendingAction ?? null}
+      pendingEntry={pendingEntry}
       viewer={viewer}
       sourceBinding={sourceBinding}
       sourceBindingError={sourceBindingError}
       bindingReady={Boolean(bindingTarget)}
       costMap={amountAllowed ? inventoryCostMap : undefined}
       showValue={amountAllowed}
+      snapshot={{
+        warehouseId: snapshotWarehouseId,
+        batches: snapshotBatches?.batches ?? [],
+        batchTotal: snapshotBatches?.batchTotal ?? 0,
+        batchPage: snapshotBatchPage,
+        batchLimit: snapshotBatches?.limit || INVENTORY_SNAPSHOT_BATCH_PAGE_SIZE,
+        detail: snapshotDetailResult,
+        batchNotice: snapshotBatchNotice,
+        batchesError: snapshotBatchesError,
+        detailError: snapshotDetailError,
+      }}
     />
   );
 }

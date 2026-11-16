@@ -62,6 +62,46 @@ export const SOURCE_FORMULA_ERROR = 'SOURCE_FORMULA_ERROR';
 export const SOURCE_VALUE_NOT_NUMERIC = 'SOURCE_VALUE_NOT_NUMERIC';
 export const INVALID_CARTON_QUANTITY = 'INVALID_CARTON_QUANTITY';
 
+/**
+ * 图片单元格编码。
+ *
+ * 文本剪贴板读不到图片；飞书开放接口读单元格时返回 embed-image 对象
+ * （fileToken / 宽高 / type）。快照的 rows[].cells 只允许字符串，因此把图片引用
+ * 编码成 `image:<canonical JSON>`。imageRef 仍不是可采纳字段：编码只作来源证据，
+ * 不写商品字段、不进入差异计划。图片二进制可另行按 fileToken 下载（见 docs）。
+ */
+export const IMAGE_CELL_PREFIX = 'image:';
+export interface SourceImageRef {
+  fileToken: string;
+  type: string;
+  width: number | null;
+  height: number | null;
+}
+export function encodeImageCell(ref: SourceImageRef): string {
+  const normalized: SourceImageRef = {
+    fileToken: ref.fileToken,
+    type: ref.type || 'embed-image',
+    width: Number.isFinite(ref.width) ? ref.width : null,
+    height: Number.isFinite(ref.height) ? ref.height : null,
+  };
+  return `${IMAGE_CELL_PREFIX}${canonicalJson(normalized)}`;
+}
+export function decodeImageCell(raw: string): SourceImageRef | null {
+  if (typeof raw !== 'string' || !raw.startsWith(IMAGE_CELL_PREFIX)) return null;
+  try {
+    const parsed = JSON.parse(raw.slice(IMAGE_CELL_PREFIX.length)) as Partial<SourceImageRef>;
+    if (typeof parsed.fileToken !== 'string' || parsed.fileToken.trim() === '') return null;
+    return {
+      fileToken: parsed.fileToken,
+      type: typeof parsed.type === 'string' && parsed.type ? parsed.type : 'embed-image',
+      width: typeof parsed.width === 'number' && Number.isFinite(parsed.width) ? parsed.width : null,
+      height: typeof parsed.height === 'number' && Number.isFinite(parsed.height) ? parsed.height : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Field whitelist
 // ---------------------------------------------------------------------------
@@ -303,7 +343,7 @@ export interface SourceSimulationMeta {
 }
 
 export interface SourceSnapshotCollection {
-  method: 'web_clipboard_copy' | 'mock_reader';
+  method: 'web_clipboard_copy' | 'mock_reader' | 'feishu_api';
   url: string;
   worksheetTitle: string;
   headerRow: number;
@@ -404,6 +444,9 @@ export interface SourceFieldConflict {
   /**
    * Per-row values that disagree. Consistency is strict: blank vs non-blank is
    * a difference (the blank row is listed with raw=null, state='explicit_empty').
+   * Every source row in the duplicate group is listed (not only one
+   * representative per distinct value) so the review UI can show the actual
+   * "两份资料" side by side and let a human choose one row.
    */
   values: { rowNumber: number; raw: string | null; state: SourceCellState }[];
 }
@@ -413,6 +456,55 @@ export interface SourceFieldNote {
   fieldKey: ProductSourceFieldKey;
   reason: string;
   raw: string;
+}
+
+/** A saved human decision for one reviewed field (defer = 暂不处理, override = 人工口径). */
+export interface PlanFieldDecision {
+  itemId: string;
+  fieldKey: AdoptableFieldKey;
+  action: 'defer' | 'override';
+  /** Only for action=override: the confirmed source value (e.g. 0.05). */
+  valueRaw: string | null;
+}
+
+/**
+ * Registered source-column interpretation rules. They are never global: a rule
+ * only applies to the exact item+field it was registered for (036 decision row).
+ * - unit_weight_per_unit_fragment: take the first "number/件" fragment from the
+ *   raw cell (e.g. LS101501 O column "0.05/件\n24.45/箱" → 0.05 kg);
+ * - confirmed_source_value: the source cell value is confirmed as-is (e.g.
+ *   LS101501 T column 24.15 for cartonWeight) and its unit is confirmed too.
+ */
+export const FIELD_INTERPRETATION_RULES = ['unit_weight_per_unit_fragment', 'confirmed_source_value'] as const;
+export type FieldInterpretationRule = (typeof FIELD_INTERPRETATION_RULES)[number];
+
+export const FIELD_INTERPRETATION_RULE_LABELS: Readonly<Record<FieldInterpretationRule, string>> = {
+  unit_weight_per_unit_fragment: '按来源重量列取每件重量',
+  confirmed_source_value: '按来源列确认值',
+};
+
+export function isFieldInterpretationRule(value: string): value is FieldInterpretationRule {
+  return (FIELD_INTERPRETATION_RULES as readonly string[]).includes(value);
+}
+
+/** One active interpretation registered for exactly one item+field. */
+export interface PlanFieldInterpretation {
+  itemId: string;
+  fieldKey: AdoptableFieldKey;
+  rule: FieldInterpretationRule;
+}
+
+/**
+ * A saved human choice for one duplicate-code group. Matching is by source
+ * content fingerprints, never by worksheet row numbers: row numbers may shift
+ * between reads while the same two rows keep meaning the same thing.
+ */
+export interface PlanDuplicateDecision {
+  iceCode: string;
+  /** sha256 over the chosen row's adoptable source fields (sourceDate excluded). */
+  chosenRowSha256: string;
+  /** sha256 over the sorted content fingerprints of every row in the group at decision time. */
+  basisSha256: string;
 }
 
 export interface SourceRowEvaluation {
@@ -427,6 +519,10 @@ export interface SourceRowEvaluation {
   conflicts: SourceFieldConflict[];
   fieldIssues: SourceFieldNote[];
   notes: string[];
+  /** True when a saved duplicate-row choice was applied and the group is treated as consistent. */
+  decisionApplied?: boolean;
+  /** True when a saved choice exists but the source content changed (new material conflict). */
+  decisionStale?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -711,6 +807,12 @@ export interface BuildPlanInput {
    * submit). Stale / invalid snapshot rules are unchanged.
    */
   retryFailedSourceKeys?: readonly string[];
+  /** Active field-level human decisions (暂不处理 / 人工口径). */
+  fieldDecisions?: readonly PlanFieldDecision[];
+  /** Active per-item+field source-column interpretation rules (never global). */
+  fieldInterpretations?: readonly PlanFieldInterpretation[];
+  /** Active duplicate-row human choices keyed by source code. */
+  duplicateDecisions?: readonly PlanDuplicateDecision[];
 }
 
 // ---------------------------------------------------------------------------
@@ -738,6 +840,8 @@ export interface ProductSourceBatchRow {
    * letters I/J/Y after a column reorder) is preserved.
    */
   cells: Record<string, string>;
+  /** Mapped field classification (never contains restricted values). */
+  fields: Record<string, SourceCell>;
   rowSha256: string;
 }
 

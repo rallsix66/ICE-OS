@@ -10,6 +10,8 @@ import {
   normalizePendingActions,
   normalizeProductSummary,
   normalizeRunDetail,
+  normalizeSnapshotBatches,
+  normalizeSnapshotRows,
   normalizeWarehouseRows,
   normalizeWarehouseStates,
   asArray,
@@ -19,7 +21,7 @@ import {
   asIntOrNull,
 } from '../normalize';
 import type { InventoryQueryState } from '../model';
-import { pendingBlocksWrites } from '../model';
+import { INVENTORY_SNAPSHOT_BATCH_PAGE_SIZE, INVENTORY_SNAPSHOT_PAGE_SIZE, pendingBlocksWrites } from '../model';
 import type {
   InventoryBindingViewerDto,
   InventoryItemDetailDto,
@@ -31,6 +33,8 @@ import type {
   InventoryPendingActionDto,
   InventoryProductSummaryDto,
   InventoryRunDetailDto,
+  InventorySnapshotBatchesDto,
+  InventorySnapshotRowsDto,
   InventoryTargetItemDto,
   InventoryWarehouseReadStateV2Dto,
   InventoryWarehouseRowsDto,
@@ -406,4 +410,59 @@ export async function getSourceBinding(
     viewer: bindingViewerOf(identity, overview),
     pendingLocked: pendingBlocksWrites(overview.pendingAction),
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * 海外库存历史快照（041 只读）
+ *
+ * - 批次列表：单仓已发布批次分页，按 observation_at 倒序；
+ * - 单批明细：明确批次独立读取（核对所属仓），按来源 SKU 搜索并分页；
+ * - 历史归属取批次保存的映射与商品版本；不存在/仓库不一致时返回可用状态，不伪造数量。
+ * 与列表/详情同一鉴权（启用中的管理员）与只读事务，不新增写路径。
+ * ------------------------------------------------------------------ */
+
+export interface InventorySnapshotBatchesRequest {
+  warehouseId: string;
+  page: number;
+  limit: number;
+}
+
+export async function getInventorySnapshotBatches(
+  identity: DbIdentity,
+  request: InventorySnapshotBatchesRequest,
+): Promise<InventorySnapshotBatchesDto> {
+  const limit = Math.max(1, Math.min(Math.trunc(request.limit) || INVENTORY_SNAPSHOT_BATCH_PAGE_SIZE, 200));
+  const page = Math.max(1, Math.trunc(request.page) || 1);
+  const raw = await callReadRpc<unknown>(identity, 'catalog.read_inventory_snapshot_batches', [
+    request.warehouseId,
+    limit,
+    (page - 1) * limit,
+  ]);
+  return normalizeSnapshotBatches(raw);
+}
+
+export interface InventorySnapshotRowsRequest {
+  /** 明确批次的核对目标仓；null = 尚未选仓的直链，只校验账号归属。 */
+  warehouseId: string | null;
+  batchId: string;
+  search: string;
+  page: number;
+  limit: number;
+}
+
+export async function getInventorySnapshotRows(
+  identity: DbIdentity,
+  request: InventorySnapshotRowsRequest,
+): Promise<InventorySnapshotRowsDto> {
+  const limit = Math.max(1, Math.min(Math.trunc(request.limit) || INVENTORY_SNAPSHOT_PAGE_SIZE, 200));
+  const page = Math.max(1, Math.trunc(request.page) || 1);
+  const offset = (page - 1) * limit;
+  const raw = await callReadRpc<unknown>(identity, 'catalog.read_inventory_snapshot_rows', [
+    request.warehouseId,
+    request.batchId,
+    request.search || null,
+    limit,
+    offset,
+  ]);
+  return normalizeSnapshotRows(raw);
 }

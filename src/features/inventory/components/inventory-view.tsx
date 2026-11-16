@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { PageHeading } from '@/ui/ice-v4/data-surface';
 import { useTableControls } from '@/ui/ice-v4/table-tools';
 import styles from './inventory.module.css';
 import {
   buildInventoryListHref,
+  buildInventorySnapshotHref,
   DOMESTIC_SNAPSHOT_LABEL,
   pendingBlocksWrites,
   type InventoryQueryState,
@@ -16,6 +18,8 @@ import type {
   InventoryItemDetailDto,
   InventoryOverviewDto,
   InventoryPendingActionDto,
+  InventorySnapshotBatchDto,
+  InventorySnapshotRowsDto,
   InventoryWarehouseReadStateV2Dto,
   InventoryWarehouseRowDto,
   SourceBindingDto,
@@ -31,6 +35,7 @@ import {
 import { InventoryDetailLayer } from './inventory-detail-layer';
 import { InventoryFilterBar } from './inventory-filter-bar';
 import { InventoryPagination } from './inventory-pagination';
+import { InventorySnapshotView } from './inventory-snapshot-view';
 import { PendingRecoveryPanel } from './pending-recovery';
 import { ProductSummaryTable } from './product-summary-table';
 import { WarehouseRowsTable } from './warehouse-rows-table';
@@ -53,12 +58,14 @@ export function InventoryView({
   itemDetail,
   itemError,
   pending,
+  pendingEntry,
   viewer,
   sourceBinding,
   sourceBindingError,
   bindingReady,
   costMap,
   showValue,
+  snapshot,
 }: {
   query: InventoryQueryState;
   effectiveFilters: { warehouse: string; market: string };
@@ -73,6 +80,8 @@ export function InventoryView({
   itemError: string | null;
   /** 最近未完成原请求（服务端）；本地未知记录由恢复面板自行读取。 */
   pending: InventoryPendingActionDto | null;
+  /** 工具栏「待处理」入口（服务端 <Suspense> 流式计数 + 弹窗懒加载清单）。 */
+  pendingEntry: ReactNode;
   /** 当前会话身份：恢复记录归属校验与绑定写入登记。 */
   viewer: LocalViewerIdentity | null;
   /** 当前打开仓库行的固定来源绑定（服务端读取）。 */
@@ -84,6 +93,24 @@ export function InventoryView({
   costMap?: InventoryCostMap;
   /** 是否显示「估算货值」列（无金额权限不显示）。 */
   showValue?: boolean;
+  /** 历史快照视图数据（只读；按需读取选定批次）。 */
+  snapshot: {
+    warehouseId: string;
+    batches: InventorySnapshotBatchDto[];
+    batchTotal: number;
+    batchPage: number;
+    batchLimit: number;
+    detail: InventorySnapshotRowsDto | null;
+    /** 明确批次不可用时的原因（不存在/与所选仓不一致），不含任何数量。 */
+    batchNotice: {
+      kind: 'not_found' | 'warehouse_mismatch' | 'no_account';
+      batchWarehouseId: string;
+      batchWarehouseName: string;
+      observationAt: string;
+    } | null;
+    batchesError: string | null;
+    detailError: string | null;
+  };
 }) {
   const warehouses = overview?.warehouses ?? [];
   const domesticScope = query.source === 'domestic';
@@ -119,6 +146,24 @@ export function InventoryView({
     market: effectiveFilters.market,
   };
 
+  // 历史快照入口：沿用当前库存筛选；首次进入时用当前选中的海外仓作为快照默认仓。
+  const snapshotHref = buildInventorySnapshotHref({
+    q: query.q,
+    warehouse: effectiveFilters.warehouse,
+    market: effectiveFilters.market,
+    view: query.view,
+    source: query.source,
+    page: query.page,
+    sort: query.sort,
+    sortDir: query.sortDir,
+    snapWarehouse: query.snapWarehouse
+      || (effectiveFilters.warehouse !== 'all' ? effectiveFilters.warehouse : ''),
+    snapBatch: query.snapBatch,
+    snapQ: query.snapQ,
+    snapPage: query.snapPage,
+    snapBPage: query.snapBPage,
+  });
+
   // 详情里的国内分区与列表同一有效范围（明确的海外仓/市场下钻不带国内）。
   const domesticDetailIncluded = domesticIncludedInScope({
     source: query.source,
@@ -127,36 +172,62 @@ export function InventoryView({
   });
 
   return (
-    <div className={styles.page} data-testid="inventory-page">
+    <div className={`${styles.page} ${query.snapshot ? styles.pageSnapshot : ''}`} data-testid="inventory-page">
       <PageHeading title="商品库存" />
 
       <div className={styles.viewTabs} role="tablist" aria-label="库存视图" data-testid="inventory-view-tabs">
         <Link
-          className={`${styles.viewTab} ${query.view === 'warehouse' ? styles.viewTabActive : ''}`}
+          className={`${styles.viewTab} ${query.view === 'warehouse' && !query.snapshot ? styles.viewTabActive : ''}`}
           role="tab"
-          aria-selected={query.view === 'warehouse'}
+          aria-selected={query.view === 'warehouse' && !query.snapshot}
           href={viewHref('warehouse')}
           data-testid="inventory-view-warehouse"
         >
           仓库明细
         </Link>
         <Link
-          className={`${styles.viewTab} ${query.view === 'product' ? styles.viewTabActive : ''}`}
+          className={`${styles.viewTab} ${query.view === 'product' && !query.snapshot ? styles.viewTabActive : ''}`}
           role="tab"
-          aria-selected={query.view === 'product'}
+          aria-selected={query.view === 'product' && !query.snapshot}
           href={viewHref('product')}
           data-testid="inventory-view-product"
         >
           商品汇总
         </Link>
+        <Link
+          className={`${styles.viewTab} ${query.snapshot ? styles.viewTabActive : ''}`}
+          role="tab"
+          aria-selected={query.snapshot}
+          href={snapshotHref}
+          data-testid="inventory-view-snapshot"
+        >
+          历史快照
+        </Link>
       </div>
 
-      <InventoryFilterBar
+      {query.snapshot ? (
+        <InventorySnapshotView
+          query={listQuery}
+          warehouses={warehouses}
+          warehouseId={snapshot.warehouseId}
+          batches={snapshot.batches}
+          batchTotal={snapshot.batchTotal}
+          batchPage={snapshot.batchPage}
+          batchLimit={snapshot.batchLimit}
+          detail={snapshot.detail}
+          batchNotice={snapshot.batchNotice}
+          batchesError={snapshot.batchesError}
+          detailError={snapshot.detailError}
+        />
+      ) : (
+        <>
+          <InventoryFilterBar
         query={listQuery}
         warehouses={warehouses}
         columns={activeColumns}
         controls={activeControls}
         total={page?.total ?? null}
+        pendingEntry={pendingEntry}
       />
 
       {scopeEmpty || failedCount > 0 ? (
@@ -218,6 +289,8 @@ export function InventoryView({
           ) : null}
         </div>
       </InventoryDetailLayer>
+        </>
+      )}
     </div>
   );
 }

@@ -140,23 +140,33 @@ test.describe('catalog ux regression (v3)', () => {
     expect(accountText).not.toContain('原始权限标识');
     expect(accountText).not.toContain('原始证据');
 
-    // 第二轮（2026-10-30）：待处理页改为只读事项队列，不再提供「只读参考」详情链接。
-    // 原 issue→source→dialog→back 链路随之消失；这里守住新页面的两条底线：
-    // 不再出现说明性长文/权限标签，也不再生成 detail= 链接（避免把入口重新加回来）。
-    // from 回程仍由上面 list→dialog→from 用例覆盖。
+    // 2026-11-10 待处理页改版：每条只保留「名称/货号 → 具体原因与差异 → 具体动作」，
+    // 删除重复的修正步骤与“标记已处理”长说明；刷子历史事项保留“查看资料”入口。
     await page.goto('/dashboard/catalog/issues', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('catalog-issues-page').waitFor({ timeout: 60_000 });
     const issuesText = await page.getByTestId('catalog-issues-page').innerText();
     expect(issuesText).not.toContain('这里汇总商品库里需要人工确认的事项');
     expect(issuesText).not.toContain('可见权限');
+    expect(issuesText).not.toContain('来源资料待核对');
+    expect(issuesText).not.toContain('去处理');
+    expect(issuesText).not.toContain('修正入口：');
+    expect(issuesText).not.toContain('「标记已处理」只关闭本条');
     // 关闭依据只保留在 sr-only 属性里供读屏/测试使用（1px 裁切，不可见），不进入可见卡片文案。
     const closureBox = await page.getByTestId('catalog-issue-closure').first()
       .evaluate((node) => node.getBoundingClientRect().width);
     expect(closureBox).toBeLessThanOrEqual(1);
-    await expect(page.locator('a[href*="detail="]')).toHaveCount(0);
+    // 商品资料链接只允许出现在折叠的来源信息里，或作为刷子历史事项的「查看资料」入口。
+    const detailLinksAllowed = await page.locator('a[href*="detail="]').evaluateAll((nodes) => nodes.every((node) => (
+      node.closest('details') !== null || (node.textContent ?? '').includes('查看资料')
+    )));
+    expect(detailLinksAllowed).toBe(true);
+    const referenceLinks = page.getByTestId('catalog-issue-reference');
+    if (await referenceLinks.count() > 0) {
+      await expect(referenceLinks.first()).toHaveText('查看资料');
+    }
     test.info().annotations.push({
       type: 'changed',
-      description: '待处理页不再提供详情链接；issue→dialog 回程并入 list→dialog→from 用例',
+      description: '待处理卡片改为原因/差异直达；刷子历史事项保留查看资料入口，其余详情收进来源信息',
     });
   });
 

@@ -210,6 +210,19 @@
   overflow-wrap: anywhere;
 }
 
+/* 刷子历史仅查看说明：不占待处理清单，但在该商品详情里说清“分别保留、是否同款未确认”。 */
+.brushPendingNote {
+  margin: 0;
+  padding: 8px 11px;
+  border: 1px solid #ecd9b4;
+  border-left: 3px solid #c99a45;
+  border-radius: 7px;
+  background: #fdf9f1;
+  color: #7a5a1b;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
 .overviewGrid {
   display: grid;
   /* 自适应列：避免宽屏出现“三张一行 + 一张孤儿”的大片留白。 */

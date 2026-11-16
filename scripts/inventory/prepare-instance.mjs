@@ -140,6 +140,14 @@ async function ensureSchema(owner, evidence) {
   // 第十四轮拆合票：原始分组相邻读取检测 + 人工确认后才沿用绑定（035，幂等；必须晚于 034：
   // 给 sync 角色读最近成功原始快照、停用本次复核涉及的覆盖、按复核范围 manual_selected 沿用）。
   const shipmentGroupingRawFile = 'db/catalog/035_shipment_grouping_raw.sql';
+  // 物流关联历史/规则预告/影响（038-040，幂等；必须晚于 026-035：DECLARE 引用 catalog.shipment_item）。
+  // 这些文件原先只写在 prepare-local-preview 的 LOCAL_SQL 里，但预览阶段还没有 026 的表，会整步失败。
+  const shipmentAssociationHistoryFile = 'db/catalog/038_shipment_association_history.sql';
+  const shipmentAssociationRulePreviewFile = 'db/catalog/039_shipment_association_rule_preview.sql';
+  const shipmentAssociationRuleImpactFile = 'db/catalog/040_shipment_association_rule_impact.sql';
+  // 海外库存「历史快照」只读读取（041，幂等；必须晚于 016 的 inventory_batch/inventory_batch_row：
+  // 两个只读函数分页列批次、按明确批次核对所属仓；不建表、不改 016-040）。
+  const inventorySnapshotFile = 'db/catalog/041_inventory_snapshot_reads.sql';
   const applied = [];
   let sqlState;
   const version = Number(before.row?.version ?? 0);
@@ -187,6 +195,12 @@ async function ensureSchema(owner, evidence) {
   applied.push(await applySql(owner, shipmentGroupingReviewFile));
   applied.push(await applySql(owner, shipmentGroupingCarryoverFile));
   applied.push(await applySql(owner, shipmentGroupingRawFile));
+  // 依赖 026-035 的目录 SQL 放在库存/物流表创建之后，正常准备实例即可使用这些只读函数。
+  applied.push(await applySql(owner, shipmentAssociationHistoryFile));
+  applied.push(await applySql(owner, shipmentAssociationRulePreviewFile));
+  applied.push(await applySql(owner, shipmentAssociationRuleImpactFile));
+  // 041 依赖 016 的库存批次表：放在 016-035 之后，正常准备实例即可使用历史快照。
+  applied.push(await applySql(owner, inventorySnapshotFile));
   const structureSha = hashFile(v6File);
   const functionsSha = hashFile(functionsFile);
   await owner.query(

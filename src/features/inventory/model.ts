@@ -35,12 +35,14 @@ import type {
   InventoryReconcileState,
   InventoryRunSummaryDto,
   InventoryScopeDto,
+  InventorySnapshotRowDto,
   InventorySourceScope,
   InventoryViewMode,
   InventoryWarehouseReadStateV2Dto,
   InventoryWarehouseRowDto,
   InventoryWarehouseSummaryDto,
 } from './types';
+import { marketLabel } from '@/features/overview/markets';
 
 export type Tone = 'neutral' | 'green' | 'amber' | 'red' | 'blue';
 
@@ -52,6 +54,10 @@ export const MAX_INVENTORY_PAGE_SIZE = 200;
 export const MAX_SEARCH_LENGTH = 120;
 export const MAPPING_QUEUE_PAGE_SIZE = 20;
 export const MAX_CONFIRM_ROWS = 100;
+/** 海外库存历史快照：明细每页行数（服务端 041 只读函数上限 200）。 */
+export const INVENTORY_SNAPSHOT_PAGE_SIZE = 50;
+/** 海外库存历史快照：左侧已发布批次每页条数（超过一页时页面提供更早批次）。 */
+export const INVENTORY_SNAPSHOT_BATCH_PAGE_SIZE = 50;
 
 /* ------------------------------------------------------------------ *
  * 时间与数字显示（确定性：固定 Asia/Shanghai）
@@ -98,6 +104,62 @@ export function formatQuantity(value: number | null | undefined): string {
 
 export function formatQuantityOr(value: number | null | undefined, fallback = '—'): string {
   return formatQuantity(value) || fallback;
+}
+
+/**
+ * 历史快照数量：真实 0 必须显示「0」；来源缺失（null/undefined/非有限数）显示「未提供」，
+ * 不把缺失写成 0，也不把 0 写成缺失。
+ */
+export function snapshotQuantityText(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '未提供';
+  return formatQuantity(value);
+}
+
+/** 历史快照单位：来源未记录（null/空白）显示「未提供」。 */
+export function snapshotUnitText(unit: string | null | undefined): string {
+  const text = (unit ?? '').trim();
+  return text || '未提供';
+}
+
+/** 历史快照商品归属：只用批次保存的 item_id / 货号 / 当时品名，不查当前对应。 */
+export function snapshotItemText(
+  row: Pick<InventorySnapshotRowDto, 'itemId' | 'iceCode' | 'nameCn'>,
+): { bound: boolean; title: string; note: string } {
+  if (!row.itemId) {
+    return { bound: false, title: '未绑定商品', note: '本批未对应商品，数量照常保留' };
+  }
+  const code = (row.iceCode ?? '').trim();
+  const name = (row.nameCn ?? '').trim();
+  return {
+    bound: true,
+    title: [code, name].filter(Boolean).join(' · ') || '已绑定商品（货号与品名未提供）',
+    note: '历史归属按批次保存的对应关系',
+  };
+}
+
+/** 历史版本说明：映射版本 + 商品版本；任一缺失写「未提供」。 */
+export function snapshotVersionText(
+  row: Pick<InventorySnapshotRowDto, 'mappingVersion' | 'itemRevision'>,
+): string {
+  const mapping = row.mappingVersion === null || row.mappingVersion === undefined
+    ? '映射版本未提供'
+    : `映射 v${row.mappingVersion}`;
+  const revision = row.itemRevision === null || row.itemRevision === undefined
+    ? '商品版本未提供'
+    : `商品版本 ${row.itemRevision}`;
+  return `${mapping} · ${revision}`;
+}
+
+/**
+ * 快照里“当前实际查看的批次”：优先用服务端已读取的批次，URL 的 snapBatch 只是回退。
+ * 列表翻页/明细分页等链接必须沿用它，不能只带 URL 里可能为空的 snapBatch，
+ * 否则默认最新批次时翻列表会把右侧详情换成该页第一批。
+ */
+export function snapshotViewedBatchId(
+  detailBatchId: string | null | undefined,
+  queryBatchId: string | null | undefined,
+): string {
+  return (detailBatchId ?? '').trim() || (queryBatchId ?? '').trim();
 }
 
 /**
@@ -637,6 +699,20 @@ export interface InventoryQueryState {
   sort: InventorySortKey;
   /** 排序方向（URL 参数 dir）。 */
   sortDir: InventorySortDir;
+  /** 经营总览「查看待绑定商品」直达：pending=open 时挂载后自动打开待处理弹窗。 */
+  pending: 'open' | null;
+  /** 历史快照视图（?snap=1）：保留原库存筛选，快照参数各自独立，返回时不互相覆盖。 */
+  snapshot: boolean;
+  /** 历史快照所选海外仓（只属于快照视图；不影响库存列表 warehouse 筛选）。 */
+  snapWarehouse: string;
+  /** 历史快照所选批次（uuid）；空 = 默认该仓最新批次。 */
+  snapBatch: string;
+  /** 历史快照的来源 SKU 搜索（只属于快照视图；切批次保留）。 */
+  snapQ: string;
+  /** 历史快照明细分页。 */
+  snapPage: number;
+  /** 历史快照左侧批次列表分页；0 = 未指定（按所选批次定位／第一页），>0 = 明确停留该页。 */
+  snapBPage: number;
 }
 
 export type InventorySortDir = 'asc' | 'desc';
@@ -703,6 +779,13 @@ export const DEFAULT_INVENTORY_QUERY: InventoryQueryState = {
   allWarehouses: false,
   sort: '',
   sortDir: 'asc',
+  pending: null,
+  snapshot: false,
+  snapWarehouse: '',
+  snapBatch: '',
+  snapQ: '',
+  snapPage: 1,
+  snapBPage: 0,
 };
 
 export function parseInventoryView(raw: string | null | undefined): InventoryViewMode {
@@ -729,6 +812,10 @@ export function parseInventorySearchParams(params: URLSearchParams): InventoryQu
   const rawRow = (params.get('row') ?? '').trim().slice(0, 220);
   const row = /^[A-Za-z0-9:_-]{1,220}$/.test(rawRow) ? rawRow : '';
   const allWarehouses = Boolean(item) && ['1', 'true', 'yes'].includes((params.get('all') ?? '').toLowerCase());
+  const rawSnapWarehouse = (params.get('snapWarehouse') ?? '').trim();
+  const rawSnapBatch = (params.get('snapBatch') ?? '').trim();
+  const rawSnapBPage = (params.get('snapBPage') ?? '').trim();
+  const snapQ = (params.get('snapQ') ?? '').trim().slice(0, MAX_SEARCH_LENGTH);
   return {
     q: rawQ,
     warehouse,
@@ -743,6 +830,14 @@ export function parseInventorySearchParams(params: URLSearchParams): InventoryQu
     allWarehouses,
     sort: parseInventorySortKey(params.get('sort')),
     sortDir: parseInventorySortDir(params.get('dir')),
+    pending: params.get('pending') === 'open' ? 'open' : null,
+    snapshot: ['1', 'true', 'yes'].includes((params.get('snap') ?? '').toLowerCase()),
+    snapWarehouse: isUuid(rawSnapWarehouse) ? rawSnapWarehouse : '',
+    snapBatch: isUuid(rawSnapBatch) ? rawSnapBatch : '',
+    snapQ,
+    snapPage: normalizePageNumber(Number(params.get('snapPage') ?? '1')),
+    // 0 = 未指定列表页（可按所选批次自动定位）；显式 snapBPage=1 与未指定必须区分。
+    snapBPage: rawSnapBPage === '' ? 0 : normalizePageNumber(Number(rawSnapBPage)),
   };
 }
 
@@ -765,6 +860,45 @@ export function buildInventoryListHref(
   if (state.page > 1) params.set('page', String(state.page));
   const qs = params.toString();
   return qs ? `/dashboard/inventory?${qs}` : '/dashboard/inventory';
+}
+
+/**
+ * 历史快照链接：在保留库存列表筛选（q/warehouse/market/view/source/sort/page）的基础上
+ * 追加快照参数（snap=1 / snapWarehouse / snapBatch / snapQ / snapPage / snapBPage）。
+ * 不携带 item/row/focus/pending：进入或返回库存时不会重开详情或待处理弹窗。
+ */
+export function buildInventorySnapshotHref(
+  state: Pick<InventoryQueryState, 'q' | 'warehouse' | 'market' | 'page'> &
+    Partial<Pick<InventoryQueryState, 'view' | 'source' | 'sort' | 'sortDir'
+      | 'snapWarehouse' | 'snapBatch' | 'snapQ' | 'snapPage' | 'snapBPage'>>,
+  overrides: Partial<Pick<InventoryQueryState, 'snapWarehouse' | 'snapBatch' | 'snapQ' | 'snapPage' | 'snapBPage'>> = {},
+): string {
+  const params = new URLSearchParams();
+  if (state.q) params.set('q', state.q);
+  if (state.warehouse && state.warehouse !== 'all') params.set('warehouse', state.warehouse);
+  if (state.market && state.market !== 'all') params.set('market', state.market);
+  if (state.view === 'product') params.set('view', 'product');
+  if (state.source && state.source !== 'all') params.set('source', state.source);
+  if (state.sort) {
+    params.set('sort', state.sort);
+    params.set('dir', state.sortDir === 'desc' ? 'desc' : 'asc');
+  }
+  if (state.page > 1) params.set('page', String(state.page));
+  params.set('snap', '1');
+  const snapWarehouse = overrides.snapWarehouse !== undefined
+    ? overrides.snapWarehouse
+    : (state.snapWarehouse ?? '');
+  if (snapWarehouse) params.set('snapWarehouse', snapWarehouse);
+  const snapBatch = overrides.snapBatch !== undefined ? overrides.snapBatch : (state.snapBatch ?? '');
+  if (snapBatch) params.set('snapBatch', snapBatch);
+  const snapQ = overrides.snapQ !== undefined ? overrides.snapQ : (state.snapQ ?? '');
+  if (snapQ) params.set('snapQ', snapQ);
+  const snapPage = overrides.snapPage !== undefined ? overrides.snapPage : (state.snapPage ?? 1);
+  if (snapPage > 1) params.set('snapPage', String(snapPage));
+  const snapBPage = overrides.snapBPage !== undefined ? overrides.snapBPage : (state.snapBPage ?? 0);
+  // 只有明确指定列表页时才写参数（含第 1 页）；未指定时不写，页面可按所选批次自动定位。
+  if (snapBPage > 0) params.set('snapBPage', String(snapBPage));
+  return `/dashboard/inventory?${params.toString()}`;
 }
 
 export function buildInventoryDetailHref(
@@ -834,7 +968,7 @@ export function inventoryScopeLabel(input: {
 }): string {
   if (input.scopeMode === 'all') return '视角：全仓（显式切换，不沿用列表筛选）';
   const parts: string[] = [];
-  if (input.market && input.market !== 'all') parts.push(`市场 ${input.market}`);
+  if (input.market && input.market !== 'all') parts.push(`市场 ${marketLabel(input.market === UNKNOWN_MARKET_TOKEN ? null : input.market)}`);
   if (input.warehouseName) parts.push(`仓库 ${input.warehouseName}`);
   return parts.length > 0 ? `视角：沿用列表筛选（${parts.join(' / ')}）` : '视角：沿用列表筛选（全部仓库）';
 }
@@ -862,6 +996,9 @@ export function marketOptionLabel(option: InventoryMarketOptionDto): string {
 /**
  * 市场展示：多个已知市场给集合，未知仓单独提示；单市场筛选保留该市场。
  * 不把跨多市场写成“市场待确认”，也不猜未知市场值。
+ *
+ * 注意：这里保留服务端市场代码（内部纯逻辑/旧调用方的基线）；页面可见的市场文案
+ * 由 `marketLabel` 在各渲染点转成中文，避免把显示映射耦合进排序/筛选逻辑。
  */
 export function marketsDisplay(
   markets: string[] | null | undefined,
@@ -2465,7 +2602,7 @@ export function marketCellQuantity(cell: Pick<InventoryProductMarketCellDto, 'on
 }
 
 export function marketCellLabel(cell: Pick<InventoryProductMarketCellDto, 'market'>): string {
-  return cell.market ?? '市场待确认';
+  return marketLabel(cell.market);
 }
 
 export function domesticCellQuantity(cell: InventoryProductDomesticCellDto | null): string {
@@ -2490,7 +2627,7 @@ export function isUnknownMarketToken(value: string | null | undefined): boolean 
 /** 市场范围短标签（市场下拉已删除，只在有国家下钻时显示一个可清除标签）。 */
 export function marketScopeLabel(market: string): string {
   if (market === 'all') return '';
-  return market === UNKNOWN_MARKET_TOKEN ? '市场待确认（未知仓）' : `市场 ${market}`;
+  return market === UNKNOWN_MARKET_TOKEN ? '市场待确认（未知仓）' : `市场 ${marketLabel(market)}`;
 }
 
 /**

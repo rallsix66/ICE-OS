@@ -3,6 +3,7 @@ import type {
   ProductShipmentLinkRowDto,
   ProductShipmentLinksDto,
   ShipmentAssociationResultDto,
+  ShipmentAssociationRulePreviewDto,
   ShipmentAssociationStatus,
   ShipmentAutoReaderStatusDto,
   ShipmentDetailDto,
@@ -750,7 +751,29 @@ export function normalizeAssociationResult(value: unknown): ShipmentAssociationR
     errorMessage: textOrNull(raw.errorMessage),
     mappingSaved: boolean(raw.mappingSaved),
     adoptedCount: intOr(raw.adoptedCount, 0),
+    ruleAdoptedCount: intOr(raw.ruleAdoptedCount, 0),
     mappingNote: textOrNull(raw.mappingNote),
+  };
+}
+
+/** 039 只读规则影响预告：字段收窄 + 票号数组过滤（不猜数、不补默认票号）。 */
+export function normalizeAssociationRulePreview(value: unknown): ShipmentAssociationRulePreviewDto {
+  const raw = record(value);
+  return {
+    ok: boolean(raw.ok),
+    itemId: text(raw.itemId),
+    market: textOrNull(raw.market),
+    nameNorm: textOrNull(raw.nameNorm),
+    productNameRaw: textOrNull(raw.productNameRaw),
+    selectedProductId: textOrNull(raw.selectedProductId),
+    matchingCount: Math.max(0, intOr(raw.matchingCount, 0)),
+    ticketCount: Math.max(0, intOr(raw.ticketCount, 0)),
+    sampleTickets: array(raw.sampleTickets)
+      .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+      .slice(0, 3),
+    unboundCount: Math.max(0, intOr(raw.unboundCount, 0)),
+    reassignCount: Math.max(0, intOr(raw.reassignCount, 0)),
+    note: textOrNull(raw.note),
   };
 }
 
@@ -991,4 +1014,39 @@ export function normalizeSnapshotRaw(value: unknown): ShipmentSnapshotRawDto | n
     }),
     collection: record(raw.collection),
   };
+}
+
+/** 旧票人工确认建议的一行（038 只读投影；只含商品身份与旧票号，不含价格/数量）。 */
+export interface ShipmentAssociationHistoryRow {
+  market: string;
+  nameNorm: string;
+  productId: string;
+  iceCode: string | null;
+  nameCn: string | null;
+  ticketNo: string | null;
+  recordedAt: string | null;
+  manual: boolean;
+  confirmations: number;
+}
+
+/** 038 只读函数结果 → 页面合并用行；缺市场/品名/商品的条目丢弃，不猜测。 */
+export function normalizeAssociationHistory(value: unknown): ShipmentAssociationHistoryRow[] {
+  return array(value).flatMap((entry): ShipmentAssociationHistoryRow[] => {
+    const row = record(entry);
+    const market = text(row.market);
+    const nameNorm = text(row.nameNorm);
+    const productId = text(row.productId);
+    if (!market || !nameNorm || !productId) return [];
+    return [{
+      market,
+      nameNorm,
+      productId,
+      iceCode: textOrNull(row.iceCode),
+      nameCn: textOrNull(row.nameCn),
+      ticketNo: textOrNull(row.ticketNo),
+      recordedAt: textOrNull(row.recordedAt),
+      manual: boolean(row.manual),
+      confirmations: intOr(row.confirmations, 1),
+    }];
+  });
 }

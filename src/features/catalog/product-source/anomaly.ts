@@ -9,9 +9,11 @@
  * merging. Real WM0069/WM0070/WM0071/WM0073 therefore become needs_review
  * (barcode blank vs value), while WM0072 (barcode consistent) can merge.
  */
+import { createHash } from 'node:crypto';
 import type {
   AdoptableFieldKey,
   CodeGroup,
+  PlanDuplicateDecision,
   ProductSourceFieldKey,
   ProductSourceReasonCode,
   SourceCell,
@@ -22,6 +24,7 @@ import type {
   SourceSnapshot,
 } from './contract';
 import {
+  ADOPTABLE_FIELD_KEYS,
   CONSISTENCY_FIELD_KEYS,
   DUPLICATE_CODE_INCONSISTENT,
   IMAGE_NOT_READ_BY_SNAPSHOT,
@@ -30,10 +33,11 @@ import {
   PRODUCT_SOURCE_FIELD_KEYS,
   SOURCE_FORMULA_ERROR,
   SOURCE_VALUE_NOT_NUMERIC,
+  canonicalJson,
   codeSourceKey,
   rowSourceKey,
 } from './contract';
-import { areSameFieldValue, normalizeCellText } from './normalize';
+import { areSameFieldValue, normalizeCellText, normalizeIdentityName } from './normalize';
 import { groupSourceRows, type SnapshotGrouping } from './grouping';
 
 export { validateSnapshot, resolveHeaderColumns, resolveHeaderMapping } from './headers';
@@ -68,12 +72,8 @@ export function cellsEquivalent(fieldKey: ProductSourceFieldKey, left: SourceCel
 
 function conflictValues(rows: SourceRow[], fieldKey: AdoptableFieldKey): SourceFieldConflict['values'] {
   const values: SourceFieldConflict['values'] = [];
-  const seen = new Set<string>();
   for (const row of rows) {
     const cell = row.fields[fieldKey] ?? { raw: '', state: 'explicit_empty' as const };
-    const signature = cellSignature(cell);
-    if (seen.has(signature)) continue;
-    seen.add(signature);
     values.push({
       rowNumber: row.rowNumber,
       raw: cell.state === 'observed' ? cell.raw : null,
@@ -81,6 +81,30 @@ function conflictValues(rows: SourceRow[], fieldKey: AdoptableFieldKey): SourceF
     });
   }
   return values;
+}
+
+/**
+ * Content fingerprint of one source row over the adoptable business fields
+ * (sourceDate and the source code are excluded). Row numbers are deliberately
+ * NOT part of the payload: a decision must survive worksheet row shifts.
+ */
+export function rowBusinessSha256(fields: Record<string, SourceCell>): string {
+  const payload: Record<string, string> = {};
+  for (const fieldKey of ADOPTABLE_FIELD_KEYS) {
+    const cell = fields[fieldKey] ?? { raw: '', state: 'explicit_empty' as const };
+    payload[fieldKey] = cellSignature(cell);
+  }
+  return sha256Text(canonicalJson(payload));
+}
+
+/** Fingerprint of the whole duplicate group at decision time (sorted, row-number free). */
+export function duplicateBasisSha256(rows: readonly SourceRow[]): string {
+  const fingerprints = rows.map((row) => rowBusinessSha256(row.fields)).sort();
+  return sha256Text(canonicalJson(fingerprints));
+}
+
+function sha256Text(input: string): string {
+  return createHash('sha256').update(input).digest('hex');
 }
 
 function rowFieldIssues(row: SourceRow): SourceFieldNote[] {
@@ -124,7 +148,7 @@ function mergeSingleRow(row: SourceRow): Record<ProductSourceFieldKey, SourceCel
   return mergeConsistentRows([row]);
 }
 
-export function evaluateCodeGroup(group: CodeGroup): SourceRowEvaluation {
+export function evaluateCodeGroup(group: CodeGroup, decision?: PlanDuplicateDecision): SourceRowEvaluation {
   const rows = [...group.rows].sort((left, right) => left.rowNumber - right.rowNumber);
   const conflicts: SourceFieldConflict[] = [];
   for (const fieldKey of CONSISTENCY_FIELD_KEYS) {
@@ -149,6 +173,41 @@ export function evaluateCodeGroup(group: CodeGroup): SourceRowEvaluation {
 
   const rowNumbers = rows.map((row) => row.rowNumber);
   if (conflicts.length > 0) {
+    // A saved human choice is reused only while the whole group's business
+    // content is unchanged. Row-number shifts are ignored; a changed cell, a
+    // new row, or a missing chosen row re-opens the review.
+    if (decision) {
+      const basis = duplicateBasisSha256(rows);
+      const chosen = rows.find((row) => rowBusinessSha256(row.fields) === decision.chosenRowSha256);
+      if (chosen && basis === decision.basisSha256) {
+        return {
+          sourceKey: codeSourceKey(group.code),
+          iceCode: group.code,
+          rowNumbers,
+          classification: 'consistent',
+          reasonCode: null,
+          logicalFields: mergeSingleRow(chosen),
+          conflicts: [],
+          fieldIssues: rowFieldIssues(chosen),
+          notes: [...notes, `已按人工选择以来源第 ${chosen.rowNumber} 行为准`],
+          decisionApplied: true,
+        };
+      }
+      return {
+        sourceKey: codeSourceKey(group.code),
+        iceCode: group.code,
+        rowNumbers,
+        classification: 'inconsistent',
+        reasonCode: DUPLICATE_CODE_INCONSISTENT,
+        logicalFields: null,
+        conflicts,
+        fieldIssues,
+        notes: [...notes, chosen
+          ? '已有同号多行选择，但来源内容出现新的差异，请重新确认'
+          : '已有同号多行选择，但当时选定的来源行已不存在，请重新确认'],
+        decisionStale: true,
+      };
+    }
     return {
       sourceKey: codeSourceKey(group.code),
       iceCode: group.code,
@@ -189,9 +248,13 @@ export function evaluateMissingCodeRow(row: SourceRow): SourceRowEvaluation {
 }
 
 /** Evaluate every business row: code groups by code asc, then missing-code rows by row number. */
-export function evaluateSourceRows(snapshot: SourceSnapshot): SourceRowEvaluation[] {
+export function evaluateSourceRows(
+  snapshot: SourceSnapshot,
+  duplicateDecisions: readonly PlanDuplicateDecision[] = [],
+): SourceRowEvaluation[] {
   const grouping: SnapshotGrouping = groupSourceRows(snapshot);
-  const codeEvaluations = grouping.codeGroups.map(evaluateCodeGroup);
+  const decisionByCode = new Map(duplicateDecisions.map((decision) => [decision.iceCode, decision]));
+  const codeEvaluations = grouping.codeGroups.map((group) => evaluateCodeGroup(group, decisionByCode.get(group.code)));
   const missingEvaluations = grouping.missingCodeRows.map(evaluateMissingCodeRow);
   return [...codeEvaluations, ...missingEvaluations];
 }
@@ -210,7 +273,7 @@ export interface SuspectedCodeCandidate {
 export interface SuspectedCodeMatch {
   suspected: boolean;
   matchedItemId: string | null;
-  matchedBy: 'barcode' | 'nameCn' | null;
+  matchedBy: 'barcode' | 'nameCn' | 'normalizedName' | null;
 }
 
 /**
@@ -250,21 +313,39 @@ export function detectSuspectedCodeChange(input: {
         return { suspected: true, matchedItemId: candidate.itemId, matchedBy: 'nameCn' };
       }
     }
+    // Whitespace-only differences are a review hint, never an automatic merge.
+    const normalizedName = normalizeIdentityName(nameCn);
+    if (normalizedName !== '') {
+      for (const candidate of candidates) {
+        if (normalizeIdentityName(candidate.nameCn) === normalizedName) {
+          return { suspected: true, matchedItemId: candidate.itemId, matchedBy: 'normalizedName' };
+        }
+        if (candidate.adoptionNameCn !== null && normalizeIdentityName(candidate.adoptionNameCn) === normalizedName) {
+          return { suspected: true, matchedItemId: candidate.itemId, matchedBy: 'normalizedName' };
+        }
+      }
+    }
   }
   return { suspected: false, matchedItemId: null, matchedBy: null };
 }
 
-/** Exact-name hint for a missing-code row against existing items that still have no code. */
+/** Name hint for a missing-code row against existing items that still have no code. */
 export function matchUncodedItemByName(
   nameCn: string,
   uncodedItems: { itemId: string; nameCn: string }[],
 ): { itemId: string; nameCn: string } | null {
   const target = normalizeCellText(nameCn);
   if (target === '') return null;
-  const matches = uncodedItems
+  const exact = uncodedItems
     .filter((item) => normalizeCellText(item.nameCn) === target)
     .sort((left, right) => (left.itemId < right.itemId ? -1 : left.itemId > right.itemId ? 1 : 0));
-  return matches[0] ?? null;
+  if (exact[0]) return exact[0];
+  const normalizedTarget = normalizeIdentityName(nameCn);
+  if (normalizedTarget === '') return null;
+  const normalized = uncodedItems
+    .filter((item) => normalizeIdentityName(item.nameCn) === normalizedTarget)
+    .sort((left, right) => (left.itemId < right.itemId ? -1 : left.itemId > right.itemId ? 1 : 0));
+  return normalized[0] ?? null;
 }
 
 /** Field-level issue kind mapping for parse failures (no price values involved). */

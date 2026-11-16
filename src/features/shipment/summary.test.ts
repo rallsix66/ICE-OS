@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildShipmentAssociationSuggestions,
   buildShipmentMarketSummary,
+  buildShipmentMarketSummaryFor,
   buildShipmentTicketValue,
+  buildShipmentValueMarketDetails,
   buildShipmentValueOverview,
   type ShipmentMarketSummarySource,
   type ShipmentMarketSummarySourceItem,
@@ -336,5 +339,114 @@ describe('第十三轮：单票在途货值', () => {
     ] as never);
     expect(value.totalValueCny).toBe('0');
     expect(value.pricedItemCount).toBe(2);
+  });
+});
+
+describe('货值汇总：按市场就地展开（第十七轮）', () => {
+  const cards = new Map([
+    ['p-1', card('p-1', 'WM0057', '4.4')],
+    ['p-2', card('p-2', 'WM0052', '3.48')],
+    ['p-3', card('p-3', 'WM0071', null)],
+  ]);
+
+  function multiMarketSource(): ShipmentMarketSummarySource {
+    return source([
+      item({ itemId: 'th-1', shipmentId: 's-th', market: '泰国', productId: 'p-1', remainingQuantity: 100 }),
+      item({ itemId: 'th-2', shipmentId: 's-th', market: '泰国', productId: null, productNameRaw: '未关联品', remainingQuantity: 40 }),
+      item({
+        itemId: 'vn-1', shipmentId: 's-vn', market: '越南', productId: 'p-2',
+        shippedQuantity: 10, receivedQuantity: null, receiptBasis: 'pending',
+        remainingQuantity: null, remainingState: 'pending', statusClass: 'unknown',
+      }),
+      item({
+        itemId: 'my-1', shipmentId: 's-my', market: '马来西亚', productId: 'p-3', remainingQuantity: 5,
+      }),
+      item({
+        itemId: 'no-1', shipmentId: 's-no', market: null, productId: null,
+        productNameRaw: '无市场未关联', remainingQuantity: 3,
+      }),
+    ]);
+  }
+
+  it('展开数据与全部市场汇总一一对应：数量、货值、未计入条数一致', () => {
+    const src = multiMarketSource();
+    const overview = buildShipmentValueOverview(src, cards);
+    const details = buildShipmentValueMarketDetails(src, cards);
+    expect(details).toHaveLength(overview.markets.length);
+    for (const row of overview.markets) {
+      const detail = details.find((entry) => entry.market === row.market && entry.unknownMarket === row.unknownMarket);
+      expect(detail).toBeDefined();
+      expect(detail!.ticketCount).toBe(row.ticketCount);
+      expect(detail!.itemCount).toBe(row.itemCount);
+      expect(detail!.totalValueCny).toBe(row.totalValueCny);
+      expect(detail!.excludedItemCount).toBe(row.excludedItemCount);
+      expect(detail!.excludedItems).toHaveLength(row.excludedItemCount);
+    }
+    // 「未计入 N 条」= 各市场展开明细之和（页面两处数字来自同一份数据）
+    expect(details.flatMap((detail) => detail.excludedItems)).toHaveLength(overview.excludedItemCount);
+    expect(overview.excludedItemCount).toBe(4);
+  });
+
+  it('展开区商品构成是聚合行（数量/票/货值），不重复搬运逐条明细', () => {
+    const details = buildShipmentValueMarketDetails(multiMarketSource(), cards);
+    const th = details.find((detail) => detail.market === '泰国')!;
+    expect(th.products).toHaveLength(1);
+    expect(th.products[0]).toMatchObject({
+      productId: 'p-1',
+      iceCode: 'WM0057',
+      remainingQuantity: 100,
+      itemCount: 1,
+      ticketCount: 1,
+      valueCny: '440',
+    });
+    expect('items' in th.products[0]).toBe(false);
+    // 未计入明细分原因，可点开原票；未关联行的商品卡为 null
+    expect(th.excludedItems[0]).toMatchObject({ itemId: 'th-2', exclusion: 'unbound', product: null });
+    expect(th.excludedItems[0].market).toBe('泰国');
+  });
+
+  it('选中单个市场：只返回该市场；未知市场用 __unknown__ 哨兵', () => {
+    const src = multiMarketSource();
+    const vn = buildShipmentMarketSummaryFor(src, cards, '越南');
+    expect(vn.market).toBe('越南');
+    expect(vn.itemCount).toBe(1);
+    expect(vn.excludedItems[0].exclusion).toBe('quantity_pending');
+    const unknown = buildShipmentMarketSummaryFor(src, cards, '__unknown__');
+    expect(unknown.unknownMarket).toBe(true);
+    expect(unknown.market).toBeNull();
+    expect(unknown.itemCount).toBe(1);
+    // 没有该市场的数据时返回空汇总，不伪造其它市场数据
+    expect(buildShipmentMarketSummaryFor(src, cards, '菲律宾').itemCount).toBe(0);
+  });
+
+  it('同市场同品名建议：只给未关联明细、按次数与货号排序、最多 3 个', () => {
+    const src = source([
+      // 同市场同品名（规范化后忽略空白/大小写）出现过 2 次 p-1、1 次 p-2、1 次 p-3、1 次 p-4
+      item({ itemId: 'a', market: '泰国', productId: 'p-1', productNameRaw: 'WM0057 腮红' }),
+      item({ itemId: 'b', market: '泰国', productId: 'p-1', productNameRaw: 'wm0057腮红 ' }),
+      item({ itemId: 'c', market: '泰国', productId: 'p-2', productNameRaw: 'WM0057 腮红' }),
+      item({ itemId: 'd', market: '泰国', productId: 'p-3', productNameRaw: 'WM0057 腮红' }),
+      // 未关联：同市场同品名 → 有建议
+      item({ itemId: 'x', market: '泰国', productId: null, productNameRaw: 'WM0057 腮红' }),
+      // 未关联但不同市场 → 不给建议
+      item({ itemId: 'y', market: '越南', productId: null, productNameRaw: 'WM0057 腮红' }),
+      // 未关联且市场为空 → 不给建议（人工对应要求市场非空）
+      item({ itemId: 'z', market: null, productId: null, productNameRaw: 'WM0057 腮红' }),
+      // 已关联的明细本身不需要建议
+      item({ itemId: 'w', market: '泰国', productId: 'p-1', productNameRaw: 'WM0057 腮红' }),
+    ]);
+    const suggestions = buildShipmentAssociationSuggestions(src, cards);
+    expect(Object.keys(suggestions).sort()).toEqual(['x']);
+    expect(suggestions.x).toHaveLength(3);
+    expect(suggestions.x[0]).toMatchObject({ productId: 'p-1', iceCode: 'WM0057', count: 3 });
+    expect(suggestions.x[1]?.count).toBe(1);
+    expect(suggestions.x[2]?.count).toBe(1);
+  });
+
+  it('没有同市场同品名可参考时不给空建议', () => {
+    const src = source([
+      item({ itemId: 'only', market: '泰国', productId: null, productNameRaw: '全新品名', remainingQuantity: 9 }),
+    ]);
+    expect(buildShipmentAssociationSuggestions(src, cards)).toEqual({});
   });
 });

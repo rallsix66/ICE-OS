@@ -42,6 +42,10 @@ import type {
   InventoryRunWarehouseDto,
   InventoryScopeDto,
   InventorySettingsDto,
+  InventorySnapshotBatchMetaDto,
+  InventorySnapshotBatchesDto,
+  InventorySnapshotRowDto,
+  InventorySnapshotRowsDto,
   InventoryWarehouseDto,
   InventoryWarehouseReadStateV2Dto,
   InventoryWarehouseRowDto,
@@ -1126,6 +1130,113 @@ export function normalizeProductSummary(raw: unknown): InventoryProductSummaryDt
     unmappedDomesticRows: asIntOrNull(pick(record, 'unmappedDomesticRows', 'unmapped_domestic_rows')) ?? 0,
     domesticAvailable: asBool(pick(record, 'domesticAvailable', 'domestic_available'), false),
     domesticReason: pickStringOrNull(record, 'domesticReason', 'domestic_reason'),
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * 海外库存历史快照（041 只读）
+ *
+ * 只改变形状、不改口径：观测时间取 observationAt；数量缺失保持 null；
+ * 商品归属只用批次行保存的 itemId/mappingId/itemRevision。
+ * ------------------------------------------------------------------ */
+
+export function normalizeSnapshotBatches(raw: unknown): InventorySnapshotBatchesDto {
+  const record = asRecord(raw);
+  // 顺序由服务端给出（observation_at DESC）；这里不重排，避免页面与服务端口径不一致。
+  const batches = asArray(record.batches)
+    .map((entry) => {
+      const row = asRecord(entry);
+      const batchId = pickString(row, 'batchId', 'batch_id');
+      const observationAt = pickString(row, 'observationAt', 'observation_at');
+      if (!batchId || !observationAt) return null;
+      return {
+        batchId,
+        observationAt,
+        publishedAt: pickString(row, 'publishedAt', 'published_at') || observationAt,
+        rowCount: asIntOrNull(pick(row, 'rowCount', 'row_count')) ?? 0,
+        adoptedCount: asIntOrNull(pick(row, 'adoptedCount', 'adopted_count')) ?? 0,
+        unmappedCount: asIntOrNull(pick(row, 'unmappedCount', 'unmapped_count')) ?? 0,
+      };
+    })
+    .filter((entry): entry is InventorySnapshotBatchesDto['batches'][number] => entry !== null);
+  return {
+    warehouseId: pickString(record, 'warehouseId', 'warehouse_id'),
+    warehouseName: pickString(record, 'warehouseName', 'warehouse_name', 'name'),
+    market: pickStringOrNull(record, 'market'),
+    batches,
+    batchTotal: asIntOrNull(pick(record, 'batchTotal', 'batch_total')) ?? batches.length,
+    offset: asIntOrNull(pick(record, 'offset')) ?? 0,
+    limit: asIntOrNull(pick(record, 'limit')) ?? batches.length,
+  };
+}
+
+function normalizeSnapshotBatchMeta(raw: unknown): InventorySnapshotBatchMetaDto | null {
+  const record = asRecord(raw);
+  const batchId = pickString(record, 'batchId', 'batch_id');
+  const observationAt = pickString(record, 'observationAt', 'observation_at');
+  if (!batchId || !observationAt) return null;
+  return {
+    batchId,
+    warehouseId: pickString(record, 'warehouseId', 'warehouse_id'),
+    warehouseName: pickString(record, 'warehouseName', 'warehouse_name', 'name'),
+    market: pickStringOrNull(record, 'market'),
+    observationAt,
+    publishedAt: pickString(record, 'publishedAt', 'published_at') || observationAt,
+    rowCount: asIntOrNull(pick(record, 'rowCount', 'row_count')) ?? 0,
+    adoptedCount: asIntOrNull(pick(record, 'adoptedCount', 'adopted_count')) ?? 0,
+    unmappedCount: asIntOrNull(pick(record, 'unmappedCount', 'unmapped_count')) ?? 0,
+  };
+}
+
+export function normalizeSnapshotRows(raw: unknown): InventorySnapshotRowsDto {
+  const record = asRecord(raw);
+  const rows = asArray(record.rows)
+    .map((entry) => {
+      const row = asRecord(entry);
+      const externalSku = pickString(row, 'externalSku', 'external_sku');
+      if (!externalSku) return null;
+      return {
+        externalSku,
+        gtin: pickStringOrNull(row, 'gtin'),
+        excelRow: asIntOrNull(pick(row, 'excelRow', 'excel_row')),
+        status: pickString(row, 'status') || 'unmapped',
+        itemId: pickStringOrNull(row, 'itemId', 'item_id'),
+        iceCode: pickStringOrNull(row, 'iceCode', 'ice_code'),
+        nameCn: pickStringOrNull(row, 'nameCn', 'name_cn'),
+        itemRevision: asIntOrNull(pick(row, 'itemRevision', 'item_revision')),
+        mappingId: pickStringOrNull(row, 'mappingId', 'mapping_id'),
+        mappingVersion: asIntOrNull(pick(row, 'mappingVersion', 'mapping_version', 'version')),
+        unit: pickStringOrNull(row, 'unit'),
+        onHand: asIntOrNull(pick(row, 'onHand', 'on_hand')),
+        orderLocked: asIntOrNull(pick(row, 'orderLocked', 'order_locked')),
+        warehouseAvailable: asIntOrNull(pick(row, 'warehouseAvailable', 'warehouse_available')),
+        observationAt: pickString(row, 'observationAt', 'observation_at'),
+      } satisfies InventorySnapshotRowDto;
+    })
+    .filter((entry): entry is InventorySnapshotRowDto => entry !== null);
+  const ok = asBool(pick(record, 'ok'), false);
+  const rawStatus = pickString(record, 'status');
+  const status: InventorySnapshotRowsDto['status'] = rawStatus === 'not_found' || rawStatus === 'warehouse_mismatch'
+    || rawStatus === 'no_account'
+    ? rawStatus
+    : (ok ? 'ok' : 'not_found');
+  return {
+    ok,
+    status,
+    reason: pickStringOrNull(record, 'reason'),
+    batch: normalizeSnapshotBatchMeta(pick(record, 'batch')),
+    batchRank: asIntOrNull(pick(record, 'batchRank', 'batch_rank')),
+    batchTotal: asIntOrNull(pick(record, 'batchTotal', 'batch_total')) ?? 0,
+    requestedWarehouseId: pickStringOrNull(record, 'requestedWarehouseId', 'requested_warehouse_id'),
+    batchWarehouseId: pickStringOrNull(record, 'batchWarehouseId', 'batch_warehouse_id'),
+    batchWarehouseName: pickStringOrNull(record, 'batchWarehouseName', 'batch_warehouse_name'),
+    batchObservationAt: pickStringOrNull(record, 'batchObservationAt', 'batch_observation_at'),
+    search: pickStringOrNull(record, 'search'),
+    total: asIntOrNull(pick(record, 'total')) ?? 0,
+    matched: asIntOrNull(pick(record, 'matched')) ?? rows.length,
+    offset: asIntOrNull(pick(record, 'offset')) ?? 0,
+    limit: asIntOrNull(pick(record, 'limit')) ?? 50,
+    rows,
   };
 }
 

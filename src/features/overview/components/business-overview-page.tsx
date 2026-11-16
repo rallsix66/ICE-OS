@@ -1,16 +1,17 @@
 import Link from 'next/link';
 import {
-  AlertTriangle,
   ArrowRight,
   Boxes,
   Clock3,
-  Info,
   Package,
   Search,
   Ship,
   Warehouse,
 } from 'lucide-react';
-import { Disclosure, EmptyState, PageHeading, StatusDot } from '@/ui/ice-v4/data-surface';
+import { EmptyState, PageHeading, StatusDot } from '@/ui/ice-v4/data-surface';
+import surface from '@/ui/ice-v4/data-surface.module.css';
+import { HomeMissingCost } from './home-missing-cost';
+import { HomePendingReview } from './home-pending-review';
 import { formatTimestamp } from '@/features/inventory/model';
 import { paginateHomeProducts, searchHomeProducts } from '../aggregate';
 import {
@@ -33,11 +34,17 @@ function quantityText(value: number | null, fallback: string): string {
 }
 
 /**
- * /dashboard 经营总览：三阶段货物与已知估算货值、海外市场分布、真实待处理事项、
- * 未计入说明、商品库存概览（搜索/分页/进入现有详情）。
+ * /dashboard 经营总览：三阶段货物与已知估算货值、海外市场分布、真实待处理事项、商品库存概览。
  *
  * 服务端组件：数据由 `getBusinessOverviewData()` 在完整范围内先汇总再切分页；
  * 页面不重新累加来源行，不把未知写成 0，不提供跨阶段总资产。
+ *
+ * 本轮（ux-round-20261112）：
+ * - 去掉页头「待处理」入口，只保留「查看商品库存」；
+ * - 删除「待处理 N 类」统计卡与各卡片重复小字，保留三阶段时间条、失败/未读取原因、
+ *   海外已知小计标记与成本读取失败状态；
+ * - 「估值口径与未计入说明」移到 /dashboard/valuation，首页底部只留文字链接；
+ * - 「需要处理」每类事项给出明确动作按钮，物流当场复核、缺价商品就地展开清单。
  */
 export function BusinessOverviewPage({
   data,
@@ -57,11 +64,6 @@ export function BusinessOverviewPage({
   const transit = aggregate.stages.transit;
   const overseas = aggregate.stages.overseas;
   const marketsWithStock = aggregate.markets.filter((row) => (row.onHand ?? 0) > 0 || row.transitTickets > 0);
-  const amountNote = data.amountsVisible
-    ? costFailed
-      ? '进货价读取失败，本次不计算金额、也不判断缺价；数量仍按来源显示，不生成补价待办。'
-      : '估算货值 = 实物数量 × 商品库当前采用进货价（人民币、单品、不含运费）。'
-    : '当前账号无金额权限，只显示数量，不显示估算货值。';
   const domesticTime = data.domesticFileDate
     ? `冻结文件日期 ${data.domesticFileDate}`
     : '国内冻结快照未读取';
@@ -72,9 +74,9 @@ export function BusinessOverviewPage({
     <div className={styles.page} data-testid="business-overview-page">
       <PageHeading
         title="经营总览"
-        meta="看清货物分布、已知估算货值和需要处理的事。三阶段来源时点不同，不合并为总资产。"
+        meta="三阶段来源时点不同，不合并为总资产。"
         actions={(
-          <Link className={styles.headAction} href="/dashboard/inventory">
+          <Link className={`${styles.headAction} ${styles.headActionTall}`} href="/dashboard/inventory">
             查看商品库存 <ArrowRight size={15} aria-hidden />
           </Link>
         )}
@@ -91,22 +93,17 @@ export function BusinessOverviewPage({
         <div className={styles.stat}>
           <span className={styles.statLabel}><Boxes size={15} aria-hidden /> 商品覆盖</span>
           <strong>{formatHomeQuantity(aggregate.productCount)}<small>款</small></strong>
-          <span className={styles.statMeta}>当前库存范围按标准商品去重</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}><Warehouse size={15} aria-hidden /> 海外市场</span>
           <strong>{formatHomeQuantity(marketsWithStock.length)}<small>个</small></strong>
-          <span className={styles.statMeta}>有海外库存或在途记录的市场</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}><Ship size={15} aria-hidden /> 运输在途</span>
-          <strong>{data.transitAvailable ? formatHomeQuantity(data.transitTicketCount) : '未读取'}<small>票</small></strong>
-          <span className={styles.statMeta}>{data.transitAvailable ? `${formatHomeQuantity(data.transitItemCount)} 条当前明细` : '在途来源未读取'}</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.statLabel}><AlertTriangle size={15} aria-hidden /> 待处理</span>
-          <strong>{formatHomeQuantity(data.pendingCount)}<small>条</small></strong>
-          <span className={styles.statMeta}>{data.pending.length} 类事项，见下方「需要处理」</span>
+          <strong>
+            {data.transitAvailable ? formatHomeQuantity(data.transitTicketCount) : '未读取'}
+            {data.transitAvailable ? <small>票</small> : null}
+          </strong>
         </div>
       </section>
 
@@ -192,16 +189,10 @@ export function BusinessOverviewPage({
         </article>
       </section>
 
-      <p className={styles.stageNote}>
-        <Info size={14} aria-hidden />
-        三阶段分别来自冻结文件、飞书当前读取与 BigSeller 最近批次，时点不同，不强行相加；未知与真实 0 分开显示。
-      </p>
-
       <div className={styles.twoColumns}>
         <section className={styles.panel} aria-label="海外市场分布">
           <header className={styles.panelHead}>
-            <div><h2>海外各市场分布</h2><p>海外实物与已知货值 · 在途为来源国家口径</p></div>
-            <span className={styles.panelHint}>点击市场进入库存或在途明细</span>
+            <h2>海外各市场分布</h2>
           </header>
           {aggregate.markets.length === 0 ? (
             <EmptyState title="暂无海外市场数据" hint="海外库存或在途读取后才显示市场分布。" />
@@ -253,25 +244,52 @@ export function BusinessOverviewPage({
           <p className={styles.tableFoot}>市场待确认行来自没有市场证据的仓库或来源国家为空，不按名称猜测归属。</p>
         </section>
 
-        <section className={styles.panel} aria-label="需要处理">
+        <section className={styles.panel} aria-label="需要处理" id="home-pending" data-testid="home-pending-section">
           <header className={styles.panelHead}>
-            <div><h2>需要处理</h2><p>库存待对应、物流待复核、来源失败或在途未计入</p></div>
-            <span className={styles.badge}>{data.pending.length} 项</span>
+            <h2>需要处理</h2>
           </header>
           {data.pending.length === 0 ? (
-            <EmptyState title="当前没有需要处理的事项" hint="来源正常、没有待对应或待复核。" />
+            <EmptyState title="暂无待处理事项" hint="来源正常、没有待对应或待复核。" />
           ) : (
             <ul className={styles.pendingList} data-testid="home-pending-list">
               {data.pending.map((item) => (
-                <li className={styles.pendingItem} key={item.key} data-testid="home-pending-item" data-key={item.key}>
+                <li
+                  className={styles.pendingItem}
+                  key={item.key}
+                  data-testid="home-pending-item"
+                  data-key={item.key}
+                  data-category={item.category}
+                  data-action={item.action}
+                >
                   <span className={styles.pendingDot} aria-hidden />
                   <div className={styles.pendingInfo}>
+                    <span className={styles.pendingTags}>
+                      <span className={styles.pendingCategory}>{item.category}</span>
+                      {item.countLabel ? <span className={styles.pendingCount}>{item.countLabel}</span> : null}
+                    </span>
                     <h3>{item.title}</h3>
                     <p>{item.detail}</p>
                   </div>
-                  <Link className={styles.pendingGo} href={item.href} aria-label={item.title}>
-                    处理 <ArrowRight size={14} aria-hidden />
-                  </Link>
+                  {item.action === 'review' ? (
+                    <HomePendingReview
+                      reviews={data.groupingReviews}
+                      error={data.groupingReviewsError}
+                      label={item.actionLabel}
+                    />
+                  ) : item.action === 'missing-cost' ? (
+                    <HomeMissingCost
+                      label={item.actionLabel}
+                      items={aggregate.valuation.missingCostProducts}
+                    />
+                  ) : (
+                    <Link
+                      className={`${surface.button} ${surface.buttonSmall}`}
+                      href={item.href}
+                      data-testid={`home-pending-action-${item.key}`}
+                    >
+                      {item.actionLabel}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -285,90 +303,9 @@ export function BusinessOverviewPage({
         </section>
       </div>
 
-      <Disclosure
-        summary="估值口径与未计入说明"
-        count={costFailed
-          ? '进货价读取失败'
-          : showAmounts && aggregate.valuation.missingCostProducts.length > 0
-            ? `${aggregate.valuation.missingCostProducts.length} 款缺价`
-            : undefined}
-        testId="home-valuation"
-      >
-        <div className={styles.valuation}>
-          <p className={styles.valuationNote}>{amountNote}</p>
-          <ul className={styles.valuationFacts}>
-            {costFailed ? (
-              <li data-testid="home-valuation-cost-failed">
-                进货价读取失败：本次不计算金额、不判断缺价，也不生成补价待办；数量与未计入情况仍按来源显示。
-              </li>
-            ) : (
-              <li>缺进货价：<strong>{aggregate.valuation.missingCostProducts.length} 款</strong> / {formatHomeQuantity(aggregate.valuation.missingCostQuantity)} 件已知数量（库存+在途）未计入金额</li>
-            )}
-            <li>
-              海外合计待核对：<strong>{aggregate.valuation.pendingTotalProducts} 款</strong>
-              {aggregate.valuation.pendingTotalItems.length > 0
-                ? `（已知小计 ${formatHomeQuantity(aggregate.valuation.pendingTotalItems.reduce((sum, item) => sum + item.quantity, 0))} 件；数量为已知小计，不等于完整合计）`
-                : ''}
-            </li>
-            <li>
-              未对应来源行：<strong>{formatHomeQuantity(aggregate.valuation.unmappedSourceRows)} 条</strong>（数量保留、不计入合计
-              {data.excludedWarehouseUnmappedRows > 0 ? `；另有 ${data.excludedWarehouseUnmappedRows} 条属已排除仓，不在本页处理` : ''}）
-            </li>
-            <li>数量未知/多单位商品：<strong>{aggregate.valuation.unknownQuantityProducts} 款</strong>（海外）</li>
-            <li>市场待确认商品：<strong>{aggregate.valuation.unknownMarketProducts} 款</strong></li>
-            {data.transitAvailable ? (
-              <li>
-                在途未计入：未关联 {aggregate.valuation.transitExclusions.unbound} · 数量待核 {aggregate.valuation.transitExclusions.quantityPending} ·
-                缺单价 {aggregate.valuation.transitExclusions.priceMissing} · 待复核 {aggregate.valuation.transitExclusions.reviewPending}
-              </li>
-            ) : null}
-          </ul>
-          {showAmounts && aggregate.valuation.missingCostProducts.length > 0 ? (
-            <div className={styles.gapList}>
-              <h3>缺价商品（按已知数量）</h3>
-              <ul>
-                {aggregate.valuation.missingCostProducts.slice(0, 8).map((item) => (
-                  <li key={item.itemId}>
-                    <Link href={`/dashboard/inventory?view=product&item=${item.itemId}`}>
-                      {item.iceCode ?? '缺货号'} · {item.nameCn ?? '未命名'}
-                    </Link>
-                    <span>{formatHomeQuantity(item.quantity)} 件</span>
-                  </li>
-                ))}
-              </ul>
-              {aggregate.valuation.missingCostProducts.length > 8 ? (
-                <p>另有 {aggregate.valuation.missingCostProducts.length - 8} 款未列出，可在商品库按货号查看。</p>
-              ) : null}
-              <Link className={styles.gapMore} href="/dashboard/catalog">到商品库补充采用进货价</Link>
-            </div>
-          ) : null}
-          {aggregate.valuation.pendingTotalItems.length > 0 ? (
-            <div className={styles.gapList} data-testid="home-valuation-pending-total">
-              <h3>合计待核对商品（已知小计）</h3>
-              <ul>
-                {aggregate.valuation.pendingTotalItems.slice(0, 8).map((item) => (
-                  <li key={item.itemId}>
-                    <Link href={`/dashboard/inventory?view=product&item=${item.itemId}`}>
-                      {item.iceCode ?? '缺货号'} · {item.nameCn ?? '未命名'}
-                    </Link>
-                    <span>已知小计 {formatHomeQuantity(item.quantity)} 件</span>
-                  </li>
-                ))}
-              </ul>
-              <Link className={styles.gapMore} href="/dashboard/inventory?view=product&source=overseas">
-                到商品库存查看市场格与待核原因
-              </Link>
-            </div>
-          ) : null}
-          <p className={styles.valuationFoot}>
-            可售数量属仓库口径，在各仓明细中查看；首页不把「整仓可用」改称跨仓可售。来源失败时保留最近成功数据与时间。
-          </p>
-        </div>
-      </Disclosure>
-
       <section className={styles.panel} aria-label="商品库存概览">
         <header className={styles.panelHead}>
-          <div><h2>商品库存概览</h2><p>国内实物 / 海外实物 / 已知剩余在途；点击商品查看现有库存详情</p></div>
+          <h2>商品库存概览</h2>
           <Link className={styles.panelLink} href="/dashboard/inventory?view=product">查看全部 <ArrowRight size={14} aria-hidden /></Link>
         </header>
         <form className={styles.searchRow} action="/dashboard" method="get" role="search">
@@ -464,14 +401,14 @@ export function BusinessOverviewPage({
           </nav>
         ) : null}
         <p className={styles.tableFoot}>
-          海外为各仓实物合计，不含跨仓可售；可售与锁定数量在仓库明细查看。「—」表示没有有效记录或未计入，不是 0。
+          海外为各仓实物合计，不含跨仓可售；「—」表示没有有效记录或未计入，不是 0。
           {costFailed ? ' 进货价读取失败，本次不显示金额列。' : ''}
         </p>
       </section>
 
-      <p className={styles.footerNote}>
-        来源：国内聚水潭冻结表格快照 · 物流在途飞书物流情况表 · 海外库存 BigSeller 最近有效批次；数据在打开页面时读取，来源更新后刷新可见。
-      </p>
+      <Link className={styles.valuationLink} href="/dashboard/valuation">
+        估值口径与未计入说明
+      </Link>
     </div>
   );
 }

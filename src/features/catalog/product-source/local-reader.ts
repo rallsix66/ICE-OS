@@ -98,8 +98,8 @@ export function createLocalSnapshotReader(options: LocalSnapshotReaderOptions = 
     profileKey: SOURCE_PROFILE_KEY,
     describe: () => ({
       mode: 'local_snapshot',
-      label: '本地模拟读取（未开通飞书 API）',
-      detail: '当前读取本地保存的来源快照，不会访问飞书；模拟变化来自本地副本。',
+      label: '已保存来源快照读取',
+      detail: '读取已落盘的来源快照（真实飞书读取或受控模拟生成）；本读取器不直接访问飞书。',
     }),
     async listSnapshots(): Promise<SourceSnapshotSummary[]> {
       const loaded = await loadAll();

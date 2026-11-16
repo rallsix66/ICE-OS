@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { DetailRetryButton } from '@/features/catalog/components/detail-retry-button';
 import { getCurrentActiveUser } from '@/lib/auth';
 import { getCatalogListPage } from '@/features/catalog/service';
-import { getCatalogIssueToolbarModel } from '@/features/catalog/issues/service';
+import { getCatalogIssuePendingPreview } from '@/features/catalog/issues/service';
 import { CatalogShell } from '@/features/catalog/shell/catalog-shell';
 import { CatalogDirectShell } from '@/features/catalog/shell/catalog-direct-shell';
 import {
@@ -78,9 +78,13 @@ export default async function CatalogPage({
 }) {
   const sp = await searchParams;
   const initialUrl: CatalogUrlState = parseCatalogSearchParams(searchParamsToUrlSearchParams(sp));
+  // 经营总览「查看商品资料」直达：?pending=open 自动打开待处理弹窗一次；
+  // 弹窗只是客户端 UI，不写入 URL，也不新增浏览器历史记录。
+  const pendingParam = Array.isArray(sp.pending) ? sp.pending[0] : sp.pending;
+  const autoOpenPending = pendingParam === 'open';
 
   // 三个读取并行：主资料失败只进入明确错误页，不拖慢/吞掉其它读取；主资料成功时等它们完成再渲染。
-  const [listResult, activeUser, issues] = await Promise.all([
+  const [listResult, activeUser, issuesPreview] = await Promise.all([
     getCatalogListPage().then(
       (value) => ({ ok: true as const, value }),
       (error: unknown) => ({ ok: false as const, error }),
@@ -88,7 +92,7 @@ export default async function CatalogPage({
     // 只用于缓存上下文；读取失败不影响已经成功的主资料列表。
     getCurrentActiveUser().catch(() => null),
     // 只读派生索引（不得抛错）：未启用/无权限/读取失败只影响工具栏入口提示，不影响列表本体。
-    getCatalogIssueToolbarModel().catch(() => null),
+    getCatalogIssuePendingPreview().catch(() => null),
   ]);
 
   const cacheContext = {
@@ -138,7 +142,8 @@ export default async function CatalogPage({
       auxiliaryErrors={list.auxiliaryErrors ?? []}
       initialUrl={initialUrl}
       cacheContext={listCacheContext}
-      issues={issues}
+      pendingPreview={issuesPreview}
+      autoOpenPending={autoOpenPending}
     />
   );
 }

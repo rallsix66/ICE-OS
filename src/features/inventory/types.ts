@@ -968,3 +968,97 @@ export interface SourceBindingDto {
 }
 
 
+
+/* ------------------------------------------------------------------ *
+ * 海外库存历史快照（041 只读）
+ *
+ * 只读已发布的 catalog.inventory_batch / inventory_batch_row：
+ * - 批次列表按 observation_at 倒序分页（batchTotal/offset 如实说明，可翻到任意更早批次）；
+ * - 明细的历史归属取批次保存的 item_id / mapping_id / item_revision；
+ * - 未绑定 SKU（itemId=null）同样返回；真实 0 原样返回 0，缺失保持 null。
+ * ------------------------------------------------------------------ */
+
+export interface InventorySnapshotBatchDto {
+  batchId: string;
+  /** 来源观测时间（采集时间口径，不用 publishedAt）。 */
+  observationAt: string;
+  publishedAt: string;
+  rowCount: number;
+  adoptedCount: number;
+  unmappedCount: number;
+}
+
+export interface InventorySnapshotBatchesDto {
+  warehouseId: string;
+  warehouseName: string;
+  market: string | null;
+  /** 本页批次（顺序由服务端给出，observation_at DESC）。 */
+  batches: InventorySnapshotBatchDto[];
+  /** 该仓已发布批次总数（分页前）。 */
+  batchTotal: number;
+  /** 本页起始偏移；服务端已把超出末页的偏移回退到最后一页。 */
+  offset: number;
+  limit: number;
+}
+
+export interface InventorySnapshotRowDto {
+  externalSku: string;
+  gtin: string | null;
+  excelRow: number | null;
+  /** adopted / unmapped（批次发布时的采用状态）。 */
+  status: string;
+  /** 历史归属：批次保存的商品 UUID；null = 未绑定。 */
+  itemId: string | null;
+  iceCode: string | null;
+  /** 按 item_revision 取当时品名；缺版本时回退当前版本。 */
+  nameCn: string | null;
+  itemRevision: number | null;
+  mappingId: string | null;
+  mappingVersion: number | null;
+  unit: string | null;
+  onHand: number | null;
+  orderLocked: number | null;
+  warehouseAvailable: number | null;
+  observationAt: string;
+}
+
+export interface InventorySnapshotBatchMetaDto {
+  batchId: string;
+  warehouseId: string;
+  warehouseName: string;
+  market: string | null;
+  observationAt: string;
+  publishedAt: string;
+  rowCount: number;
+  adoptedCount: number;
+  unmappedCount: number;
+}
+
+/** 明确批次的读取结果：ok / 不存在 / 与所选仓不一致 / 未绑定账号。 */
+export type InventorySnapshotBatchStatus = 'ok' | 'not_found' | 'warehouse_mismatch' | 'no_account';
+
+export interface InventorySnapshotRowsDto {
+  /** false = 该批不可用（不存在/与所选仓不一致）；页面不伪造空批次，也不退回最新批次。 */
+  ok: boolean;
+  status: InventorySnapshotBatchStatus;
+  reason: string | null;
+  batch: InventorySnapshotBatchMetaDto | null;
+  /** 该批在本仓倒序列表中的位置（1 起）；仅 ok=true 时有值，用于把批次列表翻到同一页。 */
+  batchRank: number | null;
+  /** 该仓已发布批次总数。 */
+  batchTotal: number;
+  /** 明确批次与所选仓不一致时：请求的仓与实际所属仓（此时不返回任何行/数量）。 */
+  requestedWarehouseId: string | null;
+  batchWarehouseId: string | null;
+  batchWarehouseName: string | null;
+  batchObservationAt: string | null;
+  /** 本次搜索回显（null = 未搜索）。 */
+  search: string | null;
+  /** 该批总行数（不受搜索影响）。 */
+  total: number;
+  /** 当前搜索匹配行数（分页前）。 */
+  matched: number;
+  offset: number;
+  limit: number;
+  rows: InventorySnapshotRowDto[];
+}
