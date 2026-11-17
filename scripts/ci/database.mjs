@@ -5,8 +5,9 @@
  *
  * This is intentionally a temporary-database entry point. It does not use
  * .local, initdb.exe, pg_dump.exe, instance markers, or live business data.
- * The target must be empty; set CI=true (GitHub Actions) or
- * CI_DATABASE_RESET=1 explicitly for a locally created scratch database.
+ * The target must be empty: no objects in public and no user/ICE schemas.
+ * Set CI=true (GitHub Actions) or CI_DATABASE_RESET=1 explicitly for a locally
+ * created scratch database; the script never drops or truncates existing objects.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -132,17 +133,17 @@ async function main() {
     if (!identity?.rolsuper) throw new Error(`CI_DATABASE_ADMIN_NOT_SUPERUSER:${identity?.usr ?? 'unknown'}`);
 
     const occupied = (await admin.query(`SELECT
-      to_regclass('catalog.catalog_item') IS NOT NULL AS catalog,
-      to_regclass('p0_02_meta.platform_instance') IS NOT NULL AS meta,
-      EXISTS(SELECT 1 FROM pg_namespace WHERE nspname IN ('catalog','catalog_private','p0_02_meta','p0_02_auth')) AS any_schema`)).rows[0];
-    if (occupied.catalog || occupied.meta || occupied.any_schema) {
+      EXISTS(SELECT 1 FROM pg_namespace WHERE nspname IN ('catalog','catalog_private','p0_02_meta','p0_02_auth')) AS ice_schema,
+      EXISTS(SELECT 1 FROM pg_namespace WHERE nspname NOT LIKE 'pg\\_%' AND nspname NOT IN ('public','information_schema')) AS other_user_schema,
+      EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public') AS public_relation,
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public') AS public_routine,
+      EXISTS(SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public') AS public_type`)).rows[0];
+    if (occupied.ice_schema || occupied.other_user_schema || occupied.public_relation || occupied.public_routine || occupied.public_type) {
       throw new Error(`CI_DATABASE_NOT_EMPTY:${identity.db}`);
     }
 
-    // A fresh database still has the default public schema; install into a
-    // clean owner-managed one exactly like the P0-02 bootstrap.
-    await admin.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public');
-
+    // A fresh database already has the default empty public schema; install
+    // into it without dropping or replacing it (or any pre-existing object).
     for (const relative of BASE_SQL) applied.push(await applyFile(admin, relative));
     await admin.query('ALTER SCHEMA public OWNER TO ice_p0_02_owner');
     await admin.query(`INSERT INTO p0_02_meta.platform_instance(run_id,label) VALUES('ci-database-check','ci')`);
@@ -213,12 +214,14 @@ async function main() {
       await app.query('BEGIN READ ONLY');
       await app.query('SET LOCAL ROLE ice_p0_02_app_runner');
       await setIdentity(app, ADMIN_ID);
+      // A read-only transaction must fail with 25006 specifically. 42501 would
+      // only prove that the app role lacks INSERT, so it cannot satisfy this check.
       const writeDenied = await expectSqlError(
         app,
         `INSERT INTO catalog.audit_event(request_id,intent_sha256,actor_id,action,result)
          VALUES ($1,$2,$3,'ci_forbidden_write','{}'::jsonb)`,
         [crypto.randomUUID(), '0'.repeat(64), ADMIN_ID],
-        ['25006', '42501'],
+        ['25006'],
         'CI_DATABASE_READ_ONLY_WRITE',
       );
       await app.query('ROLLBACK');
