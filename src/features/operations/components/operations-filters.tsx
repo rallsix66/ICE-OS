@@ -6,6 +6,7 @@ import { SearchField, SelectMenu } from '@/ui/ice-v4/data-surface';
 import surface from '@/ui/ice-v4/data-surface.module.css';
 import { buildOperationHref } from '../model';
 import type { OperationActorDto } from '../types';
+import { SingleDayPicker } from './single-day-picker';
 import styles from './operations.module.css';
 
 export interface OperationFilterQuery {
@@ -20,7 +21,7 @@ export interface OperationFilterQuery {
 /**
  * 操作记录筛选：搜索（防抖 300ms）/ 记录账号 / 开始日期 / 结束日期。
  *
- * - 日期仍用系统原生的单日选择（两个独立控件），按开始、结束分别查询；
+ * - 日期为两个独立的单日控件，共用页面内单日历弹窗，按开始、结束分别查询；
  * - 一律写回 URL（replace，不新增历史），刷新、返回与直接链接都能还原同一份筛选；
  * - 控件高度、间距与「商品库存」工具栏一致，清空按钮用系统共用样式。
  */
@@ -92,29 +93,21 @@ export function OperationsFilters({
           testId="operation-actor-filter"
         />
         <div className={styles.dateGroup} data-testid="operation-date-range">
-          <label className={styles.dateField}>
-            <span className={styles.dateLabel}>开始日期</span>
-            <input
-              className={styles.dateInput}
-              type="date"
-              value={query.from}
-              max={query.to || undefined}
-              data-testid="operation-date-from"
-              onChange={(event) => apply({ from: event.target.value })}
-            />
-          </label>
+          <SingleDayPicker
+            label="开始日期"
+            value={query.from}
+            fallback={query.to}
+            testId="operation-date-from"
+            onChange={(from) => apply({ from })}
+          />
           <span className={styles.dateSep} aria-hidden>—</span>
-          <label className={styles.dateField}>
-            <span className={styles.dateLabel}>结束日期</span>
-            <input
-              className={styles.dateInput}
-              type="date"
-              value={query.to}
-              min={query.from || undefined}
-              data-testid="operation-date-to"
-              onChange={(event) => apply({ to: event.target.value })}
-            />
-          </label>
+          <SingleDayPicker
+            label="结束日期"
+            value={query.to}
+            fallback={query.from}
+            testId="operation-date-to"
+            onChange={(to) => apply({ to })}
+          />
         </div>
         <button
           type="button"

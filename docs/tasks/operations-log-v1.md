@@ -1,49 +1,56 @@
-# 操作记录 v1（R4 收尾 + 日期还原 + 整页系统样式统一）
+# 操作记录 v1（R4 收尾 + 双日期系统日历 + 整页系统样式统一）
 
-- 日期：2026-11-17
-- 分支：`codex/operations-log-v1`（承接 `e3b3466` + `880a66b` + `2660a82`）
-- 实例：`run-20261026T211500Z-11a22b33`（Web 3011 / PostgreSQL 59345；PG pid 40076，preview pid 50072）
+- 日期：2026-11-17（日期 UI 补修）
+- 分支：`codex/operations-log-v1`（承接 `e3b3466` + `880a66b` + `2660a82` + `085760c`）
+- 实例：`run-20261026T211500Z-11a22b33`（Web 3011 / PostgreSQL 59345；PG pid 40076，preview pid 48248）
 - 入口：<http://127.0.0.1:3011/dashboard/operations>
 - 登录：`admin@catalog.test`（密码见实例 `login.local-preview.txt`，不入 Git）
-- 最终 BUILD：**`C7jyVlverZoBnOnYAcJ72`**
-- 源码快照：**`a47ba1d2e469c1b0ed3da84fdc6fc91a43b3a34824a7e54ea2daacdff2befaa2`**（与运行构建一致）
-- 证据：`.local/catalog/operations-log-r4-20261117/`（`verify-r4.json`、截图 `r4-01`–`r4-12`、`style-compare-1440.png`、`style-compare-760.png`）
+- 最终 BUILD：**`tg4VKYyZQYR3Jq7uz5ktk`**
+- 源码快照：**`1610bf943a4f3608a85a55e326ff22c426b9a0ef50abeab500df1b20ea9ecaa1`**（与运行构建一致）
+- 证据：`.local/catalog/operations-log-r5-20261117/`（`verify-r5.json`、截图 `r5-01`–`r5-15`）
 
-本轮执行最终指令 V4：**日期恢复原方式、整页统一系统样式、保留 R1–R5 业务修复**。只撤回上一轮新增的日期范围面板，不回滚整次提交。最终是否通过由审查方确认，执行方不宣布 PASS。
+上一轮（`085760c`）已恢复“开始日期 / 结束日期”两个独立控件；本轮按补修要求保留这两个控件与分别选日、选完立即筛选的使用方式，把浏览器原生日期弹窗替换为页面内可统一风格的单日历弹窗。整页样式与 R1–R5 业务修复不回滚。最终是否通过由审查方确认，执行方不宣布 PASS。
 
-## 1. 日期恢复为原来的方式
+## 1. 双日期控件 + 页面内单日历
 
 ### 1.1 使用方式
 
-- 恢复“开始日期 / 结束日期”两个独立原生单日控件，直接使用系统日期选择弹窗；没有页面内日历、没有快捷范围、没有“应用 / 取消”。
-- 选择或清空任一侧日期立即写回 URL（`replace`，不新增历史），页码回到第 1 页。
-- 保留 `max/min` 交叉约束；开始晚于结束时仍显示提示、不查询、不显示 0 条。
-- 日期仍按北京时间 +08 自然日查询，结束日包含当天；单边日期、URL、刷新、返回、详情返回能力不变。
-- 只优化控件外观：与搜索框 / 账号下拉同高 40px、同 10px 圆角、同边框与字号；标签“开始日期 / 结束日期”放在控件内，两个控件与破折号成组对齐。
+- 仍是“开始日期 / 结束日期”两个独立控件，**不合并成范围面板**，**没有“应用 / 取消”步骤**。
+- 点任一侧输入框，打开页面内单日历；两侧共用同一个 `SingleDayPicker` 组件，各自保存自己的日期。
+- 点某一天后立即写回 URL（`replace`，不新增历史）、页码回到第 1 页，并关闭弹窗。
+- 输入框内可单独清空这一侧；清空后立即按剩余条件筛选。
+- 日历支持上一年 / 上个月 / 下个月 / 下一年、回到“今天”；Esc 或点弹窗外关闭，焦点回到原输入框。
+- 不再出现浏览器原生日期弹窗：页面没有 `input[type=date]`，日历网格、年月切换、选中态、焦点态都在页面内绘制。
+- 日期仍按北京时间 +08 自然日查询，结束日包含当天；开始晚于结束时显示提示、不查询、不显示 0 条。
+- 单边日期、URL、刷新、浏览器返回、商品/货票详情返回保留；组合筛选（类别 + 关键词 + 日期 + 页码）不变。
 
-### 1.2 撤回与清理
+### 1.2 实现
 
-| 上一轮新增 | 本轮处理 |
+| 项 | 做法 |
 | --- | --- |
-| `src/features/operations/components/date-range-picker.tsx` | 删除 |
-| `src/features/operations/date-range.ts` | 删除 |
-| `src/features/operations/date-range.test.ts` | 删除 |
-| `operations.module.css` 日历面板 / 触发器 / 快捷范围样式 | 删除 |
-| `package.json` / `package-lock.json` 的 `react-day-picker@10.0.2`、`date-fns@4.1.0` | 移除（其他代码未使用） |
+| 日历库 | `react-day-picker@10.0.2` 单日模式，中文 locale；日期换算使用 `date-fns@4.1.0`，不自行编写日历算法 |
+| 共用组件 | `single-day-picker.tsx`：输入框外观的触发器 + portal 单日历；开始/结束各一个实例 |
+| 日期边界 | `calendar-date.ts`：北京时间今天、`YYYY-MM-DD` ↔ 本地中午 `Date`，避免时区把日期挪一天 |
+| 弹窗定位 | `fixed` + portal 到 body；优先在控件下方，空间不足时翻到上方，并夹在视口内；窗口 resize/scroll 重新计算 |
+| 关闭行为 | 选日后关闭并回焦；Esc、点外部关闭；清空单边后关闭 |
+| 输入框 | 40px 高、10px 圆角、系统边框与焦点环（`#8495ed` + 3px `rgba(82,102,215,.12)`）；标签、日期、清空按钮同组 |
+| 日历弹窗 | 312px 宽、10px 圆角、`#e3e7ee` 边框、系统阴影；标题 13px/600；年月按钮 28×28；日期格 34×34、8px 圆角 |
+| 日历状态 | 选中日 `#4057c0` 实心白字；今天描边强调；移入浅底；键盘焦点 2px 靛蓝环；窄屏弹窗完整可见 |
+| 清除 | 每侧输入框内置 `×`，只清空该侧；工具栏“清空”仍清空全部条件 |
 
-上一轮关于 `resetOnSelect` 与月份箭头的 B1/B2 补修要求随日期面板撤回而取消，不再实施。
+范围选择、快捷范围、应用/取消均已不存在；上一轮删除的 `date-range-picker.tsx`、`date-range.ts`、`date-range.test.ts` 不恢复。
 
 ## 2. 整页统一系统样式
 
 以现役「商品库存」为主要视觉参照，结合「商品库」「物流在途」的共用数据面；所有控件优先复用系统组件与 CSS module。
 
-| 区域 | 本轮做法 | 复用的系统资源 |
+| 区域 | 做法 | 复用的系统资源 |
 | --- | --- | --- |
 | 标题 | `PageHeading`：20px / 650 字重；下方一句“时间：北京时间”；右侧状态点“只读” | `PageHeading`、`StatusDot` |
 | 记录说明 | 标题下轻量一行，默认收起；展开为浅色说明块 | 系统字号/边框/圆角变量 |
 | 业务页签 | 与库存“仓库明细 / 商品汇总 / 历史快照”同一分段控件（3px 底、10px 圆角、选中白底）；计数用 11px 浅灰 | 与 `inventory.module.css` `.viewTabs` 同值 |
 | 工具栏 | 搜索 → 账号 → 开始日期 → 结束日期 → 清空 → 总数，同一行；窄屏自动换行 | `surface.toolbar`、`SearchField`、`SelectMenu`、`surface.button`、`surface.count` |
-| 日期 | 两个原生 `input[type=date]`，40px 高，与搜索/下拉同圆角同焦点样式 | 系统表单与焦点样式 |
+| 日期 | 两个独立单日控件 + 共用页面内单日历；输入框与弹窗同一套系统字体/颜色/边框/圆角/按钮/焦点态 | 系统变量 + 本页 `operations.module.css` |
 | 列表 | 面板固定高度、表头固定、列表内部滚动；表头 #f8f9fb / 11px；行 11×14px 内边距；长名称/货号/结果自然换行；展开行左侧靛蓝强调 | 与库存/在途面板同边框、10px 圆角 |
 | 状态标签 | 动作继续用系统 `Pill`，与外层元信息同一行，减少一行高度（行高约 70px） | `Pill` |
 | 展开详情 | 事实网格 → 字段变化表 → 商品/货票 → 入口 → 说明；变化表固定列宽；数量多时 20 条一段；来源信息使用系统折叠组件 | `Disclosure`、`surface.buttonSmall` |
@@ -63,6 +70,8 @@
 | 表头 | `rgb(248,249,251)` / 11px / 浅灰字 | 同左 |
 | 分页 | 面板内部底栏，系统 pager | 同左 |
 
+日历弹窗实测：10px 圆角 / `rgb(227,231,238)` 边框 / 白底；标题 13px/600；日期格 34×34、8px 圆角；年月按钮 28×28；选中日 `rgb(64,87,192)` + 白字；打开时输入框焦点环 `rgb(132,149,237)` + 3px `rgba(82,102,215,.12)`。
+
 ## 3. 保留的 R1–R5 业务修复
 
 - **R4 撤销 vs 替代**：只有存在 `restore_duplicate_source_decision` 审计的来源行选择才显示“撤销”；原决定保留决定时间，并显示撤销时间/账号，撤销独立成条。正常改选只把旧决定标为 `superseded`，原记录显示“已被后续选择替代”、时间写“替代时间”、给后续选择行号，不虚构撤销账号、不另造撤销记录；字段口径被新口径替代同样写“替代”。
@@ -72,67 +81,73 @@
 - **R5 计数**：全部业务 = 三类之和 **365**（商品资料 **152** / 库存对应 **100** / 物流 **113**）；读取失败、日期无效显示“—”，不冒充 0 条。
 - **来源品名 vs 关联商品**：物流明细写“来源品名：WM0057 CHIC PEAK 腮红4.8g-M07”，下一行写“关联商品：WM0090 · CHIC PEAK 腮红4.8g-M07”，并说明同一条来源品名可能对应不同货号；列表摘要显示“7 条明细 · 关联 7 款商品”。
 
-本轮没有修改 `db/catalog/042_operation_records.sql`，也没有改动任何写入链；R1–R5 的数据口径与上一轮一致。
+本轮没有修改 `db/catalog/042_operation_records.sql`，没有修改 `operations-view.tsx`、`operation-record-detail.tsx`、`model.ts`，也没有改动任何写入链；R1–R5 的数据口径与上一轮一致。
 
 ## 4. 验证（执行方自验，不代表 PASS）
 
-### 4.1 页面与样式 **38/38**
+### 4.1 页面与样式 **44/44**
 
-`verify-r4.mjs` → `verify-r4.json`，console/pageerror 0：
+`verify-r5.mjs` → `verify-r5.json`，console/pageerror 0：
 
 - 页头标题、单一“时间：北京时间”、只读状态、记录说明默认收起；
-- 两个原生日期控件、无日历/快捷范围/触发器；日期两个控件 40px；搜索/账号/清空 40px；
+- 两个独立日期控件、默认不展开、页面无 `input[type=date]`；搜索/账号/日期/清空同高 40px；
 - 顺序与库存页一致：类别页签 → 工具栏 → 列表面板；
 - 标题/正文/页签/控件/面板/表头/分页与商品库存 computed style 一致；
-- 列表首屏 50 条、行高约 70px；分页在面板内且首屏可见；滚动到末尾分页仍固定；
-- 开始日期即查：从 `2026-11-10` 起 **26** 条；加结束 `2026-11-16` 仍 **26** 条（本来都在当天）；同一天 `11-10` **23** 条；只填结束 `11-10` **362** 条，均与数据库 +08 查询一致；
-- 刷新保留日期与结果；清空恢复 365 条；日期反向显示提示且不查询；
-- 类别+关键词+日期（商品资料 / WM / 10-01 至 11-17）**133** 条，与数据库一致；第 2 页保留全部筛选；
+- 输入框与日历弹窗统一系统样式：40px 控件、10px 面板、13px 标题、34px 日期格、28px 年月按钮、打开焦点环；
+- 实际点开日历：标题/星期/6 周日期完整，桌面完整可见；上一年/下一年切换标题正确；
+- 日历选 `2026-11-10` 作开始日期后弹窗关闭并立即筛选：**26** 条；
+- 再选 `2026-11-16` 作结束日期：仍 **26** 条（记录都在当天），与数据库 +08 区间一致；
+- 选中日期样式：`rgb(64,87,192)` 实心 + 白字 + 8px 圆角；
+- 同一天 `11-10`：**23** 条；清空结束日期后只保留开始日期，仍 **26** 条；再清空开始日期恢复 365 条；
+- 只填结束日期 `11-10`：**362** 条；刷新后控件值与结果保持；
+- 日期反向：实际从日历选出开始 `11-16`、结束 `11-10`，显示提示与“—”，不查询、不冒充 0 条；
+- 类别+关键词+日期（商品资料 / WM / 10-01 至 11-17）：**133** 条，与数据库一致；第 2 页保留全部筛选；
 - 展开 → 商品资料 → 返回，URL 与第 2 页保留；货票入口 → 返回保留筛选；
 - R4 撤销/原决定、物流来源品名/关联商品、94 款批次、R5 计数回归通过；
-- 1440 无整页横向溢出；760 无横向溢出，日期控件 `w=197,h=40` 完整可见，面板/页签/分页不裁切；760 页高 991 与商品库存 991 完全一致（外壳把导航置顶后两者同一档），展开详情可读；
+- 1440 无整页横向溢出；760 无横向溢出，日期 `w=178,h=40` 完整可见；760 日历弹窗 `x=24,y=439,w=312,h=350` 完整落在 760×900 内；
+- 面板/页签/分页不裁切；760 页高 991 与商品库存 991 一致（外壳把导航置顶后两者同一档）；展开详情可读；
 - 业务行数前后一致；console/pageerror 0。
 
 ### 4.2 布局实测
 
 | 视口 | 结果 |
 | --- | --- |
-| 1440×950 | 面板 `x=240,y=314,w=1168,h=635`；分页 `y=902,h=46`，首屏可见；无横向溢出 |
-| 760×900 | 日期 `x=23,w=197` 与 `x=244,w=197`，均高 40；面板宽 714 不溢出；页高 991 与商品库存相同；无横向溢出 |
+| 1440×950 | 面板 `x=240,y=314,w=1168,h=635`；分页 `y=902,h=46`，首屏可见；日历 `x=917,y=295,w=312,h=350` 完整可见；无横向溢出 |
+| 760×900 | 日期 `x=23,w=178` 与 `x=225,w=178`，均高 40；日历 `x=24,y=439,w=312,h=350` 完整落在视口内；面板宽 714 不溢出；页高 991 与商品库存相同；无横向溢出 |
 
 ### 4.3 定向测试与静态检查
 
-- `model.test.ts` **36/36**、`navigation-config.test.ts` **7/7**，共 **43/43**；
+- `calendar-date.test.ts` **4/4**、`model.test.ts` **36/36**、`navigation-config.test.ts` **7/7**，共 **47/47**；
 - `tsc --noEmit` 仅既有 BEST 5 条（`src/lib/providers/best/__tests__/*`），`src/features/operations` 0 条；
-- `src/features/operations` eslint 0；
+- 改动文件 eslint 0；
 - `git diff --check` 无空白错误（仅既有 LF/CRLF 提示）；
 - 未重跑无关全仓套件；上一轮已通过的数据证据继续沿用（`apply-042` 40/40、真实改选 5/5、365 计数）。
 
 ### 4.4 截图
 
-桌面：`r4-01-overview-1440.png`（首屏）、`r4-03-date-filter-1440.png`（开始+结束日期）、`r4-04-range-error-1440.png`（反向提示）、`r4-05-list-1440.png`（展开与分页）、`r4-06-r4-revocation-1440.png`（R4 撤销）、`r4-07-association-1440.png`（来源品名/关联商品）、`r4-08-batch-94-1440.png`（94 款批次）、`r4-09-list-scrolled-1440.png`（分页固定）。
+桌面：`r5-01-overview-1440.png`（首屏）、`r5-03-calendar-open-1440.png`（**日历展开**）、`r5-04-date-filter-1440.png`（开始+结束已应用）、`r5-15-calendar-selected-1440.png`（**日历展开且选中 11-10**）、`r5-05-range-error-1440.png`（反向提示）、`r5-06-list-1440.png`（展开与分页）、`r5-07-revocation-1440.png`（R4 撤销）、`r5-08-association-1440.png`（来源品名/关联商品）、`r5-09-batch-94-1440.png`（94 款批次）、`r5-10-list-scrolled-1440.png`（分页固定）。
 
-窄屏：`r4-10-list-760.png`、`r4-12-detail-760.png`。
+窄屏：`r5-11-list-760.png`、`r5-14-calendar-760.png`（**760 日历展开**）、`r5-13-detail-760.png`。
 
-样式对照：`style-compare-1440.png`（操作记录 vs 商品库存）、`style-compare-760.png`；原始参照 `r4-02-compare-inventory-1440.png`、`r4-11-compare-inventory-760.png`。
+样式对照：`r5-02-compare-inventory-1440.png`、`r5-12-compare-inventory-760.png`。
 
 ## 5. 改动文件
 
 | 文件 | 本轮改动 |
 | --- | --- |
-| `src/features/operations/components/operations-filters.tsx` | 恢复两个原生日期控件；工具栏改用 `surface.toolbar`；总数移到工具栏 |
-| `src/features/operations/components/operations-view.tsx` | 系统页头/页签/面板/分页结构；说明轻量；动作与元信息同一行；空态居中 |
-| `src/features/operations/components/operation-record-detail.tsx` | 来源信息改用系统 `Disclosure`；小按钮改用共用样式 |
-| `src/features/operations/components/operations.module.css` | 按系统变量重写整页样式；删除日历面板样式；760 重排 |
-| `src/features/operations/components/date-range-picker.tsx` | 删除 |
-| `src/features/operations/date-range.ts` / `date-range.test.ts` | 删除 |
-| `package.json` / `package-lock.json` | 移除 `react-day-picker`、`date-fns` |
+| `src/features/operations/components/operations-filters.tsx` | 两个原生日期输入改为两个 `SingleDayPicker`；筛选/URL/页码逻辑不变 |
+| `src/features/operations/components/single-day-picker.tsx` | 新增：共用单日控件 + portal 单日历；年月切换、今天、清空、Esc/外部关闭、选后即筛 |
+| `src/features/operations/calendar-date.ts` | 新增：北京时间今天与 `YYYY-MM-DD` ↔ 本地中午 `Date` |
+| `src/features/operations/calendar-date.test.ts` | 新增：往返、闰日、中午固定、+08 跨零点 4 例 |
+| `src/features/operations/components/operations.module.css` | 日期输入框与日历弹窗/网格/年月按钮/选中/焦点/窄屏定位样式 |
+| `package.json` / `package-lock.json` | 重新加入 `react-day-picker@10.0.2`、`date-fns@4.1.0` |
 | `docs/tasks/operations-log-v1.md` / `docs/tasks/current-task.md` / `docs/current-state.md` / `AGENTS.md` / `docs/README.md` | 本轮记录 |
 
 ## 6. 边界
 
-- 本轮只改操作记录页与日期控件，没有修改 042 查询、R1–R5 语义或其他模块；未新增/删除业务数据。
+- 本轮只改操作记录页日期 UI 与对应样式，没有修改 042 查询、R1–R5 语义、页面其余结构或其他模块；未新增/删除业务数据。
 - 现役零业务写入；未启动库存/物流/飞书后台 worker；未改飞书与各模块写入链。
-- 未提交/推送/部署此前未纳入的 Mac 部署准备改动；`pnpm-lock.yaml` 属于工作区既有未提交部署准备，`package-lock.json` 已同步；`.local/` 证据不入 Git。
+- 未提交/推送/部署此前未纳入的 Mac 部署准备改动；`.local/` 证据不入 Git。
+- 日历可切换范围由库限制在 2020-01 至 2035-12；URL 直链日期仍按模型校验，超出范围的日期不会被日历默认定位，但不影响查询。
 - 未做 200% 缩放、完整权限矩阵、长期多日稳定性；760 下端到端仅有约 91px 纵向滚动，与商品库存同一外壳行为。
 - 最终结论由审查方给出，执行方不宣布 PASS。
