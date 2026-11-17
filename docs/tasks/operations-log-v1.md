@@ -1,215 +1,193 @@
-# 操作记录 v1（三类人工业务处理只读入口）
+# 操作记录 v1（R1–R5 补修 + 页面优化）
 
-- 日期：2026-11-16
+- 日期：2026-11-17
+- 分支：`codex/operations-log-v1`（承接 2026-11-16 初版 `9aac123`）
 - 实例：`run-20261026T211500Z-11a22b33`（Web 3011 / PostgreSQL 59345）
-- 入口：<http://127.0.0.1:3011/dashboard/operations>（一级导航「操作记录」）
+- 入口：<http://127.0.0.1:3011/dashboard/operations>
 - 登录：`admin@catalog.test`（密码见实例 `login.local-preview.txt`，不入 Git）
-- 最终 BUILD：`dO1NCoaNmTLVIYJJM-s0S`（源码快照 `0f9a0adbc02a5ab8…`，ready/manifest/server 一致、login 200）
-- 证据：`.local/catalog/operations-log-20261116/`（`verify.json`、截图、`apply-042*.json`）
+- 最终 BUILD：**`C0mYSULXwBiBcxf9DHUpp`**（源码快照 `78716bb12a20827a…`，promote → start、login 200）
+- 证据：`.local/catalog/operations-log-r2-20261117/`（`verify.json`、`layout-r2.json`、`fixtures.json`、`apply-042*.json`、截图 01–11）
 
-## 1. 合同
+本轮把 R1–R5 的数据补修与操作记录页 UI 优化作为一个交付包完成；最终是否通过仍由审查方确认，执行方不宣布 PASS。
 
-交付一个管理员真正能用的「操作记录」入口：能查到已有的人工业务处理，查看记录里的变化和结果，
-并进入对应商品、货票或批次继续核对。范围与限制：
+## 1. 本轮目标
 
-1. 覆盖三类**已有持久记录**：
-   - 商品资料：商品资料修改、补货号、来源资料行选择、来源采用结果；
-   - 库存对应：确认、换绑、重核、停用（以及国内复核采用商品对应）；
-   - 物流：商品关联、人工数量/状态修正、分合票决定与撤销。
-2. 来源采用按**已有批次结果**展示成一条，不按商品/字段重复堆叠。
-3. 直接复用各模块现有 audit/revision 记录，只通过服务端只读查询汇合；不重写写入链。
-4. 历史记录没保存的前值不得用当前值反推；记录账号不等于已确认的具体操作人。
-5. 自动同步过程继续看「数据同步」及各模块同步结果入口；本包不整合全部后台事件。
-
-## 2. 开工核实：实际保存了什么
-
-先只读核对现役库的表、列与真实行，再决定展示内容（不按印象设计）：
-
-| 来源表 | 已保存字段（用到的） | 没有保存 |
+| 编号 | 问题 | 本轮结果 |
 | --- | --- | --- |
-| `catalog.item_revision` | item_id、revision、previous_revision、ice_code_snapshot、name_cn、fields（每版全字段快照）、reason、evidence_ref、actor_id、recorded_at | 首版无上一版本；字段级前后值需与 `previous_revision` 的历史快照比较 |
-| `catalog.audit_event` | action、actor_id、item_id、result（补货号/采用回执，含 counts、results[].changes 前后值）、request_id、recorded_at | 无独立"原因"列；不存页面上未写入的字段 |
-| `catalog.product_source_batch` | status、counts、captured_at、received_at、snapshot_key、request_id | 不存操作人（从同批 `audit_event.apply_product_source_batch` 取） |
-| `catalog.product_source_duplicate_decision` | chosen_row_number、chosen_fields、comparison（逐行原值）、state、note、decided_by/at、superseded_at | 不保存"选择理由"（只有 note） |
-| `catalog.product_source_field_decision` | field_key、action、state、reason、rule、value_raw、decided_by/at、revoked_at | **不保存覆盖前的本地值**（`value_raw` 为空时不能拿当前资料补） |
-| `catalog.inventory_audit` | actor_id、action、entity_ref、detail（confirm 的 applied/committed/skipped；recheck/disable/replace 的 mapping 结果）、at | 无 request_id、无自然语言理由；confirm 的仓库取 `detail.committed[].warehouseExternalId` |
-| `catalog.inventory_sku_mapping` | version、supersedes_id、status、item_id、external_sku、unit、actor_id、created_at | 前值只在被替代的对应行（`supersedes_id`），该行仍保留 |
-| `catalog.shipment_item_association_revision` | item_id、revision、product_id、previous_product_id、method（manual_selected/manual_cleared）、actor_id、reason、recorded_at | 无请求号；同一次保存只能按"记录时间+账号+方法+票"合并 |
-| `catalog.shipment_item_manual_revision` | action（apply/restore）、manual_status、manual_shelved_quantity、previous_*、received_quantity、remaining_quantity、actor_id、actor_name、note、recorded_at | 不保存"修正理由"以外内容；actor_name 是写入时名称快照 |
-| `catalog.shipment_grouping_review` | kind、decision、status、evidence（当前/上次票面）、resolved_at、resolved_by、resolution_note | **不保存具体操作人**（只有管理员账号），不能反查谁点的 |
-| `catalog.shipment_grouping_override` | kind、spec、active、created_at/created_by、revoked_at/revoked_by | 撤销记录只有 active=false 且 revoked_at 的行 |
+| R1 | 新版本删除整个字段键时漏显示；`previous_revision` 被误判成首版 | 字段差异按新旧键并集比较；上一版本按实际解析到的历史行判断 |
+| R2 | 搜索只取同次操作中一个货号/名称；原 SKU 替换把 warehouseId 当 mappingId | 搜索覆盖同次操作全部货号/名称/来源 SKU/货票号；替换按已保存 detail 读取 |
+| R3 | 历史批次只展示前 40 款且无后续；旧批次入口跳到最新批次 | 批次明细全部可达、20 款一段；删除误导入口 |
+| R4 | 撤销事件只在原决定行里显示、按撤销时间查不到；pending 复核混入 | 撤销成为独立记录；分组只纳已处理决定；不再统一解释 superseded |
+| R5 | 选类别后「全部业务」跟着变成当前类别数；读取失败显示 0 | 全部业务 = 三类之和；失败/日期无效显示「—」 |
+| UI | 首屏说明多、筛选散、动作列宽、展开先看技术信息、760 堆叠 | 说明折叠、工具栏成组、对象与结果优先、字段变化/入口跟随商品、来源信息折叠、窄屏重排 |
 
-按钮/写入链未改：本包没有新增写 RPC，也没有修改任何业务写入函数。
+## 2. 数据补修
 
-## 3. 展示口径（避免同一次操作重复）
+### R1 删除字段与前值判断
 
-| 类别 | 记录类型（action） | 一条记录代表 | 真实条数（本机） |
-| --- | --- | --- | --- |
-| 商品资料 | `source_batch_applied` | 一次来源采用（按批次），展开列本批**真正写入**的商品与字段前后值 | 3 |
-| 商品资料 | `assign_source_code` / `assign_initial_code` | 补录货号 | 1 |
-| 商品资料 | `correct_test_source_code` | 撤销测试货号 | 1 |
-| 商品资料 | `resolve_source_issue` | 关闭来源缺货号事项 | 1 |
-| 商品资料 | `duplicate_source_decision` | 同号多行选择一行（撤销状态来自历史行） | 4（均已撤销） |
-| 商品资料 | `field_decision` | 来源字段暂不处理/人工解释/人工覆盖（含撤销） | 9 |
-| 商品资料 | `item_revision` / `item_baseline` | 未被批次或补货号覆盖的历史修订（含首版） | 128（126 首版 + 2 测试修订） |
-| 库存对应 | `inventory_confirm` / `inventory_rebind` | 一次确认请求（可多条 committed）；版本>1 即换绑，前值取被替代对应行 | 90 / 5 |
-| 库存对应 | `recheck_inventory_mapping` / `disable_inventory_mapping` / `replace_inventory_mapping` | 重核/停用/原 SKU 替换 | 0 / 0 / 0（本机无记录，路径已覆盖） |
-| 库存对应 | `domestic_review_decision` | 国内复核采用商品对应（人工复核决定） | 5 |
-| 物流 | `shipment_association_manual` / `shipment_association_cleared` | 一次保存的同一票同方法明细（合并成一条） | 90 / 15 |
-| 物流 | `shipment_manual_correction` / `shipment_manual_restore` | 人工修正数量/状态、恢复按原表 | 3 / 2 |
-| 物流 | `shipment_grouping_decision` / `shipment_grouping_revoked` | 分合票人工决定、撤销人工决定（active=false 且已撤销） | 3 / 0 |
+实际样例 WM0073：第 2 版保存商品条码 `757577407359`，第 3 版 `previous_revision=2`，但 `fields` 里整个 `barcode` 键被删除。
 
-合计 **360 条**（商品资料 147 / 库存对应 100 / 物流 113），与数据库独立重算一致。
+- 042 对 `item_revision.fields` 与解析到的上一版本 `fields` 取**键并集**，逐个字段给出 `changeKind=added|removed|modified`、`beforePresent/afterPresent` 与已保存的 `beforeRaw/afterRaw`；
+- 页面把 `removed` 显示为「商品条码：757577407359 → 已移除」；`added` 的前值写「历史未保存」；两端都有键但值为空写「未填写」；
+- `previousRevision` 改为实际解析到的上一行版本（`pv.revision`），并保留 `declaredPreviousRevision`；只有确实找不到上一行才标 `item_baseline`；
+- 首版说明「没有上一版本」；声明了上一版但历史行缺失时说明「历史里找不到该版本」，不用当前值补。
 
-**不做重复堆叠**：
-- 来源采用的商品级修订只在批次记录里展开，不另立 91/2/7 条"已更新"记录；
-- 批次回执中无 `itemRevision` 的 `needs_review` 行只计入 counts，不进"写入商品"明细；
-- 补货号同时产生的 item_revision 归到补货号记录，不重复出两条；
-- 物流同一次保存的 7 条腮红明细合并成 1 条（本机 111→105 条记录）；
-- `begin/complete_inventory_pending_action`、自动同步动作（发布批次/阶段/导出）不单独成条。
+### R2 搜索文本与原 SKU 替换
 
-## 4. 只读查询（042）
+- 物流人工关联：同一 `(recorded_at, actor_id, method, shipment)` 合并为一条，搜索文本改为 `string_agg(DISTINCT ...)` 覆盖该次保存的**全部** `product_name_raw / source_sku / ice_code / name_cn / previous_*`，再加货票号、市场与原因；
+- POKNZX027675（2026-11-06 14:34:45）涉及 WM0057、WM0058、WM0059、WM0061、WM0089、WM0090、WM0091：七款分别搜索都命中同一条关联，明细仍是 7 条；
+- `replace_inventory_mapping` 的 `audit.entity_ref` 实际是 warehouseId。042 改为读取 `detail.oldMappingId / newMappingId / oldExternalSku / newExternalSku / itemId / newVersion / effectiveAt / warehouseId`，并从 `inventory_warehouse` 与 `inventory_sku_mapping` 补仓库名、单位、备注；不再用 `entity_ref` 关联 mapping；
+- 现役没有替换记录，已用事务内隔离样例验证正常写入路径（§6.3）。
 
-`db/catalog/042_operation_records.sql` 只新增一个只读函数（不建表、不改 001–041）：
+### R3 历史批次明细
+
+- SQL 返回批次写入/失败的全部 `results`，并带 `resultRowCount`；页面不再截断 40 条；
+- 展开后每 20 款一段，显示「已显示 N / 共 94 款」；可「再显示 20 款」或「显示全部 94 款」；
+- 4173cf60-dd81-4b1b-a0f2-f84674f0ac99 第 41 款 WM0054 可达，显示 `生产工厂：历史未保存 → 广州圣宝兰生物科技有限公司`；
+- 删除「查看本批更新结果」（它指向最新批次，无法定位历史批次）；保留通用入口「打开来源资料处理页」，并在展开里说明本页已保存本批全部明细。
+
+### R4 撤销事件与人工含义
+
+- 字段口径撤销：`product_source_field_decision.revoked_at` 非空即新增 `source_field_decision_revoked`，时间取实际撤销时间，账号优先取 `restore_source_field` 审计；原决定仍保留在 `decided_at`，撤销记录写明原决定时间/字段/值/撤销说明；
+- 来源行选择撤销：`state='superseded'` 且有 `superseded_at` 即新增 `duplicate_source_decision_revoked`，一条决定只对应一条撤销记录（`restore_duplicate_source_decision` 的两条审计不会重复计数）；撤销账号取审计，没有审计时写「历史未保存」；
+- 实际样例 LS101501：12:36:38 的人工覆盖原决定 + 14:44:50 的撤销记录；14:40–14:50 查询能看到撤销，且不把撤销时间写回原决定；
+- 4 条同号选择：原决定（12:36:38）+ 4 条独立撤销（14:44:50），撤销说明使用已保存备注「撤销脚本代选：无真实人工确认记录，恢复待人工确认」；
+- `superseded` 不再统一写成「没有真实人工确认 / 重新回待处理」：原决定只写「已被后续操作撤销」，撤销记录按是否有撤销审计区分「撤销」与「被后续选择替代」；
+- `shipment_grouping_review` 只取 `status='resolved' AND resolved_at IS NOT NULL AND resolved_by IS NOT NULL`；自动生成、pending 未处理的复核不计入人工操作（隔离样例验证）。
+
+### R5 分类计数
+
+- 042 的 `categoryCounts` 始终返回 `catalog/inventory/shipment` 三个键，口径与搜索/日期/账号一致、不受当前类别影响；
+- 页面「全部业务」= 三类之和（365）；当前列表数 = 当前类别结果（商品资料 152 / 库存对应 100 / 物流 113）；
+- 读取失败或日期无效时没有执行查询，类别计数显示「—」，不显示 0；成功查询且确实为空才显示 0。
+
+## 3. 修正后的真实记录
+
+| 类别 | 条数 | 构成 |
+| --- | --- | --- |
+| 商品资料 | **152** | 来源采用 3（按批次）、补货号/初始补号/纠正测试货号/关闭缺货号 4、来源行选择 4、来源行选择撤销 4、字段人工口径 9、字段口径撤销 1、历史修订与首版 127 |
+| 库存对应 | **100** | 确认 90、换绑 5、国内复核 5；重核/停用/原 SKU 替换现役 0 条（路径已覆盖） |
+| 物流 | **113** | 人工关联 90、清除关联 15、人工修正 3、恢复按原表 2、分合票决定 3（均已处理）；撤销分组 0 |
+
+合计 **365 条**，与数据库独立重算一致。来源采用仍按批次一条，批内商品修订只在展开里；同一次物流保存仍合并一条。
+
+## 4. 只读查询（042）与准备链
+
+`db/catalog/042_operation_records.sql` 仍只有一个只读函数（不建表、不改 001–041、不新增写链）：
 
 ```sql
 catalog.read_operation_records(
-  p_category text,      -- all | catalog | inventory | shipment
-  p_actor uuid,         -- 记录账号
-  p_from timestamptz,   -- 含
-  p_to timestamptz,     -- 不含（页面按 +08 自然日换算）
-  p_search text,        -- 货号 / 来源 SKU / 货票号 / 名称 / 批次号
-  p_limit integer,      -- 1–200
-  p_offset integer
+  p_category text, p_actor uuid, p_from timestamptz, p_to timestamptz,
+  p_search text, p_limit integer, p_offset integer
 ) RETURNS jsonb
 ```
 
-- `SECURITY DEFINER` + `search_path=''` + `STABLE`，入口 `catalog.require_admin()`；app 角色只能 `EXECUTE`，PUBLIC 不可执行；
-- 返回 `total / offset / limit / categoryCounts / actors[] / rows[] / readAt`；
-- 排序 `at DESC, id ASC`（id 为各源稳定键，分页不重不漏）；
-- 关键词只搜已保存业务标识；批次记录按**本批写入商品**的货号/名称参与搜索；
-- 每条记录带 `detail`（批次回执、对应版本、前后值、修正前后、票面等），页面据此展开；
-- 分页越界由页面回读最后一页（服务端返回真实 `total`，不伪造空页）。
+本轮变化：
 
-权限/只读探针见 `scripts/catalog/apply-042.mjs`（rollback **28/28**、commit **28/28**）：
-两次安装幂等、单一重载、属主/授权正确、未登录 `CATALOG_FORBIDDEN`、全量=独立重算 360、
-分类计数、排序、id 唯一、三类真实样例与原始行逐字段一致、首版无前值、类别/账号/日期/关键词/无结果/分页/越界、
-业务行数前后不变、rollback 回到安装前签名。
+1. 修订差异改为键并集 + `changeKind/presence`；
+2. 批次返回全部明细与 `resultRowCount`；
+3. 物流关联搜索覆盖全部相关商品；原 SKU 替换按 detail 读取；
+4. 新增字段口径撤销、来源行选择撤销两条记录路径；
+5. 分合票只取已处理决定；
+6. `categoryCounts` 始终三键，口径与筛选一致。
 
-标准准备链已接入：`scripts/inventory/prepare-instance.mjs`（016–035、038–041 之后安装 042）
-与 `scripts/catalog/prepare-local-preview.mjs`（依赖表未建时记录 skipped，表就绪时就地补齐）。
+`SECURITY DEFINER` + `search_path=''` + `STABLE` + `catalog.require_admin()`；app 角色可执行、PUBLIC 不可执行。
 
-## 5. 页面
+- `apply-042.mjs --rollback` **38/38**，`--commit --allow-live-commit` **38/38**；
+- 两次安装幂等、单一重载、权限、未登录拒绝、全量 365 = 独立重算、分类计数、排序、id 唯一、三类真实样例、R1/R2/R3/R4/R5 定向、业务行数前后不变、rollback 回到安装前；
+- 标准准备链仍为 `prepare-instance.mjs` 在 041 之后安装 042、`prepare-local-preview.mjs` 依赖表就绪时就地补齐（本轮未改链顺序）。
 
-- 路由 `/dashboard/operations`，一级导航「操作记录」（`workspace-shell.tsx`、`navigation-config.ts` 同步登记）；
-- 默认按时间倒序，每条显示「时间 / 记录账号」「业务对象」「动作」「结果」，点开显示已保存依据；
-- 筛选：业务类别页签（带计数）、记录账号下拉、共享搜索框（货号/来源 SKU/货票号/名称，300ms 防抖）、
-  起止日期（+08 自然日）；筛选写回 URL（replace，不污染历史），刷新/直接链接/返回都还原；
-- 分页 50 条/页，页脚显示「第 a–b 条，共 N 条 · 第 p/P 页」，页码越界回读最后一页；
-- 展开依据：
-  - 批次：状态/采集/采用时间、写入商品、逐字段「前值 → 后值」；
-  - 换绑：来源 SKU、仓库、单位、对应版本、原商品 → 现商品（取被替代行）；
-  - 人工修正：修正前/后状态、累计到货、剩余、累计已上架（未保存写「未提供」）；
-  - 分合票：复核类型、决定、涉及票号与市场、受影响商品；
-- 入口：商品 → `/dashboard/catalog/<id>`；货票 → `/dashboard/in-transit?ticket=<shipmentId>`（无 id 时 `?q=<ticketNo>`）；
-  批次 → `/dashboard/catalog/sources`、`/dashboard/sync?panel=product-update`；
-- 返回保留：所有筛选与页码都在 URL 上，浏览器返回即回到原筛选/页码（已实测，见 §6）；
-- 无结果 / 日期反向 / 读取失败分别有独立状态：读取失败只说没读到，不显示旧缓存或 0 条。
+## 5. 页面与 UI
 
-页面文案明确写出：记录账号 ≠ 具体操作人；历史没保存的旧值显示「未保存」，不用当前值反推。
+- **首屏**：标题下一句用途说明；记录范围/账号含义/时间口径收进默认折叠的「记录说明」；错误提示只写问题与恢复动作；
+- **工具栏**：搜索（≥300px）、记录账号、起止日期（同一组相邻）、清空同组；移除「最多 80 字符」常驻小字，时间口径只出现一次；类别页签计数与当前结果数分别标明；
+- **列表**：时间/账号、业务对象与动作、处理结果、详情；动作标签在对象单元格内按文字宽度显示；货号、来源 SKU、货票号完整换行显示，不再 14 字符截断；UUID/快照哈希不进入摘要；
+- **展开**：先显示结果句，再显示业务事实；同一商品的字段「修改前 / 修改后」与商品/库存入口放在同一明细；明细 20 条一段；批次号/快照/请求号收进默认折叠的「来源信息」；查看/收起切换文字 + 方向图标；
+- **窄屏 760**：摘要按「对象+动作 / 结果 / 时间+账号」重排，详情表格在容器内滚动，整页无横向溢出；
+- **入口**：商品 → `/dashboard/catalog/<id>`；货票 → `/dashboard/in-transit?ticket=<id>`（无 id 时按票号搜索）；批次 → `/dashboard/catalog/sources`（准确名称，不再声称定位到某个历史批次）；返回保留 URL 上的筛选与页码。
 
 ## 6. 验证（执行方自验，不代表 PASS）
 
-### 6.1 页面（3011，新 BUILD，只读）**26/26**
+### 6.1 页面（3011，BUILD `C0mYSULXwBiBcxf9DHUpp`）**38/38**
 
-`verify-operations.mjs` → `verify.json`，console/pageerror 0：
+`verify-r2.mjs` → `verify.json`，console/pageerror 0：
 
-- 入口与默认：标题/一级导航、第一条=最新批次 `40b3c87c…`（2026-11-16 11:40:24）、
-  时间/账号/结果与数据库一致（`已写入 7 款…待核对 101…失败 0`）、每页 50 条、总数 360 = 三类独立重算；
-- 类别计数：商品资料 147 / 库存对应 100 / 物流 113 / 全部 360；
-- 三类真实样例逐字段核对：
-  - 商品资料：批次 `40b3c87c` 状态 partial、采集 2026-11-11 18:12:58、采用 11-16 11:40:24、
-    写入 7 款、WM0049 中文名称前后值；批次入口存在；
-  - 库存对应：换绑 喜运达MY仓 `757577983037` 对应第 2 版，原商品 WM0027（历史行）→ 现商品 WM0069；
-  - 物流：POKNZX027385 人工关联 12 条原始修订 → 12 条记录、明细合计 12 条；
-    POKNZX026710 人工修正 累计到货 0 / 剩余 11440 / 累计已上架「未提供」；
-- 筛选：类别（cat=catalog 只剩商品资料）、货号 WM0073（来源采用/商品资料修改/来源行选择）、
-  货票号 POKNZX027385、记录账号（显示名不是 UUID）、日期 11-10（18 条且全是 11-10）、
-  日期反向只提示不查询、无关键词时无结果空态 + 清空入口；
-- 分页：下一页写回 URL、每页 50、与第 1 页不重复；`page=99` 回读最后一页（10 条，8/8）；
-- 入口与返回：商品详情→返回 URL/筛选/行数不变；货票详情（`?ticket=`）→返回不变；
-  从第 2 页进商品→返回仍在第 2 页；批次→来源核实页→返回 `cat=catalog`；
-- 读取失败：临时回收 app 角色 EXECUTE 后页面显示「操作记录读取失败」+「重新读取」、0 条记录；
-  探针后立即恢复授权并复核 `has_function_privilege=true`、页面恢复 50 条。
+- 首屏说明折叠、无 80 字提示、时间口径一次、工具栏成组、默认列、查看/收起、来源信息折叠；
+- R5：全部业务 365、商品资料当前 152、库存对应当前 100、其它类别计数不变、日期反向显示「—」；
+- R1：WM0073 第 3 版「上一版本 第 2 版」「商品条码 757577407359 → 已移除」、不出现首版说明；
+- R2：七款货号分别搜索都命中 POKNZX027675 同一条关联、明细 7 条；
+- R3：4173 批次 94 款、20/60/94 分段展开、第 41 款 WM0054 的工厂变化、无「查看本批更新结果」、来源入口准确；
+- R4：LS101501 撤销在 14:44:50 独立显示、原决定时间 12:36:38 保留；WM0069 原决定与撤销各一条、说明使用已保存备注；
+- 完整编号显示、UUID 在摘要不可见、来源信息展开后可见；
+- 商品/货票入口返回保留筛选；第 2 页进入商品返回仍在第 2 页；
+- 760：无横向溢出、摘要 grid areas 为 object/result/time、长品名与分段入口可读；
+- 读取失败：临时回收 EXECUTE 后显示失败与「重新读取」、计数「—」、无分页；finally 恢复授权并复核 `app=true/public=false`；
+- 无结果、第 8 页 15 条、只读（验证前后 audit 42 / revisions 233 / inventory_audit 4285 / grouping 3）。
 
-### 6.2 布局（1440×900 / 760×900）**7/7**
+### 6.2 布局 **8/8**
 
-`layout-check.mjs` → `layout.json`：两档默认列表与展开来源采用记录后均无整页横向溢出
-（`scrollWidth == clientWidth`），筛选区在视口内，变化表在容器内滚动；console 0；截图 `layout-1440.png` / `layout-760.png`。
-导航变更后五页冒烟 **8/8**（`smoke.json`）：一级导航 6 项，五个页面 200 且高亮正确（操作记录为「操作记录」），console 0。
+`layout-r2.mjs` → `layout-r2.json`：1440 无整页横向溢出、搜索 625px、起止日期同一行相邻、无 <12px 正文；1440 展开无溢出、来源信息默认折叠、字段表不撑破；760 默认/展开无溢出且操作入口可见；console 0。
 
-### 6.3 迁移与只读
+### 6.3 隔离样例 **7/7**
 
-- `apply-042.mjs --rollback` **28/28**，`--commit --allow-live-commit` **28/28**；现役库业务行数前后一致
-  （audit_event 42 / item_revision 233 / source_batch 3 / duplicate 4 / field 9 / inventory_audit 4285 /
-  sku_mapping 517 / association_revision 200 / manual_revision 5 / grouping_review 3 / override 1）。
+`fixtures.mjs` → `fixtures.json`：单事务插入 → 调用 042 → 断言 → ROLLBACK，事后核对业务行数与样例 id 均无残留：
 
-### 6.4 测试与静态检查
+- 原 SKU 替换（entity_ref=仓库，detail 带新旧 mapping/SKU/item/newVersion）：按新 SKU、旧 SKU、货号都能搜索到，展示新旧记录号；
+- pending 分合票复核不计入人工操作；已处理决定按 resolved_at 显示；
+- 正常重新选行（superseded、无撤销审计）：原决定与「被后续选择替代」分开显示，撤销账号如实写「历史未保存」；
+- 隔离样例总数 = 365 + 4（pending 不计）。
 
-- 定向单测：`src/features/operations/model.test.ts` **21/21**、`navigation-config.test.ts` **7/7**、
-  `inactive-session-guard.test.ts` **20/20**（合计 48/48）；
-- `tsc --noEmit` 仅既有 BEST 5 条；改动文件 eslint 0；`git diff --check` 0；
-- 全仓 `npm test` 结果见 §6.4。
+### 6.4 迁移与准备链
 
-### 6.5 全仓测试
+- `apply-042.mjs --rollback` **38/38**、`--commit --allow-live-commit` **38/38**；
+- 现役业务行数前后一致：audit_event 42 / item_revision 233 / source_batch 3 / duplicate_decision 4 / field_decision 9 / inventory_audit 4285 / sku_mapping 517 / association_revision 200 / manual_revision 5 / grouping_review 3 / grouping_override 1；
+- 准备链代码核对：`prepare-instance.mjs` 在 041 后安装 042，`prepare-local-preview.mjs` 的 `DEPENDENT_SQL` 仍包含 042 且依赖表齐备时执行。
 
-`npm test` **942/943**：唯一失败是既有 `opt6-production-apply` Windows 换行基线（与本包无关；
-同轮 `get-catalog-list-page` 曾一次 5s 超时，单独重跑 5/5 通过）。改动目录 eslint 0、`git diff --check` 0。
+### 6.5 测试与静态检查
 
-## 7. 明确没有保存 / 本机没有记录的信息
+- 定向单测：`src/features/operations/model.test.ts` **31/31** + `navigation-config.test.ts` **7/7** = **38/38**；
+- `tsc --noEmit` 仅既有 BEST 5 条（`src/lib/providers/best/__tests__/*`），`src/features/operations` 0 条；
+- 改动文件 eslint 0；`git diff --check` 0（仅既有 LF/CRLF 提示）；
+- 本轮只改操作记录相关文件，不重跑无关全仓套件；初版全仓结果为 942/943（唯一既有 opt6 换行基线），本轮不把它写成新结论。
 
-1. **重核、停用、原 SKU 替换**：现役库 `inventory_audit` 没有这三类动作（0 条）；页面查询路径已覆盖，
-   未来出现即按同一套展示，当前不显示任何样例。
-2. **撤销分合票决定**：`shipment_grouping_override` 现有 1 条 active（keep_separate），撤销记录 0 条；
-   页面已覆盖 `active=false AND revoked_at IS NOT NULL`，当前无样例。
-3. **来源字段覆盖前的本地值**：`product_source_field_decision` 未保存（`value_raw` 为空），
-   页面写「未提供」，不拿当前商品资料补。
-4. **首版前值**：`item_revision.previous_revision IS NULL`，写「无（首版）」。
-5. **具体操作人**：`shipment_grouping_review`/`override` 只保存管理员账号；13:43 的分组决定只能确认记在该账号名下，
-   不能确定具体是谁点的；页面脚注与展开说明都写明。
-6. **4 条同号选择不是真实人工确认**：由一次性脚本代选后已撤销（note 原文保留），页面显示「已撤销」。
-7. **申请/理由**：`inventory_audit` 没有 request_id 与自然语言理由；页面只展示 `detail` 里的 applied/committed/skipped。
-8. **物流关联请求号**：表里没有 request_id，同次保存只能按时间+账号+方法+票合并，不做跨时间猜测。
-9. **自动同步事件**：库存发布/阶段/导出、物流自动读取等后台事件不进入本页（仍是各同步结果入口）。
-10. `assign_initial_code` 当年写入的是测试码 `TEST-PG-NEW122-0`，页面如实显示为「初始补录货号」，
-    随后 `correct_test_source_code` 记录撤销；不把测试数据美化成真实货号。
+### 6.6 截图
+
+`01-overview-1440.png`、`02-range-invalid-1440.png`、`03-r1-removed-barcode-1440.png`、
+`04-r3-batch-94-1440.png`、`05-r4-revocation-1440.png`、`06-narrow-760-expanded.png`、
+`07-read-failure-1440.png`、`08-layout-1440.png`、`09-expanded-1440.png`、`10-layout-760.png`、`11-expanded-760.png`。
+
+## 7. 明确没有保存 / 本机没有记录
+
+1. **重核、停用、原 SKU 替换**：现役 0 条；页面路径已覆盖，替换的隔离样例见 §6.3。
+2. **撤销分合票决定**：现役 1 条 active override（keep_separate），撤销 0 条；路径已覆盖。
+3. **字段覆盖前的本地值**：`product_source_field_decision` 没有保存覆盖前值，页面不拿当前商品补。
+4. **首版前值**：确实没有上一版本时不存在前值；声明了上一版但历史行缺失时如实说明缺失。
+5. **具体操作人**：分合票决定/撤销只有管理员账号；记录账号不等于具体操作人。
+6. **4 条同号选择的背景**：脚本代选后撤销，页面用已保存备注原样说明，不冒充真实人工确认。
+7. **请购/理由/请求号**：`inventory_audit` 无 request_id 与自然语言理由；物流关联无请求号；页面不展示不存在的字段。
+8. **自动同步事件**：库存发布/阶段/导出、物流自动读取、飞书后台同步不进入本页。
+9. **pending 分合票复核**：未处理前不算人工操作（隔离样例验证排除）。
 
 ## 8. 改动文件
 
-| 文件 | 改动 |
+| 文件 | 本轮改动 |
 | --- | --- |
-| `db/catalog/042_operation_records.sql` | 新增只读汇合函数（商品资料/库存对应/物流），不建表 |
-| `scripts/catalog/apply-042.mjs` | rollback/commit 探针（结构/权限/真实样例/筛选/分页/只读） |
-| `scripts/inventory/prepare-instance.mjs` | 标准准备链在 041 之后安装 042 |
-| `scripts/catalog/prepare-local-preview.mjs` | 依赖表就绪时就地补齐 042，未就绪记录 skipped |
-| `src/features/operations/types.ts` | 记录/分页 DTO |
-| `src/features/operations/model.ts` | URL 解析/分页/动作文案/展开依据（纯函数） |
-| `src/features/operations/model.test.ts` | 21 条单测（筛选/日期边界/文案/前值/入口） |
-| `src/features/operations/server/reads.ts` | app 角色只读调用 + 结构校验 |
-| `src/features/operations/components/operations-view.tsx` | 列表/展开/分页/空态/读取失败/无权限 |
-| `src/features/operations/components/operations-filters.tsx` | 搜索/账号/日期筛选（写回 URL） |
-| `src/features/operations/components/operations.module.css` | 与现役工作台一致的列表/展开样式 |
-| `src/app/dashboard/operations/page.tsx` | 页面（force-dynamic、鉴权、越界回读） |
-| `src/ui/ice-v4/workspace-shell.tsx` | 一级导航「操作记录」+ 面包屑 |
-| `src/ui/ice-v4/navigation-config.ts` | 登记 `/dashboard/operations` |
-| `src/ui/ice-v4/navigation-config.test.ts` | 导航合同更新为六个入口 |
+| `db/catalog/042_operation_records.sql` | 键并集差异、全量批次明细、全量搜索、替换分支、撤销记录、resolved 分组、三键计数 |
+| `scripts/catalog/apply-042.mjs` | 期望总数/分类口径、R1–R5 定向探针、无结果三键 0、证据目录 |
+| `src/features/operations/model.ts` | 差异状态、全量明细、分段、计数语义、撤销/替换文案、来源信息、完整编号 |
+| `src/features/operations/model.test.ts` | 31 条（R1/R2/R3/R4/R5、计数、分段、入口） |
+| `src/features/operations/components/operations-view.tsx` | 首屏、工具栏结构、摘要网格、查看/收起、结果条、失败/无效状态 |
+| `src/features/operations/components/operations-filters.tsx` | 搜索/账号/日期成组、清空、单一时间口径 |
+| `src/features/operations/components/operation-record-detail.tsx` | 新增：展开内容、来源信息折叠、明细分段、商品内联变化 |
+| `src/features/operations/components/operations.module.css` | 列表/详情/窄屏重排、字号与间距 |
+| `src/app/dashboard/operations/page.tsx` | 沿用读取与越界回读（未改协议） |
+| `docs/tasks/operations-log-v1.md` | 本记录 |
 
 ## 9. 边界
 
-- 现役库零业务写入；只读函数、只读事务与 `verify` 中的授权回收/恢复均不写业务数据；
-- 未启动库存/物流/飞书后台 worker；最新库存批次仍停在 2026-11-12 16:22；
+- 现役零业务写入；隔离样例全部在事务内 ROLLBACK；读取失败探针临时回收并恢复 EXECUTE；
+- 未启动库存/物流/飞书后台 worker；
 - 未改飞书、未改各模块写入链、未新增业务表；
-- 权限矩阵、200% 缩放、多日稳定性未做；
-- 页面暂不支持导出与跨页批量操作（不在本包范围）；
-- `README.md` 的「当前 BUILD」行本轮未改：该文件带有本包之外的 Mac 部署准备改动（按要求保留、未提交），
-  不把两包混进同一个提交；现役 BUILD 以本记录与实例 `preview-build-ready.json` 为准。
+- 权限矩阵、200% 缩放、多日稳定性、导出/跨页批量未做；
+- 工作区中的 Mac 部署准备改动（README 等）保留未提交；`.local/` 不入 Git；
+- 最终结论由审查方给出，执行方不宣布 PASS。

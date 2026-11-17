@@ -3,7 +3,8 @@
  *
  * 原则：
  * - 这里只把服务端 042 只读函数返回的**已保存字段**翻成中文，不做任何当前值反推；
- * - 历史行没有保存的内容显示「未保存 / 未提供」，不补 0、不猜；
+ * - 历史行没有保存的内容显示「历史未保存 / 未提供」，不补 0、不猜；
+ * - 字段差异按新旧版本字段键并集展示：新增 / 修改 / 删除；
  * - 记录账号 = 记录行上的 actor_id 显示名，不推断具体操作人。
  */
 import { receiptSentence } from '@/features/catalog/product-source/receipt-copy';
@@ -12,6 +13,7 @@ import type { OperationCategory, OperationCategoryFilter, OperationRecordDto } f
 
 export const OPERATION_PAGE_SIZE = 50;
 export const OPERATION_MAX_SEARCH_LENGTH = 80;
+export const OPERATION_ITEM_CHUNK = 20;
 const SHANGHAI_OFFSET = '+08:00';
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,10 +51,24 @@ export function operationCategoryLabel(category: OperationCategory): string {
   return '物流';
 }
 
-/** 类别标签上的计数文案：真实 0 显示 0 条（不隐藏、不写「—」）。 */
-export function operationCategoryCountLabel(count: number): string {
+/**
+ * 类别标签上的计数：查询失败/日期无效时传 null → 显示「—」（没读到 ≠ 0 条）；
+ * 成功查询且确实为 0 → 显示「0 条」。
+ */
+export function operationCategoryCountLabel(count: number | null): string {
+  if (count === null) return '—';
   const safe = Number.isFinite(count) && count > 0 ? Math.trunc(count) : 0;
   return `${safe} 条`;
+}
+
+/** 「全部业务」= 其他筛选条件下三类计数之和；任一类缺失视为没读到（null）。 */
+export function operationCategoryTotal(
+  counts: Partial<Record<OperationCategory, number>> | null | undefined,
+): number | null {
+  if (!counts) return null;
+  const values = [counts.catalog, counts.inventory, counts.shipment];
+  if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value))) return null;
+  return (values as number[]).reduce((sum, value) => sum + Math.max(0, Math.trunc(value)), 0);
 }
 
 function validDateValue(value: string): string {
@@ -155,7 +171,9 @@ const ACTION_LABELS: Record<string, string> = {
   correct_test_source_code: '纠正测试货号',
   resolve_source_issue: '关闭来源缺货号事项',
   duplicate_source_decision: '选择来源资料行',
+  duplicate_source_decision_revoked: '撤销来源行选择',
   field_decision: '来源字段人工口径',
+  source_field_decision_revoked: '撤销字段人工口径',
   item_revision: '商品资料修改',
   item_baseline: '商品资料首版',
   inventory_confirm: '确认商品对应',
@@ -178,6 +196,7 @@ export function operationActionLabel(action: string): string {
 
 export function operationActionTone(action: string): 'neutral' | 'green' | 'amber' | 'red' | 'blue' {
   if (action === 'shipment_grouping_revoked' || action === 'correct_test_source_code') return 'amber';
+  if (action === 'source_field_decision_revoked' || action === 'duplicate_source_decision_revoked') return 'amber';
   if (action === 'disable_inventory_mapping' || action === 'shipment_association_cleared') return 'red';
   if (action === 'source_batch_applied' || action === 'item_baseline' || action === 'item_revision') return 'blue';
   if (action === 'inventory_rebind' || action === 'replace_inventory_mapping' || action === 'domestic_review_decision') return 'green';
@@ -218,7 +237,7 @@ function detailOf(record: OperationRecordDto): Record<string, unknown> {
   return asRecord(record.detail) ?? {};
 }
 
-/** 已保存的原始值显示：空值如实写「未填写」，缺失写「未提供」。 */
+/** 已保存的原始值显示：空值如实写「未填写」，缺失写空。 */
 export function operationRawText(raw: unknown, emptyText = '未填写'): string {
   if (raw === null || raw === undefined) return emptyText;
   if (typeof raw === 'string') return raw.trim() === '' ? emptyText : raw;
@@ -328,23 +347,45 @@ export function operationResultText(record: OperationRecordDto): string {
       const state = asString(detail.state);
       const row = asNumber(detail.chosenRowNumber);
       if (state === 'superseded' || state === 'revoked') {
-        return '这条选择已撤销；没有真实人工确认，同号多行重新回到待处理。';
+        const at = formatOperationTime(asString(detail.supersededAt));
+        return `这条来源行选择${at ? `已于 ${at} 被撤销` : '已被撤销'}；原决定仍保留在这里。`;
       }
       return row ? `已选择来源第 ${row} 行资料，后续更新按这一行采用。` : '已保存来源资料行选择。';
+    }
+    case 'duplicate_source_decision_revoked': {
+      const row = asNumber(detail.chosenRowNumber);
+      const known = detail.revokedByAccount === true;
+      if (!known) return row ? `原来源第 ${row} 行选择已被后续选择替代。` : '原来源行选择已被后续选择替代。';
+      return row ? `撤销来源第 ${row} 行选择；同号多行重新回到待处理。` : '撤销来源行选择；同号多行重新回到待处理。';
     }
     case 'field_decision': {
       const action = asString(detail.action) ?? '';
       const field = operationFieldLabel(asString(detail.fieldKey) ?? '');
       const state = asString(detail.state);
       const label = FIELD_ACTION_LABELS[action] ?? '人工处理';
-      return `${label}：${field}${state === 'revoked' ? '（该决定已撤销）' : ''}。`;
+      const revokedAt = formatOperationTime(asString(detail.revokedAt));
+      return `${label}：${field}${state === 'revoked' ? `（已于 ${revokedAt || '未保存时间'} 撤销）` : ''}。`;
+    }
+    case 'source_field_decision_revoked': {
+      const field = operationFieldLabel(asString(detail.fieldKey) ?? '');
+      const note = asString(detail.revokedNote);
+      return `撤销「${field}」的人工口径${note ? `：${note}` : '，恢复按来源值解释'}。`;
     }
     case 'item_baseline':
       return '建立商品资料首版；没有上一版本，无法对比前值。';
     case 'item_revision': {
       const revision = asNumber(detail.revision);
       const reason = asString(detail.reason);
-      return `商品资料第 ${revision ?? '—'} 版${reason ? `：${reason}` : ''}。`;
+      const changes = asArray(detail.changes);
+      const added = changes.filter((entry) => asString(asRecord(entry)?.changeKind) === 'added').length;
+      const removed = changes.filter((entry) => asString(asRecord(entry)?.changeKind) === 'removed').length;
+      const modified = changes.length - added - removed;
+      const parts: string[] = [];
+      if (modified > 0) parts.push(`修改 ${modified} 项`);
+      if (added > 0) parts.push(`新增 ${added} 项`);
+      if (removed > 0) parts.push(`删除 ${removed} 项`);
+      const changeText = parts.length > 0 ? `：${parts.join('，')}` : '：字段值与上一版一致';
+      return `商品资料第 ${revision ?? '—'} 版${changeText}${reason ? `（${reason}）` : ''}。`;
     }
     case 'inventory_confirm':
     case 'inventory_rebind': {
@@ -362,8 +403,11 @@ export function operationResultText(record: OperationRecordDto): string {
       return '已发起重核；该对应退出当前库存汇总，等人工确认后由下一次完整批次采用。';
     case 'disable_inventory_mapping':
       return '已停用该商品对应；历史批次数量保留，不再计入当前汇总。';
-    case 'replace_inventory_mapping':
-      return '已按原 SKU 替换更换绑定；历史数量保留，新关系等下一批采用。';
+    case 'replace_inventory_mapping': {
+      const oldSku = asString(detail.oldExternalSku);
+      const newSku = asString(detail.newExternalSku);
+      return `已按原 SKU 替换：${oldSku ?? '原 SKU'} → ${newSku ?? '新 SKU'}；历史数量保留，新关系等下一批采用。`;
+    }
     case 'domestic_review_decision': {
       const previous = asString(detail.previousReviewState);
       const next = asString(detail.reviewState);
@@ -407,28 +451,45 @@ function associationResult(record: OperationRecordDto, verb: '关联' | '清除'
 }
 
 /* ------------------------------------------------------------------ *
- * 展开后的依据（事实 / 变化 / 明细 / 票 / 入口）
+ * 展开后的依据（事实 / 变化 / 明细 / 票 / 入口 / 来源信息）
  * ------------------------------------------------------------------ */
 
 export interface OperationFact { label: string; value: string }
-export interface OperationChange { scope: string; field: string; before: string; after: string }
+
+export type OperationChangeKind = 'added' | 'removed' | 'modified';
+
+export interface OperationChange {
+  field: string;
+  /** 展示文本：已移除 / 未填写 / 历史未保存 / 原值。 */
+  before: string;
+  after: string;
+  kind: OperationChangeKind;
+}
+
 export interface OperationItemView {
   key: string;
   title: string;
   meta: string;
-  change: string | null;
+  note: string | null;
+  changes: OperationChange[];
   productHref: string | null;
   inventoryHref: string | null;
+  ticketHref: string | null;
 }
+
 export interface OperationTicketView { ticketNo: string; meta: string; href: string | null }
 export interface OperationEntryLink { label: string; href: string }
+
 export interface OperationDetailView {
+  resultText: string;
   facts: OperationFact[];
   changes: OperationChange[];
   items: OperationItemView[];
   tickets: OperationTicketView[];
   links: OperationEntryLink[];
   notes: string[];
+  /** 批次号、快照哈希、请求号等，默认折叠。 */
+  sources: OperationFact[];
 }
 
 export function operationProductHref(itemId: string | null | undefined): string | null {
@@ -443,20 +504,85 @@ export function operationTicketHref(record: Pick<OperationRecordDto, 'ticketId' 
   return null;
 }
 
-function changeRows(
-  rawList: unknown,
-  scope: string,
-): OperationChange[] {
-  return asArray(rawList).map((entry) => asRecord(entry)).filter(Boolean).map((entry) => ({
-    scope,
-    field: operationFieldLabel(String(entry!.fieldKey ?? '')),
-    before: asString(entry!.beforeRaw) ?? '未填写',
-    after: asString(entry!.afterRaw) ?? '未填写',
-  }));
+/**
+ * 历史修订字段差异：SQL 已按新旧字段键并集给出 changeKind + beforePresent/afterPresent。
+ * 删除 → after 显示「已移除」；新增 → before 显示「历史未保存」；两端都有键但为空 →「未填写」。
+ */
+function revisionChange(raw: Record<string, unknown>): OperationChange {
+  const kindRaw = asString(raw.changeKind);
+  const kind: OperationChangeKind = kindRaw === 'added' || kindRaw === 'removed' ? kindRaw : 'modified';
+  const beforePresent = raw.beforePresent !== false;
+  const afterPresent = raw.afterPresent !== false;
+  if (kind === 'removed') {
+    return {
+      field: operationFieldLabel(String(raw.fieldKey ?? '')),
+      before: operationRawText(raw.beforeRaw),
+      after: '已移除',
+      kind,
+    };
+  }
+  if (kind === 'added') {
+    return {
+      field: operationFieldLabel(String(raw.fieldKey ?? '')),
+      before: beforePresent ? operationRawText(raw.beforeRaw) : '历史未保存',
+      after: afterPresent ? operationRawText(raw.afterRaw) : '已移除',
+      kind,
+    };
+  }
+  return {
+    field: operationFieldLabel(String(raw.fieldKey ?? '')),
+    before: beforePresent ? operationRawText(raw.beforeRaw) : '历史未保存',
+    after: afterPresent ? operationRawText(raw.afterRaw) : '已移除',
+    kind,
+  };
 }
 
-/** 展开内容：只读已保存依据；长列表截断并标注总数。 */
-export function operationDetailView(record: OperationRecordDto, maxItems = 40): OperationDetailView {
+/** 批次回执里的变化：回执没有保存字段是否存在，只用保存的 beforeRaw/afterRaw 如实展示。 */
+function receiptChange(raw: Record<string, unknown>): OperationChange {
+  const kindRaw = asString(raw.kind);
+  const beforeRaw = raw.beforeRaw;
+  const afterRaw = raw.afterRaw;
+  const kind: OperationChangeKind = kindRaw === 'initial_baseline' || beforeRaw === null || beforeRaw === undefined
+    ? 'added'
+    : afterRaw === null || afterRaw === undefined
+      ? 'removed'
+      : 'modified';
+  return {
+    field: operationFieldLabel(String(raw.fieldKey ?? '')),
+    before: kind === 'added' ? '历史未保存' : operationRawText(beforeRaw),
+    after: kind === 'removed' ? '已移除' : operationRawText(afterRaw),
+    kind,
+  };
+}
+
+function comparisonChanges(
+  fieldDifferences: unknown[],
+  chosenRow: number | null,
+): OperationChange[] {
+  return fieldDifferences.map((entry) => {
+    const diff = asRecord(entry) ?? {};
+    const values = asArray(diff.values).map((value) => asRecord(value)).filter(Boolean) as Array<Record<string, unknown>>;
+    return {
+      field: operationFieldLabel(String(diff.fieldKey ?? '')),
+      before: values.map((value) => `第${asText(value.rowNumber) ?? '?'}行 ${operationRawText(value.raw)}`).join(' / ') || '未保存',
+      after: chosenRow === null ? '已保存来源行选择' : `采用第 ${chosenRow} 行`,
+      kind: 'modified' as const,
+    };
+  });
+}
+
+function itemChange(field: string, before: string | null, after: string | null): OperationChange | null {
+  if (!before && !after) return null;
+  return {
+    field,
+    before: before ?? '历史未保存',
+    after: after ?? '未记录',
+    kind: 'modified',
+  };
+}
+
+/** 展开内容：只读已保存依据；明细不截断（页面按 20 条一段展开）。 */
+export function operationDetailView(record: OperationRecordDto): OperationDetailView {
   const detail = detailOf(record);
   const facts: OperationFact[] = [];
   const changes: OperationChange[] = [];
@@ -464,43 +590,41 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
   const tickets: OperationTicketView[] = [];
   const notes: string[] = [];
   const links: OperationEntryLink[] = [];
+  const sources: OperationFact[] = [];
   const productHref = operationProductHref(record.itemId);
-  if (productHref) links.push({ label: '查看该商品资料', href: productHref });
 
   switch (record.action) {
     case 'source_batch_applied': {
       const counts = asRecord(detail.counts) ?? {};
       const results = asArray(detail.results).map((entry) => asRecord(entry)).filter(Boolean) as Array<Record<string, unknown>>;
-      facts.push({ label: '批次', value: asString(detail.batchId) ?? '未保存' });
       facts.push({ label: '批次状态', value: asString(detail.status) === 'partial' ? '部分完成（已写入确认字段，其余保留原值）' : asString(detail.status) === 'applied' ? '已采用' : (asString(detail.status) ?? '未保存') });
-      facts.push({ label: '来源快照', value: asString(detail.snapshotKey) ?? '未保存' });
-      facts.push({ label: '采集时间', value: formatOperationTime(asString(detail.capturedAt)) || '未保存' });
-      facts.push({ label: '采用时间', value: formatOperationTime(asString(detail.receivedAt) ?? record.at) || '未保存' });
       if (asNumber(counts.businessRows) !== null) facts.push({ label: '本批业务行', value: String(counts.businessRows) });
-      facts.push({ label: '本批写入商品', value: `${results.length} 款（明细如下）` });
-      const shown = results.slice(0, maxItems);
-      for (const entry of shown) {
+      facts.push({ label: '采用时间', value: formatOperationTime(asString(detail.receivedAt) ?? record.at) || '未保存' });
+      facts.push({ label: '采集时间', value: formatOperationTime(asString(detail.capturedAt)) || '未保存' });
+      for (const entry of results) {
         const code = asString(entry.iceCode);
         const name = asString(entry.nameCn);
         const entryItemId = asString(entry.itemId);
-        const entryChanges = changeRows(entry.changes, `${code ?? ''} ${name ?? ''}`.trim() || '商品');
-        if (entryChanges.length === 0) {
-          entryChanges.push({ scope: `${code ?? ''} ${name ?? ''}`.trim() || '商品', field: '本批结果', before: '—', after: asString(entry.reasonText) ?? '未保存' });
-        }
-        changes.push(...entryChanges);
+        const entryChanges = asArray(entry.changes).map((change) => asRecord(change)).filter(Boolean).map((change) => receiptChange(change!));
+        const reason = asString(entry.reasonText);
+        const needsReview = asString(entry.action) === 'needs_review';
         items.push({
-          key: `${entryItemId ?? code ?? name ?? 'item'}:${entryChanges.length}`,
+          key: `${entryItemId ?? code ?? name ?? 'item'}`,
           title: name ?? code ?? '商品',
-          meta: [code, asString(entry.reasonText)].filter(Boolean).join(' · '),
-          change: asString(entry.reasonText),
+          meta: [code, needsReview ? '待人工核对' : null, reason].filter(Boolean).join(' · '),
+          note: needsReview ? '本批保留了原值，未采用待核对字段。' : null,
+          changes: entryChanges,
           productHref: operationProductHref(entryItemId),
           inventoryHref: null,
+          ticketHref: null,
         });
       }
-      if (results.length > shown.length) notes.push(`本批共 ${results.length} 款写入，这里显示前 ${shown.length} 款。`);
-      links.push({ label: '查看来源批次与采用记录', href: '/dashboard/catalog/sources' });
-      links.push({ label: '查看本批更新结果', href: '/dashboard/sync?panel=product-update' });
-      notes.push('「无变化 / 待核对」的款数来自本批回执计数；明细只列真正写入或失败的款。');
+      links.push({ label: '打开来源资料处理页', href: '/dashboard/catalog/sources' });
+      notes.push('明细只列本批真正写入或失败的商品；「无变化 / 待核对」是计数，不是逐款操作。');
+      notes.push('本页已保存本批全部写入明细，不再跳转到最新批次结果。');
+      if (asString(detail.batchId)) sources.push({ label: '批次号', value: asString(detail.batchId)! });
+      if (asString(detail.snapshotKey)) sources.push({ label: '快照哈希', value: asString(detail.snapshotKey)! });
+      if (asString(detail.origin)) sources.push({ label: '来源类型', value: asString(detail.origin)! });
       break;
     }
     case 'assign_source_code':
@@ -511,7 +635,7 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
       facts.push({ label: '当前正式货号', value: asString(detail.currentCode) ?? '未提供' });
       if (asString(result.removedCode)) facts.push({ label: '撤销的货号', value: asString(result.removedCode)! });
       if (result.pendingCode === true || asString(result.pendingCode) === 'true') facts.push({ label: '货号状态', value: '已恢复为待确认' });
-      if (asString(detail.requestId)) facts.push({ label: '请求号', value: asString(detail.requestId)! });
+      if (asString(detail.requestId)) sources.push({ label: '请求号', value: asString(detail.requestId)! });
       break;
     }
     case 'resolve_source_issue': {
@@ -522,48 +646,77 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
       break;
     }
     case 'duplicate_source_decision': {
+      facts.push({ label: '决定时间', value: formatOperationTime(record.at) || '未保存' });
       facts.push({ label: '来源行号', value: asArray(detail.rows).map((row) => String(row)).join(' / ') || '未保存' });
-      facts.push({ label: '选择的来源行', value: asText(detail.chosenRowNumber) ?? '未保存' });
+      facts.push({ label: '选择的来源行', value: asNumber(detail.chosenRowNumber) === null ? '未保存' : `第 ${asNumber(detail.chosenRowNumber)} 行` });
       facts.push({ label: '该行名称', value: asString(detail.chosenRowName) ?? '未保存' });
       facts.push({ label: '该行商品条码', value: asString(detail.chosenRowBarcode) ?? '未填写' });
-      facts.push({ label: '决定状态', value: asString(detail.state) === 'superseded' ? '已撤销' : (asString(detail.state) ?? '未保存') });
-      if (asString(detail.supersededAt)) facts.push({ label: '撤销时间', value: formatOperationTime(asString(detail.supersededAt)) || '未保存' });
-      if (asString(detail.note)) notes.push(asString(detail.note)!);
-      for (const diff of asArray(detail.fieldDifferences).map((entry) => asRecord(entry)).filter(Boolean)) {
-        const field = operationFieldLabel(String(diff!.fieldKey ?? ''));
-        const values = asArray(diff!.values).map((entry) => asRecord(entry)).filter(Boolean) as Array<Record<string, unknown>>;
-        changes.push({
-          scope: '两份资料逐行对照',
-          field,
-          before: values.map((value) => `第${value.rowNumber ?? '?'}行 ${asString(value.raw) ?? '未填写'}`).join(' / ') || '未保存',
-          after: '以上为来源原值',
-        });
+      const state = asString(detail.state);
+      facts.push({ label: '当前状态', value: state === 'superseded' ? '已被后续操作撤销' : state === 'active' ? '生效中' : (state ?? '未保存') });
+      changes.push(...comparisonChanges(asArray(detail.fieldDifferences), asNumber(detail.chosenRowNumber)));
+      if (state === 'superseded') {
+        const at = formatOperationTime(asString(detail.supersededAt));
+        notes.push(`这条选择${at ? `已于 ${at}` : ''}被撤销；原决定仍保留在这里，撤销作为独立记录显示。`);
       }
+      break;
+    }
+    case 'duplicate_source_decision_revoked': {
+      facts.push({ label: '原决定时间', value: formatOperationTime(asString(detail.decidedAt)) || '未保存' });
+      facts.push({ label: '原选择来源行', value: asNumber(detail.chosenRowNumber) === null ? '未保存' : `第 ${asNumber(detail.chosenRowNumber)} 行` });
+      facts.push({ label: '撤销时间', value: formatOperationTime(asString(detail.supersededAt) ?? record.at) || '未保存' });
+      if (detail.revokedByAccount === false) facts.push({ label: '撤销账号', value: '历史未保存' });
+      const note = asString(detail.note);
+      if (note) notes.push(`已保存说明：${note}`);
+      notes.push('原决定仍保留在它发生的时间；本条是后续撤销，不重复计算原选择。');
+      if (asString(detail.requestId)) sources.push({ label: '请求号', value: asString(detail.requestId)! });
       break;
     }
     case 'field_decision': {
       facts.push({ label: '字段', value: operationFieldLabel(asString(detail.fieldKey) ?? '未保存') });
       facts.push({ label: '处理方式', value: FIELD_ACTION_LABELS[asString(detail.action) ?? ''] ?? '未保存' });
+      facts.push({ label: '决定时间', value: formatOperationTime(asString(detail.decidedAt) ?? record.at) || '未保存' });
       facts.push({ label: '决定状态', value: asString(detail.state) === 'active' ? '生效中' : asString(detail.state) === 'revoked' ? '已撤销' : (asString(detail.state) ?? '未保存') });
       if (asString(detail.rule)) facts.push({ label: '采用口径', value: asString(detail.rule)! });
       if (asString(detail.valueRaw)) facts.push({ label: '人工值', value: asString(detail.valueRaw)! });
       if (asString(detail.reason)) notes.push(asString(detail.reason)!);
-      if (asString(detail.revokedAt)) facts.push({ label: '撤销时间', value: formatOperationTime(asString(detail.revokedAt)) || '未保存' });
+      if (asString(detail.note)) notes.push(asString(detail.note)!);
+      if (asString(detail.revokedAt)) {
+        notes.push(`这条决定已于 ${formatOperationTime(asString(detail.revokedAt)) || '未保存时间'} 被撤销，撤销有独立记录。`);
+      }
       notes.push('该决定行只保存决定本身；覆盖前的本地值没有保存，不能从当前商品资料反推。');
+      break;
+    }
+    case 'source_field_decision_revoked': {
+      facts.push({ label: '原决定时间', value: formatOperationTime(asString(detail.decidedAt)) || '未保存' });
+      facts.push({ label: '原处理方式', value: FIELD_ACTION_LABELS[asString(detail.originalAction) ?? ''] ?? '人工处理' });
+      facts.push({ label: '字段', value: operationFieldLabel(asString(detail.fieldKey) ?? '未保存') });
+      if (asString(detail.valueRaw)) facts.push({ label: '原人工值', value: asString(detail.valueRaw)! });
+      if (asString(detail.rule)) facts.push({ label: '原采用口径', value: asString(detail.rule)! });
+      facts.push({ label: '撤销时间', value: formatOperationTime(asString(detail.revokedAt) ?? record.at) || '未保存' });
+      const note = asString(detail.revokedNote);
+      if (note) notes.push(`已保存撤销说明：${note}`);
+      if (asString(detail.reason)) notes.push(`原决定理由：${asString(detail.reason)}`);
+      notes.push('原决定仍保留在它发生的时间；本条是后续撤销，不把撤销时间写回原决定。');
+      if (asString(detail.requestId)) sources.push({ label: '请求号', value: asString(detail.requestId)! });
       break;
     }
     case 'item_baseline':
     case 'item_revision': {
       const revision = asNumber(detail.revision);
       const previous = asNumber(detail.previousRevision);
+      const declared = asNumber(detail.declaredPreviousRevision);
       facts.push({ label: '版本', value: revision === null ? '未保存' : `第 ${revision} 版` });
       facts.push({ label: '上一版本', value: previous === null ? '无（首版）' : `第 ${previous} 版` });
       if (asString(detail.reason)) facts.push({ label: '修订原因', value: asString(detail.reason)! });
-      if (asString(detail.barcode)) facts.push({ label: '商品条码', value: asString(detail.barcode)! });
-      if (asString(detail.evidenceRef)) notes.push(`来源证据：${asString(detail.evidenceRef)}`);
-      changes.push(...changeRows(detail.changes, record.iceCode ?? '商品资料'));
-      if (asString(detail.previousRevision) === null || previous === null) notes.push('首版没有上一版本，因此没有前值可对比。');
-      else if (changes.length === 0) notes.push('该版本与上一版保存的字段值一致，没有字段级差异。');
+      changes.push(...asArray(detail.changes).map((change) => asRecord(change)).filter(Boolean).map((change) => revisionChange(change!)));
+      if (asString(detail.evidenceRef)) sources.push({ label: '来源证据', value: asString(detail.evidenceRef)! });
+      if (previous === null) {
+        notes.push(declared !== null
+          ? `声明上一版为第 ${declared} 版，但历史里找不到该版本，因此没有前值可对比。`
+          : '首版没有上一版本，因此没有前值可对比。');
+      } else if (changes.length === 0) {
+        notes.push('该版本与上一版保存的字段值一致，没有字段级差异。');
+      }
       break;
     }
     case 'inventory_confirm':
@@ -571,11 +724,16 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
       const rawItems = asArray(detail.items).map((entry) => asRecord(entry)).filter(Boolean) as Array<Record<string, unknown>>;
       facts.push({ label: '本次确认', value: `${asNumber(detail.applied) ?? rawItems.length} 条` });
       if (asArray(detail.skipped).length > 0) facts.push({ label: '跳过', value: `${asArray(detail.skipped).length} 条` });
-      for (const item of rawItems.slice(0, maxItems)) {
+      for (const item of rawItems) {
         const version = asNumber(item.version);
         const previousIce = asString(item.previousIceCode);
         const previousName = asString(item.previousNameCn);
         const changed = version !== null && version > 1;
+        const change = changed
+          ? itemChange('商品对应',
+            `原商品 ${previousIce ?? '历史未保存'}${previousName ? `（${previousName}）` : ''}`,
+            `现商品 ${asString(item.iceCode) ?? '未记录'}${asString(item.nameCn) ? `（${asString(item.nameCn)}）` : ''}`)
+          : null;
         items.push({
           key: asString(item.mappingId) ?? String(item.externalSku),
           title: asString(item.nameCn) ?? asString(item.iceCode) ?? '商品',
@@ -585,26 +743,54 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
             asString(item.unit) ? `单位 ${asString(item.unit)}` : null,
             version === null ? null : `对应第 ${version} 版`,
           ].filter(Boolean).join(' · '),
-          change: changed
-            ? `原商品 ${previousIce ?? '未保存'}${previousName ? `（${previousName}）` : ''} → 现商品 ${asString(item.iceCode) ?? '未保存'}`
-            : null,
+          note: null,
+          changes: change ? [change] : [],
           productHref: operationProductHref(asString(item.itemId)),
           inventoryHref: asString(item.externalSku)
             ? `/dashboard/inventory?q=${encodeURIComponent(asString(item.externalSku)!)}&source=overseas`
             : null,
+          ticketHref: null,
         });
       }
-      if (rawItems.length > maxItems) notes.push(`本次共 ${rawItems.length} 条对应，这里显示前 ${maxItems} 条。`);
       notes.push('「上一版商品」取被替代的对应行（仍保存在历史里），不是当前商品资料。');
       break;
     }
     case 'recheck_inventory_mapping':
-    case 'disable_inventory_mapping':
-    case 'replace_inventory_mapping': {
+    case 'disable_inventory_mapping': {
       facts.push({ label: '来源 SKU', value: asString(detail.externalSku) ?? '未保存' });
       facts.push({ label: '对应版本', value: asText(detail.mappingVersion) ?? '未保存' });
       facts.push({ label: '当前状态', value: asString(detail.mappingStatus) ?? '未保存' });
       if (asString(detail.note)) notes.push(asString(detail.note)!);
+      if (asString(detail.mappingId)) sources.push({ label: '对应记录号', value: asString(detail.mappingId)! });
+      break;
+    }
+    case 'replace_inventory_mapping': {
+      const oldSku = asString(detail.oldExternalSku);
+      const newSku = asString(detail.newExternalSku);
+      facts.push({ label: '原来源 SKU', value: oldSku ?? '未保存' });
+      facts.push({ label: '新来源 SKU', value: newSku ?? '未保存' });
+      facts.push({ label: '新对应版本', value: asText(detail.newVersion) ?? '未保存' });
+      facts.push({ label: '生效方式', value: asString(detail.effectiveAt) === 'next_batch' ? '下一批起生效' : (asString(detail.effectiveAt) ?? '未保存') });
+      if (asString(detail.mappingStatus)) facts.push({ label: '新对应状态', value: asString(detail.mappingStatus)! });
+      if (asString(detail.unit)) facts.push({ label: '单位', value: asString(detail.unit)! });
+      if (asString(detail.note)) notes.push(asString(detail.note)!);
+      const change = (oldSku || newSku)
+        ? itemChange('绑定的来源 SKU', oldSku ? `原 SKU ${oldSku}` : null, newSku ? `新 SKU ${newSku}` : null)
+        : null;
+      if (change) changes.push(change);
+      if (newSku) {
+        links.push({
+          label: '在商品库存查看新来源 SKU',
+          href: `/dashboard/inventory?q=${encodeURIComponent(newSku)}&source=overseas`,
+        });
+      }
+      for (const [label, value] of [
+        ['原对应记录号', detail.oldMappingId],
+        ['新对应记录号', detail.newMappingId],
+        ['仓库标识', detail.warehouseId],
+      ] as const) {
+        if (asString(value)) sources.push({ label, value: asString(value)! });
+      }
       break;
     }
     case 'domestic_review_decision': {
@@ -612,31 +798,41 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
       facts.push({ label: '复核后状态', value: asString(detail.reviewState) ?? '未记录' });
       facts.push({ label: '生效方式', value: asString(detail.effectiveAt) === 'immediate' ? '立即生效' : (asString(detail.effectiveAt) ?? '未保存') });
       facts.push({ label: '国内来源行', value: asString(detail.sourceRowId) ?? '未保存' });
-      facts.push({ label: '数据集', value: asString(detail.datasetId) ?? '未保存' });
+      for (const [label, value] of [
+        ['数据集', detail.datasetId],
+        ['观测记录', detail.observationId],
+      ] as const) {
+        if (asString(value)) sources.push({ label, value: asString(value)! });
+      }
       break;
     }
     case 'shipment_association_manual':
     case 'shipment_association_cleared': {
       const rawItems = asArray(detail.items).map((entry) => asRecord(entry)).filter(Boolean) as Array<Record<string, unknown>>;
       if (asString(detail.reason)) notes.push(asString(detail.reason)!);
-      for (const item of rawItems.slice(0, maxItems)) {
+      for (const item of rawItems) {
         const productId = asString(item.productId);
         const previousIce = asString(item.previousIceCode);
+        const currentIce = asString(item.iceCode);
+        const change = previousIce
+          ? itemChange('商品', `原商品 ${previousIce}${asString(item.previousNameCn) ? `（${asString(item.previousNameCn)}）` : ''}`, `现商品 ${currentIce ?? '未关联'}`)
+          : null;
         items.push({
           key: asString(item.itemId) ?? String(item.productNameRaw),
           title: asString(item.productNameRaw) ?? '货票明细',
           meta: [
             asString(item.sourceSku) ? `来源 SKU ${asString(item.sourceSku)}` : null,
-            asString(item.iceCode) ?? (productId ? null : '未关联商品'),
+            currentIce ?? (productId ? null : '未关联商品'),
             asString(item.nameCn),
           ].filter(Boolean).join(' · '),
-          change: previousIce ? `原商品 ${previousIce} → 现商品 ${asString(item.iceCode) ?? '未关联'}` : null,
+          note: null,
+          changes: change ? [change] : [],
           productHref: operationProductHref(productId),
           inventoryHref: null,
+          ticketHref: null,
         });
       }
-      if (rawItems.length > maxItems) notes.push(`本次共 ${rawItems.length} 条明细，这里显示前 ${maxItems} 条。`);
-      notes.push('同一次保存的同一票明细合并为一条记录。');
+      notes.push('同一次保存的同一票明细合并为一条记录；搜索其中任一货号都能找到它。');
       break;
     }
     case 'shipment_manual_correction':
@@ -649,13 +845,14 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
       facts.push({ label: '剩余', value: asText(detail.remainingQuantity) ?? '未保存' });
       facts.push({ label: '累计已上架', value: asText(detail.manualShelvedQuantity) ?? '未提供' });
       if (asString(detail.note)) notes.push(asString(detail.note)!);
-      notes.push('「修正前状态」取人工修正历史行的 previous_*；未人工修正时显示「未人工修正」。');
+      notes.push('「修正前状态」取人工修正历史行的 previous_*；未人工修正时显示「未记录」。');
       break;
     }
     case 'shipment_grouping_decision':
     case 'shipment_grouping_revoked': {
       facts.push({ label: '复核类型', value: GROUPING_KIND_LABELS[asString(detail.kind) ?? ''] ?? '分合票复核' });
       if (asString(detail.decision)) facts.push({ label: '人工决定', value: GROUPING_DECISION_LABELS[asString(detail.decision) ?? ''] ?? asString(detail.decision)! });
+      if (asString(detail.resolvedAt)) facts.push({ label: '处理时间', value: formatOperationTime(asString(detail.resolvedAt)) || '未保存' });
       if (asString(detail.revokedAt)) facts.push({ label: '撤销时间', value: formatOperationTime(asString(detail.revokedAt)) || '未保存' });
       if (asString(detail.resolutionNote)) notes.push(asString(detail.resolutionNote)!);
       for (const ticket of asArray(detail.tickets).map((entry) => asRecord(entry)).filter(Boolean)) {
@@ -673,15 +870,18 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
       const affected = asArray(detail.affectedProducts).map((entry) => asString(entry)).filter(Boolean) as string[];
       if (affected.length > 0) notes.push(`涉及商品：${affected.slice(0, 12).join('、')}${affected.length > 12 ? ` 等 ${affected.length} 款` : ''}`);
       notes.push('分合票决定无法反查具体操作人；记录账号只代表写入时使用的账号。');
+      if (asString(detail.fromSnapshotId)) sources.push({ label: '对比前快照', value: asString(detail.fromSnapshotId)! });
+      if (asString(detail.toSnapshotId)) sources.push({ label: '对比后快照', value: asString(detail.toSnapshotId)! });
       break;
     }
     default:
       break;
   }
 
+  if (productHref) links.push({ label: '查看该商品资料', href: productHref });
   if (record.ticketNo) {
     const href = operationTicketHref(record);
-    if (href) links.push({ label: record.ticketId ? '打开该货票详情' : `在物流在途搜索该货票`, href });
+    if (href) links.push({ label: record.ticketId ? '打开该货票详情' : '在物流在途搜索该货票', href });
   }
   if (record.externalSku && !items.some((item) => item.inventoryHref)) {
     links.push({
@@ -689,7 +889,16 @@ export function operationDetailView(record: OperationRecordDto, maxItems = 40): 
       href: `/dashboard/inventory?q=${encodeURIComponent(record.externalSku)}&source=overseas`,
     });
   }
-  return { facts, changes, items, tickets, links, notes };
+  return {
+    resultText: operationResultText(record),
+    facts,
+    changes,
+    items,
+    tickets,
+    links,
+    notes,
+    sources,
+  };
 }
 
 const SHANGHAI_TIME_ZONE = 'Asia/Shanghai';
@@ -720,4 +929,14 @@ export function formatOperationTime(iso: string | null | undefined): string {
 /** 记录账号显示（只写账号；不推断具体操作人）。 */
 export function operationActorText(record: OperationRecordDto): string {
   return actorRecordName(record);
+}
+
+/** 拆成 20 条一段，供页面分段展开；不丢任何明细。 */
+export function operationItemChunks<T>(items: T[], size = OPERATION_ITEM_CHUNK): T[][] {
+  const chunkSize = size > 0 ? Math.trunc(size) : OPERATION_ITEM_CHUNK;
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+  return chunks;
 }

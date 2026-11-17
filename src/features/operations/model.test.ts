@@ -5,8 +5,11 @@ import {
   formatOperationTime,
   operationActionLabel,
   operationActionTone,
+  operationCategoryCountLabel,
+  operationCategoryTotal,
   operationDateBounds,
   operationDetailView,
+  operationItemChunks,
   operationPageRange,
   operationResultText,
   operationTicketHref,
@@ -118,6 +121,8 @@ const groupingRecord = record({
   detail: {
     kind: 'merge',
     decision: 'keep_separate',
+    status: 'resolved',
+    resolvedAt: '2026-11-11T05:43:18.832Z',
     tickets: [{ ticketNo: 'POKNZX027485', market: '越南', itemCount: 11 }],
     affectedProducts: ['CHIC PEAK 果冻定妆喷雾 58g'],
   },
@@ -183,9 +188,23 @@ describe('操作记录：URL 解析与链接', () => {
   });
 
   it('分页范围：越界页码收敛到末页，0 条不伪造第 1 条', () => {
-    expect(operationPageRange(360, 50, 99)).toMatchObject({ page: 8, pageCount: 8, from: 351, to: 360, hasNext: false });
-    expect(operationPageRange(360, 50, 1)).toMatchObject({ page: 1, from: 1, to: 50, hasPrev: false, hasNext: true });
+    expect(operationPageRange(365, 50, 99)).toMatchObject({ page: 8, pageCount: 8, from: 351, to: 365, hasNext: false });
+    expect(operationPageRange(365, 50, 1)).toMatchObject({ page: 1, from: 1, to: 50, hasPrev: false, hasNext: true });
     expect(operationPageRange(0, 50, 1)).toMatchObject({ page: 1, pageCount: 1, from: 0, to: 0 });
+  });
+});
+
+describe('操作记录：计数语义', () => {
+  it('全部业务 = 三类之和；缺一类视为没读到', () => {
+    expect(operationCategoryTotal({ catalog: 152, inventory: 100, shipment: 113 })).toBe(365);
+    expect(operationCategoryTotal({ catalog: 152, inventory: 100 })).toBeNull();
+    expect(operationCategoryTotal(null)).toBeNull();
+  });
+
+  it('没读到显示「—」，真实 0 显示 0 条', () => {
+    expect(operationCategoryCountLabel(null)).toBe('—');
+    expect(operationCategoryCountLabel(0)).toBe('0 条');
+    expect(operationCategoryCountLabel(152)).toBe('152 条');
   });
 });
 
@@ -193,10 +212,13 @@ describe('操作记录：文案只用已保存字段', () => {
   it('动作中文名与色调', () => {
     expect(operationActionLabel('source_batch_applied')).toBe('来源资料采用');
     expect(operationActionLabel('inventory_rebind')).toBe('更换绑定（换绑商品对应）');
+    expect(operationActionLabel('source_field_decision_revoked')).toBe('撤销字段人工口径');
+    expect(operationActionLabel('duplicate_source_decision_revoked')).toBe('撤销来源行选择');
     expect(operationActionLabel('shipment_grouping_revoked')).toBe('撤销分合票人工决定');
     expect(operationActionLabel('unknown_action')).toBe('业务处理');
     expect(operationActionTone('disable_inventory_mapping')).toBe('red');
     expect(operationActionTone('inventory_rebind')).toBe('green');
+    expect(operationActionTone('source_field_decision_revoked')).toBe('amber');
   });
 
   it('来源采用结果按回执计数与已写入明细生成，不把未写入行算成已更新', () => {
@@ -219,18 +241,66 @@ describe('操作记录：文案只用已保存字段', () => {
     expect(operationResultText(groupingRecord)).toBe('合票复核结论：仍然分开。');
   });
 
-  it('已撤销的来源资料选择不写成人工确认', () => {
+  it('已撤销的来源资料选择不写成“没有真实人工确认”，只说明被撤销', () => {
     const text = operationResultText(record({
       action: 'duplicate_source_decision',
-      detail: { state: 'superseded', chosenRowNumber: 128, note: '撤销脚本代选：无真实人工确认记录，恢复待人工确认' },
+      detail: {
+        state: 'superseded',
+        chosenRowNumber: 128,
+        supersededAt: '2026-11-10T06:44:50.408Z',
+        note: '撤销脚本代选：无真实人工确认记录，恢复待人工确认',
+      },
     }));
-    expect(text).toContain('已撤销');
-    expect(text).toContain('没有真实人工确认');
+    expect(text).toContain('已于 2026-11-10 14:44:50 被撤销');
+    expect(text).toContain('原决定仍保留');
+    expect(text).not.toContain('没有真实人工确认');
   });
 
-  it('商品资料首版明确写「无法对比前值」', () => {
+  it('撤销字段口径：写明撤销的字段与已保存说明', () => {
+    const text = operationResultText(record({
+      action: 'source_field_decision_revoked',
+      detail: {
+        fieldKey: 'unitWeight',
+        originalAction: 'override',
+        decidedAt: '2026-11-10T04:36:38.362Z',
+        revokedAt: '2026-11-10T06:44:50.408Z',
+        revokedNote: '撤销固定 0.05 override：改为按来源列解释重量',
+      },
+    }));
+    expect(text).toContain('撤销「单件重量」的人工口径');
+    expect(text).toContain('改为按来源列解释重量');
+  });
+
+  it('撤销来源行选择分「撤销」与「被后续选择替代」两种真实状态', () => {
+    const revoked = operationResultText(record({
+      action: 'duplicate_source_decision_revoked',
+      detail: { chosenRowNumber: 132, revokedByAccount: true },
+    }));
+    expect(revoked).toContain('撤销来源第 132 行选择');
+    const replaced = operationResultText(record({
+      action: 'duplicate_source_decision_revoked',
+      detail: { chosenRowNumber: 132, revokedByAccount: false },
+    }));
+    expect(replaced).toContain('已被后续选择替代');
+  });
+
+  it('商品资料首版明确写「没有上一版本」', () => {
     expect(operationResultText(record({ action: 'item_baseline', detail: { revision: 1, previousRevision: null } })))
       .toContain('没有上一版本');
+  });
+
+  it('商品资料修改摘要按已保存差异计数（删除也计入）', () => {
+    const text = operationResultText(record({
+      action: 'item_revision',
+      detail: {
+        revision: 3,
+        previousRevision: 2,
+        reason: '撤销脚本代选，恢复待人工确认',
+        changes: [{ fieldKey: 'barcode', changeKind: 'removed', beforeRaw: '757577407359', afterRaw: null }],
+      },
+    }));
+    expect(text).toContain('第 3 版');
+    expect(text).toContain('删除 1 项');
   });
 
   it('时间固定按 Asia/Shanghai 显示', () => {
@@ -248,23 +318,25 @@ describe('操作记录：文案只用已保存字段', () => {
 });
 
 describe('操作记录：展开依据', () => {
-  it('来源采用：逐字段前后值、商品入口与批次入口', () => {
+  it('来源采用：商品变化与入口在同一明细里，批次入口名称准确且不再跳最新批次', () => {
     const view = operationDetailView(batchRecord);
-    expect(view.changes).toContainEqual({
-      scope: 'WM0049 ICE LERSKIN 多效提亮防晒喷雾',
+    expect(view.items).toHaveLength(1);
+    expect(view.items[0].changes).toContainEqual({
       field: '中文名称',
       before: 'ICE LERSKIN 防晒喷雾升级版150ml',
       after: 'ICE LERSKIN 多效提亮防晒喷雾',
+      kind: 'modified',
     });
     expect(view.items[0].productHref).toBe('/dashboard/catalog/b47da6ed-375c-48b7-b54d-9a3129f445cd');
     expect(view.links.map((link) => link.href)).toContain('/dashboard/catalog/sources');
-    expect(view.links.map((link) => link.href)).toContain('/dashboard/sync?panel=product-update');
+    expect(view.links.map((link) => link.href)).not.toContain('/dashboard/sync?panel=product-update');
+    expect(view.sources.map((source) => source.label)).toContain('快照哈希');
   });
 
   it('换绑：上一版商品取被替代行，并给商品与库存入口', () => {
     const view = operationDetailView(rebindRecord);
-    expect(view.items[0].change).toContain('原商品 WM0027');
-    expect(view.items[0].change).toContain('现商品 WM0069');
+    expect(view.items[0].changes[0].before).toContain('原商品 WM0027');
+    expect(view.items[0].changes[0].after).toContain('现商品 WM0069');
     expect(view.items[0].productHref).toBe('/dashboard/catalog/eeccfdee-a041-4539-918b-8e0441b1bf52');
     expect(view.items[0].inventoryHref).toBe('/dashboard/inventory?q=757577983037&source=overseas');
     expect(view.notes.join(' ')).toContain('不是当前商品资料');
@@ -295,5 +367,102 @@ describe('操作记录：展开依据', () => {
     expect(facts['上一版本']).toBe('无（首版）');
     expect(view.changes).toEqual([]);
     expect(view.notes.join(' ')).toContain('没有前值');
+  });
+
+  it('R1 删除字段：商品条码显示 757577407359 → 已移除，不再误判首版', () => {
+    const view = operationDetailView(record({
+      action: 'item_revision',
+      iceCode: 'WM0073',
+      itemId: '4a97ad8b-8bd9-4aaf-a48a-530ae130b68a',
+      at: '2026-11-10T06:44:50.408Z',
+      detail: {
+        revision: 3,
+        previousRevision: 2,
+        declaredPreviousRevision: 2,
+        reason: '撤销脚本代选，恢复待人工确认',
+        changes: [{
+          fieldKey: 'barcode',
+          changeKind: 'removed',
+          beforeRaw: '757577407359',
+          afterRaw: null,
+          beforePresent: true,
+          afterPresent: false,
+        }],
+      },
+    }));
+    const facts = Object.fromEntries(view.facts.map((fact) => [fact.label, fact.value]));
+    expect(view.changes[0]).toEqual({ field: '商品条码', before: '757577407359', after: '已移除', kind: 'removed' });
+    expect(facts['上一版本']).toBe('第 2 版');
+    expect(view.notes.join(' ')).not.toContain('首版');
+    expect(view.notes.join(' ')).not.toContain('没有前值');
+  });
+
+  it('R1 新增字段显示「历史未保存」，已有键的空值显示「未填写」', () => {
+    const view = operationDetailView(record({
+      action: 'item_revision',
+      detail: {
+        revision: 4,
+        previousRevision: 3,
+        changes: [
+          { fieldKey: 'factory', changeKind: 'added', beforeRaw: null, afterRaw: '广州圣宝兰生物科技有限公司', beforePresent: false, afterPresent: true },
+          { fieldKey: 'barcode', changeKind: 'modified', beforeRaw: null, afterRaw: '757577407359', beforePresent: true, afterPresent: true },
+        ],
+      },
+    }));
+    expect(view.changes[0]).toMatchObject({ field: '生产工厂', before: '历史未保存', after: '广州圣宝兰生物科技有限公司', kind: 'added' });
+    expect(view.changes[1]).toMatchObject({ field: '商品条码', before: '未填写', after: '757577407359', kind: 'modified' });
+  });
+
+  it('声明了上一版但历史行缺失：不伪造前值，也不写成首版', () => {
+    const view = operationDetailView(record({
+      action: 'item_revision',
+      detail: { revision: 3, previousRevision: null, declaredPreviousRevision: 2, changes: [] },
+    }));
+    expect(view.notes.join(' ')).toContain('历史里找不到该版本');
+    expect(view.notes.join(' ')).not.toContain('首版没有上一版本');
+  });
+
+  it('R3 批次明细不截断：94 款全部进入展开模型，可分段展示', () => {
+    const results = Array.from({ length: 94 }, (_, index) => ({
+      itemId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      iceCode: index === 40 ? 'WM0054' : `WM${String(index).padStart(4, '0')}`,
+      nameCn: `商品 ${index + 1}`,
+      itemRevision: 2,
+      action: 'update',
+      reasonText: '来源首轮基线',
+      changes: index === 40 ? [{ fieldKey: 'factory', beforeRaw: null, afterRaw: '广州圣宝兰生物科技有限公司', kind: 'initial_baseline' }] : [],
+    }));
+    const view = operationDetailView(record({
+      action: 'source_batch_applied',
+      objectTitle: '来源资料批次',
+      detail: { status: 'partial', counts: { businessRows: 131 }, results },
+    }));
+    expect(view.items).toHaveLength(94);
+    expect(view.items[40].title).toBe('商品 41');
+    expect(view.items[40].changes[0]).toMatchObject({ field: '生产工厂', before: '历史未保存', after: '广州圣宝兰生物科技有限公司', kind: 'added' });
+    const chunks = operationItemChunks(view.items);
+    expect(chunks).toHaveLength(5);
+    expect(chunks.map((chunk) => chunk.length)).toEqual([20, 20, 20, 20, 14]);
+    expect(chunks[4][13].key).toBe(view.items[93].key);
+  });
+
+  it('撤销字段口径：保留原决定时间，撤销说明与请求号分开展示', () => {
+    const view = operationDetailView(record({
+      action: 'source_field_decision_revoked',
+      detail: {
+        fieldKey: 'unitWeight',
+        originalAction: 'override',
+        decidedAt: '2026-11-10T04:36:38.362Z',
+        revokedAt: '2026-11-10T06:44:50.408Z',
+        revokedNote: '撤销固定 0.05 override：改为按来源列解释重量',
+        reason: '用户确认：单个重量取 O 列 0.05/件',
+        requestId: '498fcd8c-b81f-4e2f-ba56-fe3232961dc3',
+      },
+    }));
+    const facts = Object.fromEntries(view.facts.map((fact) => [fact.label, fact.value]));
+    expect(facts['原决定时间']).toBe('2026-11-10 12:36:38');
+    expect(facts['撤销时间']).toBe('2026-11-10 14:44:50');
+    expect(view.notes.join(' ')).toContain('已保存撤销说明');
+    expect(view.sources.map((source) => source.label)).toContain('请求号');
   });
 });

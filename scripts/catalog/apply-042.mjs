@@ -29,7 +29,7 @@ const SQL_FILE = 'db/catalog/042_operation_records.sql';
 const FUNCTION = 'read_operation_records';
 const APP_ROLE = 'ice_p0_02_app_runner';
 const ADMIN_PROFILE_ID = '11111111-1111-4111-8111-111111111101';
-const EVIDENCE_DIR = path.join(REPO_ROOT, '.local', 'catalog', 'operations-log-20261116');
+const EVIDENCE_DIR = path.join(REPO_ROOT, '.local', 'catalog', 'operations-log-r2-20261117');
 
 function readArgs(argv) {
   const args = {};
@@ -117,7 +117,10 @@ const expectedSql = `SELECT
   + (SELECT count(*) FROM catalog.audit_event a WHERE a.action IN ('assign_source_code','assign_initial_code','correct_test_source_code')
       OR (a.action='resolve_source_issue' AND coalesce(a.result->>'issueKind','') LIKE 'missing%'))::int
   + (SELECT count(*) FROM catalog.product_source_duplicate_decision)::int
+  + (SELECT count(*) FROM catalog.product_source_duplicate_decision d
+      WHERE d.state='superseded' AND d.superseded_at IS NOT NULL)::int
   + (SELECT count(*) FROM catalog.product_source_field_decision)::int
+  + (SELECT count(*) FROM catalog.product_source_field_decision f WHERE f.revoked_at IS NOT NULL)::int
   + (SELECT count(*) FROM catalog.item_revision r
       WHERE NOT EXISTS (SELECT 1 FROM catalog.product_source_batch b2
         WHERE b2.snapshot_key IS NOT NULL AND r.evidence_ref LIKE 'product-source:'||b2.snapshot_key||'%')
@@ -136,7 +139,8 @@ const expectedSql = `SELECT
       WHERE r.method IN ('manual_selected','manual_cleared')
       GROUP BY r.recorded_at,r.actor_id,r.method,s.id))::int
   + (SELECT count(*) FROM catalog.shipment_item_manual_revision)::int
-  + (SELECT count(*) FROM catalog.shipment_grouping_review)::int
+  + (SELECT count(*) FROM catalog.shipment_grouping_review g
+      WHERE g.status='resolved' AND g.resolved_at IS NOT NULL AND g.resolved_by IS NOT NULL)::int
   + (SELECT count(*) FROM catalog.shipment_grouping_override o
       WHERE o.active=false AND o.revoked_at IS NOT NULL)::int AS expected_total`;
 
@@ -366,9 +370,10 @@ async function main() {
       { total: byTicket?.total });
 
     const none = await readRecords(owner, ['all', null, null, null, '__NO_SUCH_BUSINESS_ID__', 50, 0]);
-    check(results, '无结果：total=0、rows=[]、分类计数为空对象（不伪造 0 条记录）',
+    check(results, '无结果：total=0、rows=[]、三个分类计数都为真实 0',
       none?.ok === true && none.total === 0 && Array.isArray(none.rows) && none.rows.length === 0
-      && Object.keys(none.categoryCounts ?? {}).length === 0,
+      && Object.keys(none.categoryCounts ?? {}).length === 3
+      && Object.values(none.categoryCounts).every((value) => value === 0),
       none && { total: none.total, counts: none.categoryCounts });
 
     const paging = await readRecords(owner, ['all', null, null, null, null, 20, 20]);
@@ -382,6 +387,96 @@ async function main() {
     check(results, '页码超出末页：返回空页但保留真实总数（页面据此回退页码）',
       overflow?.ok === true && overflow.total === page1.total && (overflow.rows ?? []).length === 0,
       { total: overflow?.total, rows: overflow?.rows?.length });
+
+    // R1：字段键并集比较 —— WM0073 第 3 版删除了整个 barcode 键，仍要显示“已移除”。
+    const wm0073Rev3 = allRows.find((row) => row.action === 'item_revision'
+      && row.iceCode === 'WM0073' && row.detail.revision === 3);
+    const barcodeRemoved = wm0073Rev3?.detail.changes?.find((change) => change.fieldKey === 'barcode');
+    evidence.wm0073 = wm0073Rev3 && { at: wm0073Rev3.at, detail: wm0073Rev3.detail };
+    check(results, 'R1 删除字段：WM0073 第 3 版显示商品条码 757577407359 → 已移除，上一版解析为第 2 版',
+      Boolean(wm0073Rev3) && wm0073Rev3.detail.previousRevision === 2
+      && barcodeRemoved?.changeKind === 'removed'
+      && barcodeRemoved?.beforeRaw === '757577407359' && barcodeRemoved?.afterRaw == null,
+      wm0073Rev3 && { previousRevision: wm0073Rev3.detail.previousRevision, barcodeRemoved });
+    check(results, 'R1 首版判断：所有 item_baseline 都没有解析到上一版本，且不生成前后值',
+      allRows.filter((row) => row.action === 'item_baseline').length === 126
+      && allRows.filter((row) => row.action === 'item_baseline')
+        .every((row) => row.detail.previousRevision === null && (row.detail.changes ?? []).length === 0),
+      { baselines: allRows.filter((row) => row.action === 'item_baseline').length });
+
+    // R2：同一次关联涉及 7 款商品，搜索其中任意一款都能找到同一条记录（一条操作、7 条明细）。
+    const associationId = 'sar:131a88e4-4db7-4c15-9f4e-0791d2c59220:2:7:';
+    const sevenCodes = ['WM0057', 'WM0058', 'WM0059', 'WM0061', 'WM0089', 'WM0090', 'WM0091'];
+    const sevenHits = {};
+    for (const code of sevenCodes) {
+      const hit = await readRecords(owner, ['all', null, null, null, code, 200, 0]);
+      const row = (hit?.rows ?? []).find((entry) => entry.id.startsWith(associationId));
+      sevenHits[code] = row ? { at: row.at, items: row.detail.items?.length } : null;
+    }
+    evidence.sevenCodeSearch = sevenHits;
+    check(results, 'R2 搜索覆盖同次操作全部商品：七款货号分别搜索都命中同一条人工关联（7 条明细）',
+      sevenCodes.every((code) => sevenHits[code]?.items === 7)
+      && new Set(sevenCodes.map((code) => JSON.stringify(sevenHits[code]))).size === 1,
+      sevenHits);
+    const assocRow = allRows.find((row) => row.id.startsWith(associationId));
+    const assocCodes = [...new Set((assocRow?.detail.items ?? []).map((item) => item.iceCode))].sort();
+    check(results, 'R2 关联记录明细保留七款不同商品（不是只取一个货号/名称）',
+      assocCodes.length === 7 && sevenCodes.slice().sort().every((code) => assocCodes.includes(code)),
+      assocCodes);
+
+    // R3：历史批次 4173 写入 94 款，SQL 返回全部明细；第 41 款 WM0054 及其字段变化可达。
+    const bigBatch = allRows.find((row) => row.action === 'source_batch_applied'
+      && row.batchId === '4173cf60-dd81-4b1b-a0f2-f84674f0ac99');
+    const wm0054 = bigBatch?.detail.results?.find((entry) => entry.iceCode === 'WM0054');
+    evidence.bigBatch = bigBatch && { at: bigBatch.at, resultRowCount: bigBatch.detail.resultRowCount, results: bigBatch.detail.results?.length, wm0054 };
+    check(results, 'R3 历史批次明细完整：4173 共 94 款全部返回，第 41 款 WM0054 含字段变化',
+      Boolean(bigBatch) && bigBatch.detail.resultRowCount === 94 && bigBatch.detail.results.length === 94
+      && wm0054?.itemRevision === 2
+      && wm0054?.changes?.some((change) => change.fieldKey === 'factory'
+        && change.beforeRaw == null && change.afterRaw === '广州圣宝兰生物科技有限公司'),
+      bigBatch && { resultRowCount: bigBatch.detail.resultRowCount, wm0054: wm0054?.iceCode });
+    check(results, 'R3 明细顺序稳定（按货号），WM0054 位于第 41 款',
+      Boolean(bigBatch) && bigBatch.detail.results[40]?.iceCode === 'WM0054',
+      bigBatch && bigBatch.detail.results.slice(38, 42).map((entry) => entry.iceCode));
+
+    // R4：撤销在实际撤销时间（2026-11-10 14:44:50 +08）成为独立记录，原决定保留在 12:36:38。
+    const revokeWindow = await readRecords(owner, ['all', null, '2026-11-10T06:40:00Z', '2026-11-10T06:50:00Z', null, 200, 0]);
+    const fieldRevoke = (revokeWindow?.rows ?? []).find((row) => row.action === 'source_field_decision_revoked');
+    const dupRevokes = (revokeWindow?.rows ?? []).filter((row) => row.action === 'duplicate_source_decision_revoked');
+    const dupDecisionIds = new Set(dupRevokes.map((row) => row.detail.decisionId));
+    evidence.revocationWindow = {
+      total: revokeWindow?.total,
+      actions: (revokeWindow?.rows ?? []).map((row) => row.action),
+      fieldRevoke: fieldRevoke && { at: fieldRevoke.at, detail: fieldRevoke.detail },
+      dupRevokes: dupRevokes.map((row) => ({ at: row.at, actorId: row.actorId, detail: row.detail })),
+    };
+    check(results, 'R4 字段口径撤销：14:44:50(+08) 独立显示撤销，原决定时间保留为 12:36:38(+08)',
+      Boolean(fieldRevoke)
+      && Date.parse(fieldRevoke.at) === Date.parse('2026-11-10T06:44:50.408Z')
+      && fieldRevoke.detail.fieldKey === 'unitWeight'
+      && Date.parse(fieldRevoke.detail.decidedAt) === Date.parse('2026-11-10T04:36:38.362Z')
+      && fieldRevoke.actorId === ADMIN_PROFILE_ID,
+      fieldRevoke && { at: fieldRevoke.at, detail: fieldRevoke.detail });
+    check(results, 'R4 来源行选择撤销：四条决定各有一条独立撤销记录（不重复计数），撤销账号来自审计',
+      dupRevokes.length === 4 && dupDecisionIds.size === 4
+      && dupRevokes.every((row) => row.actorId === ADMIN_PROFILE_ID
+        && Date.parse(row.at) === Date.parse('2026-11-10T06:44:50.408Z')
+        && row.detail.originalAction === 'duplicate_source_decision'),
+      dupRevokes.map((row) => row.detail.decisionId));
+    check(results, 'R4 分合票只纳人工已处理决定（resolved + resolved_at + resolved_by）',
+      allRows.filter((row) => row.action === 'shipment_grouping_decision')
+        .every((row) => row.detail.status === 'resolved' && Boolean(row.detail.resolvedAt)),
+      allRows.filter((row) => row.action === 'shipment_grouping_decision').map((row) => row.detail.status));
+
+    // R5：类别计数不受当前类别筛选影响；全部业务 = 三类之和。
+    const invOnly = await readRecords(owner, ['inventory', null, null, null, null, 50, 0]);
+    check(results, 'R5 分类计数：选中库存对应时“全部业务”仍为三类之和，其它类别计数不变',
+      invOnly?.ok === true && invOnly.total === invOnly.categoryCounts.inventory
+      && invOnly.categoryCounts.catalog === page1.categoryCounts.catalog
+      && invOnly.categoryCounts.shipment === page1.categoryCounts.shipment
+      && Number(invOnly.categoryCounts.catalog) + Number(invOnly.categoryCounts.inventory)
+        + Number(invOnly.categoryCounts.shipment) === page1.total,
+      { total: invOnly?.total, counts: invOnly?.categoryCounts });
 
     const countsAfterProbe = (await owner.query(countsSql)).rows[0];
     evidence.countsAfterProbe = countsAfterProbe;

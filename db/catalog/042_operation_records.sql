@@ -4,19 +4,25 @@
 --   * 不建表、不写任何业务数据、不改 001-041；
 --   * 只汇合各模块**已经保存**的人工处理记录：
 --       商品资料：来源资料采用（按批次一条）、补货号、来源资料行选择/撤销、
---                 来源字段人工口径（暂不处理/人工解释/撤销）、商品资料修订（含首版）；
+--                 来源字段人工口径（暂不处理/人工解释/人工覆盖/撤销）、商品资料修订（含首版）；
 --       库存对应：确认/换绑（confirm_inventory_mapping 的 committed 版本）、
 --                 重核、停用、原 SKU 替换、国内复核采用商品对应；
 --       物流：人工关联/清除商品关联（同一时间同一次保存合并为一条）、
 --             人工修正数量/状态、恢复按原表判断、分合票人工决定、撤销人工分组决定。
 --   * 自动同步过程不进入本查询（库存/物流后台事件仍看各自同步结果入口）；
 --     begin/complete_inventory_pending_action 等请求簿记不单独成条，避免同一次操作重复堆叠；
+--   * 撤销是独立事件：来源行选择/字段口径的撤销按历史行保存的 superseded_at / revoked_at
+--     （账号优先取已保存的撤销审计）另成一条，原决定仍保留在决定发生时间；
+--   * shipment_grouping_review 只取 status='resolved' 且已有 resolved_at/resolved_by 的人工决定，
+--     自动生成、尚未处理的 pending 复核不算人工操作；
 --   * 「前值」只用历史行本身（item_revision.previous_revision / mapping.supersedes_id /
 --     人工修正历史行的 previous_* / 关联修订 previous_product_id），不用当前值反推；
---     历史行没有保存的字段在页面上显示「未保存」，由页面文案负责；
+--     字段差异按新旧版本字段键的**并集**比较，新增/修改/删除都能显示；
+--     历史行没有保存的字段在页面上显示「历史未保存」，由页面文案负责；
+--   * 搜索文本覆盖同一次操作涉及的全部货号/名称/来源 SKU/货票号，而不是其中一个；
 --   * 记录账号 = 记录行上的 actor_id（经 public.profiles 显示名）；不推断具体操作人；
---   * 关键词只按已保存的业务标识搜索（货号/来源 SKU/货票号/名称/批次号）；
 --   * 时间倒序分页（p_limit 1-200），返回 total/offset/limit、分类计数与账号清单；
+--     分类计数与关键词/日期/账号筛选同口径（不受当前类别筛选影响）；
 --   * SECURITY DEFINER + search_path='' + require_admin；app 角色只能 EXECUTE。
 SET ROLE ice_p0_02_owner;
 
@@ -50,7 +56,7 @@ BEGIN
   FROM catalog.catalog_item i
  ),
  warehouse_identity AS (
-  SELECT w.external_warehouse_id, w.external_name FROM catalog.inventory_warehouse w
+  SELECT w.id AS warehouse_id, w.external_warehouse_id, w.external_name FROM catalog.inventory_warehouse w
  ),
  records AS (
   -- 1) 商品资料 · 来源资料采用（一次采用 = 一条批次结果，不按商品/字段重复堆叠）
@@ -79,8 +85,9 @@ BEGIN
     'capturedAt',b.captured_at,
     'receivedAt',b.received_at,
     'origin',b.origin,
-    -- 明细只保留本批真正写入/失败的商品行；无变化与仅提示的行走 counts，不重复堆叠。
-    'results',z.results) AS detail,
+    'resultRowCount',coalesce(z.result_count,0),
+    -- 明细保留本批真正写入/失败的商品行；无变化与仅提示的行走 counts，不重复堆叠。
+    'results',coalesce(z.results,'[]'::jsonb)) AS detail,
    concat_ws(' ','来源资料采用',b.snapshot_key,b.id::text,z.search_text)::text AS search_text
   FROM catalog.product_source_batch b
   LEFT JOIN LATERAL (
@@ -89,8 +96,12 @@ BEGIN
     ORDER BY a2.recorded_at DESC LIMIT 1) a ON true
   LEFT JOIN LATERAL (
     SELECT
-      coalesce(jsonb_agg(x ORDER BY x->>'iceCode'),'[]'::jsonb) AS results,
-      concat_ws(' ',string_agg(DISTINCT x->>'iceCode',' '),string_agg(DISTINCT x->>'nameCn',' ')) AS search_text
+      count(*)::integer AS result_count,
+      jsonb_agg(x ORDER BY x->>'iceCode') AS results,
+      concat_ws(' ',
+        string_agg(DISTINCT x->>'iceCode',' '),
+        string_agg(DISTINCT x->>'nameCn',' '),
+        string_agg(DISTINCT x->>'sourceKey',' ')) AS search_text
     FROM jsonb_array_elements(coalesce(a.result->'results','[]'::jsonb)) x
     WHERE coalesce(x->>'itemRevision','')<>'' OR x->>'action'='failed') z ON true
   WHERE b.status IN ('applied','partial')
@@ -133,7 +144,7 @@ BEGIN
     AND (a.action<>'resolve_source_issue' OR coalesce(a.result->>'issueKind','') LIKE 'missing%')
 
   UNION ALL
-  -- 3) 商品资料 · 来源资料行选择（含撤销：state/superseded_at 都是历史行本身）
+  -- 3) 商品资料 · 来源资料行选择（原决定保留在决定时间；撤销另见第 14 段）
   SELECT
    ('dup:'||d.id::text)::text,
    d.decided_at,
@@ -159,12 +170,13 @@ BEGIN
     'fieldDifferences',coalesce(d.comparison->'fields','[]'::jsonb),
     'note',d.note,
     'supersededAt',d.superseded_at),
-   concat_ws(' ',d.ice_code,cur.name_cn,d.note,d.item_id::text)::text
+   concat_ws(' ',d.ice_code,cur.name_cn,d.chosen_fields->'nameCn'->>'raw',
+     d.chosen_fields->'barcode'->>'raw',d.note,d.item_id::text)::text
   FROM catalog.product_source_duplicate_decision d
   LEFT JOIN item_identity cur ON cur.item_id=d.item_id
 
   UNION ALL
-  -- 4) 商品资料 · 来源字段人工口径（暂不处理/人工解释/人工覆盖/撤销）
+  -- 4) 商品资料 · 来源字段人工口径（暂不处理/人工解释/人工覆盖；撤销另见第 13 段）
   SELECT
    ('fd:'||f.id::text)::text,
    f.decided_at,
@@ -189,19 +201,23 @@ BEGIN
     'rule',f.rule,
     'valueRaw',f.value_raw,
     'note',f.note,
+    'decidedAt',f.decided_at,
     'revokedAt',f.revoked_at,
+    'revokedBy',f.revoked_by,
+    'revokedNote',f.revoked_note,
     'supersededAt',f.superseded_at),
-   concat_ws(' ',f.ice_code,cur.name_cn,f.field_key,f.reason,f.note)::text
+   concat_ws(' ',f.ice_code,cur.name_cn,f.field_key,f.reason,f.note,f.value_raw)::text
   FROM catalog.product_source_field_decision f
   LEFT JOIN item_identity cur ON cur.item_id=f.item_id
 
   UNION ALL
   -- 5) 商品资料 · 商品资料修订（未被来源批次/补货号动作覆盖的历史修订；含首版）
+  --    字段差异按新旧字段键并集比较：新增、修改、删除都有记录；首版以实际解析到的上一行为准。
   SELECT
    ('rev:'||r.item_id::text||':'||r.revision::text)::text,
    r.recorded_at,
    'catalog',
-   (CASE WHEN r.previous_revision IS NULL THEN 'item_baseline' ELSE 'item_revision' END)::text,
+   (CASE WHEN pv.item_id IS NULL THEN 'item_baseline' ELSE 'item_revision' END)::text,
    r.actor_id,
    '商品'::text,
    coalesce(r.name_cn,'商品资料')::text,
@@ -215,21 +231,39 @@ BEGIN
    NULL::text,
    jsonb_build_object(
     'revision',r.revision,
-    'previousRevision',r.previous_revision,
+    'previousRevision',pv.revision,
+    'declaredPreviousRevision',r.previous_revision,
     'reason',r.reason,
     'evidenceRef',r.evidence_ref,
     'barcode',r.fields->'barcode'->>'raw',
-    'changes',(
-      SELECT coalesce(jsonb_agg(jsonb_build_object(
-        'fieldKey',k,'beforeRaw',pv.fields->k->>'raw','afterRaw',r.fields->k->>'raw') ORDER BY k),'[]'::jsonb)
-      FROM jsonb_object_keys(coalesce(r.fields,'{}'::jsonb)) AS k
-      WHERE pv.item_id IS NOT NULL
-        AND coalesce(pv.fields->k->>'raw','')<>coalesce(r.fields->k->>'raw',''))),
-   concat_ws(' ',r.ice_code_snapshot,r.name_cn,r.fields->'barcode'->>'raw',r.reason)::text
+    'changes',coalesce(d.changes,'[]'::jsonb)),
+   concat_ws(' ',r.ice_code_snapshot,r.name_cn,r.fields->'barcode'->>'raw',
+     pv.fields->'barcode'->>'raw',r.reason,d.diff_text)::text
   FROM catalog.item_revision r
   LEFT JOIN LATERAL (
-    SELECT p.* FROM catalog.item_revision p
+    SELECT p.item_id,p.revision,p.fields FROM catalog.item_revision p
     WHERE p.item_id=r.item_id AND p.revision=r.previous_revision) pv ON true
+  LEFT JOIN LATERAL (
+    SELECT
+      jsonb_agg(jsonb_build_object(
+        'fieldKey',k.k,
+        'changeKind',CASE
+          WHEN NOT (pv.fields ? k.k) THEN 'added'
+          WHEN NOT (r.fields ? k.k) THEN 'removed'
+          ELSE 'modified' END,
+        'beforeRaw',pv.fields->k.k->>'raw',
+        'afterRaw',r.fields->k.k->>'raw',
+        'beforePresent',pv.fields ? k.k,
+        'afterPresent',r.fields ? k.k) ORDER BY k.k) AS changes,
+      string_agg(DISTINCT concat_ws(' ',
+        CASE WHEN pv.fields ? k.k THEN pv.fields->k.k->>'raw' END,
+        CASE WHEN r.fields ? k.k THEN r.fields->k.k->>'raw' END),' ') AS diff_text
+    FROM (
+      SELECT jsonb_object_keys(coalesce(pv.fields,'{}'::jsonb)) AS k
+      UNION
+      SELECT jsonb_object_keys(coalesce(r.fields,'{}'::jsonb)) AS k) k
+    WHERE pv.item_id IS NOT NULL
+      AND coalesce(pv.fields->k.k->>'raw','')<>coalesce(r.fields->k.k->>'raw','')) d ON true
   WHERE NOT EXISTS (
     SELECT 1 FROM catalog.product_source_batch b2
     WHERE b2.snapshot_key IS NOT NULL
@@ -300,7 +334,7 @@ BEGIN
   WHERE a.action='confirm_inventory_mapping'
 
   UNION ALL
-  -- 7) 库存对应 · 重核 / 停用 / 原 SKU 替换（本机现役库当前没有记录，出现即显示）
+  -- 7) 库存对应 · 重核 / 停用（entity_ref = mappingId；现役库当前没有记录，出现即显示）
   SELECT
    ('invaudit:'||a.id::text)::text,
    a.at,
@@ -331,12 +365,55 @@ BEGIN
    concat_ws(' ',a.action,m.external_sku,a.detail->>'externalSku',ii.ice_code,ii.name_cn)::text
   FROM catalog.inventory_audit a
   LEFT JOIN catalog.inventory_sku_mapping m ON m.id::text=a.entity_ref
-  LEFT JOIN warehouse_identity mw ON mw.external_warehouse_id=coalesce(
-    (SELECT w3.external_warehouse_id FROM catalog.inventory_warehouse w3 WHERE w3.id=m.warehouse_id),
-    CASE WHEN a.entity_ref ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      THEN (SELECT w4.external_warehouse_id FROM catalog.inventory_warehouse w4 WHERE w4.id=a.entity_ref::uuid) END)
+  LEFT JOIN warehouse_identity mw ON mw.warehouse_id=m.warehouse_id
   LEFT JOIN item_identity ii ON ii.item_id=m.item_id
-  WHERE a.action IN ('recheck_inventory_mapping','disable_inventory_mapping','replace_inventory_mapping')
+  WHERE a.action IN ('recheck_inventory_mapping','disable_inventory_mapping')
+
+  UNION ALL
+  -- 7b) 库存对应 · 原 SKU 替换（entity_ref 是 warehouseId，不是 mappingId；
+  --     按已保存 result 里的 oldMappingId/newMappingId/oldExternalSku/newExternalSku/itemId/newVersion 读取）
+  SELECT
+   ('invaudit:'||a.id::text)::text,
+   a.at,
+   'inventory',
+   'replace_inventory_mapping'::text,
+   a.actor_id,
+   '库存对应'::text,
+   coalesce(iw.external_name,'库存对应')::text,
+   (coalesce(a.detail->>'oldExternalSku','原 SKU')||' → '
+     ||coalesce(a.detail->>'newExternalSku','新 SKU'))::text,
+   CASE WHEN coalesce(a.detail->>'itemId','') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     THEN (a.detail->>'itemId')::uuid END,
+   NULL::uuid,
+   NULL::uuid,
+   ii.ice_code,
+   a.detail->>'newExternalSku',
+   NULL::text,
+   NULL::text,
+   jsonb_build_object(
+    'action',a.action,
+    'detail',a.detail,
+    'oldMappingId',a.detail->>'oldMappingId',
+    'newMappingId',a.detail->>'newMappingId',
+    'oldExternalSku',a.detail->>'oldExternalSku',
+    'newExternalSku',a.detail->>'newExternalSku',
+    'itemId',a.detail->>'itemId',
+    'newVersion',CASE WHEN coalesce(a.detail->>'newVersion','') ~ '^[0-9]+$'
+      THEN (a.detail->>'newVersion')::integer END,
+    'releasedOnly',coalesce((a.detail->>'releasedOnly')::boolean,false),
+    'effectiveAt',a.detail->>'effectiveAt',
+    'warehouseId',a.detail->>'warehouseId',
+    'unit',m.unit,
+    'note',m.note,
+    'mappingStatus',m.status),
+   concat_ws(' ','replace_inventory_mapping',a.detail->>'oldExternalSku',a.detail->>'newExternalSku',
+     a.detail->>'oldMappingId',a.detail->>'newMappingId',a.detail->>'itemId',
+     ii.ice_code,ii.name_cn,iw.external_name)::text
+  FROM catalog.inventory_audit a
+  LEFT JOIN warehouse_identity iw ON iw.warehouse_id::text=coalesce(a.detail->>'warehouseId',a.entity_ref)
+  LEFT JOIN catalog.inventory_sku_mapping m ON m.id::text=a.detail->>'newMappingId'
+  LEFT JOIN item_identity ii ON ii.item_id::text=a.detail->>'itemId'
+  WHERE a.action='replace_inventory_mapping'
 
   UNION ALL
   -- 8) 库存对应 · 国内复核采用商品对应（人工复核决定；不改写历史批次数量）
@@ -378,7 +455,8 @@ BEGIN
   WHERE a.action='apply_domestic_review_decision'
 
   UNION ALL
-  -- 9) 物流 · 人工关联 / 清除商品关联（同一次保存的同一票同一方法合并成一条）
+  -- 9) 物流 · 人工关联 / 清除商品关联（同一次保存的同一票同一方法合并成一条；
+  --    搜索文本覆盖同次操作涉及的全部货号、名称、来源 SKU 与货票号）
   SELECT
    ('sar:'||min(r.item_id::text)||':'||min(r.revision)::text||':'||count(*)::text||':'
      ||to_char(r.recorded_at,'YYYYMMDDHH24MISSUS'))::text,
@@ -400,6 +478,7 @@ BEGIN
    jsonb_build_object(
     'method',r.method,
     'reason',min(r.reason),
+    'itemCount',count(*)::integer,
     'items',jsonb_agg(jsonb_build_object(
       'itemId',i.id,
       'revision',r.revision,
@@ -412,8 +491,13 @@ BEGIN
       'nameCn',ii.name_cn,
       'previousIceCode',pii.ice_code,
       'previousNameCn',pii.name_cn) ORDER BY i.product_name_raw)),
-   concat_ws(' ',s.ticket_no,s.market,min(r.reason),min(i.product_name_raw),
-     min(ii.ice_code),min(ii.name_cn))::text
+   concat_ws(' ',s.ticket_no,s.market,min(r.reason),
+     string_agg(DISTINCT i.product_name_raw,' '),
+     string_agg(DISTINCT i.source_sku,' '),
+     string_agg(DISTINCT ii.ice_code,' '),
+     string_agg(DISTINCT ii.name_cn,' '),
+     string_agg(DISTINCT pii.ice_code,' '),
+     string_agg(DISTINCT pii.name_cn,' '))::text
   FROM catalog.shipment_item_association_revision r
   JOIN catalog.shipment_item i ON i.id=r.item_id
   JOIN catalog.shipment s ON s.id=i.shipment_id
@@ -455,17 +539,18 @@ BEGIN
     'itemId',i.id,
     'productNameRaw',i.product_name_raw,
     'nameCn',ii.name_cn),
-   concat_ws(' ',s.ticket_no,i.product_name_raw,ii.ice_code,ii.name_cn,m.actor_name)::text
+   concat_ws(' ',s.ticket_no,i.product_name_raw,ii.ice_code,ii.name_cn,m.actor_name,m.note)::text
   FROM catalog.shipment_item_manual_revision m
   JOIN catalog.shipment_item i ON i.id=m.item_id
   JOIN catalog.shipment s ON s.id=i.shipment_id
   LEFT JOIN item_identity ii ON ii.item_id=i.product_id
 
   UNION ALL
-  -- 11) 物流 · 分合票人工决定
+  -- 11) 物流 · 分合票人工决定（只含 status='resolved' 且已有 resolved_at/resolved_by 的人工处理；
+  --     自动生成、尚未处理的 pending 复核不算人工操作）
   SELECT
    ('grp:'||g.id::text)::text,
-   coalesce(g.resolved_at,g.created_at),
+   g.resolved_at,
    'shipment',
    'shipment_grouping_decision'::text,
    g.resolved_by,
@@ -487,6 +572,8 @@ BEGIN
     'kind',g.kind,
     'decision',g.decision,
     'status',g.status,
+    'createdAt',g.created_at,
+    'resolvedAt',g.resolved_at,
     'resolutionNote',g.resolution_note,
     'fromSnapshotId',g.from_snapshot_id,
     'toSnapshotId',g.to_snapshot_id,
@@ -501,12 +588,13 @@ BEGIN
         'sourceRowEnd',t3->>'sourceRowEnd')),'[]'::jsonb)
       FROM jsonb_array_elements(coalesce(g.evidence->'current'->'tickets','[]'::jsonb)) t3),
     'affectedProducts',coalesce(g.evidence->'affectedProducts','[]'::jsonb)),
-   concat_ws(' ',g.kind,g.decision,
+   concat_ws(' ',g.kind,g.decision,g.status,
      (SELECT string_agg(DISTINCT t4->>'ticketNo',' ')
       FROM jsonb_array_elements(coalesce(g.evidence->'current'->'tickets','[]'::jsonb)) t4),
      (SELECT string_agg(DISTINCT p,' ')
       FROM jsonb_array_elements_text(coalesce(g.evidence->'affectedProducts','[]'::jsonb)) p))::text
   FROM catalog.shipment_grouping_review g
+  WHERE g.status='resolved' AND g.resolved_at IS NOT NULL AND g.resolved_by IS NOT NULL
 
   UNION ALL
   -- 12) 物流 · 撤销人工分组决定（恢复按飞书判断；active=false 且已记录撤销）
@@ -547,6 +635,86 @@ BEGIN
       FROM jsonb_array_elements(coalesce(o.spec->'groups','[]'::jsonb)) grp3))::text
   FROM catalog.shipment_grouping_override o
   WHERE o.active=false AND o.revoked_at IS NOT NULL
+
+  UNION ALL
+  -- 13) 商品资料 · 撤销来源字段人工口径（独立事件；账号优先取已保存的 restore_source_field 审计）
+  SELECT
+   ('fdrev:'||f.id::text)::text,
+   f.revoked_at,
+   'catalog',
+   'source_field_decision_revoked'::text,
+   coalesce(rev.actor_id,f.revoked_by),
+   '商品'::text,
+   coalesce(cur.name_cn,f.ice_code,'商品资料')::text,
+   f.ice_code,
+   f.item_id,
+   NULL::uuid,
+   NULL::uuid,
+   f.ice_code,
+   NULL::text,
+   NULL::text,
+   NULL::text,
+   jsonb_build_object(
+    'decisionId',f.id,
+    'originalAction',f.action,
+    'fieldKey',f.field_key,
+    'valueRaw',f.value_raw,
+    'rule',f.rule,
+    'decidedAt',f.decided_at,
+    'revokedAt',f.revoked_at,
+    'revokedBy',coalesce(rev.actor_id,f.revoked_by),
+    'revokedNote',coalesce(f.revoked_note,rev.note),
+    'reason',f.reason,
+    'requestId',rev.request_id),
+   concat_ws(' ',f.ice_code,cur.name_cn,f.field_key,f.value_raw,f.rule,
+     coalesce(f.revoked_note,rev.note),f.item_id::text)::text
+  FROM catalog.product_source_field_decision f
+  LEFT JOIN item_identity cur ON cur.item_id=f.item_id
+  LEFT JOIN LATERAL (
+    SELECT a2.actor_id,a2.request_id,
+      coalesce(a2.result->>'note',a2.result->>'revokedNote') AS note
+    FROM catalog.audit_event a2
+    WHERE a2.action='restore_source_field' AND a2.result->>'decisionId'=f.id::text
+    ORDER BY a2.recorded_at DESC LIMIT 1) rev ON true
+  WHERE f.revoked_at IS NOT NULL
+
+  UNION ALL
+  -- 14) 商品资料 · 撤销来源资料行选择（独立事件；账号取已保存的 restore_duplicate_source_decision 审计）
+  SELECT
+   ('duprev:'||d.id::text)::text,
+   d.superseded_at,
+   'catalog',
+   'duplicate_source_decision_revoked'::text,
+   rev.actor_id,
+   '商品'::text,
+   coalesce(cur.name_cn,d.ice_code,'来源资料')::text,
+   d.ice_code,
+   d.item_id,
+   NULL::uuid,
+   NULL::uuid,
+   d.ice_code,
+   NULL::text,
+   NULL::text,
+   NULL::text,
+   jsonb_build_object(
+    'decisionId',d.id,
+    'originalAction','duplicate_source_decision',
+    'decidedAt',d.decided_at,
+    'chosenRowNumber',d.chosen_row_number,
+    'state',d.state,
+    'supersededAt',d.superseded_at,
+    'note',d.note,
+    'revokedByAccount',(rev.actor_id IS NOT NULL),
+    'requestId',rev.request_id),
+   concat_ws(' ',d.ice_code,cur.name_cn,d.note,d.chosen_fields->'nameCn'->>'raw',d.item_id::text)::text
+  FROM catalog.product_source_duplicate_decision d
+  LEFT JOIN item_identity cur ON cur.item_id=d.item_id
+  LEFT JOIN LATERAL (
+    SELECT a2.actor_id,a2.request_id FROM catalog.audit_event a2
+    WHERE a2.action='restore_duplicate_source_decision'
+      AND (a2.result->>'decisionId'=d.id::text OR a2.result->>'revokedDecisionId'=d.id::text)
+    ORDER BY a2.recorded_at DESC LIMIT 1) rev ON true
+  WHERE d.state='superseded' AND d.superseded_at IS NOT NULL
  ),
  scoped AS (
   SELECT r.* FROM records r
@@ -591,8 +759,12 @@ BEGIN
       FROM records r
       LEFT JOIN public.profiles pf ON pf.id=r.actor_id
       GROUP BY r.actor_id) s),'[]'::jsonb),
-  coalesce((SELECT jsonb_object_agg(s.category,s.c) FROM (
-     SELECT sc.category,count(*)::integer AS c FROM scoped sc GROUP BY sc.category) s),'{}'::jsonb)
+  -- 分类计数与关键词/日期/账号同口径，但不受当前类别筛选影响；三个类别键始终存在。
+  (SELECT jsonb_build_object(
+     'catalog',count(*) FILTER (WHERE sc.category='catalog'),
+     'inventory',count(*) FILTER (WHERE sc.category='inventory'),
+     'shipment',count(*) FILTER (WHERE sc.category='shipment'))
+   FROM scoped sc)
  INTO v_total,v_rows,v_actors,v_category_counts;
  RETURN jsonb_build_object(
   'ok',true,

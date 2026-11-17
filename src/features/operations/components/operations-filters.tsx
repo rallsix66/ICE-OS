@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import { SearchField, SelectMenu } from '@/ui/ice-v4/data-surface';
-import { buildOperationHref, OPERATION_MAX_SEARCH_LENGTH } from '../model';
+import { buildOperationHref } from '../model';
 import type { OperationActorDto } from '../types';
 import styles from './operations.module.css';
 
@@ -17,17 +18,15 @@ export interface OperationFilterQuery {
 }
 
 /**
- * 操作记录筛选：搜索（防抖 300ms）/ 记录账号 / 起止日期。
+ * 操作记录筛选：搜索（防抖 300ms）/ 记录账号 / 起止日期（同一组，相邻）。
  * 一律写回 URL（replace，不新增历史），刷新、返回与直接链接都能还原同一份筛选。
  */
 export function OperationsFilters({
   query,
   actors,
-  total,
 }: {
   query: OperationFilterQuery;
   actors: OperationActorDto[];
-  total: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -58,71 +57,74 @@ export function OperationsFilters({
     });
   }
 
-  const totalActorCount = actors.reduce((sum, actor) => sum + actor.count, 0);
   const actorOptions = [
-    { value: '', label: `全部记录账号（${totalActorCount} 条）` },
+    { value: '', label: '全部记录账号' },
     ...actors
       .filter((actor): actor is OperationActorDto & { actorId: string } => Boolean(actor.actorId))
-      .map((actor) => ({ value: actor.actorId, label: `${actor.name}（${actor.count} 条）` })),
+      .map((actor) => ({ value: actor.actorId, label: actor.name })),
   ];
+  const dirty = query.category !== 'all' || Boolean(query.actor) || Boolean(query.from) || Boolean(query.to) || Boolean(q);
 
   return (
-    <div className={styles.filters} data-testid="operation-filters">
-      <SearchField
-        value={q}
-        onChange={setQ}
-        placeholder="货号 / 来源 SKU / 货票号 / 名称"
-        ariaLabel="搜索操作记录"
-        testId="operation-search"
-        pending={pending}
-      />
-      <SelectMenu
-        value={query.actor}
-        onChange={(value) => apply({ actor: value })}
-        options={actorOptions}
-        ariaLabel="按记录账号筛选"
-        testId="operation-actor-filter"
-      />
-      <label className={styles.dateField}>
-        <span>开始日期</span>
-        <input
-          type="date"
-          value={query.from}
-          max={query.to || undefined}
-          data-testid="operation-date-from"
-          onChange={(event) => apply({ from: event.target.value })}
+    <div className={styles.toolbarWrap}>
+      <div className={styles.filters} data-testid="operation-filters">
+        <div className={styles.searchWrap}>
+          <SearchField
+            value={q}
+            onChange={setQ}
+            placeholder="搜索货号、名称、来源 SKU、货票号或批次号"
+            ariaLabel="搜索操作记录"
+            testId="operation-search"
+            pending={pending}
+          />
+        </div>
+        <SelectMenu
+          value={query.actor}
+          onChange={(value) => apply({ actor: value })}
+          options={actorOptions}
+          ariaLabel="按记录账号筛选"
+          testId="operation-actor-filter"
         />
-      </label>
-      <label className={styles.dateField}>
-        <span>结束日期</span>
-        <input
-          type="date"
-          value={query.to}
-          min={query.from || undefined}
-          data-testid="operation-date-to"
-          onChange={(event) => apply({ to: event.target.value })}
-        />
-      </label>
-      <button
-        type="button"
-        className={styles.clearButton}
-        data-testid="operation-clear-filters"
-        disabled={query.category === 'all' && !query.actor && !query.from && !query.to && !q}
-        onClick={() => {
-          setQ('');
-          setCommitted('');
-          startTransition(() => {
-            router.replace('/dashboard/operations', { scroll: false });
-          });
-        }}
-      >
-        清空
-      </button>
-      <span className={styles.count} data-testid="operation-count">
-        {pending ? '查询中…' : `共 ${total} 条`}
-      </span>
-      <span className={styles.searchHint}>时间按中国标准时间（+08）</span>
-      <span className={styles.searchHint}>最多 {OPERATION_MAX_SEARCH_LENGTH} 个字符</span>
+        <div className={styles.dateGroup}>
+          <label className={styles.dateField}>
+            <span>开始</span>
+            <input
+              type="date"
+              value={query.from}
+              max={query.to || undefined}
+              data-testid="operation-date-from"
+              onChange={(event) => apply({ from: event.target.value })}
+            />
+          </label>
+          <span className={styles.dateDash} aria-hidden>—</span>
+          <label className={styles.dateField}>
+            <span>结束</span>
+            <input
+              type="date"
+              value={query.to}
+              min={query.from || undefined}
+              data-testid="operation-date-to"
+              onChange={(event) => apply({ to: event.target.value })}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          className={styles.clearButton}
+          data-testid="operation-clear-filters"
+          disabled={!dirty}
+          onClick={() => {
+            setQ('');
+            setCommitted('');
+            startTransition(() => {
+              router.replace('/dashboard/operations', { scroll: false });
+            });
+          }}
+        >
+          <X size={13} strokeWidth={2} aria-hidden />清空
+        </button>
+      </div>
+      <p className={styles.toolbarCaption}>时间按中国标准时间（+08）· 日期筛选按 +08 自然日</p>
     </div>
   );
 }
