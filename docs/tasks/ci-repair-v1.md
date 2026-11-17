@@ -1,15 +1,17 @@
 # CI 修复 v1（跨平台基线 + 现役数据库检查）
 
-- 日期：2026-11-17（初版 + 独立审查补修）
-- 分支：`codex/ci-repair-v1`（初版）、`codex/ci-repair-v1-followup`（补修）
-- PR：初版 **[#17](https://github.com/rallsix66/ICE-OS/pull/17)**、文档收尾 **[#18](https://github.com/rallsix66/ICE-OS/pull/18)**、补修 **[#19](https://github.com/rallsix66/ICE-OS/pull/19)**
+- 日期：2026-11-17（初版 + 补修 + 独立验收）
+- 分支：`codex/ci-repair-v1`（初版）、`codex/ci-repair-v1-followup`（补修）、`codex/ci-repair-v1-review-closeout`（文档收尾）
+- PR：初版 **[#17](https://github.com/rallsix66/ICE-OS/pull/17)**、文档收尾 **[#18](https://github.com/rallsix66/ICE-OS/pull/18)**、补修 **[#19](https://github.com/rallsix66/ICE-OS/pull/19)**；本轮文档收尾 PR 见交付回执
 - 初版实现提交：`af231c3`；初版文档：`238477c`；收尾文档：`979a365`
-- 补修实现提交：`c1d26ea`（`fix(ci): 收紧数据库空库与只读断言`）
-- 状态：初版与文档收尾已合并；补修 PR #19 实现提交已通过四组 CI，最终 head 与 master 合并/CI 见交付回执。
+- 补修实现提交：`c1d26ea`（`fix(ci): 收紧数据库空库与只读断言`）；补修 PR final head：`b046948`；补修合并提交：`534f403`
+- 状态：**CI 修复 v1 已完成，独立复核 PASS，阻断 0**。该 PASS 由审查方在补修后给出，执行方仅登记结论，不自行宣布独立审查通过。
+- 代码验收对象：实现提交 `c1d26eab4e642796975e449b2915974e316e5cfd`、PR #19 final head `b046948d3d41c3c4abbc6f7e991a4cbfd276ba2c`、合并提交 `534f40368f1650d999c76189c8517099a744e5ab`；本轮文档收尾提交只登记结论，不改变代码验收对象。
+- PR 最终 head CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44045424734>
+- 合并后 master CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44045702304>
 - 初版 PR final head（`238477c`）CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44040075051>
 - 初版合并提交：**`a36959579db44125608faa3fe5e3779a011d88f5`**；master CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44040384827>
 - 文档收尾 PR #18 最终 master：**`b0337986173419f78c3c3af887f72268fe6f3009`**；CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44041324456>
-- 补修实现提交 CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44044902291>
 - 必需检查：`Tests`、`Lint`、`Build`、`Database checks`（`strict=false`、`enforce_admins=true`）
 
 ## 1. 原失败根因
@@ -129,7 +131,7 @@ PR #17 最终 head `238477c`（含文档提交）的 CI：<https://github.com/ra
 
 ## 4. 补修（独立审查 B1/B2）
 
-独立审查报告：`.local/catalog/ci-repair-v1-review-20261117/independent-review.md`（本机证据，不入库）。其结论为：初版 CI 真实运行、合并和必需检查已确认；但 B1 空库检查遗漏 public 并随后清空、B2 只读断言接受权限拒绝，最终验收暂不 PASS，需最小补修；D1 文档索引遗漏；操作记录 v1 的 PASS 不变。以下为执行方修复与定向自验，**不自行宣布独立复核 PASS**。
+独立审查报告：`.local/catalog/ci-repair-v1-review-20261117/independent-review.md`（本机证据，不入库）。其结论为：初版 CI 真实运行、合并和必需检查已确认；但 B1 空库检查遗漏 public 并随后清空、B2 只读断言接受权限拒绝，最终验收暂不 PASS，需最小补修；D1 文档索引遗漏；操作记录 v1 的 PASS 不变。以下为执行方修复与定向自验，**不自行宣布独立复核 PASS**。该历史结论已由 §5 的补修后独立复核接续，保留不改写。
 
 ### 4.1 B1：取消 public 清空，补全空库检查
 
@@ -179,9 +181,46 @@ PR #17 最终 head `238477c`（含文档提交）的 CI：<https://github.com/ra
 | Build | SUCCESS | <https://github.com/rallsix66/ICE-OS/actions/runs/44044902291/job/133908076947> |
 | Database checks | SUCCESS | <https://github.com/rallsix66/ICE-OS/actions/runs/44044902291/job/133908077038> |
 
-本机 `npx eslint scripts/ci/database.mjs --max-warnings 0` 与 `git diff --check` 通过。补修 PR 最终 head 的 CI、合并 SHA 与合并后 master 运行在交付回执列明。
+本机 `npx eslint scripts/ci/database.mjs --max-warnings 0` 与 `git diff --check` 通过。补修 PR 最终 head 的 CI、合并 SHA 与合并后 master 运行见 §5。
 
-## 5. 范围与边界
+## 5. 最终独立验收（PASS）
+
+**结论：CI 修复 v1 已完成，独立复核 PASS，阻断 0。** 该 PASS 由独立审查方在补修后给出，执行方只登记结论，不自行宣布独立审查通过。本次复核接续上轮 `independent-review.md` 的“暂不 PASS”，不改写上轮结论；操作记录 v1 的既有 PASS 不变，本结论只限定 CI 修复验收。
+
+### 5.1 验收对象与差异
+
+- PR：[#19](https://github.com/rallsix66/ICE-OS/pull/19)
+- 实现提交：`c1d26eab4e642796975e449b2915974e316e5cfd`
+- PR final head：`b046948d3d41c3c4abbc6f7e991a4cbfd276ba2c`
+- 合并提交：`534f40368f1650d999c76189c8517099a744e5ab`
+- 差异基准：`b033798..534f403`；仅 `scripts/ci/database.mjs` 与 5 个文档。
+- 代码验收对象是上述实现提交与合并提交；本轮文档收尾提交、PR 和合并 SHA 只登记结论，不冒充代码验收对象。
+- 独立复核报告：`.local/catalog/ci-repair-v1-review-20261117/independent-review-followup.md`（本机证据，不入库）。
+
+### 5.2 B1 / B2 / D1 关闭结果
+
+- **B1 已关闭**：`scripts/ci/database.mjs` 第 135–142 行在首次安装（第 147 行）之前检查 public relation/routine/type、其他用户 schema 和 ICE schema；已删除 `DROP SCHEMA public CASCADE`，不再清空 public。独立代码审查确认拒绝发生在任何安装写入之前。`keep_me` 事后 1 行/`must survive` 的结果来自执行方回执与任务文档；原始回读日志未单独保存，独立审查没有为此重跑数据库验证。
+- **B2 已关闭**：只读写入检查只接受 **25006**；未授权身份检查仍要求 **42501**；业务角色权限未调整。执行方负向日志 `expected 25006, got 42501` 证明普通权限拒绝不会误判通过；独立审查读取了该日志，未重跑数据库。
+- **D1 已关闭**：任务文档已补齐 PR #17 final head `238477c`/run 44040075051、PR #18、master `b033798`/run 44041324456；本轮最终 head、合并 SHA 与 master 运行也已在 §5.1、§5.3 登记，无需为回填自身提交号再开文档 PR。
+
+### 5.3 最终 CI 与必需检查
+
+| 运行 | 对象 | 结果 |
+| --- | --- | --- |
+| [44045424734](https://github.com/rallsix66/ICE-OS/actions/runs/44045424734) | PR #19 final head `b046948` | Tests / Lint / Build / Database checks 四组全部 completed/success |
+| [44045702304](https://github.com/rallsix66/ICE-OS/actions/runs/44045702304) | 合并提交 `534f403` | Tests / Lint / Build / Database checks 四组全部 completed/success |
+
+PR final head 的 job：Tests <https://github.com/rallsix66/ICE-OS/actions/runs/44045424734/job/133909795696>、Lint <https://github.com/rallsix66/ICE-OS/actions/runs/44045424734/job/133909795595>、Build <https://github.com/rallsix66/ICE-OS/actions/runs/44045424734/job/133909795818>、Database checks <https://github.com/rallsix66/ICE-OS/actions/runs/44045424734/job/133909795258>。
+
+合并后 master 的 job：Tests <https://github.com/rallsix66/ICE-OS/actions/runs/44045702304/job/133910719151>、Lint <https://github.com/rallsix66/ICE-OS/actions/runs/44045702304/job/133910718647>、Build <https://github.com/rallsix66/ICE-OS/actions/runs/44045702304/job/133910719048>、Database checks <https://github.com/rallsix66/ICE-OS/actions/runs/44045702304/job/133910718995>。
+
+最终 master 数据库日志：45 SQL、82 表、232 函数；`appRead=1`、`rpcSaved.iceCode=CI-0001`/`revision=2`、`operationsTotal=1`、`unauthorizedIdentity=42501`、`readOnlyWrite=25006`。独立审查回读 `master` protection：`Tests`、`Lint`、`Build`、`Database checks` 四项均绑定 GitHub Actions `app_id 15368`；`strict=false`、`enforce_admins=true`、`required_pull_request_reviews=null`、force push/deletion=false。
+
+### 5.4 审查范围与证据归属
+
+独立审查实际做了：`b033798..534f403` 代码/文档差异复核、执行方日志核对、PR #19 远端合并状态回查、两次最终 CI 运行 API 核对、master 必需检查保护设置回读。独立审查**没有**重跑全仓测试、页面验收或数据库探针，没有连接数据库、启动 worker、重启或部署实例；`keep_me` 与负向只读日志属于执行方证据，不写成审查方独立重跑。现役运行事实沿用执行方回执，不把 CI 通过表述为生产部署验收。
+
+## 6. 范围与边界
 
 - 本包只改 CI、跨平台基线、数据库 CI 入口、lint 清理与文档；未改业务逻辑、数据库结构、现役实例或无关部署准备。
 - 不重新验收操作记录页面；其既有“独立复核 PASS、阻断 0”结论保持不变。
@@ -189,7 +228,7 @@ PR #17 最终 head `238477c`（含文档提交）的 CI：<https://github.com/ra
 - `CI=true` 是 GitHub Actions 的临时库授权；本地运行需显式 `CI_DATABASE_RESET=1`。目标必须为空（public 无对象、无用户/ICE schema）；脚本不提供数据库重置或备份。
 - 未做 200% 缩放、长期稳定性、生产部署与真实外部服务凭据验证。
 
-## 6. 证据索引
+## 7. 证据索引
 
 - 工作流：`.github/workflows/ci.yml`
 - 数据库入口：`scripts/ci/database.mjs`、`package.json` 的 `ci:database`
@@ -201,6 +240,9 @@ PR #17 最终 head `238477c`（含文档提交）的 CI：<https://github.com/ra
 - 初版 master CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44040384827>
 - 文档收尾 master CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44041324456>
 - 补修实现提交：`c1d26eab4e642796975e449b2915974e316e5cfd`；CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44044902291>
-- 独立审查报告：`.local/catalog/ci-repair-v1-review-20261117/independent-review.md`（本机证据，不入库；结论不是执行方 PASS）
+- 补修 PR final head：`b046948d3d41c3c4abbc6f7e991a4cbfd276ba2c`；CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44045424734>
+- 补修合并提交：`534f40368f1650d999c76189c8517099a744e5ab`；master CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44045702304>
+- 初轮独立审查（暂不 PASS）：`.local/catalog/ci-repair-v1-review-20261117/independent-review.md`（本机证据，不入库）
+- 补修后独立复核（PASS、阻断 0）：`.local/catalog/ci-repair-v1-review-20261117/independent-review-followup.md`（本机证据，不入库；PASS 由审查方给出）
 - 本机补修验证日志：`.local/catalog/ci-repair-v1-followup-20261117/`（空库、非空 public、B2 负向/正向运行日志，不入库）
-- 必需检查回读：`["Tests","Lint","Build","Database checks"]`，`strict=false`，`enforce_admins=true`，未增加审查人数/签名/部署审批。
+- 必需检查回读：`["Tests","Lint","Build","Database checks"]`，四项绑定 GitHub Actions `app_id 15368`，`strict=false`，`enforce_admins=true`，未增加审查人数/签名/部署审批。
