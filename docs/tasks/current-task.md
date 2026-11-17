@@ -8,7 +8,7 @@
 
 ## 当前任务：操作记录 v1 R1–R5 补修 + 页面优化（2026-11-17）—— 执行方自验完成，待独立复核
 
-状态：**执行方自验完成，未宣布 PASS**（最终结论由审查方给出）。仅限现役实例 `run-20261026T211500Z-11a22b33`（3011/59345）；最终 BUILD **`C0mYSULXwBiBcxf9DHUpp`**（源码快照 `78716bb12a20827a…`）。合同与执行记录：[operations-log-v1.md](operations-log-v1.md)；证据 `.local/catalog/operations-log-r2-20261117/`（`verify.json`、`layout-r2.json`、`fixtures.json`、`apply-042*.json`、截图 01–11）。
+状态：**执行方自验完成，未宣布 PASS**（最终结论由审查方给出）。仅限现役实例 `run-20261026T211500Z-11a22b33`（3011/59345）；最终 BUILD **`4gZ0zjpGDrnR58RpmYOQr`**（源码快照 `c926430a75a9c020…`）。合同与执行记录：[operations-log-v1.md](operations-log-v1.md)；证据 `.local/catalog/operations-log-r2-20261117/`（`verify.json`、`layout-r2.json`、`fixtures.json`、`apply-042*.json`、截图 01–11）。
 
 - **R1 删除字段**：修订差异按新旧字段键并集比较（新增/修改/删除）；WM0073 第 3 版显示「商品条码 757577407359 → 已移除」，上一版本正确为第 2 版。首版只以实际解析到的上一行为准；声明上一版但历史缺失时说明「找不到该版本」，不用当前值补。
 - **R2 搜索与替换**：同一次人工关联的搜索文本覆盖全部货号/名称/来源 SKU/货票号；POKNZX027675 涉及七款（WM0057/58/59/61/89/90/91）分别搜索都命中同一条、7 条明细。原 SKU 替换改读 `detail.oldMappingId/newMappingId/oldExternalSku/newExternalSku/itemId/newVersion`，不再把 warehouseId 当 mappingId；现役 0 条，用事务隔离样例验证。

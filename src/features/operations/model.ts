@@ -375,7 +375,6 @@ export function operationResultText(record: OperationRecordDto): string {
       return '建立商品资料首版；没有上一版本，无法对比前值。';
     case 'item_revision': {
       const revision = asNumber(detail.revision);
-      const reason = asString(detail.reason);
       const changes = asArray(detail.changes);
       const added = changes.filter((entry) => asString(asRecord(entry)?.changeKind) === 'added').length;
       const removed = changes.filter((entry) => asString(asRecord(entry)?.changeKind) === 'removed').length;
@@ -385,7 +384,7 @@ export function operationResultText(record: OperationRecordDto): string {
       if (added > 0) parts.push(`新增 ${added} 项`);
       if (removed > 0) parts.push(`删除 ${removed} 项`);
       const changeText = parts.length > 0 ? `：${parts.join('，')}` : '：字段值与上一版一致';
-      return `商品资料第 ${revision ?? '—'} 版${changeText}${reason ? `（${reason}）` : ''}。`;
+      return `商品资料第 ${revision ?? '—'} 版${changeText}。`;
     }
     case 'inventory_confirm':
     case 'inventory_rebind': {

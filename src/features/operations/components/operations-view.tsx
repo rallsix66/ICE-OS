@@ -111,7 +111,7 @@ export function OperationsView({
       ) : readError ? (
         <div className={styles.failure} role="alert" data-testid="operation-read-failure">
           <strong>操作记录读取失败。</strong>
-          <span>{readError}。请稍后重试；如果持续失败，请确认当前实例已安装 042 只读查询。</span>
+          <span>{readError}。请稍后重试；如果持续失败，请联系管理员检查读取权限或实例是否就绪。</span>
           <Link href={retryHref}>重新读取</Link>
         </div>
       ) : page && page.rows.length === 0 ? (

@@ -5,7 +5,7 @@
 - 实例：`run-20261026T211500Z-11a22b33`（Web 3011 / PostgreSQL 59345）
 - 入口：<http://127.0.0.1:3011/dashboard/operations>
 - 登录：`admin@catalog.test`（密码见实例 `login.local-preview.txt`，不入 Git）
-- 最终 BUILD：**`C0mYSULXwBiBcxf9DHUpp`**（源码快照 `78716bb12a20827a…`，promote → start、login 200）
+- 最终 BUILD：**`4gZ0zjpGDrnR58RpmYOQr`**（源码快照 `c926430a75a9c020…`，promote → start、login 200）
 - 证据：`.local/catalog/operations-log-r2-20261117/`（`verify.json`、`layout-r2.json`、`fixtures.json`、`apply-042*.json`、截图 01–11）
 
 本轮把 R1–R5 的数据补修与操作记录页 UI 优化作为一个交付包完成；最终是否通过仍由审查方确认，执行方不宣布 PASS。
@@ -108,7 +108,7 @@ catalog.read_operation_records(
 
 ## 6. 验证（执行方自验，不代表 PASS）
 
-### 6.1 页面（3011，BUILD `C0mYSULXwBiBcxf9DHUpp`）**38/38**
+### 6.1 页面（3011，BUILD `4gZ0zjpGDrnR58RpmYOQr`）**38/38**
 
 `verify-r2.mjs` → `verify.json`，console/pageerror 0：
 
