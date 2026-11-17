@@ -33,7 +33,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 import { REPO_ROOT, safeEnv } from '../prepare.mjs';
 import { createTsLoader } from './ts-loader.mjs';
