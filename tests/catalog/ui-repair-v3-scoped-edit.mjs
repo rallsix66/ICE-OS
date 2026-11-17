@@ -23,7 +23,7 @@ const runId = arg('--run-id');
 const port = Number(arg('--port', '3015'));
 const run = await resolveRun(runId);
 const rec = createRecorder('v3-04-scoped-edit', runId);
-const { expectations, expect, summary } = expectAll();
+const { expect, summary } = expectAll();
 const db = await ownerClient(run);
 const base = `http://127.0.0.1:${port}`;
 const tag = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
@@ -41,9 +41,6 @@ async function itemById(itemId) {
 }
 async function auditByRequest(requestId) {
   return (await db.query('SELECT request_id, action, result FROM catalog.audit_event WHERE request_id=$1', [requestId])).rows[0] ?? null;
-}
-async function revisions(itemId) {
-  return (await db.query('SELECT revision, name_cn FROM catalog.item_revision WHERE item_id=$1 ORDER BY revision', [itemId])).rows;
 }
 async function bumpExternal(itemId) {
   await db.query('BEGIN');

@@ -24,7 +24,7 @@ const adminA = { email: arg('--email-a', 'admin@catalog.test'), password: arg('-
 const adminB = { email: arg('--email-b', 'scope-b@catalog.test'), password: arg('--password-b', 'CatalogScopeB123!') };
 const run = await resolveRun(runId);
 const rec = createRecorder('v3-04-draft-isolation', runId);
-const { expectations, expect, summary } = expectAll();
+const { expect, summary } = expectAll();
 const db = await ownerClient(run);
 const base = `http://127.0.0.1:${port}`;
 const draftValue = `V3-DRAFT-A-${Date.now()}`;
@@ -46,7 +46,6 @@ try {
   const storageA = await storage(page);
   const aDraftKey = Object.keys(storageA).find((key) => key.startsWith('catalog:edit-state:v3:') && key.endsWith(`:${itemId}`));
   expect('A/draft-stored-under-principal-key', Boolean(aDraftKey) && storageA[aDraftKey].includes(draftValue), { aDraftKey });
-  const aPrincipal = aDraftKey ? aDraftKey.split(':')[3] : null;
   await rec.shot(page, 'a-draft');
 
   /* Inject a legacy unbound draft before B opens the editor */

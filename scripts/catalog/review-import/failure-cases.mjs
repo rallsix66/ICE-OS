@@ -16,7 +16,6 @@ import { DEFAULT_CSV, buildPlan, loadAdminProfileId, loadReviewCsv, loadState, w
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const INSTANCE_FILE = path.join(REPO_ROOT, '.local', 'catalog', 'run-20261026T211500Z-11a22b33', 'instance', 'catalog-instance.json');
 const FORMAL_DB = 'iceos_catalog_run_20261026T211500Z_11a22b33';
-const ADMIN = '11111111-1111-4111-8111-111111111101';
 const FILE_SHA = '5f39ae7438b4003caa5727dcace377ac912ad796ac9b3c9e61663dec69b40d12';
 
 function readArgs(argv) {
@@ -153,6 +152,7 @@ async function main() {
     }
     const staleSkipped = staleReceipt?.skipped?.map((s) => s.reason) ?? [];
     const afterStale = await readState();
+    void afterStale;
     const staleRows = (await withReadTx(app, adminProfileId, async () => (await app.query(
       `SELECT version,status,item_id FROM catalog.inventory_sku_mapping
        WHERE account_id=$1 AND warehouse_id=$2 AND external_sku=$3 ORDER BY version`, [before.state.account.id, wh.id, mappingKey.externalSku])).rows));

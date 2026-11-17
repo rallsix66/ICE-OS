@@ -616,10 +616,9 @@ async function findReceipt(client, adminProfileId, requestId) {
 // ---------------------------------------------------------------------------
 // 回读：按当前库重新核对（写入后也用它生成 result）
 // ---------------------------------------------------------------------------
-async function readback(client, plan, csv) {
+async function readback(client, plan) {
   const state = await withReadTx(client, plan.adminProfileId, async () => loadState(client));
   const itemById = new Map(state.items.map((i) => [i.id, i]));
-  const itemByCode = new Map(state.items.map((i) => [i.ice_code, i]));
   const warehouseByName = new Map(state.warehouses.map((w) => [w.external_name, w]));
   const mappingByKey = new Map(state.mappings.map((m) => [`${m.warehouse_id}|${m.external_sku}`, m]));
   const jstByCandidate = new Map(state.jstLinks.map((l) => [l.legacyCandidateId, l]));
@@ -913,7 +912,7 @@ async function main() {
       const elapsedMs = Date.now() - started;
       const failures = plan.rows.filter((r) => r.receiptError).slice(0, 40)
         .map((r) => ({ sourceRowId: r.sourceRowId, category: r.category, action: r.action, error: r.receiptError }));
-      readbackResult = await readback(app, plan, csv);
+      readbackResult = await readback(app, plan);
       console.log(JSON.stringify({
         stage: 'apply',
         elapsedMs,
@@ -923,7 +922,7 @@ async function main() {
         failures,
       }, null, 2));
     } else if (args.mode === 'verify') {
-      readbackResult = await readback(app, plan, csv);
+      readbackResult = await readback(app, plan);
       console.log(JSON.stringify({ stage: 'verify', bs: readbackResult.bs.counts, jst: readbackResult.jst.counts, domesticSnapshot: readbackResult.domesticSnapshot }, null, 2));
     }
 

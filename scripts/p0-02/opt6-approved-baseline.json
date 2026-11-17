@@ -1,6 +1,6 @@
 {
   "capturedAt": "2026-10-14T03:23:28.430Z",
-  "knownFailure": "Only canonical body test at opt6-production-apply.test.ts:43:93; 1 failed / 5 passed",
+  "knownFailure": "Historical (2026-10-14 Windows CRLF): only the canonical body test; fixed 2026-11-17 by normalizing the packet and comparing LF-normalized digests; detector retained for old runner compatibility",
   "files": [
     {
       "rel": "supabase/migrations/00051_optimize_role_rls_policy_overlap.sql",
@@ -18,10 +18,12 @@
     },
     {
       "rel": "src/features/database/opt6-production-apply.test.ts",
-      "sha256": "3bf48a02862febb39f89cb0f83db0cb7f155489bbcea80fda2e32461be18e7bd",
-      "normalizedLfSha256": "5a065bdfed4e46365bb64b8847abef1bdfabc4fe02b213fc367a8f2d85c357b0",
-      "crlfCount": 76,
+      "sha256": "3e26cfa446fd5c5de65dafc53d22b517646efb7b1b1507f4b704e1c1771a8db5",
+      "normalizedLfSha256": "6452b501b740530013633a8c6d9a9325cf1786c078d51b90fc096b590a64c8d5",
+      "crlfCount": 85,
       "loneLfCount": 0
     }
-  ]
+  ],
+  "updatedAt": "2026-11-17",
+  "lineEndingPolicy": "normalizedLfSha256 is authoritative; raw sha256/crlfCount/loneLfCount are checkout diagnostics only"
 }

@@ -21,7 +21,7 @@ const attachmentsItem = arg('--attachments-item', null);
 const code = arg('--code', 'WM0043');
 const run = await resolveRun(runId);
 const rec = createRecorder('v3-08-resilience', runId);
-const { expectations, expect, summary } = expectAll();
+const { expect, summary } = expectAll();
 const db = await ownerClient(run);
 const base = `http://127.0.0.1:${port}`;
 async function withRename(table, suffix, fn) {

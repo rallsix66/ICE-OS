@@ -15,10 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: Tests, lint, and build
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     env:
       CI: true
 
@@ -40,26 +40,54 @@ jobs:
       - name: Run default test suite
         run: npm run test
 
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CI: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Enforce lint warning budget
         run: npm run lint -- --max-warnings 0
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build application
         run: npm run build
 
-      - name: Check changed lines for whitespace errors
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          if [[ -n "$BASE_SHA" && "$BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
-            git diff --check "$BASE_SHA" "$HEAD_SHA"
-          else
-            git show --check --oneline --no-renames "$HEAD_SHA"
-          fi
-
-  postgres-concurrency:
-    name: PostgreSQL concurrency tests
+  database:
+    name: Database checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -97,8 +125,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run PostgreSQL concurrency suite
-        run: npm run test:concurrency
-
-      - name: Replay migrations and verify RPC/RLS behavior
-        run: npm run test:database-contract
+      - name: Install current database from empty and exercise app role
+        run: npm run ci:database

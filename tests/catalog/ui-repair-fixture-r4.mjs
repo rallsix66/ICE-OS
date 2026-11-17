@@ -11,7 +11,7 @@
  *   node tests/catalog/ui-repair-fixture-r4.mjs --run-id <fixture-run> --port 3012
  */
 import {
-  baseUrl, captureActionId, createRecorder, launch, newLoggedInPage, ownerClient, patchFlightBody, resolveRun, safeName,
+  baseUrl, captureActionId, createRecorder, launch, newLoggedInPage, ownerClient, patchFlightBody, resolveRun,
 } from './ui-repair-fixture-lib.mjs';
 
 const ADMIN = '11111111-1111-4111-8111-111111111101';
@@ -351,12 +351,11 @@ try {
 
   /* ---------------- 5. browser back keeps draft ---------------- */
   {
-    const state = await itemByCode('WM0059');
     const value = `FIXTURE-R4-BACK-${tag}`;
     const { context, page } = await newLoggedInPage(browser, base);
     await openDetailByCode(page, 'WM0059');
     await enterEdit(page);
-    const fields = await fillRevision(page, { field: 'englishName', value, evidence: 'fixture:r4:back', reason: `R4 back ${tag}` });
+    await fillRevision(page, { field: 'englishName', value, evidence: 'fixture:r4:back', reason: `R4 back ${tag}` });
     await page.goBack();
     await page.waitForTimeout(1_500);
     const dialogAfterBack = await page.getByTestId('catalog-detail-core-ready').count();

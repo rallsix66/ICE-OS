@@ -2,19 +2,21 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+const normalizeLineEndings = (value: string) => value.replace(/\r\n/g, '\n')
+
 describe('OPT-6 Batch 2 Production apply packet static contract', () => {
   let packet = ''
   let migration = ''
 
   beforeAll(() => {
-    packet = readFileSync(
+    packet = normalizeLineEndings(readFileSync(
       resolve(process.cwd(), 'docs/reports/sql/2026-07-21-opt6-00051-production-apply.sql'),
       'utf8',
-    )
-    migration = readFileSync(
+    ))
+    migration = normalizeLineEndings(readFileSync(
       resolve(process.cwd(), 'supabase/migrations/00051_optimize_role_rls_policy_overlap.sql'),
       'utf8',
-    ).replace(/\r\n/g, '\n')
+    ))
   })
 
   it('keeps one transaction and locks history before the embedded migration body', () => {
@@ -46,6 +48,13 @@ describe('OPT-6 Batch 2 Production apply packet static contract', () => {
     expect(postBody).toContain("md5(statements[1]) = 'aee8d4811b5382afc9786ef0dae195be'")
     expect(postBody).toContain("status = 'in_progress'")
     expect(postBody).toContain('count(*) FROM supabase_migrations.schema_migrations) <> 51')
+  })
+
+  it('treats CRLF and LF packet copies as equivalent only after normalization', () => {
+    const bodyPattern = new RegExp(migration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
+    const crlfPacket = packet.replace(/\n/g, '\r\n')
+    expect(crlfPacket.match(bodyPattern) ?? []).toHaveLength(0)
+    expect(normalizeLineEndings(crlfPacket).match(bodyPattern)).toHaveLength(2)
   })
 
   it('has exactly one expected-history insert and rejects duplicate VALUES tokens', () => {
