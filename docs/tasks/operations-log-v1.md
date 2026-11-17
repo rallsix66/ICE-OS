@@ -1,15 +1,73 @@
-# 操作记录 v1（R4 收尾 + 双日期系统日历 + 整页系统样式统一）
+# 操作记录 v1（R1–R5 + 整页系统样式 + 双日期系统日历）
 
-- 日期：2026-11-17（日期 UI 补修）
-- 分支：`codex/operations-log-v1`（承接 `e3b3466` + `880a66b` + `2660a82` + `085760c`）
+- 日期：2026-11-17
+- 状态：**独立复核 PASS，阻断 0；本轮已完成（2026-11-17）**
+- 分支：`codex/operations-log-v1`
+- 已验收实现提交：**`105b127`**
+- 文档收尾提交：本轮 `docs(operations)` 提交（SHA 见 PR / 最终回执）
+- 合并目标：`master`；PR：创建后回填（见 §8）
 - 实例：`run-20261026T211500Z-11a22b33`（Web 3011 / PostgreSQL 59345；PG pid 40076，preview pid 48248）
-- 入口：<http://127.0.0.1:3011/dashboard/operations>
-- 登录：`admin@catalog.test`（密码见实例 `login.local-preview.txt`，不入 Git）
 - 最终 BUILD：**`tg4VKYyZQYR3Jq7uz5ktk`**
 - 源码快照：**`1610bf943a4f3608a85a55e326ff22c426b9a0ef50abeab500df1b20ea9ecaa1`**（与运行构建一致）
-- 证据：`.local/catalog/operations-log-r5-20261117/`（`verify-r5.json`、截图 `r5-01`–`r5-15`）
+- 入口：<http://127.0.0.1:3011/dashboard/operations>
+- 登录：`admin@catalog.test`（密码见实例 `login.local-preview.txt`，不入 Git）
+- 独立复核报告：`.local/catalog/operations-log-r5-20261117/independent-review.md`（本地保留，不入 Git）
+- 本地证据：`.local/catalog/operations-log-r5-20261117/`（`verify-r5.json`、`verify-r5.mjs`、截图 `r5-01`–`r5-15`）
 
-上一轮（`085760c`）已恢复“开始日期 / 结束日期”两个独立控件；本轮按补修要求保留这两个控件与分别选日、选完立即筛选的使用方式，把浏览器原生日期弹窗替换为页面内可统一风格的单日历弹窗。整页样式与 R1–R5 业务修复不回滚。最终是否通过由审查方确认，执行方不宣布 PASS。
+本轮是操作记录 v1 的最终交付收尾。执行方自验 **44/44** 页面/样式、**47/47** 定向单测；独立复核给出 **PASS、阻断 0**，范围是当前本地现役实例的操作记录页面（R1–R5、整页系统样式、最终双日期日历），**不是生产部署结论**。上一轮 `085760c` 的“执行方自验完成、未宣布 PASS”状态由本轮独立复核接续，历史事实保留，不改写为当时的通过。
+
+## 0. 验收结论与范围
+
+### 0.1 验收基准
+
+| 项 | 值 |
+| --- | --- |
+| 分支 | `codex/operations-log-v1` |
+| 已验收实现提交 | `105b127`（`fix(operations): 双日期控件改用页面内系统日历`） |
+| BUILD | `tg4VKYyZQYR3Jq7uz5ktk` |
+| 源码快照 | `1610bf943a4f3608a85a55e326ff22c426b9a0ef50abeab500df1b20ea9ecaa1` |
+| 现役入口 | `http://127.0.0.1:3011/dashboard/operations` |
+| 独立复核 | PASS，阻断 0；报告 `.local/catalog/operations-log-r5-20261117/independent-review.md` |
+
+独立复核核对 ready、preview server、workspace manifest 的源码快照一致；运行目录 BUILD_ID 与 ready 一致，PID 48248 存活；`single-day-picker.tsx`、`calendar-date.ts`、`operations-filters.tsx`、`operations.module.css` 四个文件的工作区 SHA256 与构建清单逐个相同。
+
+### 0.2 证据分层
+
+| 证据 | 内容 | 归属 |
+| --- | --- | --- |
+| 页面与样式 44/44 | `verify-r5.mjs` / `verify-r5.json`：日期选日、年月切换、单边清空、刷新、反向、组合筛选、分页、详情返回、1440/760、R1–R5 回归、console 0 | 执行方自验，独立复核沿用部分结果，不把 44/44 计为独立测试数量 |
+| 定向单测 47/47 | `calendar-date` 4 + `model` 36 + `navigation-config` 7 | 执行方自验，独立复核沿用 |
+| 独立页面操作 | 主审在 3011 实际操作默认桌面视口与 760×900 | 独立复核 |
+| 独立代码检查 | 共用组件、筛选写回、与 `085760c` 的 Git blob 对照、`git diff --check` | 独立复核 |
+| 历史数据证据 | `apply-042` rollback 40/40、真实改选 5/5、365 计数 | 前轮已通过，本轮沿用，未重复执行 |
+
+### 0.3 独立复核的实际操作
+
+主审在现役 3011 实际操作：
+
+1. 初始列表 **365** 条，三类 **152 / 100 / 113**；页面 `input[type=date]` 数量为 **0**。
+2. 打开开始日期，在页面日历点 `2026-11-10`：弹窗关闭，URL 为 `?from=2026-11-10`，共 **26** 条。
+3. 打开结束日期点同一天：URL 为 `?from=2026-11-10&to=2026-11-10`，共 **23** 条。
+4. 单独清空开始日期：URL 仅保留 `?to=2026-11-10`，共 **362** 条。
+5. 760×900 打开结束日历，选中态完整可见；上一月、上一年、下一年、下一月依次显示 `2026年10月`、`2025年10月`、`2026年10月`、`2026年11月`。
+6. Esc 关闭后焦点回到结束日期触发器，筛选 URL 未变。
+7. 实点开始 `11-16`、结束仍 `11-10`：显示反向提示、无记录行；清空后恢复 365 条。
+8. 浏览器捕获的 warning/error 为空；结束时清空筛选并恢复临时视口设置。
+
+主审另核对桌面默认视口与 760 窄屏；1440 样式对照、组合筛选、分页、商品/货票详情返回沿用执行方 44/44 证据，未将该数字计为主审独立测试数量。
+
+### 0.4 代码复核与沿用证据
+
+- 两侧实际共用 `SingleDayPicker`；选日和清空仍走原筛选 `apply`，保留关键词并回第 1 页。
+- `db/catalog/042_operation_records.sql`、`model.ts` 及其测试、`server/reads.ts`、`types.ts`、`operations-view.tsx`、`operation-record-detail.tsx`、服务端页面均与 `085760c` 的 Git blob 相同。
+- R1–R5 业务逻辑、详情返回与明细分段没有回滚；新增封装有真实的两侧复用，未发现不必要的架构扩张。
+- 执行方 47/47 定向单测、静态检查、业务行数前后不变证据沿用；主审未重跑全仓测试、未写业务数据、未启动 worker、未推送或部署；独立 `git diff --check` 通过。
+
+### 0.5 已知限制
+
+- **O1（非阻断维护项）**：`src/features/operations/components/single-day-picker.tsx` 第 252–253 行给 DayPicker 设定 **2020–2035** 范围，但自定义年月标题/按钮不受该范围限制。用已安装库的纯函数验证：标题 `2019年11月` 时库内日格被夹到 `2020年1月`，标题 `2036年11月` 时被夹到 `2035年12月`；未做浏览器越界操作，结论来自代码与库函数验证。当前 2026 年业务范围不受影响，本轮只登记，不追加功能修改；后续维护可直接移除没有业务依据的两行范围限制。
+- 200% 缩放、完整权限矩阵、长期多日稳定性未验证，不包装成已验证，也不扩为本轮阻断项。
+- 760 下端到端约 91px 纵向滚动，与商品库存同一外壳行为（≤900px 导航置顶），不是操作记录独有缺陷。
 
 ## 1. 双日期控件 + 页面内单日历
 
@@ -83,9 +141,9 @@
 
 本轮没有修改 `db/catalog/042_operation_records.sql`，没有修改 `operations-view.tsx`、`operation-record-detail.tsx`、`model.ts`，也没有改动任何写入链；R1–R5 的数据口径与上一轮一致。
 
-## 4. 验证（执行方自验，不代表 PASS）
+## 4. 验证记录
 
-### 4.1 页面与样式 **44/44**
+### 4.1 执行方页面与样式 **44/44**
 
 `verify-r5.mjs` → `verify-r5.json`，console/pageerror 0：
 
@@ -105,7 +163,7 @@
 - 展开 → 商品资料 → 返回，URL 与第 2 页保留；货票入口 → 返回保留筛选；
 - R4 撤销/原决定、物流来源品名/关联商品、94 款批次、R5 计数回归通过；
 - 1440 无整页横向溢出；760 无横向溢出，日期 `w=178,h=40` 完整可见；760 日历弹窗 `x=24,y=439,w=312,h=350` 完整落在 760×900 内；
-- 面板/页签/分页不裁切；760 页高 991 与商品库存 991 一致（外壳把导航置顶后两者同一档）；展开详情可读；
+- 面板/页签/分页不裁切；760 页高 991 与商品库存 991 一致；展开详情可读；
 - 业务行数前后一致；console/pageerror 0。
 
 ### 4.2 布局实测
@@ -115,13 +173,13 @@
 | 1440×950 | 面板 `x=240,y=314,w=1168,h=635`；分页 `y=902,h=46`，首屏可见；日历 `x=917,y=295,w=312,h=350` 完整可见；无横向溢出 |
 | 760×900 | 日期 `x=23,w=178` 与 `x=225,w=178`，均高 40；日历 `x=24,y=439,w=312,h=350` 完整落在视口内；面板宽 714 不溢出；页高 991 与商品库存相同；无横向溢出 |
 
-### 4.3 定向测试与静态检查
+### 4.3 执行方定向测试与静态检查
 
 - `calendar-date.test.ts` **4/4**、`model.test.ts` **36/36**、`navigation-config.test.ts` **7/7**，共 **47/47**；
 - `tsc --noEmit` 仅既有 BEST 5 条（`src/lib/providers/best/__tests__/*`），`src/features/operations` 0 条；
 - 改动文件 eslint 0；
 - `git diff --check` 无空白错误（仅既有 LF/CRLF 提示）；
-- 未重跑无关全仓套件；上一轮已通过的数据证据继续沿用（`apply-042` 40/40、真实改选 5/5、365 计数）。
+- 未重跑无关全仓套件；前轮已通过的数据证据继续沿用（`apply-042` 40/40、真实改选 5/5、365 计数）。
 
 ### 4.4 截图
 
@@ -131,23 +189,59 @@
 
 样式对照：`r5-02-compare-inventory-1440.png`、`r5-12-compare-inventory-760.png`。
 
-## 5. 改动文件
+### 4.5 独立复核
 
-| 文件 | 本轮改动 |
+见 §0.3、§0.4 与独立报告；结论 **PASS，阻断 0**。主审实际操作了默认桌面视口与 760×900 的日历选日、单边清空、年月切换、Esc 回焦、反向提示；代码复核确认两侧共用组件、筛选行为未变、R1–R5 文件与 `085760c` 的 Git blob 相同。未重跑全仓测试、未写业务数据、未启动 worker、未推送或部署。
+
+## 5. 交付范围
+
+本包相对 `master`（`177e6b0`）共 6 个功能/文档提交 + 本轮文档收尾提交：
+
+| 提交 | 内容 |
 | --- | --- |
-| `src/features/operations/components/operations-filters.tsx` | 两个原生日期输入改为两个 `SingleDayPicker`；筛选/URL/页码逻辑不变 |
-| `src/features/operations/components/single-day-picker.tsx` | 新增：共用单日控件 + portal 单日历；年月切换、今天、清空、Esc/外部关闭、选后即筛 |
-| `src/features/operations/calendar-date.ts` | 新增：北京时间今天与 `YYYY-MM-DD` ↔ 本地中午 `Date` |
-| `src/features/operations/calendar-date.test.ts` | 新增：往返、闰日、中午固定、+08 跨零点 4 例 |
-| `src/features/operations/components/operations.module.css` | 日期输入框与日历弹窗/网格/年月按钮/选中/焦点/窄屏定位样式 |
-| `package.json` / `package-lock.json` | 重新加入 `react-day-picker@10.0.2`、`date-fns@4.1.0` |
-| `docs/tasks/operations-log-v1.md` / `docs/tasks/current-task.md` / `docs/current-state.md` / `AGENTS.md` / `docs/README.md` | 本轮记录 |
+| `9aac123` | 新增操作记录只读入口（商品资料 / 库存对应 / 物流） |
+| `e3b3466` | 完成 R1–R5 数据补修并优化操作记录页 |
+| `880a66b` | 收口 R1–R5 摘要文案与验证记录 |
+| `2660a82` | R4 撤销语义收尾、日期范围与第二轮 UI |
+| `085760c` | 恢复原生双日期控件并统一整页系统样式 |
+| `105b127` | 双日期控件改用页面内系统日历（最终验收实现） |
+| 本轮文档提交 | 独立复核 PASS、验收结论、PR 与收尾记录 |
 
-## 6. 边界
+主要文件：
 
-- 本轮只改操作记录页日期 UI 与对应样式，没有修改 042 查询、R1–R5 语义、页面其余结构或其他模块；未新增/删除业务数据。
+- 数据库与准备链：`db/catalog/042_operation_records.sql`、`scripts/catalog/apply-042.mjs`、`scripts/catalog/prepare-local-preview.mjs`、`scripts/inventory/prepare-instance.mjs`；
+- 页面与服务端：`src/app/dashboard/operations/page.tsx`、`src/features/operations/{model.ts,types.ts,server/reads.ts}`、`components/{operations-view.tsx,operations-filters.tsx,operation-record-detail.tsx,single-day-picker.tsx}`、`calendar-date.ts`、`operations.module.css`；
+- 导航：`src/ui/ice-v4/navigation-config.ts`、`workspace-shell.tsx`；
+- 测试：`model.test.ts`、`calendar-date.test.ts`、`navigation-config.test.ts`；
+- 依赖：`react-day-picker@10.0.2`、`date-fns@4.1.0`；
+- 文档：`AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`、`docs/tasks/operations-log-v1.md`、`docs/README.md`。
+
+## 6. 证据索引
+
+仓库内可读证据：
+
+- 代码与迁移：上表文件、`042` 只读函数、`apply-042.mjs`；
+- 验收记录：本文件 §0、§4；`docs/current-state.md`；`AGENTS.md`；
+- Git：`105b127` 及本分支提交；PR 与合并提交见 §8；
+- 测试：`calendar-date.test.ts`、`model.test.ts`、`navigation-config.test.ts`。
+
+本地保留（`.local`，不入 Git）：
+
+- 独立复核报告：`.local/catalog/operations-log-r5-20261117/independent-review.md`；
+- 执行方自验：`verify-r5.json`、`verify-r5.mjs`；
+- 截图：`r5-01`–`r5-15`（含桌面/760 日历展开、选中态、反向提示、R4 撤销、关联商品、94 款批次、分页固定）。
+
+## 7. 边界与未覆盖
+
+- 本轮未改 042 查询、R1–R5 语义、写入链或其他模块；未新增/删除业务数据。
 - 现役零业务写入；未启动库存/物流/飞书后台 worker；未改飞书与各模块写入链。
-- 未提交/推送/部署此前未纳入的 Mac 部署准备改动；`.local/` 证据不入 Git。
-- 日历可切换范围由库限制在 2020-01 至 2035-12；URL 直链日期仍按模型校验，超出范围的日期不会被日历默认定位，但不影响查询。
-- 未做 200% 缩放、完整权限矩阵、长期多日稳定性；760 下端到端仅有约 91px 纵向滚动，与商品库存同一外壳行为。
-- 最终结论由审查方给出，执行方不宣布 PASS。
+- 本次收尾不重新部署、不重建/重启现役实例、不启动后台 worker；现役 BUILD 仍为 `tg4VKYyZQYR3Jq7uz5ktk`。
+- 工作区既有的 Mac 部署准备、无关 pnpm 文件、`.local` 证据不进入本包。
+- O1 年份边界只登记不修改；200% 缩放、完整权限矩阵、长期稳定性未验证。
+- 仓库 CI 的既有基线（并发套件固定退出 1、lint warning 预算、单测既有 `opt6` 基线）如实记录，不包装成全绿；本 PR 的实际检查结果以 GitHub PR 为准。
+
+## 8. PR 与合并
+
+- PR：创建后回填（目标 `master`）。
+- 合并方式：仓库既有 merge commit；保留本轮提交历史。
+- 合并提交 SHA：由 GitHub 合并后回读，见最终交付回执与 PR 页面。
