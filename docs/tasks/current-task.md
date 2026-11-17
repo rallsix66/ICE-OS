@@ -6,9 +6,9 @@
 > 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 > 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 
-## 当前任务：CI 修复 v1（跨平台基线 + 现役数据库检查）（2026-11-17）—— PR 四组检查全绿
+## 当前任务：CI 修复 v1（跨平台基线 + 现役数据库检查）（2026-11-17）—— 已合并，PR 与 master 四组检查全绿
 
-状态：**PR #17 的 Tests / Lint / Build / Database checks 四组实际执行并通过；master 必需检查已配置并回读**。实现提交 `af231c3`；PR CI <https://github.com/rallsix66/ICE-OS/actions/runs/44038848207>；合并与 master CI 结果见 PR / 最终回执。完整记录：[ci-repair-v1.md](ci-repair-v1.md)。
+状态：**已合并 `a369595`；PR #17 与 master 的 Tests / Lint / Build / Database checks 四组均实际执行并通过；master 必需检查已配置并回读**。实现提交 `af231c3`；PR CI <https://github.com/rallsix66/ICE-OS/actions/runs/44038848207>；master CI <https://github.com/rallsix66/ICE-OS/actions/runs/44040384827>。完整记录：[ci-repair-v1.md](ci-repair-v1.md)。
 
 - **跨平台修复**：`opt6-baseline` 只比较 LF 规范化 SHA，原始 SHA/换行计数仅作诊断；`opt6-production-apply` 的 packet 与 migration 同时规范化；新增 LF/CRLF 等价与篡改拒绝断言；仅因测试文件变更更新批准指纹，未改历史 SQL。
 - **现役数据库检查**：`npm run ci:database` 在 GitHub Actions PostgreSQL 17 临时库从空库安装 45 个 SQL（82 表 / 232 函数），用实际 app 角色验证读取、`catalog.assign_initial_code` 保存回读、`read_operation_records`、未授权 42501 与只读写入 25006；非空目标拒绝。
