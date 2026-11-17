@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { SearchField, SelectMenu } from '@/ui/ice-v4/data-surface';
 import { buildOperationHref } from '../model';
 import type { OperationActorDto } from '../types';
+import { DateRangePicker } from './date-range-picker';
 import styles from './operations.module.css';
 
 export interface OperationFilterQuery {
@@ -18,7 +19,7 @@ export interface OperationFilterQuery {
 }
 
 /**
- * 操作记录筛选：搜索（防抖 300ms）/ 记录账号 / 起止日期（同一组，相邻）。
+ * 操作记录筛选：搜索（防抖 300ms）/ 记录账号 / 日期范围（面板内选好再应用）。
  * 一律写回 URL（replace，不新增历史），刷新、返回与直接链接都能还原同一份筛选。
  */
 export function OperationsFilters({
@@ -52,8 +53,10 @@ export function OperationsFilters({
   }, [q, committed, query, router]);
 
   function apply(patch: Partial<OperationFilterQuery>) {
+    // 日期/账号变更时把输入框里尚未到防抖时间的关键词一起带上，避免刚输入就被旧 URL 覆盖。
+    setCommitted(q);
     startTransition(() => {
-      router.replace(buildOperationHref(query, { ...patch, page: 1 }), { scroll: false });
+      router.replace(buildOperationHref(query, { ...patch, q, page: 1 }), { scroll: false });
     });
   }
 
@@ -78,36 +81,20 @@ export function OperationsFilters({
             pending={pending}
           />
         </div>
-        <SelectMenu
-          value={query.actor}
-          onChange={(value) => apply({ actor: value })}
-          options={actorOptions}
-          ariaLabel="按记录账号筛选"
-          testId="operation-actor-filter"
-        />
-        <div className={styles.dateGroup}>
-          <label className={styles.dateField}>
-            <span>开始</span>
-            <input
-              type="date"
-              value={query.from}
-              max={query.to || undefined}
-              data-testid="operation-date-from"
-              onChange={(event) => apply({ from: event.target.value })}
-            />
-          </label>
-          <span className={styles.dateDash} aria-hidden>—</span>
-          <label className={styles.dateField}>
-            <span>结束</span>
-            <input
-              type="date"
-              value={query.to}
-              min={query.from || undefined}
-              data-testid="operation-date-to"
-              onChange={(event) => apply({ to: event.target.value })}
-            />
-          </label>
+        <div className={styles.actorWrap}>
+          <SelectMenu
+            value={query.actor}
+            onChange={(value) => apply({ actor: value })}
+            options={actorOptions}
+            ariaLabel="按记录账号筛选"
+            testId="operation-actor-filter"
+          />
         </div>
+        <DateRangePicker
+          from={query.from}
+          to={query.to}
+          onApply={(from, to) => apply({ from, to })}
+        />
         <button
           type="button"
           className={styles.clearButton}
@@ -124,7 +111,6 @@ export function OperationsFilters({
           <X size={13} strokeWidth={2} aria-hidden />清空
         </button>
       </div>
-      <p className={styles.toolbarCaption}>时间按中国标准时间（+08）· 日期筛选按 +08 自然日</p>
     </div>
   );
 }

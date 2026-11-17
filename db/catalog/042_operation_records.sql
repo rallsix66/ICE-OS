@@ -11,8 +11,9 @@
 --             人工修正数量/状态、恢复按原表判断、分合票人工决定、撤销人工分组决定。
 --   * 自动同步过程不进入本查询（库存/物流后台事件仍看各自同步结果入口）；
 --     begin/complete_inventory_pending_action 等请求簿记不单独成条，避免同一次操作重复堆叠；
---   * 撤销是独立事件：来源行选择/字段口径的撤销按历史行保存的 superseded_at / revoked_at
---     （账号优先取已保存的撤销审计）另成一条，原决定仍保留在决定发生时间；
+--   * 撤销是独立事件：只有存在已保存的撤销事实（来源行选择有 restore_duplicate_source_decision
+--     审计；字段口径有 revoked_at）才另成一条，原决定仍保留在决定发生时间；
+--     正常改选只把旧决定标为 superseded，由原决定显示「已被后续选择替代」，不另造撤销记录；
 --   * shipment_grouping_review 只取 status='resolved' 且已有 resolved_at/resolved_by 的人工决定，
 --     自动生成、尚未处理的 pending 复核不算人工操作；
 --   * 「前值」只用历史行本身（item_revision.previous_revision / mapping.supersedes_id /
@@ -169,11 +170,33 @@ BEGIN
     'rows',coalesce(d.comparison->'rowNumbers','[]'::jsonb),
     'fieldDifferences',coalesce(d.comparison->'fields','[]'::jsonb),
     'note',d.note,
-    'supersededAt',d.superseded_at),
+    'supersededAt',d.superseded_at,
+    -- 只有存在已保存的 restore_duplicate_source_decision 审计，才是“撤销”；
+    -- 正常改选只把旧决定标为 superseded，不写撤销审计。
+    'revoked',(rev.audit_id IS NOT NULL),
+    'revokedAt',rev.recorded_at,
+    'revokedBy',rev.actor_id,
+    'revokedByName',revp.display_name,
+    'revocationRequestId',rev.request_id,
+    'replacementRowNumber',nd.chosen_row_number,
+    'replacementAt',nd.decided_at),
    concat_ws(' ',d.ice_code,cur.name_cn,d.chosen_fields->'nameCn'->>'raw',
      d.chosen_fields->'barcode'->>'raw',d.note,d.item_id::text)::text
   FROM catalog.product_source_duplicate_decision d
   LEFT JOIN item_identity cur ON cur.item_id=d.item_id
+  LEFT JOIN LATERAL (
+    SELECT a2.id AS audit_id,a2.actor_id,a2.recorded_at,a2.request_id
+    FROM catalog.audit_event a2
+    WHERE a2.action='restore_duplicate_source_decision'
+      AND (a2.result->>'decisionId'=d.id::text OR a2.result->>'revokedDecisionId'=d.id::text)
+    ORDER BY a2.recorded_at DESC,a2.id DESC LIMIT 1) rev ON true
+  LEFT JOIN public.profiles revp ON revp.id=rev.actor_id
+  LEFT JOIN LATERAL (
+    SELECT d2.chosen_row_number,d2.decided_at
+    FROM catalog.product_source_duplicate_decision d2
+    WHERE d2.profile_id=d.profile_id AND d2.ice_code=d.ice_code AND d2.id<>d.id
+      AND d2.decided_at>=d.decided_at
+    ORDER BY (d2.state='active') DESC,d2.decided_at ASC,d2.id ASC LIMIT 1) nd ON true
 
   UNION ALL
   -- 4) 商品资料 · 来源字段人工口径（暂不处理/人工解释/人工覆盖；撤销另见第 13 段）
@@ -679,7 +702,8 @@ BEGIN
   WHERE f.revoked_at IS NOT NULL
 
   UNION ALL
-  -- 14) 商品资料 · 撤销来源资料行选择（独立事件；账号取已保存的 restore_duplicate_source_decision 审计）
+  -- 14) 商品资料 · 撤销来源资料行选择（独立事件；仅限已有 restore_duplicate_source_decision 审计的明确撤销）
+  --     正常改选只把旧决定标为 superseded，由第 3 段显示“已被后续选择替代”，不在这里另造撤销。
   SELECT
    ('duprev:'||d.id::text)::text,
    d.superseded_at,
@@ -710,11 +734,11 @@ BEGIN
   FROM catalog.product_source_duplicate_decision d
   LEFT JOIN item_identity cur ON cur.item_id=d.item_id
   LEFT JOIN LATERAL (
-    SELECT a2.actor_id,a2.request_id FROM catalog.audit_event a2
+    SELECT a2.id AS audit_id,a2.actor_id,a2.request_id FROM catalog.audit_event a2
     WHERE a2.action='restore_duplicate_source_decision'
       AND (a2.result->>'decisionId'=d.id::text OR a2.result->>'revokedDecisionId'=d.id::text)
-    ORDER BY a2.recorded_at DESC LIMIT 1) rev ON true
-  WHERE d.state='superseded' AND d.superseded_at IS NOT NULL
+    ORDER BY a2.recorded_at DESC,a2.id DESC LIMIT 1) rev ON true
+  WHERE d.state='superseded' AND d.superseded_at IS NOT NULL AND rev.audit_id IS NOT NULL
  ),
  scoped AS (
   SELECT r.* FROM records r

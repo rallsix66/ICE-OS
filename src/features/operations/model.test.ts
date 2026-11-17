@@ -241,19 +241,37 @@ describe('操作记录：文案只用已保存字段', () => {
     expect(operationResultText(groupingRecord)).toBe('合票复核结论：仍然分开。');
   });
 
-  it('已撤销的来源资料选择不写成“没有真实人工确认”，只说明被撤销', () => {
+  it('明确撤销的来源资料选择：显示撤销时间与撤销事实，不写成“没有真实人工确认”', () => {
     const text = operationResultText(record({
       action: 'duplicate_source_decision',
       detail: {
         state: 'superseded',
+        revoked: true,
         chosenRowNumber: 128,
         supersededAt: '2026-11-10T06:44:50.408Z',
+        revokedAt: '2026-11-10T06:44:50.408Z',
         note: '撤销脚本代选：无真实人工确认记录，恢复待人工确认',
       },
     }));
     expect(text).toContain('已于 2026-11-10 14:44:50 被撤销');
     expect(text).toContain('原决定仍保留');
     expect(text).not.toContain('没有真实人工确认');
+  });
+
+  it('正常改选：旧决定显示“被后续选择替代”，不写成撤销', () => {
+    const text = operationResultText(record({
+      action: 'duplicate_source_decision',
+      detail: {
+        state: 'superseded',
+        revoked: false,
+        chosenRowNumber: 128,
+        supersededAt: '2026-11-10T06:44:50.408Z',
+        replacementRowNumber: 129,
+      },
+    }));
+    expect(text).toContain('已于 2026-11-10 14:44:50 被后续选择替代');
+    expect(text).toContain('新的选择另有一条记录');
+    expect(text).not.toContain('撤销');
   });
 
   it('撤销字段口径：写明撤销的字段与已保存说明', () => {
@@ -271,17 +289,15 @@ describe('操作记录：文案只用已保存字段', () => {
     expect(text).toContain('改为按来源列解释重量');
   });
 
-  it('撤销来源行选择分「撤销」与「被后续选择替代」两种真实状态', () => {
+  it('撤销来源行选择与正常替代分开：撤销记录不再虚构“恢复待处理”', () => {
     const revoked = operationResultText(record({
       action: 'duplicate_source_decision_revoked',
-      detail: { chosenRowNumber: 132, revokedByAccount: true },
+      detail: { chosenRowNumber: 132 },
     }));
     expect(revoked).toContain('撤销来源第 132 行选择');
-    const replaced = operationResultText(record({
-      action: 'duplicate_source_decision_revoked',
-      detail: { chosenRowNumber: 132, revokedByAccount: false },
-    }));
-    expect(replaced).toContain('已被后续选择替代');
+    expect(revoked).toContain('不再生效');
+    expect(revoked).not.toContain('恢复待处理');
+    expect(revoked).not.toContain('后续选择替代');
   });
 
   it('商品资料首版明确写「没有上一版本」', () => {
@@ -464,5 +480,90 @@ describe('操作记录：展开依据', () => {
     expect(facts['撤销时间']).toBe('2026-11-10 14:44:50');
     expect(view.notes.join(' ')).toContain('已保存撤销说明');
     expect(view.sources.map((source) => source.label)).toContain('请求号');
+  });
+
+  it('R4 正常改选详情：状态/时间/后续选择都写“替代”，不出现撤销账号', () => {
+    const view = operationDetailView(record({
+      action: 'duplicate_source_decision',
+      at: '2026-11-10T04:36:38.362Z',
+      detail: {
+        state: 'superseded',
+        revoked: false,
+        chosenRowNumber: 128,
+        supersededAt: '2026-11-10T06:44:50.408Z',
+        replacementRowNumber: 129,
+        replacementAt: '2026-11-10T06:44:50.408Z',
+      },
+    }));
+    const facts = Object.fromEntries(view.facts.map((fact) => [fact.label, fact.value]));
+    expect(facts['当前状态']).toBe('已被后续选择替代');
+    expect(facts['替代时间']).toBe('2026-11-10 14:44:50');
+    expect(facts['后续选择']).toContain('第 129 行');
+    expect(facts['撤销账号']).toBeUndefined();
+    expect(view.notes.join(' ')).toContain('正常改选，不是撤销');
+    expect(view.changeSectionTitle).toBe('来源行差异');
+    expect(view.changeBeforeLabel).toBe('其他来源行');
+    expect(view.changeAfterLabel).toBe('采用行');
+  });
+
+  it('R4 明确撤销详情：status=已撤销、撤销账号来自审计，不写“后续选择”', () => {
+    const view = operationDetailView(record({
+      action: 'duplicate_source_decision',
+      detail: {
+        state: 'superseded',
+        revoked: true,
+        chosenRowNumber: 128,
+        revokedAt: '2026-11-10T06:44:50.408Z',
+        revokedByName: 'ISOLATED TEST admin',
+      },
+    }));
+    const facts = Object.fromEntries(view.facts.map((fact) => [fact.label, fact.value]));
+    expect(facts['当前状态']).toBe('已撤销');
+    expect(facts['撤销时间']).toBe('2026-11-10 14:44:50');
+    expect(facts['撤销账号']).toBe('ISOLATED TEST admin');
+    expect(facts['后续选择']).toBeUndefined();
+  });
+
+  it('R4 字段口径被新口径替代：写“替代”，不写撤销', () => {
+    const fieldRecord = record({
+      action: 'field_decision',
+      detail: {
+        state: 'superseded',
+        fieldKey: 'unitWeight',
+        action: 'override',
+        valueRaw: '0.05',
+        supersededAt: '2026-11-10T06:44:50.408Z',
+      },
+    });
+    const view = operationDetailView(fieldRecord);
+    const facts = Object.fromEntries(view.facts.map((fact) => [fact.label, fact.value]));
+    expect(operationResultText(fieldRecord)).toContain('已被后续字段口径替代');
+    expect(facts['决定状态']).toBe('已被后续字段口径替代');
+    expect(facts['替代时间']).toBe('2026-11-10 14:44:50');
+    expect(view.notes.join(' ')).toContain('正常替代，不是撤销');
+  });
+
+  it('物流关联明细：来源品名与关联商品分开展示，货号指向正式商品', () => {
+    const view = operationDetailView(record({
+      category: 'shipment',
+      action: 'shipment_association_manual',
+      objectTitle: 'POKNZX027675',
+      ticketNo: 'POKNZX027675',
+      detail: {
+        items: [{
+          itemId: '131a88e4-4db7-4c15-9f4e-0791d2c59220',
+          productId: 'fe13de7d-1f2b-480a-a250-af9c28751930',
+          productNameRaw: 'WM0057 CHIC PEAK 腮红4.8g-M07',
+          nameCn: 'CHIC PEAK 腮红4.8g-M07',
+          iceCode: 'WM0090',
+        }],
+        reason: '按用户确认色号对应',
+      },
+    }));
+    expect(view.items[0].title).toBe('来源品名：WM0057 CHIC PEAK 腮红4.8g-M07');
+    expect(view.items[0].meta).toContain('关联商品：WM0090');
+    expect(view.items[0].meta).toContain('CHIC PEAK 腮红4.8g-M07');
+    expect(view.notes.join(' ')).toContain('「来源品名」保留原始表名称');
+    expect(view.notes.join(' ')).toContain('已保存说明');
   });
 });

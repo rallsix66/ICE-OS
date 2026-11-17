@@ -24,8 +24,6 @@ export function OperationRecordDetail({ record }: { record: OperationRecordDto }
 
   return (
     <div className={styles.recordBody} data-testid="operation-record-detail">
-      <p className={styles.resultLine}>{view.resultText}</p>
-
       {view.facts.length > 0 ? (
         <dl className={styles.facts}>
           {view.facts.map((fact) => (
@@ -39,8 +37,13 @@ export function OperationRecordDetail({ record }: { record: OperationRecordDto }
 
       {view.changes.length > 0 ? (
         <div className={styles.block}>
-          <h3 className={styles.blockTitle}>字段变化</h3>
-          <ChangeTable changes={view.changes} testId="operation-record-changes" />
+          <h3 className={styles.blockTitle}>{view.changeSectionTitle ?? '字段变化'}</h3>
+          <ChangeTable
+            changes={view.changes}
+            testId="operation-record-changes"
+            beforeLabel={view.changeBeforeLabel}
+            afterLabel={view.changeAfterLabel}
+          />
         </div>
       ) : null}
 
@@ -153,17 +156,29 @@ export function OperationRecordDetail({ record }: { record: OperationRecordDto }
 
 function itemSectionTitle(action: string): string {
   if (action === 'source_batch_applied') return '本批写入商品';
-  if (action === 'shipment_association_manual' || action === 'shipment_association_cleared') return '涉及商品明细';
+  if (action === 'shipment_association_manual' || action === 'shipment_association_cleared') return '来源品名与关联商品';
   if (action === 'inventory_confirm' || action === 'inventory_rebind') return '涉及商品对应';
   return '涉及明细';
 }
 
-function ChangeTable({ changes, compact = false, testId }: { changes: OperationChange[]; compact?: boolean; testId?: string }) {
+function ChangeTable({
+  changes,
+  compact = false,
+  testId,
+  beforeLabel = '修改前',
+  afterLabel = '修改后',
+}: {
+  changes: OperationChange[];
+  compact?: boolean;
+  testId?: string;
+  beforeLabel?: string;
+  afterLabel?: string;
+}) {
   return (
     <div className={compact ? styles.changeScrollCompact : styles.tableScroll}>
       <table className={compact ? `${styles.table} ${styles.compactTable}` : styles.table} data-testid={testId}>
         <thead>
-          <tr><th>字段</th><th>修改前</th><th>修改后</th></tr>
+          <tr><th>字段</th><th>{beforeLabel}</th><th>{afterLabel}</th></tr>
         </thead>
         <tbody>
           {changes.map((change, index) => (

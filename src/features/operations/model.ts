@@ -346,25 +346,37 @@ export function operationResultText(record: OperationRecordDto): string {
     case 'duplicate_source_decision': {
       const state = asString(detail.state);
       const row = asNumber(detail.chosenRowNumber);
-      if (state === 'superseded' || state === 'revoked') {
+      const revoked = detail.revoked === true || state === 'revoked';
+      if (revoked) {
+        const at = formatOperationTime(asString(detail.revokedAt) ?? asString(detail.supersededAt));
+        return `这条来源行选择${at ? `已于 ${at} ` : ''}被撤销；原决定仍保留在这里。`;
+      }
+      if (state === 'superseded') {
         const at = formatOperationTime(asString(detail.supersededAt));
-        return `这条来源行选择${at ? `已于 ${at} 被撤销` : '已被撤销'}；原决定仍保留在这里。`;
+        return `这条来源行选择${at ? `已于 ${at} ` : ''}被后续选择替代；原决定仍保留在这里，新的选择另有一条记录。`;
       }
       return row ? `已选择来源第 ${row} 行资料，后续更新按这一行采用。` : '已保存来源资料行选择。';
     }
     case 'duplicate_source_decision_revoked': {
       const row = asNumber(detail.chosenRowNumber);
-      const known = detail.revokedByAccount === true;
-      if (!known) return row ? `原来源第 ${row} 行选择已被后续选择替代。` : '原来源行选择已被后续选择替代。';
-      return row ? `撤销来源第 ${row} 行选择；同号多行重新回到待处理。` : '撤销来源行选择；同号多行重新回到待处理。';
+      return row
+        ? `撤销来源第 ${row} 行选择；该选择不再生效。`
+        : '撤销来源行选择；该选择不再生效。';
     }
     case 'field_decision': {
       const action = asString(detail.action) ?? '';
       const field = operationFieldLabel(asString(detail.fieldKey) ?? '');
       const state = asString(detail.state);
       const label = FIELD_ACTION_LABELS[action] ?? '人工处理';
-      const revokedAt = formatOperationTime(asString(detail.revokedAt));
-      return `${label}：${field}${state === 'revoked' ? `（已于 ${revokedAt || '未保存时间'} 撤销）` : ''}。`;
+      if (state === 'revoked') {
+        const revokedAt = formatOperationTime(asString(detail.revokedAt));
+        return `${label}：${field}${revokedAt ? `（已于 ${revokedAt} 撤销）` : '（已撤销）'}。`;
+      }
+      if (state === 'superseded') {
+        const at = formatOperationTime(asString(detail.supersededAt));
+        return `${label}：${field}（已被后续字段口径替代${at ? `，替代时间 ${at}` : ''}）。`;
+      }
+      return `${label}：${field}。`;
     }
     case 'source_field_decision_revoked': {
       const field = operationFieldLabel(asString(detail.fieldKey) ?? '');
@@ -444,9 +456,7 @@ export function operationResultText(record: OperationRecordDto): string {
 function associationResult(record: OperationRecordDto, verb: '关联' | '清除'): string {
   const detail = detailOf(record);
   const items = asArray(detail.items).length;
-  const reason = asString(detail.reason);
-  const base = `已${verb} ${items} 条明细的商品关联`;
-  return `${base}${reason ? `（${reason}）` : ''}。`;
+  return `已${verb} ${items} 条明细的商品关联。`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -483,6 +493,10 @@ export interface OperationDetailView {
   resultText: string;
   facts: OperationFact[];
   changes: OperationChange[];
+  /** 顶层变化表的标题与列名；默认「字段变化 / 修改前 / 修改后」。 */
+  changeSectionTitle?: string;
+  changeBeforeLabel?: string;
+  changeAfterLabel?: string;
   items: OperationItemView[];
   tickets: OperationTicketView[];
   links: OperationEntryLink[];
@@ -590,6 +604,9 @@ export function operationDetailView(record: OperationRecordDto): OperationDetail
   const notes: string[] = [];
   const links: OperationEntryLink[] = [];
   const sources: OperationFact[] = [];
+  let changeSectionTitle: string | undefined;
+  let changeBeforeLabel: string | undefined;
+  let changeAfterLabel: string | undefined;
   const productHref = operationProductHref(record.itemId);
 
   switch (record.action) {
@@ -651,19 +668,40 @@ export function operationDetailView(record: OperationRecordDto): OperationDetail
       facts.push({ label: '该行名称', value: asString(detail.chosenRowName) ?? '未保存' });
       facts.push({ label: '该行商品条码', value: asString(detail.chosenRowBarcode) ?? '未填写' });
       const state = asString(detail.state);
-      facts.push({ label: '当前状态', value: state === 'superseded' ? '已被后续操作撤销' : state === 'active' ? '生效中' : (state ?? '未保存') });
-      changes.push(...comparisonChanges(asArray(detail.fieldDifferences), asNumber(detail.chosenRowNumber)));
-      if (state === 'superseded') {
-        const at = formatOperationTime(asString(detail.supersededAt));
-        notes.push(`这条选择${at ? `已于 ${at}` : ''}被撤销；原决定仍保留在这里，撤销作为独立记录显示。`);
+      const revoked = detail.revoked === true || state === 'revoked';
+      if (revoked) {
+        facts.push({ label: '当前状态', value: '已撤销' });
+        facts.push({ label: '撤销时间', value: formatOperationTime(asString(detail.revokedAt) ?? asString(detail.supersededAt)) || '未保存' });
+        facts.push({ label: '撤销账号', value: asString(detail.revokedByName) ?? '历史未保存' });
+        notes.push('这条选择已被明确撤销；原决定仍保留在决定时间，撤销作为独立记录显示。');
+      } else if (state === 'superseded') {
+        facts.push({ label: '当前状态', value: '已被后续选择替代' });
+        facts.push({ label: '替代时间', value: formatOperationTime(asString(detail.supersededAt)) || '未保存' });
+        const replacementRow = asNumber(detail.replacementRowNumber);
+        const replacementAt = formatOperationTime(asString(detail.replacementAt));
+        facts.push({
+          label: '后续选择',
+          value: replacementRow === null
+            ? '已有新的来源行选择'
+            : `第 ${replacementRow} 行${replacementAt ? `（${replacementAt}）` : ''}`,
+        });
+        notes.push('后续重新选择了来源行，原决定保留在这里；这是正常改选，不是撤销。');
+      } else if (state === 'active') {
+        facts.push({ label: '当前状态', value: '生效中' });
+      } else {
+        facts.push({ label: '当前状态', value: state ?? '未保存' });
       }
+      changes.push(...comparisonChanges(asArray(detail.fieldDifferences), asNumber(detail.chosenRowNumber)));
+      changeSectionTitle = '来源行差异';
+      changeBeforeLabel = '其他来源行';
+      changeAfterLabel = '采用行';
       break;
     }
     case 'duplicate_source_decision_revoked': {
       facts.push({ label: '原决定时间', value: formatOperationTime(asString(detail.decidedAt)) || '未保存' });
       facts.push({ label: '原选择来源行', value: asNumber(detail.chosenRowNumber) === null ? '未保存' : `第 ${asNumber(detail.chosenRowNumber)} 行` });
       facts.push({ label: '撤销时间', value: formatOperationTime(asString(detail.supersededAt) ?? record.at) || '未保存' });
-      if (detail.revokedByAccount === false) facts.push({ label: '撤销账号', value: '历史未保存' });
+      facts.push({ label: '撤销账号', value: record.actorName ?? '历史未保存' });
       const note = asString(detail.note);
       if (note) notes.push(`已保存说明：${note}`);
       notes.push('原决定仍保留在它发生的时间；本条是后续撤销，不重复计算原选择。');
@@ -671,16 +709,29 @@ export function operationDetailView(record: OperationRecordDto): OperationDetail
       break;
     }
     case 'field_decision': {
+      const state = asString(detail.state);
       facts.push({ label: '字段', value: operationFieldLabel(asString(detail.fieldKey) ?? '未保存') });
       facts.push({ label: '处理方式', value: FIELD_ACTION_LABELS[asString(detail.action) ?? ''] ?? '未保存' });
       facts.push({ label: '决定时间', value: formatOperationTime(asString(detail.decidedAt) ?? record.at) || '未保存' });
-      facts.push({ label: '决定状态', value: asString(detail.state) === 'active' ? '生效中' : asString(detail.state) === 'revoked' ? '已撤销' : (asString(detail.state) ?? '未保存') });
+      facts.push({
+        label: '决定状态',
+        value: state === 'active'
+          ? '生效中'
+          : state === 'revoked'
+            ? '已撤销'
+            : state === 'superseded'
+              ? '已被后续字段口径替代'
+              : (state ?? '未保存'),
+      });
       if (asString(detail.rule)) facts.push({ label: '采用口径', value: asString(detail.rule)! });
       if (asString(detail.valueRaw)) facts.push({ label: '人工值', value: asString(detail.valueRaw)! });
       if (asString(detail.reason)) notes.push(asString(detail.reason)!);
       if (asString(detail.note)) notes.push(asString(detail.note)!);
-      if (asString(detail.revokedAt)) {
+      if (state === 'revoked') {
         notes.push(`这条决定已于 ${formatOperationTime(asString(detail.revokedAt)) || '未保存时间'} 被撤销，撤销有独立记录。`);
+      } else if (state === 'superseded') {
+        facts.push({ label: '替代时间', value: formatOperationTime(asString(detail.supersededAt)) || '未保存' });
+        notes.push('后续在同一商品字段上登记了新的口径，原决定保留；这是正常替代，不是撤销。');
       }
       notes.push('该决定行只保存决定本身；覆盖前的本地值没有保存，不能从当前商品资料反推。');
       break;
@@ -808,21 +859,23 @@ export function operationDetailView(record: OperationRecordDto): OperationDetail
     case 'shipment_association_manual':
     case 'shipment_association_cleared': {
       const rawItems = asArray(detail.items).map((entry) => asRecord(entry)).filter(Boolean) as Array<Record<string, unknown>>;
-      if (asString(detail.reason)) notes.push(asString(detail.reason)!);
+      if (asString(detail.reason)) notes.push(`已保存说明：${asString(detail.reason)}`);
       for (const item of rawItems) {
         const productId = asString(item.productId);
         const previousIce = asString(item.previousIceCode);
         const currentIce = asString(item.iceCode);
+        const rawName = asString(item.productNameRaw);
         const change = previousIce
           ? itemChange('商品', `原商品 ${previousIce}${asString(item.previousNameCn) ? `（${asString(item.previousNameCn)}）` : ''}`, `现商品 ${currentIce ?? '未关联'}`)
           : null;
         items.push({
           key: asString(item.itemId) ?? String(item.productNameRaw),
-          title: asString(item.productNameRaw) ?? '货票明细',
+          title: rawName ? `来源品名：${rawName}` : '来源品名：历史未保存',
           meta: [
+            currentIce
+              ? `关联商品：${currentIce}${asString(item.nameCn) ? ` · ${asString(item.nameCn)}` : ''}`
+              : '关联商品：未关联',
             asString(item.sourceSku) ? `来源 SKU ${asString(item.sourceSku)}` : null,
-            currentIce ?? (productId ? null : '未关联商品'),
-            asString(item.nameCn),
           ].filter(Boolean).join(' · '),
           note: null,
           changes: change ? [change] : [],
@@ -831,6 +884,7 @@ export function operationDetailView(record: OperationRecordDto): OperationDetail
           ticketHref: null,
         });
       }
+      notes.push('「来源品名」保留原始表名称；「关联商品」是保存后的正式商品。同一条来源品名可能对应不同货号，以「关联商品」为准。');
       notes.push('同一次保存的同一票明细合并为一条记录；搜索其中任一货号都能找到它。');
       break;
     }
@@ -877,7 +931,9 @@ export function operationDetailView(record: OperationRecordDto): OperationDetail
       break;
   }
 
-  if (productHref) links.push({ label: '查看该商品资料', href: productHref });
+  if (productHref && !items.some((item) => item.productHref === productHref)) {
+    links.push({ label: '查看该商品资料', href: productHref });
+  }
   if (record.ticketNo) {
     const href = operationTicketHref(record);
     if (href) links.push({ label: record.ticketId ? '打开该货票详情' : '在物流在途搜索该货票', href });
@@ -892,6 +948,9 @@ export function operationDetailView(record: OperationRecordDto): OperationDetail
     resultText: operationResultText(record),
     facts,
     changes,
+    changeSectionTitle,
+    changeBeforeLabel,
+    changeAfterLabel,
     items,
     tickets,
     links,

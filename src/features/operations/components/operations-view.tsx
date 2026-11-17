@@ -10,7 +10,6 @@ import {
   operationActionTone,
   operationActorText,
   operationCategoryCountLabel,
-  operationCategoryLabel,
   operationCategoryTotal,
   operationPageRange,
   operationResultText,
@@ -50,21 +49,24 @@ export function OperationsView({
     <div className={styles.page} data-testid="operations-page">
       <PageHeading
         title="操作记录"
-        meta="查看商品资料、库存对应与物流中已经保存的人工处理，以及它们带来的变化。"
+        meta="商品资料、库存对应与物流中已经保存的人工处理。"
         actions={<span className={styles.headingBadge}><History size={14} strokeWidth={1.8} aria-hidden />只读</span>}
       />
 
-      <details className={styles.guide} data-testid="operation-guide">
-        <summary>
-          <span>记录说明</span>
-          <ChevronDown className={styles.guideChevron} size={15} strokeWidth={1.8} aria-hidden />
-        </summary>
-        <div className={styles.guideBody}>
-          <p>这里汇总商品资料、库存对应与物流中<strong>已经保存的人工处理</strong>，按处理时间倒序。后台自动同步不在这里：同步结果看「数据同步」，库存历史数量看「商品库存 → 历史快照」。</p>
-          <p><strong>记录账号</strong>是写入这条记录时使用的账号，不一定是实际点击的人。历史行没有保存的内容显示「历史未保存 / 未提供」，不用当前商品或货票数据反推。</p>
-          <p>日期筛选按 +08 自然日；关键词匹配货号、商品名称、来源 SKU、货票号与批次号。</p>
-        </div>
-      </details>
+      <div className={styles.guideRow}>
+        <details className={styles.guide} data-testid="operation-guide">
+          <summary>
+            <span>记录说明</span>
+            <ChevronDown className={styles.guideChevron} size={14} strokeWidth={1.9} aria-hidden />
+          </summary>
+          <div className={styles.guideBody}>
+            <p>这里汇总商品资料、库存对应与物流中<strong>已经保存的人工处理</strong>，按处理时间倒序。后台自动同步不在这里：同步结果看「数据同步」，库存历史数量看「商品库存 → 历史快照」。</p>
+            <p><strong>记录账号</strong>是写入这条记录时使用的账号，不一定是实际点击的人。历史行没有保存的内容显示「历史未保存 / 未提供」，不用当前商品或货票数据反推。</p>
+            <p>关键词匹配货号、商品名称、来源 SKU、货票号与批次号。</p>
+          </div>
+        </details>
+        <span className={styles.timeCaption}>时间：北京时间</span>
+      </div>
 
       <OperationsFilters
         query={{
@@ -78,29 +80,36 @@ export function OperationsView({
         actors={page?.actors ?? []}
       />
 
-      <nav className={styles.tabs} aria-label="按业务类别筛选" data-testid="operation-category-tabs">
-        {OPERATION_CATEGORY_OPTIONS.map((option) => {
-          const active = query.category === option.value;
-          const count = option.value === 'all'
-            ? allCount
-            : counts && typeof counts[option.value] === 'number'
-              ? counts[option.value]!
-              : page ? 0 : null;
-          return (
-            <Link
-              key={option.value}
-              href={buildOperationHref(query, { category: option.value, page: 1 })}
-              className={active ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-              aria-current={active ? 'page' : undefined}
-              data-testid={`operation-category-${option.value}`}
-              data-count={count === null ? undefined : count}
-            >
-              {option.label}
-              <span className={styles.tabCount}>{operationCategoryCountLabel(count)}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      <div className={styles.listControls}>
+        <nav className={styles.tabs} aria-label="按业务类别筛选" data-testid="operation-category-tabs">
+          {OPERATION_CATEGORY_OPTIONS.map((option) => {
+            const active = query.category === option.value;
+            const count = option.value === 'all'
+              ? allCount
+              : counts && typeof counts[option.value] === 'number'
+                ? counts[option.value]!
+                : page ? 0 : null;
+            return (
+              <Link
+                key={option.value}
+                href={buildOperationHref(query, { category: option.value, page: 1 })}
+                className={active ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+                aria-current={active ? 'page' : undefined}
+                data-testid={`operation-category-${option.value}`}
+                data-count={count === null ? undefined : count}
+              >
+                {option.label}
+                <span className={styles.tabCount}>{operationCategoryCountLabel(count)}</span>
+              </Link>
+            );
+          })}
+        </nav>
+        {page && !failed ? (
+          <span className={styles.resultSummary} data-testid="operation-current-count">
+            共 {currentCount ?? '—'} 条 · 按处理时间倒序
+          </span>
+        ) : null}
+      </div>
 
       {rangeInvalid ? (
         <div className={styles.filterError} role="alert" data-testid="operation-range-error">
@@ -124,13 +133,6 @@ export function OperationsView({
         />
       ) : page ? (
         <>
-          <div className={styles.resultBar} data-testid="operation-result-bar">
-            <span className={styles.resultCategory}>{query.category === 'all' ? '全部业务' : operationCategoryLabel(query.category)}</span>
-            <span className={styles.resultCount} data-testid="operation-current-count">
-              {currentCount === null ? '—' : `${currentCount} 条记录`}
-            </span>
-            <span className={styles.resultHint}>按处理时间倒序</span>
-          </div>
           <section className={styles.panel} data-testid="operation-list">
             <div className={styles.listHeader} aria-hidden="true">
               <span>时间 / 账号</span>
@@ -146,7 +148,7 @@ export function OperationsView({
       {range && page && page.total > 0 && !failed ? (
         <div className={styles.pager} data-testid="operation-pagination">
           <span className={styles.pagerInfo}>
-            第 {range.from}–{range.to} 条，共 {range.total} 条 · 第 {range.page}/{range.pageCount} 页
+            第 {range.from}–{range.to} 条 · 第 {range.page}/{range.pageCount} 页
           </span>
           <nav className={styles.pagerNav} aria-label="操作记录分页">
             {range.hasPrev ? (
@@ -227,12 +229,21 @@ function objectMetaText(record: OperationRecordDto): string {
     if (skus.length > 0 && skus.length <= 3) parts.push(`来源 SKU ${skus.join('、')}`);
     else if (skus.length > 3) parts.push(`${skus.length} 条来源 SKU`);
     else parts.push(record.objectRef);
+  } else if (record.action === 'shipment_association_manual' || record.action === 'shipment_association_cleared') {
+    const detail = record.detail ?? {};
+    const items = Array.isArray(detail.items) ? detail.items : [];
+    const codes = [...new Set(items
+      .map((item) => (item && typeof item === 'object' ? (item as Record<string, unknown>).iceCode : null))
+      .filter((code): code is string => typeof code === 'string' && code.length > 0))];
+    parts.push(record.objectRef, `${items.length} 条明细`);
+    if (codes.length > 0) parts.push(codes.length <= 4 ? `关联 ${codes.join('、')}` : `关联 ${codes.length} 款商品`);
   } else {
     parts.push(record.objectRef && record.objectRef !== record.objectTitle ? record.objectRef : null);
   }
   parts.push(record.iceCode, record.externalSku, record.ticketNo, record.market);
   return parts
     .filter((part): part is string => Boolean(part))
+    .filter((part) => part !== record.objectTitle)
     .filter((part, index, list) => list.indexOf(part) === index)
     .join(' · ');
 }
@@ -256,7 +267,6 @@ function OperationRecord({ record }: { record: OperationRecordDto }) {
           <span className={styles.objectTitle}>{record.objectTitle || record.objectKind}</span>
           <span className={styles.objectAction} data-testid="operation-record-action">
             <Pill tone={operationActionTone(record.action)}>{operationActionLabel(record.action)}</Pill>
-            <small>{operationCategoryLabel(record.category)}</small>
           </span>
           <span className={styles.objectMeta}>{meta || record.objectKind}</span>
         </span>

@@ -118,7 +118,10 @@ const expectedSql = `SELECT
       OR (a.action='resolve_source_issue' AND coalesce(a.result->>'issueKind','') LIKE 'missing%'))::int
   + (SELECT count(*) FROM catalog.product_source_duplicate_decision)::int
   + (SELECT count(*) FROM catalog.product_source_duplicate_decision d
-      WHERE d.state='superseded' AND d.superseded_at IS NOT NULL)::int
+      WHERE d.state='superseded' AND d.superseded_at IS NOT NULL
+        AND EXISTS (SELECT 1 FROM catalog.audit_event a2
+          WHERE a2.action='restore_duplicate_source_decision'
+            AND (a2.result->>'decisionId'=d.id::text OR a2.result->>'revokedDecisionId'=d.id::text)))::int
   + (SELECT count(*) FROM catalog.product_source_field_decision)::int
   + (SELECT count(*) FROM catalog.product_source_field_decision f WHERE f.revoked_at IS NOT NULL)::int
   + (SELECT count(*) FROM catalog.item_revision r
@@ -463,6 +466,64 @@ async function main() {
         && Date.parse(row.at) === Date.parse('2026-11-10T06:44:50.408Z')
         && row.detail.originalAction === 'duplicate_source_decision'),
       dupRevokes.map((row) => row.detail.decisionId));
+    check(results, 'R4 原决定保存明确撤销事实：revoked=true + 撤销时间/账号，与独立撤销记录指向同一条决定',
+      dupRevokes.every((revokedRow) => {
+        const original = allRows.find((row) => row.action === 'duplicate_source_decision'
+          && row.detail.decisionId === undefined && row.id === `dup:${revokedRow.detail.decisionId}`);
+        return Boolean(original) && original.detail.revoked === true
+          && Date.parse(original.detail.revokedAt) === Date.parse(revokedRow.at)
+          && original.detail.revokedByName === 'ISOLATED TEST admin';
+      }),
+      dupRevokes.map((row) => row.detail.decisionId));
+
+    /*
+     * R4 构造投影（不是完整业务写入链）：直接插入一条“正常改选”旧决定
+     * （state=superseded，但没有 restore 审计）和一条新的 active 决定，
+     * 验证查询把旧决定显示为“被后续选择替代”，不另造撤销记录。
+     * 全部在 SAVEPOINT 内，随后回滚，不留在现役库。
+     */
+    const fixtureCode = 'R4-NORMAL-RESELECT';
+    await owner.query('SAVEPOINT r4_normal_reselect');
+    try {
+      const fixtureBase = (await owner.query(
+        `SELECT d.profile_id,d.item_id,d.decided_by
+           FROM catalog.product_source_duplicate_decision d
+          ORDER BY d.decided_at DESC LIMIT 1`)).rows[0];
+      const sha = 'a'.repeat(64);
+      const oldDecisionId = (await owner.query(
+        `INSERT INTO catalog.product_source_duplicate_decision(profile_id,ice_code,item_id,
+           chosen_row_number,chosen_row_sha256,basis_sha256,evidence_row_sha256,chosen_fields,comparison,
+           state,decided_by,decided_at,superseded_at,note)
+         VALUES($1,$2,$3,1,$4,$4,$4,'{"nameCn":{"raw":"构造旧选择"}}'::jsonb,
+           '{"rowNumbers":[1,2],"fields":[]}'::jsonb,'superseded',$5,now()-interval '1 hour',now(),'构造旧选择')
+         RETURNING id`,
+        [fixtureBase.profile_id, fixtureCode, fixtureBase.item_id, sha, fixtureBase.decided_by])).rows[0].id;
+      const newDecisionId = (await owner.query(
+        `INSERT INTO catalog.product_source_duplicate_decision(profile_id,ice_code,item_id,
+           chosen_row_number,chosen_row_sha256,basis_sha256,evidence_row_sha256,chosen_fields,comparison,
+           state,decided_by,decided_at,note)
+         VALUES($1,$2,$3,2,$4,$4,$4,'{"nameCn":{"raw":"构造新选择"}}'::jsonb,
+           '{"rowNumbers":[1,2],"fields":[]}'::jsonb,'active',$5,now(),'构造新选择')
+         RETURNING id`,
+        [fixtureBase.profile_id, fixtureCode, fixtureBase.item_id, sha, fixtureBase.decided_by])).rows[0].id;
+      const fixtureRows = (await readRecords(owner, ['catalog', null, null, null, fixtureCode, 50, 0]))?.rows ?? [];
+      const oldRow = fixtureRows.find((row) => row.id === `dup:${oldDecisionId}`);
+      const newRow = fixtureRows.find((row) => row.id === `dup:${newDecisionId}`);
+      const revocationRows = fixtureRows.filter((row) => row.action === 'duplicate_source_decision_revoked');
+      evidence.r4NormalReselectProjection = {
+        oldDecisionId, newDecisionId, old: oldRow?.detail, new: newRow?.detail,
+        revocationRows: revocationRows.map((row) => row.id),
+      };
+      check(results, 'R4 构造投影（正常改选）：旧决定 revoked=false、替代行号指向新选择，不生成撤销记录',
+        Boolean(oldRow) && oldRow.detail.state === 'superseded' && oldRow.detail.revoked === false
+        && oldRow.detail.replacementRowNumber === 2
+        && Boolean(newRow) && newRow.detail.state === 'active'
+        && revocationRows.length === 0,
+        evidence.r4NormalReselectProjection);
+    } finally {
+      await owner.query('ROLLBACK TO SAVEPOINT r4_normal_reselect');
+      await owner.query('RELEASE SAVEPOINT r4_normal_reselect');
+    }
     check(results, 'R4 分合票只纳人工已处理决定（resolved + resolved_at + resolved_by）',
       allRows.filter((row) => row.action === 'shipment_grouping_decision')
         .every((row) => row.detail.status === 'resolved' && Boolean(row.detail.resolvedAt)),
