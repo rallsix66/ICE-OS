@@ -6,15 +6,15 @@
 > 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 > 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 
-## 当前任务：CI 修复 v1（跨平台基线 + 现役数据库检查）（2026-11-17）—— 已合并，PR 与 master 四组检查全绿
+## 当前任务：CI 修复 v1 补修（B1 空库检查 / B2 只读断言）（2026-11-17）—— 补修 PR #19 四组 CI 通过，最终合并见回执
 
-状态：**已合并 `a369595`；PR #17 与 master 的 Tests / Lint / Build / Database checks 四组均实际执行并通过；master 必需检查已配置并回读**。实现提交 `af231c3`；PR CI <https://github.com/rallsix66/ICE-OS/actions/runs/44038848207>；master CI <https://github.com/rallsix66/ICE-OS/actions/runs/44040384827>。完整记录：[ci-repair-v1.md](ci-repair-v1.md)。
+状态：独立审查 B1/B2 已按最小改动修复。初版 #17 已合并 `a369595`；补修 PR **[#19](https://github.com/rallsix66/ICE-OS/pull/19)**，实现提交 `c1d26ea`，run <https://github.com/rallsix66/ICE-OS/actions/runs/44044902291> 的 Tests / Lint / Build / Database checks 四组实际通过；最终 head、合并 SHA 与 master CI 见交付回执。完整记录：[ci-repair-v1.md](ci-repair-v1.md)。
 
-- **跨平台修复**：`opt6-baseline` 只比较 LF 规范化 SHA，原始 SHA/换行计数仅作诊断；`opt6-production-apply` 的 packet 与 migration 同时规范化；新增 LF/CRLF 等价与篡改拒绝断言；仅因测试文件变更更新批准指纹，未改历史 SQL。
-- **现役数据库检查**：`npm run ci:database` 在 GitHub Actions PostgreSQL 17 临时库从空库安装 45 个 SQL（82 表 / 232 函数），用实际 app 角色验证读取、`catalog.assign_initial_code` 保存回读、`read_operation_records`、未授权 42501 与只读写入 25006；非空目标拒绝。
-- **CI/Lint**：拆成 Tests / Lint / Build / Database checks 四个独立 job；清理 19 条既有 warning，`--max-warnings 0` 通过；旧 `test:concurrency`/`test:database-contract` 保留历史用途但退出默认 CI。
-- **本地证据**：默认测试 **948 passed / 16 skipped / 0 failed**；lint 0；build 成功；`ci:database` 成功。操作记录 v1 的独立复核 PASS 结论不变。
-- **边界**：只改 CI/跨平台测试/lint/文档；不操作现役业务数据，不重建/重启实例，不启动 worker，不扩大业务范围。
+- **B1**：`scripts/ci/database.mjs` 去掉 `DROP SCHEMA public CASCADE; CREATE SCHEMA public`；安装前检查 public 已有 relation/routine/type、其他非系统 schema，并保留四个 ICE schema 拒绝；非空目标在安装写入前返回 `CI_DATABASE_NOT_EMPTY`。
+- **B2**：只读事务写入拒绝只接受 `25006`；未授权身份仍只接受 `42501`；未调整角色权限。
+- **定向验证**：空库完整成功（45 SQL / 82 表 / 232 函数，appRead=1、CI-0001/rev2、operationsTotal=1、42501、25006）；public 非空库 exit 1 且原表 1 行 `must survive` 保留、无 catalog/p0_02_meta schema；临时普通 `BEGIN` 负向 `expected 25006, got 42501`，恢复正式实现后通过。
+- **证据补齐**：PR #17 final head `238477c`/run 44040075051、PR #18、master `b033798`/run 44041324456。
+- **边界**：只改数据库 CI 脚本与文档；使用本机隔离临时库（55437），不操作现役 3011/59345，不重启实例/启动 worker；操作记录 v1 的独立复核 PASS 不变；执行方不自行宣布独立复核 PASS。
 
 ## 上一任务：操作记录 v1 最终交付（已验收）
 
