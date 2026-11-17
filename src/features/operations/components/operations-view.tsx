@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { ChevronDown, ChevronLeft, ChevronRight, History } from 'lucide-react';
-import { EmptyState, PageHeading } from '@/ui/ice-v4/data-surface';
+import { ChevronDown, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { EmptyState, PageHeading, StatusDot } from '@/ui/ice-v4/data-surface';
+import surface from '@/ui/ice-v4/data-surface.module.css';
 import { Pill } from '@/ui/ice-v4/primitives';
 import {
   buildOperationHref,
@@ -23,8 +24,10 @@ import styles from './operations.module.css';
 /**
  * 操作记录页（只读）。
  *
- * 列表按时间倒序；每条默认显示 时间/账号、业务对象与动作、处理结果，
- * 展开后先看处理结果与业务变化，再按商品追溯；批次号/快照/请求号收进「来源信息」。
+ * 视觉与「商品库存」「物流在途」共用同一套 ICE v4 数据面：
+ * 标题 → 记录说明 → 类别页签 → 工具栏 → 列表面板（分页固定在面板底部）。
+ * 每条默认显示 时间/账号、业务对象与动作、处理结果；
+ * 展开后先看字段变化与业务变化，再按商品追溯；批次号/快照/请求号收进「来源信息」。
  * 所有筛选与页码都在 URL 里：刷新、返回、直接链接都还原同一份结果。
  */
 export function OperationsView({
@@ -43,42 +46,29 @@ export function OperationsView({
   const range = page ? operationPageRange(page.total, page.limit, query.page) : null;
   const counts = page?.categoryCounts ?? null;
   const allCount = operationCategoryTotal(counts);
-  const currentCount = page ? page.total : null;
   const failed = Boolean(readError) || rangeInvalid;
   return (
     <div className={styles.page} data-testid="operations-page">
       <PageHeading
         title="操作记录"
-        meta="商品资料、库存对应与物流中已经保存的人工处理。"
-        actions={<span className={styles.headingBadge}><History size={14} strokeWidth={1.8} aria-hidden />只读</span>}
+        meta="时间：北京时间"
+        actions={<StatusDot tone="neutral">只读</StatusDot>}
       />
 
       <div className={styles.guideRow}>
         <details className={styles.guide} data-testid="operation-guide">
           <summary>
+            <Info size={13} strokeWidth={1.9} aria-hidden />
             <span>记录说明</span>
-            <ChevronDown className={styles.guideChevron} size={14} strokeWidth={1.9} aria-hidden />
+            <ChevronDown className={styles.guideChevron} size={13} strokeWidth={2} aria-hidden />
           </summary>
           <div className={styles.guideBody}>
             <p>这里汇总商品资料、库存对应与物流中<strong>已经保存的人工处理</strong>，按处理时间倒序。后台自动同步不在这里：同步结果看「数据同步」，库存历史数量看「商品库存 → 历史快照」。</p>
             <p><strong>记录账号</strong>是写入这条记录时使用的账号，不一定是实际点击的人。历史行没有保存的内容显示「历史未保存 / 未提供」，不用当前商品或货票数据反推。</p>
-            <p>关键词匹配货号、商品名称、来源 SKU、货票号与批次号。</p>
+            <p>关键词匹配货号、商品名称、来源 SKU、货票号与批次号；日期按北京时间自然日，可只填开始或只填结束。</p>
           </div>
         </details>
-        <span className={styles.timeCaption}>时间：北京时间</span>
       </div>
-
-      <OperationsFilters
-        query={{
-          category: query.category,
-          actor: query.actor,
-          from: query.from,
-          to: query.to,
-          q: query.q,
-          page: query.page,
-        }}
-        actors={page?.actors ?? []}
-      />
 
       <div className={styles.listControls}>
         <nav className={styles.tabs} aria-label="按业务类别筛选" data-testid="operation-category-tabs">
@@ -104,12 +94,21 @@ export function OperationsView({
             );
           })}
         </nav>
-        {page && !failed ? (
-          <span className={styles.resultSummary} data-testid="operation-current-count">
-            共 {currentCount ?? '—'} 条 · 按处理时间倒序
-          </span>
-        ) : null}
+        {page && !failed ? <span className={styles.resultSummary}>按处理时间倒序</span> : null}
       </div>
+
+      <OperationsFilters
+        query={{
+          category: query.category,
+          actor: query.actor,
+          from: query.from,
+          to: query.to,
+          q: query.q,
+          page: query.page,
+        }}
+        actors={page?.actors ?? []}
+        total={page && !failed ? page.total : null}
+      />
 
       {rangeInvalid ? (
         <div className={styles.filterError} role="alert" data-testid="operation-range-error">
@@ -124,60 +123,63 @@ export function OperationsView({
           <Link href={retryHref}>重新读取</Link>
         </div>
       ) : page && page.rows.length === 0 ? (
-        <EmptyState
-          title={page.total === 0 ? '没有符合条件的记录' : '这一页没有记录'}
-          hint={page.total === 0
-            ? '换一个货号、来源 SKU 或货票号，或清空类别、账号与日期筛选。'
-            : '页码超出当前结果；用下面的上一页回到最后一页。'}
-          action={<Link className={styles.emptyAction} href="/dashboard/operations" data-testid="operation-empty-clear">清空筛选</Link>}
-        />
+        <section className={`${styles.panel} ${styles.emptyPanel}`} data-testid="operation-empty">
+          <EmptyState
+            title={page.total === 0 ? '没有符合条件的记录' : '这一页没有记录'}
+            hint={page.total === 0
+              ? '换一个货号、来源 SKU 或货票号，或清空类别、账号与日期筛选。'
+              : '页码超出当前结果；用下面的上一页回到最后一页。'}
+            action={<Link className={surface.button} href="/dashboard/operations" data-testid="operation-empty-clear">清空筛选</Link>}
+          />
+        </section>
       ) : page ? (
-        <>
-          <section className={styles.panel} data-testid="operation-list">
-            <div className={styles.listHeader} aria-hidden="true">
-              <span>时间 / 账号</span>
-              <span>业务对象与动作</span>
-              <span>处理结果</span>
-              <span>详情</span>
-            </div>
+        <section className={styles.panel} data-testid="operation-list">
+          <div className={styles.listHeader} aria-hidden="true">
+            <span>时间 / 账号</span>
+            <span>业务对象与动作</span>
+            <span>处理结果</span>
+            <span>详情</span>
+          </div>
+          <div className={styles.listScroll}>
             {page.rows.map((record) => <OperationRecord key={record.id} record={record} />)}
-          </section>
-        </>
-      ) : null}
-
-      {range && page && page.total > 0 && !failed ? (
-        <div className={styles.pager} data-testid="operation-pagination">
-          <span className={styles.pagerInfo}>
-            第 {range.from}–{range.to} 条 · 第 {range.page}/{range.pageCount} 页
-          </span>
-          <nav className={styles.pagerNav} aria-label="操作记录分页">
-            {range.hasPrev ? (
-              <Link className={styles.pageBtn} href={buildOperationHref(query, { page: range.page - 1 })} data-testid="operation-page-prev">
-                <ChevronLeft size={14} aria-hidden />上一页
-              </Link>
-            ) : (
-              <span className={`${styles.pageBtn} ${styles.pageBtnDisabled}`} aria-disabled="true">
-                <ChevronLeft size={14} aria-hidden />上一页
-              </span>
-            )}
-            {range.hasPrev ? <Link className={styles.pageBtn} href={buildOperationHref(query, { page: 1 })}>第 1 页</Link> : null}
-            <span className={`${styles.pageBtn} ${styles.pageBtnCurrent}`} aria-current="page" data-testid="operation-page-current">
-              {range.page}
-            </span>
-            {range.hasNext ? (
-              <Link className={styles.pageBtn} href={buildOperationHref(query, { page: range.pageCount })}>第 {range.pageCount} 页</Link>
-            ) : null}
-            {range.hasNext ? (
-              <Link className={styles.pageBtn} href={buildOperationHref(query, { page: range.page + 1 })} data-testid="operation-page-next">
-                下一页<ChevronRight size={14} aria-hidden />
-              </Link>
-            ) : (
-              <span className={`${styles.pageBtn} ${styles.pageBtnDisabled}`} aria-disabled="true">
-                下一页<ChevronRight size={14} aria-hidden />
-              </span>
-            )}
-          </nav>
-        </div>
+          </div>
+          {range && page.total > 0 && !failed ? (
+            <div className={styles.pagerBar}>
+              <div className={surface.pager} data-testid="operation-pagination">
+                <span className={surface.pagerInfo}>
+                  第 {range.from}–{range.to} 条 · 第 {range.page}/{range.pageCount} 页
+                </span>
+                <nav className={surface.pagerNav} aria-label="操作记录分页">
+                  {range.hasPrev ? (
+                    <Link className={surface.pageBtn} href={buildOperationHref(query, { page: range.page - 1 })} data-testid="operation-page-prev">
+                      <ChevronLeft size={14} aria-hidden />上一页
+                    </Link>
+                  ) : (
+                    <span className={`${surface.pageBtn} ${surface.pageBtnDisabled}`} aria-disabled="true">
+                      <ChevronLeft size={14} aria-hidden />上一页
+                    </span>
+                  )}
+                  {range.hasPrev ? <Link className={surface.pageBtn} href={buildOperationHref(query, { page: 1 })}>第 1 页</Link> : null}
+                  <span className={`${surface.pageBtn} ${surface.pageBtnCurrent}`} aria-current="page" data-testid="operation-page-current">
+                    {range.page}
+                  </span>
+                  {range.hasNext ? (
+                    <Link className={surface.pageBtn} href={buildOperationHref(query, { page: range.pageCount })}>第 {range.pageCount} 页</Link>
+                  ) : null}
+                  {range.hasNext ? (
+                    <Link className={surface.pageBtn} href={buildOperationHref(query, { page: range.page + 1 })} data-testid="operation-page-next">
+                      下一页<ChevronRight size={14} aria-hidden />
+                    </Link>
+                  ) : (
+                    <span className={`${surface.pageBtn} ${surface.pageBtnDisabled}`} aria-disabled="true">
+                      下一页<ChevronRight size={14} aria-hidden />
+                    </span>
+                  )}
+                </nav>
+              </div>
+            </div>
+          ) : null}
+        </section>
       ) : null}
     </div>
   );
@@ -267,8 +269,8 @@ function OperationRecord({ record }: { record: OperationRecordDto }) {
           <span className={styles.objectTitle}>{record.objectTitle || record.objectKind}</span>
           <span className={styles.objectAction} data-testid="operation-record-action">
             <Pill tone={operationActionTone(record.action)}>{operationActionLabel(record.action)}</Pill>
+            <span className={styles.objectMeta}>{meta || record.objectKind}</span>
           </span>
-          <span className={styles.objectMeta}>{meta || record.objectKind}</span>
         </span>
         <span className={styles.resultCell} data-testid="operation-record-result">{operationResultText(record)}</span>
         <span className={styles.toggleCell}>

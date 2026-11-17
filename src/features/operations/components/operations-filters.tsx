@@ -2,11 +2,10 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
 import { SearchField, SelectMenu } from '@/ui/ice-v4/data-surface';
+import surface from '@/ui/ice-v4/data-surface.module.css';
 import { buildOperationHref } from '../model';
 import type { OperationActorDto } from '../types';
-import { DateRangePicker } from './date-range-picker';
 import styles from './operations.module.css';
 
 export interface OperationFilterQuery {
@@ -19,15 +18,21 @@ export interface OperationFilterQuery {
 }
 
 /**
- * 操作记录筛选：搜索（防抖 300ms）/ 记录账号 / 日期范围（面板内选好再应用）。
- * 一律写回 URL（replace，不新增历史），刷新、返回与直接链接都能还原同一份筛选。
+ * 操作记录筛选：搜索（防抖 300ms）/ 记录账号 / 开始日期 / 结束日期。
+ *
+ * - 日期仍用系统原生的单日选择（两个独立控件），按开始、结束分别查询；
+ * - 一律写回 URL（replace，不新增历史），刷新、返回与直接链接都能还原同一份筛选；
+ * - 控件高度、间距与「商品库存」工具栏一致，清空按钮用系统共用样式。
  */
 export function OperationsFilters({
   query,
   actors,
+  total,
 }: {
   query: OperationFilterQuery;
   actors: OperationActorDto[];
+  /** 当前筛选结果总数（null = 读取失败或日期无效，不显示假数字）。 */
+  total: number | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -69,35 +74,51 @@ export function OperationsFilters({
   const dirty = query.category !== 'all' || Boolean(query.actor) || Boolean(query.from) || Boolean(query.to) || Boolean(q);
 
   return (
-    <div className={styles.toolbarWrap}>
-      <div className={styles.filters} data-testid="operation-filters">
-        <div className={styles.searchWrap}>
-          <SearchField
-            value={q}
-            onChange={setQ}
-            placeholder="搜索货号、名称、来源 SKU、货票号或批次号"
-            ariaLabel="搜索操作记录"
-            testId="operation-search"
-            pending={pending}
-          />
-        </div>
-        <div className={styles.actorWrap}>
-          <SelectMenu
-            value={query.actor}
-            onChange={(value) => apply({ actor: value })}
-            options={actorOptions}
-            ariaLabel="按记录账号筛选"
-            testId="operation-actor-filter"
-          />
-        </div>
-        <DateRangePicker
-          from={query.from}
-          to={query.to}
-          onApply={(from, to) => apply({ from, to })}
+    <section className={styles.toolbarWrap} data-testid="operation-filters">
+      <div className={surface.toolbar}>
+        <SearchField
+          value={q}
+          onChange={setQ}
+          placeholder="搜索货号、名称、来源 SKU、货票号或批次号"
+          ariaLabel="搜索操作记录"
+          testId="operation-search"
+          pending={pending}
         />
+        <SelectMenu
+          value={query.actor}
+          onChange={(value) => apply({ actor: value })}
+          options={actorOptions}
+          ariaLabel="按记录账号筛选"
+          testId="operation-actor-filter"
+        />
+        <div className={styles.dateGroup} data-testid="operation-date-range">
+          <label className={styles.dateField}>
+            <span className={styles.dateLabel}>开始日期</span>
+            <input
+              className={styles.dateInput}
+              type="date"
+              value={query.from}
+              max={query.to || undefined}
+              data-testid="operation-date-from"
+              onChange={(event) => apply({ from: event.target.value })}
+            />
+          </label>
+          <span className={styles.dateSep} aria-hidden>—</span>
+          <label className={styles.dateField}>
+            <span className={styles.dateLabel}>结束日期</span>
+            <input
+              className={styles.dateInput}
+              type="date"
+              value={query.to}
+              min={query.from || undefined}
+              data-testid="operation-date-to"
+              onChange={(event) => apply({ to: event.target.value })}
+            />
+          </label>
+        </div>
         <button
           type="button"
-          className={styles.clearButton}
+          className={surface.button}
           data-testid="operation-clear-filters"
           disabled={!dirty}
           onClick={() => {
@@ -108,9 +129,12 @@ export function OperationsFilters({
             });
           }}
         >
-          <X size={13} strokeWidth={2} aria-hidden />清空
+          清空
         </button>
+        <span className={surface.count} data-testid="operation-current-count">
+          {total === null ? '' : `共 ${total} 条`}
+        </span>
       </div>
-    </div>
+    </section>
   );
 }

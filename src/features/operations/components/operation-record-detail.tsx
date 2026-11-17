@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown } from 'lucide-react';
+import { Disclosure } from '@/ui/ice-v4/data-surface';
+import surface from '@/ui/ice-v4/data-surface.module.css';
 import {
   OPERATION_ITEM_CHUNK,
   operationDetailView,
@@ -14,7 +15,7 @@ import styles from './operations.module.css';
 /**
  * 一条记录的展开内容（客户端小岛，仅为“明细分段展开”保留状态）。
  *
- * 顺序：处理结果 → 事实 → 字段变化 → 涉及商品（变化与入口放一起）→ 货票 → 入口 → 说明 → 来源信息。
+ * 顺序：事实 → 字段变化 → 涉及商品（变化与入口放一起）→ 货票 → 入口 → 说明 → 来源信息。
  * 明细不截断：每段 20 条，显示“已显示 x / 共 n”，可继续展开或一次显示全部。
  */
 export function OperationRecordDetail({ record }: { record: OperationRecordDto }) {
@@ -77,7 +78,7 @@ export function OperationRecordDetail({ record }: { record: OperationRecordDto }
             <div className={styles.itemMore}>
               <button
                 type="button"
-                className={styles.moreButton}
+                className={`${surface.button} ${surface.buttonSmall}`}
                 data-testid="operation-items-more"
                 onClick={() => setVisible((current) => Math.min(current + OPERATION_ITEM_CHUNK, view.items.length))}
               >
@@ -134,12 +135,7 @@ export function OperationRecordDetail({ record }: { record: OperationRecordDto }
       ) : null}
 
       {view.sources.length > 0 ? (
-        <details className={styles.sources} data-testid="operation-record-sources">
-          <summary>
-            <span>来源信息</span>
-            <small>批次号、快照哈希、请求号</small>
-            <ChevronDown size={14} strokeWidth={1.8} aria-hidden />
-          </summary>
+        <Disclosure summary="来源信息" count="批次号、快照哈希、请求号" testId="operation-record-sources">
           <dl className={styles.sourceList}>
             {view.sources.map((source) => (
               <div key={`${source.label}:${source.value}`}>
@@ -148,7 +144,7 @@ export function OperationRecordDetail({ record }: { record: OperationRecordDto }
               </div>
             ))}
           </dl>
-        </details>
+        </Disclosure>
       ) : null}
     </div>
   );
