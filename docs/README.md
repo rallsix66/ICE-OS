@@ -2,11 +2,23 @@
 
 本文档是 ICEOS（原 DIS）项目资料的统一入口。先从当前状态和目标方案进入；旧系统资料用于维护与追溯，不覆盖新方案或当前授权。
 
+## 当前运行与部署（2026-11-09）
+
+- 现役只有本机实例 `run-20261026T211500Z-11a22b33`（Web 3011 / PostgreSQL 59345），Vercel 与 Supabase 已退役；
+  启动/状态/停止命令与依赖见根目录 [README](../README.md)。
+- [部署准备：Mac mini + Cloudflare + NAS](deploy/mac-mini-cloudflare-nas-v1.md)：目标分工、依赖、持久数据、
+  搬迁步骤、Mac 实机待验证清单、登录重建项。
+- [备份与恢复入口](deploy/backup-restore.md)：数据库/配置/来源文件备份、恢复校验与整实例恢复步骤。
+- [操作记录 v1：双日期系统日历 + 整页系统样式统一](tasks/operations-log-v1.md)：商品资料/库存对应/物流已保存人工处理只读入口；
+  只有明确撤销审计才显示“撤销”，正常改选显示“已被后续选择替代”；保留“开始日期 / 结束日期”两个独立控件与分别选日、
+  选完立即筛选，浏览器原生日期弹窗换成页面内共用单日历（可切年月、清空单边、Esc/点外关闭），输入框与日历统一系统样式；
+  整页标题、页签、工具栏、列表面板、展开详情与分页继续复用商品库存的共用样式。**独立复核 PASS、阻断 0，本轮已完成**
+  （已验收实现 `105b127`、BUILD `tg4VKYyZQYR3Jq7uz5ktk`）；执行证据页面与样式 44/44、定向单测 47/47；O1 年份边界为
+  非阻断维护项，详见任务文档。
 - [海外库存历史快照查询 v1](tasks/inventory-snapshot-v1.md)：商品库存内第三页签「历史快照」，按仓 + 已发布批次
   查看当时 SKU/商品归属/实物/锁定/仓库可用/单位；批次列表分页可翻到任意更早批次，明确批次按编号独立读取并核对所属仓，
   不存在/仓库不匹配只给提示、不显示其他批次数量；未绑定 SKU 可查，真实 0 显示 0、缺失「未提供」、本批未见明确提示；
-  切批次保留来源 SKU 搜索，返回库存保留原筛选；含 041 只读函数、标准实例准备接入与真实批次核对样例；独立差异复核 PASS、阻断 0。
-
+  切批次保留来源 SKU 搜索，返回库存保留原筛选；含 041 只读函数、标准实例准备接入与真实批次核对样例。
 - [飞书商品资料真实持续更新 v1](tasks/feishu-product-source-real-v1.md)：真实读取、字段范围、采用/待核对结果、
   定时读取入口与验证证据；日常入口为「数据同步」页的「飞书商品资料」区块，来源待核对事项已接入商品库「待处理」
 - [飞书商品资料人工核对与持续采用流程 v1](tasks/feishu-product-source-review-flow-20261110.md)：跨批待办去重、字段级
@@ -40,16 +52,17 @@
   WM0131 从最新待应用快照直接显示并确认采用；执行方 3011 页面 28/28、克隆库 12/12 + RPC 13/13，**独立差异复核 PASS、阻断 0**。
 - [待处理页原因/差异/入口精简](tasks/catalog-pending-simplify-20261110.md)：每条直接显示具体原因、逐行差异与
   具体动作按钮，来源详情按需展开，按钮定位到对应事项；执行方定向验证 + **独立差异复核 PASS、阻断 0**。
+- 运行交接：[库存自动同步](tasks/inventory-sync-v1-runbook.md)、[物流在途读取](tasks/shipment-in-transit-v1-runbook.md)。
 
 ## ICE v4 当前设计入口
 
-2026-10-13 新方向：[独立PostgreSQL架构 v3](architecture-v3.md) + [历史数据模型](history-data-model-v1.md) + [ADR-ICE-002](adr/ADR-ICE-002-independent-postgres-history.md)。已确认脱离Supabase、预留历史分析基础，暂不开发复杂分析页；运行代码仍为旧平台，迁移未执行。
+2026-10-13 新方向：[独立PostgreSQL架构 v3](architecture-v3.md) + [历史数据模型](history-data-model-v1.md) + [ADR-ICE-002](adr/ADR-ICE-002-independent-postgres-history.md)。已确认脱离Supabase、预留历史分析基础，暂不开发复杂分析页；2026-11-08 已退出 Vercel/Supabase，现役为本地 PostgreSQL + Better Auth 实例。
 
 最新交互反馈与验证：[2026-10-13 同步/权限、首页库存、市场物流改进](reports/2026-10-13-ice-v4-feedback.md)。Demo现为八个入口，首版六视图记录仅作历史。
 
 当前任务以 [current-state.md](current-state.md) 与 [current-task.md](tasks/current-task.md) 为准。下面的新文档描述设计与隔离Demo，不代表生产已改造：
 
-- [现状分析](current-analysis.md)：代码事实、Supabase依赖、库存口径、复用与风险。
+- [现状分析](current-analysis.md)：代码事实、库存口径、复用与风险（Supabase 依赖已于 2026-11-08 退役）。
 - [产品方案（v4 基础，吸收 V5）](product-plan-v4.md)：三种经营视角、现有八入口职责、不含运费估值、历史与后续分析边界。
 - [目标架构 v3](architecture-v3.md)：自主数据库/认证、服务边界、迁移与恢复；[v2](architecture-v2.md) 保留首版背景。
 - [历史数据模型](history-data-model-v1.md)：原始快照、业务/维度修订、日统计、晚到补数、权限与可追溯查询。

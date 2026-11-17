@@ -38,6 +38,15 @@ const DEPENDENT_SQL = [
     path: 'db/catalog/041_inventory_snapshot_reads.sql',
     requires: ['catalog.inventory_batch', 'catalog.inventory_batch_row'],
   },
+  {
+    // 操作记录只读汇合（042）：要读商品/库存/物流三类的历史行；表未就绪时由 prepare-instance 安装。
+    path: 'db/catalog/042_operation_records.sql',
+    requires: [
+      'catalog.audit_event', 'catalog.item_revision', 'catalog.inventory_audit',
+      'catalog.inventory_sku_mapping', 'catalog.shipment_item_association_revision',
+      'catalog.shipment_item_manual_revision', 'catalog.shipment_grouping_review',
+    ],
+  },
 ];
 
 async function applyCatalogSql(run) {

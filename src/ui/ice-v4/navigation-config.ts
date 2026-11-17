@@ -4,6 +4,7 @@ export const ICE_V4_ACTIVE_NAV_HREFS = [
   '/dashboard/catalog',
   '/dashboard/inventory',
   '/dashboard/in-transit',
+  '/dashboard/operations',
   '/dashboard/sync',
 ] as const;
 

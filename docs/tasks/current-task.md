@@ -6,7 +6,43 @@
 > 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 > 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 
-## 当前任务：海外库存历史快照查询（2026-11-16）—— 已完成（独立差异复核 PASS、阻断 0）
+## 当前任务：操作记录 v1 最终交付（独立复核 PASS，阻断 0）（2026-11-17）—— 已完成
+
+状态：**独立复核 PASS，阻断 0；本轮已完成**。范围为当前本地现役实例的操作记录 v1（R1–R5、整页系统样式、最终双日期日历），不是生产部署结论。已验收实现提交 **`105b127`**；BUILD **`tg4VKYyZQYR3Jq7uz5ktk`**（源码快照 `1610bf94…`，preview pid 48248），入口 <http://127.0.0.1:3011/dashboard/operations>。独立复核报告：`.local/catalog/operations-log-r5-20261117/independent-review.md`；执行方证据 `.local/catalog/operations-log-r5-20261117/`（`verify-r5.json`、截图 `r5-01`–`r5-15`）。合同与完整验收记录：[operations-log-v1.md](operations-log-v1.md)。
+
+- **验收结论**：独立复核 PASS、阻断 0。主审实际操作 3011 默认桌面与 760×900：365 条三类 152/100/113；`input[type=date]` 为 0；日历选 `11-10` 开始 → 26 条、同一天 → 23 条、清空开始 → 362 条；760 年月切换与选中态完整；Esc 回焦；反向提示且无记录；warning/error 0。代码复核确认两侧共用 `SingleDayPicker`、筛选行为未变、R1–R5 文件与 `085760c` 的 Git blob 相同。
+- **证据分层**：页面/样式 **44/44**、定向单测 **47/47**（calendar-date 4 + model 36 + navigation 7）、`tsc` BEST 5、改动文件 eslint 0、diff 0、业务行数前后一致属于执行方自验；独立复核沿用其中部分结果，不把 44/44 计为独立测试数量。
+- **最终日期方案**：保留“开始日期 / 结束日期”两个独立控件，共用页面内单日历，分别选日、立即筛选、单边清空；输入框与弹窗统一系统样式；无合并范围面板、无应用/取消。
+- **O1（非阻断维护项）**：`single-day-picker.tsx` 第 252–253 行的 2020–2035 范围只约束日格，不约束自定义年月标题；2020 年以前或 2035 年以后可能出现标题与日格不同步。本轮只登记，不追加功能修改。
+- **交付**：本分支相对 `master`（`177e6b0`）含操作记录初版、R1–R5、UI 调整、最终日历、安装链/导航/依赖/文档；文档收尾提交与 PR/合并信息见 [operations-log-v1.md](operations-log-v1.md) §8。
+- **边界**：现役零业务写入；未启动后台 worker；未改飞书与各模块写入链；本次收尾不重新部署、不重建/重启实例；工作区 Mac 部署准备、无关 pnpm 文件与 `.local` 证据保持原处、不进入本包。
+
+## 上一任务：操作记录 v1 R4 收尾 + 日期范围选择器 + 第二轮 UI（2026-11-17）—— 日期面板已由本轮撤回，R4 与业务修复保留
+
+状态：执行方自验完成，未宣布 PASS；BUILD **`VzVOTmdMgVQD2xOh5lKba`**，源码快照 `410844eb0980c0cc…`，证据 `.local/catalog/operations-log-r3-20261117/`（`verify-r3.json` 47/47、`real-reselect.json` 5/5）。
+
+- **R4**：只有 `restore_duplicate_source_decision` 审计才显示“撤销”；正常改选只标 superseded，原记录写“已被后续选择替代”与替代时间，不虚构撤销账号；字段口径替代同样写“替代”。
+- **验证口径**：`real-reselect.mjs` 是同一事务内调用真实 RPC 两次后 ROLLBACK；`apply-042` 正常改选探针是直接插入构造投影；两者都不表述为“完整正常改选业务写入链已验证”。
+- **日期**：上一轮新增页面内日历与快捷范围，已在本轮按最终指令撤回。
+
+## 上一任务：操作记录 v1 R1–R5 补修 + 页面优化（2026-11-17）—— 已由后续轮次接续
+
+状态：执行方自验完成，未宣布 PASS；BUILD **`4gZ0zjpGDrnR58RpmYOQr`**，源码快照 `c926430a75a9c020…`，证据 `.local/catalog/operations-log-r2-20261117/`。
+
+- **R1–R5**：修订差异按新旧字段键并集比较（WM0073 第 3 版「商品条码 757577407359 → 已移除」、上一版本第 2 版）；同一次关联搜索覆盖全部货号/名称/SKU/货票号（POKNZX027675 七款分别命中同一条 7 明细），原 SKU 替换改读 detail；4173 批次 94 款全部可达、第 41 款 WM0054 可看，删除误导入口；字段口径与 4 条来源行选择撤销在实际撤销时间 14:44:50 独立成条、原决定 12:36:38 保留，分组只纳 resolved；全部业务 = 三类之和 365（152/100/113），失败/日期无效显示「—」。
+- **UI**：记录说明折叠、工具栏成组、对象/结果优先、编号完整、UUID/哈希收进「来源信息」、商品内联字段变化、760 重排无溢出。
+- **验证**：页面 38/38、布局 8/8、隔离样例 7/7、`apply-042` rollback 38/38 + commit 38/38、定向单测 38/38、`tsc` 仅既有 BEST 5、eslint 0、diff 0、console 0。
+
+## 上一任务：操作记录 v1 初版（2026-11-16）—— 已由 R1–R5 补修替代，执行方自验完成且未宣布 PASS
+
+- **一、入口**：一级导航新增「操作记录」→ `/dashboard/operations`（`workspace-shell.tsx`、`navigation-config.ts` 同步登记）。列表按时间倒序、50 条/页，默认显示 时间 / 记录账号 / 业务对象 / 动作 / 结果；展开显示已保存依据（批次回执与逐字段前后值、换绑原商品→现商品、人工修正前后状态与数量、分合票决定与票面）。
+- **二、三类记录**：商品资料 147（来源采用 3 条按批次、补货号 3、来源行选择 4（均已撤销）、字段人工口径 9、历史修订/首版 128）；库存对应 100（确认 90、换绑 5、国内复核 5；重核/停用/原 SKU 替换本机 0 条、路径已覆盖）；物流 113（人工关联 90、清除关联 15、人工修正 3、恢复按原表 2、分合票决定 3；撤销分组本机 0 条）。
+- **三、只读查询**：`db/catalog/042_operation_records.sql` 只新增 `catalog.read_operation_records(text,uuid,timestamptz,timestamptz,text,int,int)`；`apply-042` rollback **28/28**、commit **28/28**；标准准备链（`prepare-instance.mjs` / `prepare-local-preview.mjs`）已接入。
+- **四、口径与未保存**：来源采用一条批次结果，批内商品修订只在展开里；物流同一次保存合并一条。历史未保存的：重核/停用/撤销分组无记录、字段覆盖前本地值、首版前值、分组具体操作人、inventory_audit 理由/请求号、物流关联请求号；页面显示「未保存/未提供」，记录账号不等于具体操作人。
+- **五、验证**：现役页面 **26/26**（三类样例与数据库逐字段核对、类别/账号/日期/关键词/分页/越界、无结果、日期反向、读取失败与恢复、商品/货票/批次入口返回保留筛选与页码、console 0）；总数 360 与独立重算一致；定向单测 **48/48**；`npm test` **942/943**（唯一既有 opt6 换行基线）；`tsc` 仅既有 BEST 5、改动文件 eslint 0、`git diff --check` 0。
+- **六、边界**：现役零业务写入；未启动后台 worker；未改飞书与各模块写入链；未提交/推送/部署；README 的 BUILD 行带本包之外的 Mac 部署准备改动，按要求保留未提交。
+
+## 上一任务：海外库存历史快照查询（2026-11-16）—— 已完成（独立差异复核 PASS、阻断 0）
 
 状态：**已完成（2026-11-16 收口）、独立差异复核 PASS、阻断 0**（PASS 由独立复核给出，执行方不自行宣布；最终报告 [independent-review-r3.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review-r3.md)）。仅限现役实例 `run-20261026T211500Z-11a22b33`（3011/59345）；最终 BUILD **`S1prE-Z5-Gb9BRJNwaKIT`**（源码快照 `f19186de20ab2a3f…`）。合同与执行记录：[inventory-snapshot-v1.md](inventory-snapshot-v1.md)；首轮/二轮复核报告 [independent-review.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review.md)（首轮）与 [independent-review-r2.md](../../.local/catalog/inventory-snapshot-20261116/reviewer/independent-review-r2.md)（二轮）；证据 `.local/catalog/inventory-snapshot-20261116/`。
 

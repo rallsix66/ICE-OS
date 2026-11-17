@@ -1,0 +1,1070 @@
+/*
+ * 操作记录：与「商品库存」「物流在途」「商品库」共用 ICE v4 数据面。
+ * 只使用系统变量（--ice-ui-*）与共用控件，不新造配色；
+ * 结构同库存页：标题 → 说明 → 页签 → 工具栏 → 面板（列表滚动、分页固定）。
+ */
+
+.page {
+  display: flex;
+  min-width: 0;
+  min-height: 560px;
+  height: calc(100vh - 96px);
+  flex-direction: column;
+  gap: 10px;
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.page > * {
+  min-width: 0;
+}
+
+.page > header,
+.guideRow,
+.listControls,
+.toolbarWrap,
+.filterError,
+.failure {
+  flex: none;
+}
+
+/* ---------- 记录说明：默认一行，展开才占空间 ---------- */
+
+.guide {
+  min-width: 0;
+}
+
+.guide summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 0;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.guide summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide summary:hover {
+  color: var(--ice-ui-accent-strong);
+}
+
+.guide summary:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.guideChevron {
+  color: var(--ice-ui-faint);
+  transition: transform 160ms var(--ice-ui-ease-out);
+}
+
+.guide[open] .guideChevron {
+  transform: rotate(180deg);
+}
+
+.guideBody {
+  display: grid;
+  gap: 5px;
+  max-width: 980px;
+  margin-top: 8px;
+  padding: 10px 13px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: var(--ice-ui-radius-sm);
+  background: #fbfcfe;
+  color: var(--ice-ui-muted);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+
+.guideBody p {
+  margin: 0;
+}
+
+.guideBody strong {
+  color: #3b475c;
+  font-weight: 600;
+}
+
+/* ---------- 类别页签：与库存/在途同一套分段控件 ---------- */
+
+.listControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 3px;
+  border-radius: var(--ice-ui-radius);
+  background: #f1f3f8;
+}
+
+.tab {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ice-ui-muted);
+  font-size: 13px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: background 150ms var(--ice-ui-ease-out), color 150ms var(--ice-ui-ease-out);
+}
+
+.tab:hover {
+  color: var(--ice-ui-text);
+  background: #fff;
+}
+
+.tabActive,
+.tabActive:hover {
+  border-color: var(--ice-ui-line);
+  background: #fff;
+  color: var(--ice-ui-accent-strong);
+}
+
+.tab:focus-visible {
+  outline: 2px solid #5266d7;
+  outline-offset: 1px;
+}
+
+.tabCount {
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabActive .tabCount {
+  color: var(--ice-ui-accent);
+}
+
+.resultSummary {
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- 工具栏：搜索 / 账号 / 开始日期 / 结束日期 / 清空 ---------- */
+
+.toolbarWrap {
+  display: grid;
+  gap: 8px;
+}
+
+/*
+ * 日期：开始 / 结束两个独立单日控件，共用页面内单日历弹窗。
+ * 输入框与弹窗都使用系统控件尺寸、圆角、边框、焦点环与强调色，不调用浏览器原生日期面板。
+ */
+.dateGroup {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.dateControl {
+  position: relative;
+  display: inline-flex;
+  min-width: 172px;
+  height: var(--ice-ui-control);
+  align-items: center;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: var(--ice-ui-radius);
+  background: #fff;
+  transition: border-color 160ms var(--ice-ui-ease-out), box-shadow 160ms var(--ice-ui-ease-out);
+}
+
+.dateControl:hover {
+  border-color: var(--ice-ui-line-strong);
+}
+
+.dateControl:focus-within,
+.dateControl[data-open='true'] {
+  border-color: #8495ed;
+  box-shadow: 0 0 0 3px rgba(82, 102, 215, 0.12);
+}
+
+.dateTrigger {
+  display: inline-flex;
+  min-width: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 0 11px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--ice-ui-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dateTrigger:focus-visible {
+  outline: none;
+}
+
+.dateIcon {
+  flex: 0 0 auto;
+  color: #8a94a1;
+}
+
+.dateLabel {
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.dateValue,
+.datePlaceholder {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.datePlaceholder {
+  color: #9aa3b2;
+}
+
+.dateClear {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  margin-right: 4px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #8a94a1;
+  cursor: pointer;
+}
+
+.dateClear:hover {
+  background: #f0f2f8;
+  color: #4b5a70;
+}
+
+.dateClear:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 1px;
+}
+
+.dateSep {
+  color: #b8bfca;
+  font-size: 12px;
+}
+
+/* ---------- 页面内单日历弹窗（与工具栏同一套系统控件外观） ---------- */
+
+.datePanel {
+  position: fixed;
+  z-index: 90;
+  display: grid;
+  width: 312px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #e3e7ee;
+  border-radius: var(--ice-ui-radius);
+  background: #fff;
+  box-shadow: 0 18px 44px rgba(23, 32, 56, 0.16), 0 2px 6px rgba(23, 32, 56, 0.05);
+  animation: datePanelIn 140ms var(--ice-ui-ease-out);
+}
+
+@keyframes datePanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.calHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.calNavGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.calNavButton {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #5b687c;
+  cursor: pointer;
+}
+
+.calNavButton:hover {
+  background: #f0f2f8;
+  color: var(--ice-ui-text);
+}
+
+.calNavButton:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 1px;
+}
+
+.calTitle {
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.calendar {
+  min-width: 0;
+}
+
+/* react-day-picker 结构类（classNames 映射，不引入库自带样式表） */
+.rdpRoot {
+  width: 100%;
+  color: var(--ice-ui-text);
+  font-size: 12.5px;
+}
+
+.rdpMonths,
+.rdpMonth {
+  width: 100%;
+}
+
+.rdpMonthCaption,
+.rdpNav {
+  display: none;
+}
+
+.rdpMonthGrid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rdpWeekdays {
+  border-bottom: 1px solid #f0f2f6;
+}
+
+.rdpWeekday {
+  width: 14.285%;
+  height: 26px;
+  color: var(--ice-ui-faint);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.rdpWeek {
+  height: 36px;
+}
+
+.rdpDay {
+  width: 14.285%;
+  padding: 1px;
+  text-align: center;
+}
+
+.rdpDayButton {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #33405a;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 120ms var(--ice-ui-ease-out), color 120ms var(--ice-ui-ease-out);
+}
+
+.rdpDayButton:hover {
+  background: #f0f2f8;
+}
+
+.rdpDayButton:focus-visible {
+  outline: 2px solid #5266d7;
+  outline-offset: 0;
+}
+
+.rdpToday .rdpDayButton {
+  color: var(--ice-ui-accent);
+  font-weight: 650;
+  box-shadow: inset 0 0 0 1px #c7d0ef;
+}
+
+.rdpOutside .rdpDayButton {
+  color: #b7bfcc;
+}
+
+.rdpSelected .rdpDayButton {
+  background: var(--ice-ui-accent);
+  color: #fff;
+  box-shadow: none;
+}
+
+.rdpSelected .rdpDayButton:hover {
+  background: var(--ice-ui-accent-strong);
+}
+
+.rdpFocused .rdpDayButton {
+  box-shadow: inset 0 0 0 2px #8495ed;
+}
+
+.rdpSelected.rdpFocused .rdpDayButton {
+  box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px #5266d7;
+}
+
+.calFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f2f6;
+  color: var(--ice-ui-faint);
+  font-size: 11.5px;
+}
+
+.calToday {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: 7px;
+  background: #fff;
+  color: #4b5a70;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.calToday:hover {
+  border-color: #c9d0e0;
+  background: #f7f8fc;
+}
+
+.calToday:focus-visible {
+  outline: 2px solid #8495ed;
+  outline-offset: 1px;
+}
+
+/* ---------- 错误与空状态 ---------- */
+
+.filterError,
+.failure {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid #f0e7d6;
+  border-radius: var(--ice-ui-radius-sm);
+  background: #fbf5e9;
+  color: #8a5a2a;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.failure {
+  border-color: #f2e2df;
+  background: #fcf1ed;
+  color: #8a3a30;
+}
+
+.filterError a,
+.failure a {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* ---------- 列表：面板内滚动，分页固定在底部 ---------- */
+
+.panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  border: 1px solid var(--ice-ui-line);
+  border-radius: var(--ice-ui-radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.listHeader {
+  display: grid;
+  flex: none;
+  grid-template-columns: 150px minmax(0, 1.05fr) minmax(0, 1.55fr) 84px;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--ice-ui-line);
+  background: #f8f9fb;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.listHeader span:last-child {
+  text-align: right;
+}
+
+.emptyPanel {
+  align-items: center;
+  justify-content: center;
+}
+
+.listScroll {
+  min-height: 160px;
+  flex: 1 1 auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.record {
+  border-bottom: 1px solid #f1f2f5;
+}
+
+.record:last-child {
+  border-bottom: 0;
+}
+
+.recordSummary {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1.05fr) minmax(0, 1.55fr) 84px;
+  gap: 12px;
+  align-items: start;
+  padding: 11px 14px;
+  cursor: pointer;
+  list-style: none;
+  transition: background 120ms var(--ice-ui-ease-out);
+}
+
+.recordSummary::-webkit-details-marker {
+  display: none;
+}
+
+.recordSummary:hover {
+  background: #fafbfe;
+}
+
+.recordSummary:focus-visible {
+  outline: none;
+  background: #fafbfe;
+  box-shadow: inset 3px 0 0 #8495ed;
+}
+
+.record[open] .recordSummary {
+  background: #fafbff;
+  border-bottom: 1px solid var(--ice-ui-line);
+  box-shadow: inset 3px 0 0 var(--ice-ui-accent);
+}
+
+.timeCell {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.timeCell strong {
+  color: #3b475c;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.timeCell small {
+  color: var(--ice-ui-faint);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.objectCell {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.objectTitle {
+  color: var(--ice-ui-text);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.objectAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+}
+
+.objectMeta {
+  min-width: 0;
+  flex: 1 1 180px;
+  color: var(--ice-ui-faint);
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.resultCell {
+  color: #4c586a;
+  font-size: 12.5px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.toggleCell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  color: var(--ice-ui-accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.toggleLabel span {
+  display: inline;
+}
+
+.toggleClose {
+  display: none !important;
+}
+
+.record[open] .toggleOpen {
+  display: none;
+}
+
+.record[open] .toggleClose {
+  display: inline !important;
+}
+
+.toggleChevron {
+  color: var(--ice-ui-faint);
+  transition: transform 160ms var(--ice-ui-ease-out);
+}
+
+.record[open] .toggleChevron {
+  transform: rotate(180deg);
+}
+
+.pagerBar {
+  flex: none;
+  padding: 0 14px;
+  border-top: 1px solid var(--ice-ui-line);
+  background: #fff;
+}
+
+/* ---------- 展开内容 ---------- */
+
+.recordBody {
+  display: grid;
+  gap: 13px;
+  padding: 13px 16px 16px;
+  background: #fbfcff;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 6px 20px;
+  margin: 0;
+}
+
+.facts > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px dashed #e9edf5;
+}
+
+.facts dt {
+  color: var(--ice-ui-faint);
+  font-size: 12.5px;
+}
+
+.facts dd {
+  margin: 0;
+  color: #3b475c;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.block {
+  display: grid;
+  gap: 7px;
+}
+
+.blockHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.blockTitle {
+  margin: 0;
+  color: #344154;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.itemProgress {
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableScroll,
+.changeScrollCompact {
+  overflow-x: auto;
+  border: 1px solid #e9ecf1;
+  border-radius: var(--ice-ui-radius-sm);
+  background: #fff;
+}
+
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.table th:first-child {
+  width: 118px;
+}
+
+.table th,
+.table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f2f5;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.table tbody tr:last-child th,
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table thead th {
+  background: #f8f9fb;
+  color: var(--ice-ui-faint);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table tbody th {
+  color: var(--ice-ui-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.beforeCell {
+  color: var(--ice-ui-faint);
+}
+
+.removedCell {
+  color: #a33a3a;
+  font-weight: 600;
+}
+
+.compactTable {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.compactTable th,
+.compactTable td {
+  padding: 6px 9px;
+}
+
+.itemList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid #eef0f4;
+}
+
+.itemList li {
+  padding: 10px 2px;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.itemList li:last-child {
+  border-bottom: 0;
+}
+
+.itemMain {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.itemHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.itemHead strong {
+  color: var(--ice-ui-text);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.itemMain small {
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.itemNote {
+  color: var(--ice-ui-muted) !important;
+}
+
+.itemLinks {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.itemLinks a,
+.entryLinks a {
+  color: var(--ice-ui-accent-strong);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.itemLinks a:hover,
+.entryLinks a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.itemMore {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.moreLink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ice-ui-accent-strong);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.allShown {
+  margin: 0;
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+.entryLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding-top: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.notes {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 17px;
+  color: var(--ice-ui-muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.sourceList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.sourceList > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.sourceList dt {
+  color: var(--ice-ui-faint);
+  font-size: 12px;
+}
+
+.sourceList dd {
+  margin: 0;
+  color: var(--ice-ui-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 窄屏：业务对象+动作 / 结果 / 时间+账号 ---------- */
+
+@media (max-width: 900px) {
+  .listHeader {
+    display: none;
+  }
+
+  .recordSummary {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'object toggle'
+      'result result'
+      'time time';
+    gap: 7px 12px;
+    padding: 11px 13px;
+  }
+
+  .objectCell {
+    grid-area: object;
+  }
+
+  .resultCell {
+    grid-area: result;
+  }
+
+  .timeCell {
+    grid-area: time;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 10px;
+  }
+
+  .timeCell strong {
+    white-space: normal;
+  }
+
+  .toggleCell {
+    grid-area: toggle;
+    align-self: start;
+  }
+
+  .recordBody {
+    padding: 12px 13px 15px;
+  }
+
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .listControls {
+    align-items: flex-start;
+  }
+
+  .sourceList > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1px;
+  }
+}
+
+@media (max-width: 720px) {
+  .dateGroup {
+    flex: 1 1 100%;
+  }
+
+  .dateControl {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .guideBody {
+    padding: 9px 11px;
+  }
+
+  .dateGroup {
+    flex-wrap: wrap;
+  }
+
+  .dateControl {
+    flex: 1 1 100%;
+  }
+
+  .dateSep {
+    display: none;
+  }
+
+  .facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guideChevron,
+  .toggleChevron,
+  .recordSummary,
+  .tab,
+  .dateControl,
+  .datePanel {
+    transition: none;
+  }
+
+  .datePanel {
+    animation: none;
+  }
+}

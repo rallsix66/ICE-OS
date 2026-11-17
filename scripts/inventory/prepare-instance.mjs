@@ -148,6 +148,9 @@ async function ensureSchema(owner, evidence) {
   // 海外库存「历史快照」只读读取（041，幂等；必须晚于 016 的 inventory_batch/inventory_batch_row：
   // 两个只读函数分页列批次、按明确批次核对所属仓；不建表、不改 016-040）。
   const inventorySnapshotFile = 'db/catalog/041_inventory_snapshot_reads.sql';
+  // 「操作记录」只读汇合（042，幂等；必须晚于 026-035 的物流表与 016/024 的库存对应表：
+  // 只读商品/库存/物流三类已保存的人工处理记录，不建表、不改 001-041）。
+  const operationRecordsFile = 'db/catalog/042_operation_records.sql';
   const applied = [];
   let sqlState;
   const version = Number(before.row?.version ?? 0);
@@ -201,6 +204,8 @@ async function ensureSchema(owner, evidence) {
   applied.push(await applySql(owner, shipmentAssociationRuleImpactFile));
   // 041 依赖 016 的库存批次表：放在 016-035 之后，正常准备实例即可使用历史快照。
   applied.push(await applySql(owner, inventorySnapshotFile));
+  // 042 依赖 026-035 的物流表与 016/024 的库存对应表：放在最后，正常准备实例即可使用操作记录。
+  applied.push(await applySql(owner, operationRecordsFile));
   const structureSha = hashFile(v6File);
   const functionsSha = hashFile(functionsFile);
   await owner.query(
