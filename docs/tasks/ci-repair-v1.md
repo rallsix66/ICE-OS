@@ -4,9 +4,12 @@
 - 分支：`codex/ci-repair-v1`
 - PR：**[#17](https://github.com/rallsix66/ICE-OS/pull/17)** → `master`
 - 实现提交：`af231c3`（`fix(ci): 修复跨平台基线并接入现役数据库检查`）
-- 文档提交：本轮 `docs(ci)` 提交（SHA 见 PR / 最终回执）
-- 状态：**PR 四组检查全部通过；master 必需检查已配置**。合并与 master CI 结果见 PR 与最终回执。
+- 文档提交：`238477c`（CI 修复记录）+ 本轮收尾提交
+- 状态：**已合并 master；PR 与 master 四组检查均实际执行并通过；master 必需检查已配置并回读**。
 - PR CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44038848207>
+- 合并提交：**`a36959579db44125608faa3fe5e3779a011d88f5`**
+- master CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44040384827>
+- 必需检查：`Tests`、`Lint`、`Build`、`Database checks`（`strict=false`、`enforce_admins=true`）
 
 ## 1. 原失败根因
 
@@ -85,7 +88,16 @@ Run：<https://github.com/rallsix66/ICE-OS/actions/runs/44038848207>
 
 ### 3.3 master CI
 
-合并后在 `master` 的合并提交上触发同四组 job；结果与链接见 PR 页面、合并提交检查页与最终交付回执。不以 PR head 的绿灯冒充 master 结果。
+合并提交 `a369595` 的 push 运行：<https://github.com/rallsix66/ICE-OS/actions/runs/44040384827>。四个 job 全部实际执行并通过：
+
+| Job | 结果 |
+| --- | --- |
+| Tests | SUCCESS |
+| Lint | SUCCESS |
+| Build | SUCCESS |
+| Database checks | SUCCESS |
+
+不以 PR head 的绿灯冒充 master 结果；该运行对应合并提交本身。
 
 ### 3.4 必需检查
 
@@ -111,4 +123,6 @@ Run：<https://github.com/rallsix66/ICE-OS/actions/runs/44038848207>
 - 跨平台基线：`scripts/p0-01/opt6-baseline.mjs`、`scripts/p0-02/opt6-baseline.mjs`、两份 `opt6-approved-baseline.json`
 - 测试：`tests/p0-01/opt6-baseline.test.ts`、`src/features/database/opt6-production-apply.test.ts`
 - PR：<https://github.com/rallsix66/ICE-OS/pull/17>
-- 合并提交：见 PR / 最终回执
+- 合并提交：`a36959579db44125608faa3fe5e3779a011d88f5`
+- master CI：<https://github.com/rallsix66/ICE-OS/actions/runs/44040384827>
+- 必需检查回读：`["Tests","Lint","Build","Database checks"]`，`strict=false`，`enforce_admins=true`，未增加审查人数/签名/部署审批。
