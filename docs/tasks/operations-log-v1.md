@@ -4,8 +4,8 @@
 - 状态：**独立复核 PASS，阻断 0；本轮已完成（2026-11-17）**
 - 分支：`codex/operations-log-v1`
 - 已验收实现提交：**`105b127`**
-- 文档收尾提交：本轮 `docs(operations)` 提交（SHA 见 PR / 最终回执）
-- 合并目标：`master`；PR：创建后回填（见 §8）
+- 文档收尾提交：**`1452be5`**（独立复核 PASS 与验收结论）+ PR 链接回填提交（见 §8）
+- 合并目标：`master`；PR：**[#16](https://github.com/rallsix66/ICE-OS/pull/16)**
 - 实例：`run-20261026T211500Z-11a22b33`（Web 3011 / PostgreSQL 59345；PG pid 40076，preview pid 48248）
 - 最终 BUILD：**`tg4VKYyZQYR3Jq7uz5ktk`**
 - 源码快照：**`1610bf943a4f3608a85a55e326ff22c426b9a0ef50abeab500df1b20ea9ecaa1`**（与运行构建一致）
@@ -242,6 +242,7 @@
 
 ## 8. PR 与合并
 
-- PR：创建后回填（目标 `master`）。
+- PR：**[#16](https://github.com/rallsix66/ICE-OS/pull/16)** → `master`。
+- 验收文档提交：`1452be5`（`docs(operations): 登记独立复核 PASS 与最终验收结论`）；PR 链接回填提交见 PR 提交列表。
 - 合并方式：仓库既有 merge commit；保留本轮提交历史。
 - 合并提交 SHA：由 GitHub 合并后回读，见最终交付回执与 PR 页面。
