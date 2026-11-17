@@ -6,7 +6,17 @@
 > 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 > 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 
-## 当前任务：操作记录 v1 最终交付（独立复核 PASS，阻断 0）（2026-11-17）—— 已完成
+## 当前任务：CI 修复 v1（跨平台基线 + 现役数据库检查）（2026-11-17）—— PR 四组检查全绿
+
+状态：**PR #17 的 Tests / Lint / Build / Database checks 四组实际执行并通过；master 必需检查已配置并回读**。实现提交 `af231c3`；PR CI <https://github.com/rallsix66/ICE-OS/actions/runs/44038848207>；合并与 master CI 结果见 PR / 最终回执。完整记录：[ci-repair-v1.md](ci-repair-v1.md)。
+
+- **跨平台修复**：`opt6-baseline` 只比较 LF 规范化 SHA，原始 SHA/换行计数仅作诊断；`opt6-production-apply` 的 packet 与 migration 同时规范化；新增 LF/CRLF 等价与篡改拒绝断言；仅因测试文件变更更新批准指纹，未改历史 SQL。
+- **现役数据库检查**：`npm run ci:database` 在 GitHub Actions PostgreSQL 17 临时库从空库安装 45 个 SQL（82 表 / 232 函数），用实际 app 角色验证读取、`catalog.assign_initial_code` 保存回读、`read_operation_records`、未授权 42501 与只读写入 25006；非空目标拒绝。
+- **CI/Lint**：拆成 Tests / Lint / Build / Database checks 四个独立 job；清理 19 条既有 warning，`--max-warnings 0` 通过；旧 `test:concurrency`/`test:database-contract` 保留历史用途但退出默认 CI。
+- **本地证据**：默认测试 **948 passed / 16 skipped / 0 failed**；lint 0；build 成功；`ci:database` 成功。操作记录 v1 的独立复核 PASS 结论不变。
+- **边界**：只改 CI/跨平台测试/lint/文档；不操作现役业务数据，不重建/重启实例，不启动 worker，不扩大业务范围。
+
+## 上一任务：操作记录 v1 最终交付（已验收）
 
 状态：**独立复核 PASS，阻断 0；本轮已完成**。范围为当前本地现役实例的操作记录 v1（R1–R5、整页系统样式、最终双日期日历），不是生产部署结论。已验收实现提交 **`105b127`**；BUILD **`tg4VKYyZQYR3Jq7uz5ktk`**（源码快照 `1610bf94…`，preview pid 48248），入口 <http://127.0.0.1:3011/dashboard/operations>。独立复核报告：`.local/catalog/operations-log-r5-20261117/independent-review.md`；执行方证据 `.local/catalog/operations-log-r5-20261117/`（`verify-r5.json`、截图 `r5-01`–`r5-15`）。合同与完整验收记录：[operations-log-v1.md](operations-log-v1.md)。
 

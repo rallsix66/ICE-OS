@@ -9,6 +9,10 @@
 - [部署准备：Mac mini + Cloudflare + NAS](deploy/mac-mini-cloudflare-nas-v1.md)：目标分工、依赖、持久数据、
   搬迁步骤、Mac 实机待验证清单、登录重建项。
 - [备份与恢复入口](deploy/backup-restore.md)：数据库/配置/来源文件备份、恢复校验与整实例恢复步骤。
+- [CI 修复 v1：跨平台基线 + 现役数据库检查](tasks/ci-repair-v1.md)：修复 Linux/Windows 换行导致的
+  `opt6` 基线失败；默认 CI 拆成 Tests / Lint / Build / Database checks 四个独立 job；数据库检查在
+  PostgreSQL 17 临时库从空库安装 P0-02 + catalog 001–042（45 SQL / 82 表 / 232 函数），用实际 app 角色验证
+  读取、RPC 保存回读、操作记录、未授权与只读写入拒绝；PR 四组检查全绿，master 必需检查已配置并回读。
 - [操作记录 v1：双日期系统日历 + 整页系统样式统一](tasks/operations-log-v1.md)：商品资料/库存对应/物流已保存人工处理只读入口；
   只有明确撤销审计才显示“撤销”，正常改选显示“已被后续选择替代”；保留“开始日期 / 结束日期”两个独立控件与分别选日、
   选完立即筛选，浏览器原生日期弹窗换成页面内共用单日历（可切年月、清空单边、Esc/点外关闭），输入框与日历统一系统样式；
