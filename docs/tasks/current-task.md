@@ -6,15 +6,14 @@
 > 2026-10-30 追加：三页 UI 第二轮（表格排序/显示列/列宽、自定义下拉、待处理页瘦身、商品汇总详情重做、同步详情/设置改抽屉）已完成并在 3011 验证；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 > 2026-10-30 晚追加：三页 UI 第三轮（裸链接按钮化、列宽拖拽重做与百分比列宽、工具栏/列顺序统一、商品库详情过渡、库存来源改名 BigSeller/聚水潭、删实物列加估算货值、两表详情按钮）已完成并在 3011 验证（BUILD `Em1LtKpUBa7DSmmusfOH0`，定向 54/54、商品库 Playwright 22/22）；未提交/推送/部署。范围见 [ui-refresh-v1.md](ui-refresh-v1.md)。
 
-## 当前任务：CI 修复 v1 补修（B1 空库检查 / B2 只读断言）（2026-11-17）—— 补修 PR #19 四组 CI 通过，最终合并见回执
+## 当前任务：CI 修复 v1 已完成，独立复核 PASS，阻断 0（2026-11-17）—— 已收尾
 
-状态：独立审查 B1/B2 已按最小改动修复。初版 #17 已合并 `a369595`；补修 PR **[#19](https://github.com/rallsix66/ICE-OS/pull/19)**，实现提交 `c1d26ea`，run <https://github.com/rallsix66/ICE-OS/actions/runs/44044902291> 的 Tests / Lint / Build / Database checks 四组实际通过；最终 head、合并 SHA 与 master CI 见交付回执。完整记录：[ci-repair-v1.md](ci-repair-v1.md)。
+状态：**CI 修复 v1 已完成，独立复核 PASS，阻断 0**（PASS 由补修后独立复核给出，执行方仅登记）。验收对象 PR #19 / 实现提交 `c1d26ea` / final head `b046948` / 合并提交 `534f403`；PR run <https://github.com/rallsix66/ICE-OS/actions/runs/44045424734> 与 master run <https://github.com/rallsix66/ICE-OS/actions/runs/44045702304> 的 Tests / Lint / Build / Database checks 四组实际通过；B1/B2 已关闭，四项必需检查已由独立审查回读。此前“暂不 PASS”已由补修后复核接续，详见 [ci-repair-v1.md](ci-repair-v1.md)。
 
-- **B1**：`scripts/ci/database.mjs` 去掉 `DROP SCHEMA public CASCADE; CREATE SCHEMA public`；安装前检查 public 已有 relation/routine/type、其他非系统 schema，并保留四个 ICE schema 拒绝；非空目标在安装写入前返回 `CI_DATABASE_NOT_EMPTY`。
-- **B2**：只读事务写入拒绝只接受 `25006`；未授权身份仍只接受 `42501`；未调整角色权限。
-- **定向验证**：空库完整成功（45 SQL / 82 表 / 232 函数，appRead=1、CI-0001/rev2、operationsTotal=1、42501、25006）；public 非空库 exit 1 且原表 1 行 `must survive` 保留、无 catalog/p0_02_meta schema；临时普通 `BEGIN` 负向 `expected 25006, got 42501`，恢复正式实现后通过。
-- **证据补齐**：PR #17 final head `238477c`/run 44040075051、PR #18、master `b033798`/run 44041324456。
-- **边界**：只改数据库 CI 脚本与文档；使用本机隔离临时库（55437），不操作现役 3011/59345，不重启实例/启动 worker；操作记录 v1 的独立复核 PASS 不变；执行方不自行宣布独立复核 PASS。
+- **B1**：安装前拒绝非空 public（及其他用户/ICE schema），不再清空 public；`keep_me` 事后保留来自执行方回执，独立代码审查确认拒绝发生在安装前。
+- **B2**：只读写入仅接受 25006，未授权身份仍 42501；负向日志证明普通权限拒绝不会误判通过。
+- **验收边界**：独立审查做代码差异、执行日志、远端合并、CI 和保护设置复核，未重跑全仓测试、页面或数据库；操作记录 v1 PASS 不变。
+- **代码对象**：`c1d26ea` / `534f403`；本轮文档提交只登记结论，不冒充代码验收对象。
 
 ## 上一任务：操作记录 v1 最终交付（已验收）
 
