@@ -222,8 +222,6 @@ async function main() {
     // 3. 成员范围仍按授权收窄
     const granted = (await owner.query(
       "SELECT id,external_name,external_warehouse_id FROM catalog.inventory_warehouse WHERE external_warehouse_id='50455'")).rows[0];
-    const other = (await owner.query(
-      "SELECT id FROM catalog.inventory_warehouse WHERE external_warehouse_id='56673'")).rows[0];
     const roleRow = (await owner.query("SELECT id FROM catalog.access_role WHERE preset_key='ops'")).rows[0]
       ?? (await owner.query('SELECT id FROM catalog.access_role ORDER BY created_at LIMIT 1')).rows[0];
     await owner.query('SAVEPOINT seed_member');
