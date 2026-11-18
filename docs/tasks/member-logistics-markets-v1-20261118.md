@@ -1,7 +1,7 @@
 # 成员按授权物流市场查看物流在途 v1（2026-11-18）
 
 适用实例：**`run-20261026T211500Z-11a22b33`**（Web `3011` / PostgreSQL `59345`）。
-交付状态：**本机实现与实跑验收完成（执行方自验）**；本地提交在分支 `feat/member-logistics-market-v1`，**未推送/部署**，最终独立复核由复核方给出。
+交付状态：**本机现役独立复核 PASS，阻断 0**（验收提交 `7a4dd12`；功能 `76b851d`，四项补修见 [补修记录](member-logistics-markets-v1-fixes-20261118.md)）。
 运行构建：**BUILD `-lyX4Pxg5aGgaM_7bUUNS`**（源码快照 `c2720425…`，3011 login 200；含 2026-11-18 补修 046 与账号文案调整，补修记录见 [member-logistics-markets-v1-fixes-20261118.md](member-logistics-markets-v1-fixes-20261118.md)）。
 
 - 前置任务：[permissions-v1-20261117.md](permissions-v1-20261117.md)（角色/账号/仓库范围；物流在途仍是管理员功能）
@@ -113,10 +113,12 @@ node scripts/catalog/promote-preview-build.mjs --run-id run-20261026T211500Z-11a
 $env:CATALOG_PREVIEW_PORT="3011"; node scripts/catalog/start-local-preview.mjs --run-id run-20261026T211500Z-11a22b33
 ```
 
-现役 BUILD **`qVS5s3VseWDEWDk7NmvkU`**（源码快照 `dee5a54b1762a7e2…`，ready/manifest/preview-server 一致、login 200）；数据库迁移 045 已应用到现役库，业务数据零写入（探针全部回滚）。交付时成员「验收成员V1」已授予「越南物流」、仍无其它市场；现役 `account_access_market` 1 行、越南当前快照 6 票。
+本轮最终 BUILD **`-lyX4Pxg5aGgaM_7bUUNS`**（源码快照 `c2720425…`，含 046 与账号文案调整；ready/manifest/preview-server 一致、login 200）；数据库迁移 045/046 已应用到现役库，迁移探针全部在事务内回滚。浏览器验收阶段另临时写入 **1 张票、2 条明细**（用于冲突样例页面读取），读取后已按票 ID 删除；独立复核回查 85 票/231 明细无残留。现役 `account_access_market` 1 行、越南当前快照 6 票。
 
 ## 7. 验证与已知边界
 
+> 2026-11-18 收尾：本机现役独立复核 **PASS，阻断 0**（验收提交 `7a4dd12`）。首轮成员查票实跑与四项补修均通过；复核报告 [independent-review.md](../../.local/catalog/member-logistics-markets-v1-20261118/independent-review.md)、[independent-review-followup.md](../../.local/catalog/member-logistics-markets-v1-20261118/independent-review-followup.md)。样例说明已更正：迁移探针在事务内回滚；浏览器验收临时写入 1 张票、2 条明细，页面读取后删除，复核回查 85 票/231 明细无残留。
+>
 > 2026-11-18 补修：新增 [046](member-logistics-markets-v1-fixes-20261118.md)，恢复 045 漏掉的冲突/原数量字段并修正账号启停审计；成员市场过滤未回退。全量标准测试 **971/971 PASS**。
 
 - 全量标准测试 `npm test` **971/971 PASS**。
