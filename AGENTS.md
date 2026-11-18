@@ -16,7 +16,7 @@ Read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js
 
 ## 入口与状态
 
-- **当前状态（2026-11-18 10:52）：权限设置 v1 本机现役实例独立复核 PASS，阻断 0。** BUILD `y_naEIGp34k9I4LE66Eul`。角色、账号及海外库存成员使用已验收，见[任务记录 §12](docs/tasks/permissions-v1-20261117.md#12-最终独立复核)。
+- **当前状态（2026-11-18 10:52）：权限设置 v1 本机现役实例独立复核 PASS，阻断 0。** BUILD `y_naEIGp34k9I4LE66Eul`。角色、账号及海外库存成员使用已验收，见[任务记录 §12](docs/tasks/permissions-v1-20261117.md#12-最终独立复核)。本地 Git 收尾：分支 `codex/permissions-v1`，包提交 **`6b4c34b`**；未推送、未部署。
 
 - 最后两项补修的执行方自验记录：现役 BUILD `y_naEIGp34k9I4LE66Eul`（3011/59345，login 200，ready 一致）。①**按行下发货值**：仓库明细/商品汇总改在服务端复用 `estimateValueScaled`（实物数量 × 采用价）计算，只给当前结果行附 `estimatedValueText`；页面不再接收 `costMap`。越南 WM0043 / SKU `757577407120` 管理员与成员同批（10:22:17、89 行）均 **¥6,747.30**；按 SKU 响应 1 个值、无成本表，整页 50 行恰好 50 个值；关闭金额权限后无列、无 `¥`、无字段。②**失效书签**：搜索/清空时保留失效 `snapWarehouse` 作为待重选上下文，不再自动切到第一个授权仓；连续“打开旧书签 → 输入 → 清空”三步批次/明细均为 0，主动选越南仓后才显示 10:22 批次与明细。③**验证**：E2E **14/14**、受影响单测 **128/128**、全量 **966/967**（唯一既有 opt6 换行基线）、`tsc` 仅既有 BEST 5、改动 eslint 0；console/pageerror 0。三个后台保持运行；未提交/推送/部署。见[完整记录 §11](docs/tasks/permissions-v1-20261117.md#11-最后两项补修2026-11-18)。
 

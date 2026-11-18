@@ -1,7 +1,7 @@
 # 权限设置 v1：角色与账号管理 + 海外库存成员使用（2026-11-17）
 
 适用实例：**`run-20261026T211500Z-11a22b33`**（Web `3011` / PostgreSQL `59345`）。
-交付状态：**2026-11-18 10:52 本机现役实例最终独立复核 PASS，阻断 0**。首轮发现与补修保留在 §8–§11，验收结果见 §12。
+交付状态：**2026-11-18 10:52 本机现役实例最终独立复核 PASS，阻断 0；本地 Git 收尾已完成**。首轮发现与补修保留在 §8–§11，验收结果见 §12，本地 Git 收尾见 §13。
 运行构建：**BUILD `y_naEIGp34k9I4LE66Eul`**（§9/§10 的 `OsuD3WcqYIAZFXEFqws7p` 已被本轮替代），预览进程与实例 `next-workspace` 一致。
 
 - 上一包（已复核 PASS）：[live-data-resume-20261117.md](live-data-resume-20261117.md)（§10 复核登记与两处表述澄清）
@@ -279,7 +279,7 @@ node scripts/catalog/apply-044.mjs --commit --allow-live-commit --run-id run-202
 | 构建 / 就绪 | staging build **`y_naEIGp34k9I4LE66Eul`** → promote → 3011 login 200；ready/BUILD_ID 一致 |
 
 - 三个后台保持运行：库存 `42160`、物流 `53028`、商品资料 `53036`；本轮只重建并重启 Next（预览 pid `38556`），未新增迁移、未改表/函数；仅测试期间临时切换并恢复成员角色的金额权限。
-- 测试期间临时关闭再恢复成员角色金额权限，交付状态为「启用 · 含金额 · 2 仓」；未提交、未推送、未部署；工作区原有 Mac 部署准备改动保持原样。
+- 测试期间临时关闭再恢复成员角色金额权限，交付状态为「启用 · 含金额 · 2 仓」；本机验收时未提交，本地 Git 收尾见 §13（未推送、未部署）；工作区原有 Mac 部署准备改动保持原样。
 - 复核入口建议：`/dashboard/inventory?warehouse=79d492ca-0987-4254-8ba1-edba1b881ebe&q=757577407120`（成员与管理员同值）、`?snap=1&snapWarehouse=19451232-18d3-4492-b913-a30cb3b14c48`（失效书签连续操作）。
 
 ### 11.4 仍存边界
@@ -294,4 +294,12 @@ node scripts/catalog/apply-044.mjs --commit --allow-live-commit --run-id run-202
 
 - **成员收到的金额字段。** 越南青林湾仓 WM0043「CHIC PEAK 唇泥 P01」，来源 SKU `757577407120`。管理员与含金额权限成员仓库明细均为可售 2,292、货值 ¥6,747.30；成员商品汇总为实物 2,295、货值 ¥6,747.30，与采用单位成本 2.94 一致。主审读取正常页面响应：单 SKU 明细和单商品汇总各有 1 行、1 个货值字段；越南仓第一页 50 行、50 个货值字段，三次响应均无成本表字段。代码核对确认先对完整结果排序、再切页，只有当前页行附货值。关闭金额权限下的两表结果沿用 §11 的实际取证，并确认服务端分支省略该字段。
 - **失效书签连续操作。** 主审打开印尼 DEE 仓旧书签，输入上述 SKU，再点「清空搜索」。三步 URL 均保留原仓，选仓显示「请选择」，重选提示一直可见，均无批次列表、无明细。主动选择越南青林湾仓后，URL 才切换，提示消失，显示「本批共 89 行」、首页明细 50 行。本次复核页面异常数为 0。
-- **运行与前轮成果。** 现役登录页 200，运行 BUILD_ID 与 ready 一致。10:22 自动任务导出 733 行、发布 7 仓 655 行。库存、物流、商品资料后台均存活。角色与账号管理、停用、改密留痕、授权范围、成员详情、标准实例准备及重复准备沿用 §3、§9、§10 的相应证据。§11 的 14/14、128/128、966/967 等为执行方结果。该 PASS 范围为本机现役构建；Git 收尾与正式部署另行记录。
+- **运行与前轮成果。** 现役登录页 200，运行 BUILD_ID 与 ready 一致。10:22 自动任务导出 733 行、发布 7 仓 655 行。库存、物流、商品资料后台均存活。角色与账号管理、停用、改密留痕、授权范围、成员详情、标准实例准备及重复准备沿用 §3、§9、§10 的相应证据。§11 的 14/14、128/128、966/967 等为执行方结果。该 PASS 范围为本机现役构建；本地 Git 收尾见 §13，正式部署另行记录。
+
+## 13. 本地 Git 收尾
+
+- 分支：`codex/permissions-v1`（从 `codex/operations-log-v1` 的 `55f7356` 创建；仅本地，未推送）。
+- 包提交：**`6b4c34b`** `feat(permissions): 权限设置 v1 与两轮补修`，共 37 个文件：043/044 迁移与 apply 脚本、权限页面与 access 服务端、库存成员/金额/详情/快照改动、导航、定向测试、准备链和本包交付文档。
+- 共用文档只提交本包段落：`AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`、`docs/tasks/inventory-sync-v1-runbook.md`（§9 权限设置）。
+- 保留在工作区、未纳入包提交：Mac 部署准备（`scripts/catalog/start-catalog-postgres.mjs`、`stop-catalog-postgres.mjs`、`scripts/inventory/login-bigseller.mjs`、`start-worker.mjs`、`scripts/shipment/start-worker.mjs`、`tools/inventory-sync/bigseller_session.py`，以及 README/部署文档、`docs/deploy/`、`scripts/deploy/`、`scripts/runtime/check-runtime.mjs`、pnpm 文件、`.gitignore` 的部署准备忽略项）；上一包 `docs/tasks/live-data-resume-20261117.md` 及其共用文档段落；本机 `.local` 凭据与证据。
+- 本提交只做本地版本收尾；未推送、未部署，3011 运行构建与三个后台未重启，沿用 §12 的 PASS 结论。
