@@ -43,6 +43,8 @@ export function ShipmentFilterBar({
   compact = false,
   compactCountText,
   reviewEntry,
+  allowAbsent = true,
+  allowColumns = true,
 }: {
   query: ShipmentQueryState;
   markets: ShipmentMarketCountDto[];
@@ -58,6 +60,9 @@ export function ShipmentFilterBar({
   compactCountText?: string;
   /** 「待复核」弹窗入口（工具栏右侧；列表与货值汇总都显示）。 */
   reviewEntry?: ReactNode;
+  /** 成员只读：不提供「包含本次来源未见」与列设置（管理员能力）。 */
+  allowAbsent?: boolean;
+  allowColumns?: boolean;
 }) {
   const router = useRouter();
   const [term, setTerm] = useState(query.q);
@@ -226,13 +231,15 @@ export function ShipmentFilterBar({
           ariaLabel="业务状态筛选"
           testId="shipment-status-filter"
         />
-        <SelectMenu
-          value={query.includeAbsent ? 'absent' : 'current'}
-          onChange={(next) => navigate({ includeAbsent: next === 'absent' })}
-          options={ABSENT_OPTIONS}
-          ariaLabel="是否包含本次来源未见"
-          testId="shipment-absent-filter"
-        />
+        {allowAbsent ? (
+          <SelectMenu
+            value={query.includeAbsent ? 'absent' : 'current'}
+            onChange={(next) => navigate({ includeAbsent: next === 'absent' })}
+            options={ABSENT_OPTIONS}
+            ariaLabel="是否包含本次来源未见"
+            testId="shipment-absent-filter"
+          />
+        ) : null}
         <SelectMenu
           value={String(query.limit)}
           onChange={(next) => navigate({ limit: Number(next) })}
@@ -240,7 +247,7 @@ export function ShipmentFilterBar({
           ariaLabel="每页条数"
           testId="shipment-limit-filter"
         />
-        <ColumnsMenu columns={columns} controls={controls} testId="shipment-columns" />
+        {allowColumns ? <ColumnsMenu columns={columns} controls={controls} testId="shipment-columns" /> : null}
         <button
           type="button"
           className={surface.button}
@@ -264,7 +271,7 @@ export function ShipmentFilterBar({
           ))}
         </div>
       ) : null}
-      {absentText ? (
+      {allowAbsent && absentText ? (
         <p className={styles.pageNotice} data-testid="shipment-absent-note">{absentText}</p>
       ) : null}
     </section>

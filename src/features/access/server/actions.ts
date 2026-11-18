@@ -82,6 +82,15 @@ function uuidOrNull(value: unknown): string | null {
     ? value : null;
 }
 
+/** 物流市场是飞书来源国家原值（中文），这里只做格式收敛，是否真实存在由数据库入口校验。 */
+function marketKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry.length <= 40))].slice(0, 20);
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** 编辑弹窗打开时读取账号详情（含仓库范围）；只服务管理员。 */
@@ -124,6 +133,7 @@ export async function createAccessAccountAction(input: {
   password: string;
   roleId: string;
   warehouseIds: string[];
+  marketKeys: string[];
   isActive: boolean;
 }): Promise<AccessActionResult> {
   return perform(async () => {
@@ -133,6 +143,7 @@ export async function createAccessAccountAction(input: {
     const password = typeof input.password === 'string' ? input.password : '';
     const roleId = uuidOrNull(input.roleId);
     const warehouseIds = uuidList(input.warehouseIds);
+    const markets = marketKeys(input.marketKeys);
     if (!displayName) throw new Error('ACCESS_ACCOUNT_NAME_REQUIRED');
     if (!EMAIL_RE.test(email)) throw new Error('ACCESS_ACCOUNT_EMAIL_INVALID');
     if (password.length < 8) throw new Error('ACCESS_ACCOUNT_PASSWORD_INVALID');
@@ -140,7 +151,7 @@ export async function createAccessAccountAction(input: {
     const { authUserId } = await provisionAuthAccount({ email, password, name: displayName });
     try {
       await callAppRpc(identity, 'catalog.create_access_account',
-        [authUserId, email, displayName, roleId, warehouseIds, input.isActive === true]);
+        [authUserId, email, displayName, roleId, warehouseIds, input.isActive === true, markets]);
     } catch (error) {
       await deleteAuthAccount(authUserId);
       throw error;
@@ -154,6 +165,7 @@ export async function updateAccessAccountAction(input: {
   roleId: string;
   isActive: boolean;
   warehouseIds: string[];
+  marketKeys: string[];
 }): Promise<AccessActionResult> {
   return perform(async () => {
     const identity = await requireAccessAdmin();
@@ -167,6 +179,7 @@ export async function updateAccessAccountAction(input: {
       roleId,
       input.isActive === true,
       uuidList(input.warehouseIds),
+      marketKeys(input.marketKeys),
     ]);
   });
 }

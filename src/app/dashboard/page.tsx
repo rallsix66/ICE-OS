@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getCurrentActiveUser } from '@/lib/auth';
+import { getMyInventoryAccess } from '@/features/access/server/reads';
 import { ReadFailurePanel } from '@/features/inventory/components/display';
 import { classifyReadFailure } from '@/features/inventory/model';
 import { BusinessOverviewPage } from '@/features/overview/components/business-overview-page';
@@ -24,9 +25,15 @@ export default async function DashboardHomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // 权限设置 v1：成员没有全站总览权限，登录后直接进自己能用的商品库存，不显示空的总览。
+  // 权限设置 v1：成员没有全站总览权限，登录后直接进自己能用的页面：
+  // 有库存范围去商品库存；只有物流市场授权去物流在途；两者都没有仍回库存看空态提示。
   const actor = await getCurrentActiveUser();
-  if (actor && actor.roleName !== 'admin') redirect('/dashboard/inventory');
+  if (actor && actor.roleName !== 'admin') {
+    const access = await getMyInventoryAccess().catch(() => null);
+    redirect(access && !access.canViewInventory && access.canViewShipment
+      ? '/dashboard/in-transit'
+      : '/dashboard/inventory');
+  }
 
   const sp = await searchParams;
   const query = parseHomeSearchParams(sp);

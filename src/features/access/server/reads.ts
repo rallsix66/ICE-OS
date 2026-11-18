@@ -6,6 +6,7 @@ import type {
   AccessAccountDetailDto,
   AccessAccountsPageDto,
   AccessAccountDto,
+  AccessMarketOptionDto,
   AccessRoleDto,
   AccessWarehouseOptionDto,
   MyInventoryAccessDto,
@@ -88,6 +89,7 @@ function normalizeAccount(raw: unknown): AccessAccountDto | null {
     canViewInventory: bool(row.canViewInventory),
     canViewAmount: bool(row.canViewAmount),
     markets: asArray(row.markets).map((entry) => text(entry)).filter(Boolean),
+    logisticsMarkets: asArray(row.logisticsMarkets).map((entry) => text(entry)).filter(Boolean),
     warehouseCount: int(row.warehouseCount),
   };
 }
@@ -138,6 +140,8 @@ export async function getMyInventoryAccess(): Promise<MyInventoryAccessDto | nul
         market: textOrNull(warehouse.market),
       };
     }).filter((warehouse) => warehouse.id.length > 0),
+    canViewShipment: bool(row.canViewShipment),
+    shipmentMarkets: asArray(row.shipmentMarkets).map((entry) => text(entry)).filter(Boolean),
   };
 }
 
@@ -168,8 +172,21 @@ export async function getAccessWarehouseOptions(): Promise<AccessWarehouseOption
     .filter((entry): entry is AccessWarehouseOptionDto => entry !== null);
 }
 
-export interface AccessAccountQuery {
-  search: string;
+/** 账号可勾选的物流市场（来自飞书物流表里真实出现过的市场），只服务管理员。 */
+export async function getAccessMarketOptions(): Promise<AccessMarketOptionDto[]> {
+  const identity = await requireAccessAdmin();
+  const raw = await callReadRpc<unknown>(identity, 'catalog.read_access_market_options', []);
+  return asArray(asRecord(raw).markets)
+    .map((entry) => {
+      const row = asRecord(entry);
+      const market = text(row.market);
+      if (!market) return null;
+      return { market, ticketCount: int(row.ticketCount) } satisfies AccessMarketOptionDto;
+    })
+    .filter((entry): entry is AccessMarketOptionDto => entry !== null);
+}
+
+export interface AccessAccountQuery {  search: string;
   roleId: string | null;
   status: 'active' | 'inactive' | null;
   page: number;

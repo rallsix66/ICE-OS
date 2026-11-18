@@ -75,6 +75,28 @@ const DEPENDENT_SQL = [
       'catalog.read_inventory_item(uuid,text,text,boolean)',
     ],
   },
+  {
+    // 成员按授权物流市场查看物流在途（045）：必须晚于 043/044 与 026 的货票读取函数；
+    // 目录预览还没有物流表时跳过，由 prepare-instance 在 026-044 之后按顺序安装。
+    path: 'db/catalog/045_member_logistics_markets.sql',
+    requires: [
+      'catalog.access_role', 'catalog.account_access', 'catalog.account_access_warehouse',
+      'catalog.shipment', 'catalog.shipment_item', 'catalog.shipment_source_snapshot',
+      'public.profiles',
+    ],
+    requiresFunctions: [
+      'catalog.require_admin()',
+      'catalog.is_admin()',
+      'catalog.read_shipment_list(text,text,text,uuid,boolean,integer,integer)',
+      'catalog.read_shipment_detail(uuid)',
+      'catalog.read_shipment_manual_index()',
+      'catalog.read_shipment_manual_history(uuid)',
+      'catalog.read_shipment_source_status()',
+      'catalog.read_my_inventory_access()',
+      'catalog.access_account_rows(text,uuid,text,integer,integer)',
+      'catalog.read_access_account(uuid)',
+    ],
+  },
 ];
 
 async function applyCatalogSql(run) {

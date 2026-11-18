@@ -40,8 +40,8 @@ export const UNKNOWN_MARKET_TOKEN = '__unknown__';
 export const SHIPMENT_MARKET_ALL = 'all';
 
 /** 列表/详情/搜索文案保持一致：采购单号、运单号、商品名称。 */
-export const SHIPMENT_SEARCH_PLACEHOLDER = '搜索采购单号 / 运单号 / 商品名称';
-export const SHIPMENT_SEARCH_ARIA = '搜索采购单号、运单号或商品名称';
+export const SHIPMENT_SEARCH_PLACEHOLDER = '搜索票号 / 采购单号 / 运单号 / 商品名称';
+export const SHIPMENT_SEARCH_ARIA = '搜索票号、采购单号、运单号或商品名称';
 
 /* ------------------------------------------------------------------ *
  * 时间与数量（确定性：固定 Asia/Shanghai）
