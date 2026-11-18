@@ -6,8 +6,6 @@ import { useTransition } from 'react';
 import { EmptyState } from '@/ui/ice-v4/data-surface';
 import surface from '@/ui/ice-v4/data-surface.module.css';
 import { SortableTh, type TableColumn, type TableControls } from '@/ui/ice-v4/table-tools';
-import { formatMoney } from '@/features/catalog/local-display/decimal';
-import { formatCnyValue } from '@/features/catalog/local-display/money-display';
 import styles from './inventory.module.css';
 import {
   buildInventoryListHref,
@@ -20,8 +18,7 @@ import {
   type Tone,
 } from '../model';
 import type { InventoryProductSummaryRowDto } from '../types';
-import type { InventoryCostMap, ProductSummaryMergeResult } from '../dual-view';
-import { estimateValueScaled } from '../dual-view';
+import type { ProductSummaryMergeResult } from '../dual-view';
 import { columnOf } from './inventory-columns';
 import { useInventoryDetail } from './detail-context';
 
@@ -35,16 +32,9 @@ function summaryStatus(row: InventoryProductSummaryRowDto, domesticOnlyScope: bo
   return bound ? { text: '已绑定', tone: 'green' } : { text: '未绑定', tone: 'amber' };
 }
 
-/** 估算货值：海外/全部用海外实物合计×成本，仅国内用国内数量×成本；缺数量或缺成本显示“—”。 */
-function summaryValueText(
-  row: InventoryProductSummaryRowDto,
-  domesticOnlyScope: boolean,
-  costMap: InventoryCostMap | undefined,
-): string {
-  const qty = domesticOnlyScope ? row.domestic?.onHand : row.overseasOnHand;
-  const scaled = estimateValueScaled(qty, costMap?.[row.itemId]);
-  if (scaled === null) return '—';
-  return formatCnyValue(formatMoney(scaled)) ?? '—';
+/** 估算货值：服务端已按当前来源范围的数量与采用成本算好；缺失显示“—”。 */
+function summaryValueText(row: InventoryProductSummaryRowDto): string {
+  return row.estimatedValueText ?? '—';
 }
 
 function ProductNameButton({
@@ -79,7 +69,6 @@ export function ProductSummaryTable({
   domesticOnlyScope,
   controls,
   columns,
-  costMap,
   showValue,
 }: {
   query: InventoryQueryState;
@@ -87,7 +76,6 @@ export function ProductSummaryTable({
   domesticOnlyScope: boolean;
   controls: TableControls;
   columns: TableColumn[];
-  costMap?: InventoryCostMap;
   showValue: boolean;
 }) {
   const api = useInventoryDetail();
@@ -229,7 +217,7 @@ export function ProductSummaryTable({
                     ) : null}
                     {showValue && controls.isVisible('value') ? (
                       <td className={styles.numCell} data-testid="inventory-summary-value">
-                        {summaryValueText(row, domesticOnlyScope, costMap)}
+                        {summaryValueText(row)}
                       </td>
                     ) : null}
                     {controls.isVisible('status') ? (

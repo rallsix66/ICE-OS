@@ -5,8 +5,6 @@ import { useTransition } from 'react';
 import { EmptyState } from '@/ui/ice-v4/data-surface';
 import surface from '@/ui/ice-v4/data-surface.module.css';
 import { SortableTh, type TableColumn, type TableControls } from '@/ui/ice-v4/table-tools';
-import { formatMoney } from '@/features/catalog/local-display/decimal';
-import { formatCnyValue } from '@/features/catalog/local-display/money-display';
 import styles from './inventory.module.css';
 import {
   buildInventoryListHref,
@@ -18,8 +16,7 @@ import {
   type Tone,
 } from '../model';
 import type { InventoryWarehouseRowDto } from '../types';
-import type { InventoryCostMap, WarehouseRowsPageResult } from '../dual-view';
-import { estimateValueScaled } from '../dual-view';
+import type { WarehouseRowsPageResult } from '../dual-view';
 import { columnOf } from './inventory-columns';
 import { useInventoryDetail } from './detail-context';
 
@@ -50,11 +47,9 @@ function RowTitleButton({ row }: { row: InventoryWarehouseRowDto }) {
   );
 }
 
-/** 估算货值：行内实物数量 × 该商品当前采用单位成本；任一缺失显示“—”（缺成本不是 0）。 */
-function valueText(row: InventoryWarehouseRowDto, costMap: InventoryCostMap | undefined): string {
-  const scaled = estimateValueScaled(row.onHand, costMap?.[row.itemId ?? '']);
-  if (scaled === null) return '—';
-  return formatCnyValue(formatMoney(scaled)) ?? '—';
+/** 估算货值：服务端已按「行内实物数量 × 当前采用单位成本」算好；缺失显示“—”。 */
+function valueText(row: InventoryWarehouseRowDto): string {
+  return row.estimatedValueText ?? '—';
 }
 
 /**
@@ -66,14 +61,12 @@ export function WarehouseRowsTable({
   page,
   controls,
   columns,
-  costMap,
   showValue,
 }: {
   query: InventoryQueryState;
   page: WarehouseRowsPageResult;
   controls: TableControls;
   columns: TableColumn[];
-  costMap?: InventoryCostMap;
   showValue: boolean;
 }) {
   const api = useInventoryDetail();
@@ -165,7 +158,7 @@ export function WarehouseRowsTable({
                     ) : null}
                     {showValue && controls.isVisible('value') ? (
                       <td className={styles.numCell} data-testid="inventory-row-value">
-                        {valueText(row, costMap)}
+                        {valueText(row)}
                       </td>
                     ) : null}
                     {controls.isVisible('status') ? (

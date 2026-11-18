@@ -716,6 +716,11 @@ export interface InventoryWarehouseRowDto {
   fileName?: string | null;
   /** 国内行：原表「运营云仓可用数」原文（单独保留，不并入可用数）。 */
   cloudAvailableText?: string | null;
+  /**
+   * 服务端按当前结果行算好的估算货值显示文本（人民币，含符号与 2 位小数）。
+   * null = 缺实物数量或缺采用价（页面显示“—”）；无金额权限时不出现该字段。
+   */
+  estimatedValueText?: string | null;
 }
 
 /** 逐仓读取状态（同步页 / 仓库明细顶部共用：真实批次与覆盖，不按最近登记 run 冒充）。 */
@@ -783,6 +788,11 @@ export interface InventoryProductSummaryRowDto extends InventoryListItemDto {
   overseasOnHand: number | null;
   overseasSkuCount: number;
   domestic: InventoryProductDomesticCellDto | null;
+  /**
+   * 服务端按当前结果行算好的估算货值显示文本（含符号与 2 位小数）。
+   * null = 缺数量或缺采用价（页面显示“—”）；无金额权限时不出现该字段。
+   */
+  estimatedValueText?: string | null;
 }
 
 export interface InventoryProductSummaryDto {

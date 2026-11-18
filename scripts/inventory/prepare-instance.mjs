@@ -151,6 +151,11 @@ async function ensureSchema(owner, evidence) {
   // 「操作记录」只读汇合（042，幂等；必须晚于 026-035 的物流表与 016/024 的库存对应表：
   // 只读商品/库存/物流三类已保存的人工处理记录，不建表、不改 001-041）。
   const operationRecordsFile = 'db/catalog/042_operation_records.sql';
+  // 权限设置 v1（043，幂等；必须晚于 016-042）：角色/账号/仓库范围三张表与成员读取守卫。
+  const permissionsV1File = 'db/catalog/043_permissions_v1.sql';
+  // 权限设置 v1 首轮补修（044，幂等；必须晚于 043）：后台范围读取、成员详情裁剪、
+  // 成员金额读取与密码重置留痕。重复准备只替换函数/补策略，不动已有角色与仓库授权。
+  const permissionsV1FixesFile = 'db/catalog/044_permissions_v1_fixes.sql';
   const applied = [];
   let sqlState;
   const version = Number(before.row?.version ?? 0);
@@ -206,6 +211,10 @@ async function ensureSchema(owner, evidence) {
   applied.push(await applySql(owner, inventorySnapshotFile));
   // 042 依赖 026-035 的物流表与 016/024 的库存对应表：放在最后，正常准备实例即可使用操作记录。
   applied.push(await applySql(owner, operationRecordsFile));
+  // 043/044 依赖 016-042（库存读模型、历史快照、权限表）：每次准备都按顺序重放，
+  // 幂等且不覆盖已有角色/仓库授权；已安装 042 的库重跑不会被旧管理员守卫覆盖。
+  applied.push(await applySql(owner, permissionsV1File));
+  applied.push(await applySql(owner, permissionsV1FixesFile));
   const structureSha = hashFile(v6File);
   const functionsSha = hashFile(functionsFile);
   await owner.query(

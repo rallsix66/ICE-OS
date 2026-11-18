@@ -47,6 +47,34 @@ const DEPENDENT_SQL = [
       'catalog.shipment_item_manual_revision', 'catalog.shipment_grouping_review',
     ],
   },
+  {
+    // 权限设置 v1（043）：需要 016-042 的库存读模型、历史快照函数与 profiles；
+    // 目录预览还没有这些对象时跳过，由 prepare-instance 在 042 之后按顺序安装。
+    path: 'db/catalog/043_permissions_v1.sql',
+    requires: [
+      'public.profiles', 'catalog.inventory_warehouse', 'catalog.inventory_batch',
+      'catalog.inventory_batch_row', 'catalog.inventory_sync_settings', 'catalog.inventory_scope',
+    ],
+    requiresFunctions: [
+      'catalog.read_inventory_warehouse_states()',
+      'catalog.read_inventory_warehouse_rows(text,text,text)',
+      'catalog.read_inventory_product_summary(text,text,text,integer,integer)',
+      'catalog.read_inventory_item(uuid,text,text,boolean)',
+      'catalog.read_inventory_snapshot_batches(uuid,integer,integer)',
+      'catalog.read_inventory_snapshot_rows(uuid,uuid,text,integer,integer)',
+      'catalog.inventory_scope_payload(uuid)',
+    ],
+  },
+  {
+    // 权限设置 v1 首轮补修（044）：必须晚于 043；只替换函数/补策略，重复准备保留角色与仓库授权。
+    path: 'db/catalog/044_permissions_v1_fixes.sql',
+    requires: ['catalog.access_role', 'catalog.account_access', 'catalog.account_access_warehouse'],
+    requiresFunctions: [
+      'catalog.inventory_scope_payload(uuid)',
+      'catalog.inventory_effective_rows(uuid,uuid[])',
+      'catalog.read_inventory_item(uuid,text,text,boolean)',
+    ],
+  },
 ];
 
 async function applyCatalogSql(run) {
@@ -71,8 +99,12 @@ async function applyCatalogSql(run) {
         const present = (await owner.query('SELECT to_regclass($1) IS NOT NULL AS present', [table])).rows[0]?.present === true;
         if (!present) missing.push(table);
       }
+      for (const fn of entry.requiresFunctions ?? []) {
+        const present = (await owner.query('SELECT to_regprocedure($1) IS NOT NULL AS present', [fn])).rows[0]?.present === true;
+        if (!present) missing.push(fn);
+      }
       if (missing.length > 0) {
-        skipped.push({ path: entry.path, missing, reason: 'required tables are created later by prepare-instance (016-035)' });
+        skipped.push({ path: entry.path, missing, reason: 'required tables/functions are created later by prepare-instance (016-042)' });
         continue;
       }
       const file = path.join(REPO_ROOT, entry.path);

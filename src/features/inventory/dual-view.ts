@@ -23,9 +23,10 @@ import type {
 import type { InventoryQueryState } from './model';
 import { compareStableText, UNKNOWN_MARKET_TOKEN } from './model';
 import { marketLabel } from '@/features/overview/markets';
-import { multiplyMoneyByQuantity, parseMoney, parseQuantity } from '@/features/catalog/local-display/decimal';
+import { formatMoney, multiplyMoneyByQuantity, parseMoney, parseQuantity } from '@/features/catalog/local-display/decimal';
+import { formatCnyValue } from '@/features/catalog/local-display/money-display';
 
-/** 估算货值用的成本映射：itemId → 当前采用单位成本（人民币字符串，不含运费）。 */
+/** 估算货值用的成本映射：itemId → 当前采用单位成本（人民币字符串，不含运费）。仅服务端使用。 */
 export type InventoryCostMap = Record<string, string>;
 
 /** 估算货值（4 位定点 bigint）：实物数量 × 采用单位成本；任一缺失返回 null（缺成本不是 0）。 */
@@ -37,6 +38,19 @@ export function estimateValueScaled(
   const cost = parseMoney(costAmountCny);
   if (quantity === null || cost === null) return null;
   return multiplyMoneyByQuantity(cost, quantity);
+}
+
+/**
+ * 行货值的显示文本：服务端用同一 `estimateValueScaled` 计算并格式化，页面只收到结果。
+ * 缺数量或缺采用价返回 null（页面显示“—”，不当 0）。
+ */
+export function estimatedValueText(
+  qty: number | null | undefined,
+  costAmountCny: string | null | undefined,
+): string | null {
+  const scaled = estimateValueScaled(qty, costAmountCny);
+  if (scaled === null) return null;
+  return formatCnyValue(formatMoney(scaled)) ?? null;
 }
 
 function compareValueScaled(a: bigint | null, b: bigint | null, dir: InventoryQueryState['sortDir']): number {
@@ -263,10 +277,14 @@ export function mergeWarehouseRowsPage(input: {
   query: DualQueryInput;
   overseas: InventoryWarehouseRowsDto | null;
   domestic: InventoryDomesticSnapshotDto | null;
-  /** itemId → 当前采用单位成本；无金额权限时为空。 */
+  /**
+   * itemId → 当前采用单位成本；无金额权限时传 undefined。
+   * 成本只用于服务端排序和当前页行货值，不进入页面 props。
+   */
   costMap?: InventoryCostMap;
 }): WarehouseRowsPageResult {
   const { query, overseas, domestic } = input;
+  const valueEnabled = input.costMap !== undefined;
   const costMap = input.costMap ?? {};
   const overseasIncluded = query.source !== 'domestic';
   const domesticAvailable = Boolean(domestic?.available);
@@ -309,7 +327,14 @@ export function mergeWarehouseRowsPage(input: {
   const pageCount = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(Math.max(1, Math.trunc(query.page || 1)), pageCount);
   const offset = (page - 1) * limit;
-  const rows = merged.slice(offset, offset + limit);
+  // 先在全量行上排序，再切页；只为当前结果行附上显示文本（不把成本表交给客户端）。
+  const pageRows = merged.slice(offset, offset + limit);
+  const rows = valueEnabled
+    ? pageRows.map((row) => ({
+      ...row,
+      estimatedValueText: estimatedValueText(row.onHand, costMap[row.itemId ?? '']),
+    }))
+    : pageRows;
   const domesticFileDates = [...new Set(domesticSourceRows.map((row) => row.fileDate ?? '').filter(Boolean))].sort();
 
   return {
@@ -425,10 +450,14 @@ export function mergeProductSummary(input: {
   query: DualQueryInput;
   summary: InventoryProductSummaryDto;
   domestic: InventoryDomesticSnapshotDto | null;
-  /** itemId → 当前采用单位成本；无金额权限时为空。 */
+  /**
+   * itemId → 当前采用单位成本；无金额权限时传 undefined。
+   * 成本只用于服务端排序和当前页行货值，不进入页面 props。
+   */
   costMap?: InventoryCostMap;
 }): ProductSummaryMergeResult {
   const { query, summary, domestic } = input;
+  const valueEnabled = input.costMap !== undefined;
   const costMap = input.costMap ?? {};
   const limit = Math.max(1, Math.trunc(query.limit || 50));
   const domesticAvailable = Boolean(domestic?.available);
@@ -507,17 +536,14 @@ export function mergeProductSummary(input: {
   }
 
   rows.sort((a, b) => compareStableText(a.iceCode, b.iceCode) || compareStableText(a.nameCn, b.nameCn) || compareStableText(a.itemId, b.itemId));
+  // 估算货值基数：海外/全部用海外实物合计，仅国内用国内数量。
+  const valueQuantity = (row: InventoryProductSummaryRowDto): number | null =>
+    domesticOnlyScope ? row.domestic?.onHand ?? null : row.overseasOnHand;
   // URL 排序：先对合并后的全量商品行排序，再切页（空值最后、稳定）。
   if (query.sort === 'value') {
     rows.sort((a, b) => compareValueScaled(
-      estimateValueScaled(
-        domesticOnlyScope ? a.domestic?.onHand : a.overseasOnHand,
-        costMap[a.itemId],
-      ),
-      estimateValueScaled(
-        domesticOnlyScope ? b.domestic?.onHand : b.overseasOnHand,
-        costMap[b.itemId],
-      ),
+      estimateValueScaled(valueQuantity(a), costMap[a.itemId]),
+      estimateValueScaled(valueQuantity(b), costMap[b.itemId]),
       query.sortDir,
     ));
   } else if (query.sort) {
@@ -543,12 +569,20 @@ export function mergeProductSummary(input: {
   const pageCount = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(Math.max(1, Math.trunc(query.page || 1)), pageCount);
   const offset = (page - 1) * limit;
+  const pageRows = rows.slice(offset, offset + limit);
+  // 只为当前结果行附上货值显示文本；无金额权限时字段整体不出现。
+  const resultRows = valueEnabled
+    ? pageRows.map((row) => ({
+      ...row,
+      estimatedValueText: estimatedValueText(valueQuantity(row), costMap[row.itemId]),
+    }))
+    : pageRows;
 
   // 国内商品数也按当前搜索/范围计算（不能搜索后仍写全局 118）。
   const domesticItemCount = domesticIncluded ? rows.filter((row) => row.domestic !== null).length : 0;
 
   return {
-    rows: rows.slice(offset, offset + limit),
+    rows: resultRows,
     total,
     offset,
     limit,

@@ -29,9 +29,12 @@ export function InventoryFilterBar({
   controls,
   total,
   pendingEntry,
+  allowDomestic = true,
 }: {
   query: InventoryQueryState;
   warehouses: InventoryWarehouseDto[];
+  /** 是否允许切到国内（聚水潭）冻结快照：仅管理员可用，成员只看海外库存。 */
+  allowDomestic?: boolean;
   /** 当前视图的列定义与布局状态（显示列菜单与表格共用）。 */
   columns: TableColumn[];
   controls: TableControls;
@@ -178,7 +181,7 @@ export function InventoryFilterBar({
         <SelectMenu
           value={query.source}
           onChange={onSourceChange}
-          options={SOURCE_OPTIONS}
+          options={allowDomestic ? SOURCE_OPTIONS : SOURCE_OPTIONS.filter((option) => option.value !== 'domestic')}
           ariaLabel="来源范围"
           testId="inventory-source-scope"
         />

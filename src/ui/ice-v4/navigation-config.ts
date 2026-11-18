@@ -9,6 +9,14 @@ export const ICE_V4_ACTIVE_NAV_HREFS = [
 ] as const;
 
 /**
+ * 只对管理员显示的一级入口（PERMISSIONS_V1）：
+ * 角色与账号管理属于管理员配置，成员登录后不出现。
+ */
+export const ICE_V4_ADMIN_NAV_HREFS = [
+  '/dashboard/permissions',
+] as const;
+
+/**
  * 已退出所有常驻导航、但必须保持 URL 可达的旧处理入口。
  * 页面保留原处理能力（模块启用时）或中文安全引导，不得 404、不得删后端能力。
  */

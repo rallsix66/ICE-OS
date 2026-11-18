@@ -522,6 +522,7 @@ describe('估算货值排序（sort=value）', () => {
     });
     // A = 2×10 = 20，B = 3×5 = 15，C 缺成本 → 最后。
     expect(desc.rows.map((row) => row.externalSku)).toEqual(['A', 'B', 'C']);
+    expect(desc.rows.map((row) => row.estimatedValueText)).toEqual(['¥20.00', '¥15.00', null]);
     const asc = mergeWarehouseRowsPage({
       query: query({ sort: 'value', sortDir: 'asc' }),
       overseas,
@@ -529,6 +530,38 @@ describe('估算货值排序（sort=value）', () => {
       costMap,
     });
     expect(asc.rows.map((row) => row.externalSku)).toEqual(['B', 'A', 'C']);
+  });
+
+  it('仓库明细：无金额权限时不附货值字段，且只为当前页行附值', () => {
+    const rows = [1, 2, 3].map((n) => overseasRow({
+      rowKey: `bigseller:wh1:A${n}`,
+      externalSku: `A${n}`,
+      itemId: `aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa${n}`,
+      onHand: n,
+    }));
+    const costMap = {
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1': '10',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2': '10',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3': '10',
+    };
+    const withoutAmount = mergeWarehouseRowsPage({
+      query: query({ sort: 'value', sortDir: 'desc' }),
+      overseas: overseasRows(rows),
+      domestic: null,
+    });
+    expect(withoutAmount.rows.every((row) => !('estimatedValueText' in row))).toBe(true);
+    // 无成本表时所有值都缺失，value 排序保持稳定原序（缺值不参与大小比较）。
+    expect(withoutAmount.rows.map((row) => row.externalSku)).toEqual(['A1', 'A2', 'A3']);
+
+    const page2 = mergeWarehouseRowsPage({
+      query: query({ sort: 'value', sortDir: 'desc', limit: 2, page: 2 }),
+      overseas: overseasRows(rows),
+      domestic: null,
+      costMap,
+    });
+    // 先全量排序（3 > 2 > 1）再切页：第 2 页只剩 1 行，且只有该行带值。
+    expect(page2.rows.map((row) => row.externalSku)).toEqual(['A1']);
+    expect(page2.rows.map((row) => row.estimatedValueText)).toEqual(['¥10.00']);
   });
 
   it('商品汇总：全部范围用海外数量，仅国内用国内数量', () => {
@@ -547,6 +580,7 @@ describe('估算货值排序（sort=value）', () => {
       costMap,
     });
     expect(all.rows.map((row) => row.iceCode)).toEqual(['WM0001', 'WM0002']);
+    expect(all.rows.map((row) => row.estimatedValueText)).toEqual(['¥20.00', '¥15.00']);
 
     const domestic = domesticSnapshot([
       domesticRow({ itemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', iceCode: 'WM0001', actualQty: 1, availableQty: 1 }),
@@ -560,6 +594,7 @@ describe('估算货值排序（sort=value）', () => {
     });
     // 仅国内：WM0001 = 1×10 = 10，WM0002 = 10×5 = 50。
     expect(domesticOnly.rows.map((row) => row.iceCode)).toEqual(['WM0002', 'WM0001']);
+    expect(domesticOnly.rows.map((row) => row.estimatedValueText)).toEqual(['¥50.00', '¥10.00']);
   });
 
   it('URL 排序键 value 可解析并保留在列表链接里', () => {

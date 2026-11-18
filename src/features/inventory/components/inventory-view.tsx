@@ -16,15 +16,15 @@ import type {
   InventoryDomesticRowDto,
   InventoryDomesticSnapshotDto,
   InventoryItemDetailDto,
-  InventoryOverviewDto,
   InventoryPendingActionDto,
   InventorySnapshotBatchDto,
   InventorySnapshotRowsDto,
+  InventoryWarehouseDto,
   InventoryWarehouseReadStateV2Dto,
   InventoryWarehouseRowDto,
   SourceBindingDto,
 } from '../types';
-import type { InventoryCostMap, ProductSummaryMergeResult, WarehouseRowsPageResult } from '../dual-view';
+import type { ProductSummaryMergeResult, WarehouseRowsPageResult } from '../dual-view';
 import { domesticIncludedInScope } from '../dual-view';
 import {
   SUMMARY_TABLE_STORAGE_KEY,
@@ -48,7 +48,9 @@ import type { LocalViewerIdentity } from '../client-pending';
 export function InventoryView({
   query,
   effectiveFilters,
-  overview,
+  warehouses,
+  scopeEmpty,
+  allowDomestic = true,
   warehouseRows,
   productSummary,
   warehouseStates,
@@ -63,13 +65,17 @@ export function InventoryView({
   sourceBinding,
   sourceBindingError,
   bindingReady,
-  costMap,
   showValue,
   snapshot,
 }: {
   query: InventoryQueryState;
   effectiveFilters: { warehouse: string; market: string };
-  overview: InventoryOverviewDto | null;
+  /** 当前账号可见的仓库（管理员：参与仓；成员：被授予的仓）。 */
+  warehouses: InventoryWarehouseDto[];
+  /** 可见范围为 0 个仓（成员未分配范围时页面要明确说明，不显示 0 结论）。 */
+  scopeEmpty: boolean;
+  /** 是否允许切到国内（聚水潭）冻结快照：仅管理员可用。 */
+  allowDomestic?: boolean;
   warehouseRows: WarehouseRowsPageResult | null;
   productSummary: ProductSummaryMergeResult | null;
   warehouseStates: InventoryWarehouseReadStateV2Dto[];
@@ -89,13 +95,13 @@ export function InventoryView({
   sourceBindingError: string | null;
   /** 服务端已针对当前行尝试读取绑定（false = 页面读取尚未返回）。 */
   bindingReady: boolean;
-  /** itemId → 当前采用单位成本（仅 amount:read 权限时有值；无权限不传）。 */
-  costMap?: InventoryCostMap;
   /** 是否显示「估算货值」列（无金额权限不显示）。 */
   showValue?: boolean;
   /** 历史快照视图数据（只读；按需读取选定批次）。 */
   snapshot: {
     warehouseId: string;
+    /** 书签指定的仓已不在当前账号授权范围：提示重新选仓，不静默改选。 */
+    warehouseSelectionLost: boolean;
     batches: InventorySnapshotBatchDto[];
     batchTotal: number;
     batchPage: number;
@@ -112,10 +118,8 @@ export function InventoryView({
     detailError: string | null;
   };
 }) {
-  const warehouses = overview?.warehouses ?? [];
   const domesticScope = query.source === 'domestic';
   const failedCount = warehouseStates.filter((state) => state.warehouseStatus === 'confirmed' && state.failed).length;
-  const scopeEmpty = overview?.scope.empty === true;
   const showValueColumn = showValue === true;
 
   const warehouseColumns = warehouseTableColumns(showValueColumn);
@@ -210,6 +214,7 @@ export function InventoryView({
           query={listQuery}
           warehouses={warehouses}
           warehouseId={snapshot.warehouseId}
+          warehouseSelectionLost={snapshot.warehouseSelectionLost}
           batches={snapshot.batches}
           batchTotal={snapshot.batchTotal}
           batchPage={snapshot.batchPage}
@@ -228,11 +233,14 @@ export function InventoryView({
         controls={activeControls}
         total={page?.total ?? null}
         pendingEntry={pendingEntry}
+        allowDomestic={allowDomestic}
       />
 
       {scopeEmpty || failedCount > 0 ? (
         <p className={styles.pageStatus} data-testid="inventory-status-line">
-          {scopeEmpty ? <span>参与仓库为空</span> : null}
+          {scopeEmpty
+            ? <span>{allowDomestic ? '参与仓库为空' : '暂无授权库存：请联系管理员分配市场与仓库'}</span>
+            : null}
           {scopeEmpty && failedCount > 0 ? <span className={styles.statusSep}>·</span> : null}
           {failedCount > 0 ? <span>{failedCount} 个仓沿用上次成功数据</span> : null}
         </p>
@@ -267,7 +275,6 @@ export function InventoryView({
               page={warehouseRows}
               controls={warehouseControls}
               columns={warehouseColumns}
-              costMap={costMap}
               showValue={showValueColumn}
             />
           ) : null}
@@ -278,7 +285,6 @@ export function InventoryView({
               domesticOnlyScope={domesticScope}
               controls={summaryControls}
               columns={summaryColumns}
-              costMap={costMap}
               showValue={showValueColumn}
             />
           ) : null}

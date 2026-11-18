@@ -1,7 +1,10 @@
 import 'server-only';
 
-import { requireActiveAdmin } from '@/lib/auth';
+import { requireActiveAdmin, requireActiveAuth } from '@/lib/auth';
 import { withReadOnlyAppDb, type DbIdentity } from '@/lib/database/app-db';
+import { getMyInventoryAccess } from '@/features/access/server/reads';
+import type { MyInventoryAccessDto } from '@/features/access/types';
+import type { PreparedFinancial } from '@/features/catalog/types';
 import {
   normalizeItemDetail,
   normalizeList,
@@ -57,6 +60,34 @@ import type {
 export async function requireInventoryAdmin(): Promise<DbIdentity> {
   const actor = await requireActiveAdmin();
   return { profileUserId: actor.id };
+}
+
+/** 商品库存的读权限会话：管理员，或启用中且被授予「库存查看」的成员。 */
+export interface InventoryReaderSession {
+  identity: DbIdentity;
+  access: MyInventoryAccessDto;
+  isAdmin: boolean;
+  /** 只有为 true 时页面才显示「估算货值」列并由服务端下发金额。 */
+  canViewAmount: boolean;
+}
+
+/**
+ * 权限设置 v1 的库存读取入口：不再只认管理员。
+ *
+ * - 管理员：沿用原有全站读取（范围 = 同步范围里的参与仓）；
+ * - 成员：必须有「库存查看」，可见仓与金额都由服务端 read_my_inventory_access 给出；
+ *   数据库侧读函数同样按被授予的仓过滤（见 db/catalog/043_permissions_v1.sql）。
+ */
+export async function requireInventoryReader(): Promise<InventoryReaderSession> {
+  const actor = await requireActiveAuth();
+  const access = await getMyInventoryAccess();
+  if (!access || !access.canViewInventory) throw new Error('CATALOG_FORBIDDEN');
+  return {
+    identity: { profileUserId: actor.id },
+    access,
+    isAdmin: access.isAdmin,
+    canViewAmount: access.canViewAmount,
+  };
 }
 
 async function callReadRpc<T>(identity: DbIdentity, functionSpec: string, params: unknown[]): Promise<T> {
@@ -146,8 +177,20 @@ export async function getInventoryItem(
   };
 }
 
-/** 刷新后的 pending 恢复入口（最近 24h 未完成原请求，payload 原样返回）。 */
-export async function getInventoryPendingActions(identity: DbIdentity): Promise<InventoryPendingActionDto[]> {
+/**
+ * 含金额权限成员的采用成本：数据库按「当前授权仓读模型里出现过的商品」返回采用价版本，
+ * 与页面数量同一范围；无金额权限时数据库函数直接拒绝，服务端不会读到成本。
+ * 货值仍由服务端按「采用单位成本 × 页面数量」计算，页面只收到结果列。
+ */
+export async function getMemberItemAmounts(
+  identity: DbIdentity,
+): Promise<Map<string, PreparedFinancial | null>> {
+  const raw = await callReadRpc<Record<string, PreparedFinancial | null> | null>(
+    identity, 'catalog.read_member_item_amounts', []);
+  return new Map(Object.entries(raw ?? {}));
+}
+
+/** 刷新后的 pending 恢复入口（最近 24h 未完成原请求，payload 原样返回）。 */export async function getInventoryPendingActions(identity: DbIdentity): Promise<InventoryPendingActionDto[]> {
   const raw = await callReadRpc<unknown>(identity, 'catalog.read_inventory_pending_actions', []);
   return normalizePendingActions(raw);
 }
