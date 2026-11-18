@@ -22,21 +22,21 @@ type NavItem = {
   icon: typeof Package;
   match?: (pathname: string) => boolean;
   /** admin：只有管理员看得到；inventory：有库存查看权限（管理员或成员）即可；
-   *  shipment：有物流在途权限（管理员或至少获授一个物流市场）即可。 */
+   *  shipment：有物流在途权限（管理员或至少获授一个物流市场）即可。
+   *  经营总览对全部启用账号可见：成员看到自己获授权范围的版本。 */
   requires?: 'admin' | 'inventory' | 'shipment';
 };
 
 /**
  * 一级常驻导航：经营总览 → 商品库 → 商品库存 → 物流在途 → 操作记录 → 数据同步。
  * 数据维护/待处理等内部页面不放进日常界面，URL 仍保留可达。
- * 权限设置只对管理员显示；成员登录后只保留其真正能用的入口（商品库存）。
+ * 权限设置只对管理员显示；成员保留经营总览与真正能用的业务入口。
  */
 const NAV: NavItem[] = [
   {
     href: '/dashboard',
     label: '经营总览',
     icon: LayoutDashboard,
-    requires: 'admin',
     match: (pathname) => pathname === '/dashboard' || pathname.startsWith('/dashboard?'),
   },
   {

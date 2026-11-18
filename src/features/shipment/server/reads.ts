@@ -310,6 +310,19 @@ async function loadSummaryCards(
 }
 
 /**
+ * 成员经营总览：一次读取当前成功快照的全部当前明细（028 的成员范围版本，047）。
+ *
+ * 047 把 028 的入口守卫换成 require_shipment_read()，非管理员只返回
+ * access_member_markets() 内市场；管理员仍返回全部市场。这里只返回原始
+ * 汇总 DTO，不组装商品卡片、不读成本，金额权限不会因此被打开。
+ */
+export async function getMemberShipmentMarketSource(): Promise<ShipmentMarketSummarySource> {
+  const identity = await requireShipmentReader();
+  const raw = await callReadRpc<unknown>(identity, 'catalog.read_shipment_market_summary', ['all']);
+  return normalizeMarketSummary(raw);
+}
+
+/**
  * 货值汇总「全部市场」：一次取该来源全部当前明细（028 不过滤市场），
  * 服务端按市场分组后用同一套口径各自合计；价格读取失败直接抛错，不伪造 0。
  */

@@ -162,6 +162,9 @@ async function ensureSchema(owner, evidence) {
   // 成员物流在途 v1 补修（046，幂等；必须晚于 045）：恢复 045 漏掉的数量冲突/原数量字段，
   // 修正账号保存审计 before.isActive 取值；保留成员市场过滤。
   const memberLogisticsFixesFile = 'db/catalog/046_member_logistics_markets_fixes.sql';
+  // 成员经营总览 v1（047，幂等；必须晚于 028/030/045/046）：物流市场汇总允许成员读取，
+  // 非管理员只返回授权市场；管理员口径不变。
+  const memberOverviewFile = 'db/catalog/047_member_overview.sql';
   const applied = [];
   let sqlState;
   const version = Number(before.row?.version ?? 0);
@@ -223,6 +226,7 @@ async function ensureSchema(owner, evidence) {
   applied.push(await applySql(owner, permissionsV1FixesFile));
   applied.push(await applySql(owner, memberLogisticsMarketsFile));
   applied.push(await applySql(owner, memberLogisticsFixesFile));
+  applied.push(await applySql(owner, memberOverviewFile));
   const structureSha = hashFile(v6File);
   const functionsSha = hashFile(functionsFile);
   await owner.query(
