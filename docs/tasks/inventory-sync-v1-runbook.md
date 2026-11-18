@@ -27,10 +27,11 @@
 |---|---|
 | 库存 worker | Python 常驻进程 `inv-worker-59345`；配置 `…\instance\inventory-worker.json`；marker `…\instance\inventory-worker.pid.json` |
 | 冻结构建 | worker 实际运行 `…\instance\inventory-worker-src\worker.py`（prepare 时冻结，哈希 `1db4017a…`，与仓库 `tools/inventory-sync/*.py` 归一化换行后一致） |
-| 日志 | `…\inventory-work\logs\worker-YYYYMMDD.jsonl`（事件：`worker_started` / `worker_heartbeat` / `run_claimed` / `export_registered` / `run_finished` / `worker_idle` / `worker_shutdown_requested` / `worker_stopped`）；stdout `worker.stdout.log` |
+| 日志 | `…\inventory-work\logs\worker-YYYYMMDD.jsonl`（事件：`worker_started` / `worker_heartbeat` / `run_claimed` / `export_registered` / `run_finished` / `worker_idle` / `worker_shutdown_requested` / `worker_stopped`）；stdout `worker.stdout.log`（注意：文件名为**本地日期**，启动脚本打印的是按 UTC 推算的名字，以实际文件为准） |
 | 导出文件 | `…\inventory-work\exports\库存清单YYYYMMDDhhmmssSSS.xlsx`（每次真实导出）；文件指纹登记在 `catalog.inventory_export_file` |
 | 浏览器会话 | Chrome 持久化 profile `tools\bigseller-scraper\runtime\profile`；会话状态 `…\.local\inventory-sync-20261025\session\session-status.json`；锁 `browser.lock` |
 | 物流读取（并列，不受本交接控制） | `scripts/shipment/worker.mjs`，10 分钟；配置 `…\instance\shipment-auto-reader.json` |
+| 飞书商品来源读取（并列，只读） | `scripts/catalog/feishu-source/worker.mjs`，60 分钟；配置 `…\instance\product-source-reader.json`；只写 `…\source-snapshots\`（快照 + `reader-status.json`），不连数据库、不写飞书原表、不自动采用 |
 
 ## 2. 依赖
 
@@ -61,10 +62,15 @@ node scripts/inventory/start-web.mjs --run-id run-20261026T211500Z-11a22b33
 node scripts/inventory/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
 # 4) 物流在途读取进程（与本包无关，保持原来的 10 分钟计划）
 node scripts/shipment/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
+# 5) 飞书商品来源只读读取进程（60 分钟，只生成待应用快照；等第一轮读取最多 60s）
+node scripts/catalog/feishu-source/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
 ```
 
+- 第 1 步的整实例命令已按 `postgres -> web -> worker -> shipment-auto-reader -> product-source-reader -> status` 的顺序包含上面 5 步，正常只用一条命令即可。
+- 注意：在受限沙箱（Low 完整性）会话里直接跑这些命令会因 `…\.local` 目录没有 Low 标签而 `EPERM`。请在普通终端窗口或完全权限会话里启动；三个后台进程起来后与发起它的会话无关，可继续常驻。
+
 - `start-worker.mjs` 只在 marker 指向的进程已不存在时启动；进程活着且归属校验通过时直接提示已在运行。
-- `start-instance.mjs` 会依次检查并启动四步，已在运行的组件不会启动第二份；如果只想把停掉的库存 worker 拉起来（DB/Web/物流读取都正常），直接用上面的第 3 步，避免多余步骤。
+- `start-instance.mjs` 会依次检查并启动五步，已在运行的组件不会启动第二份；如果只想把停掉的库存 worker 拉起来（DB/Web/物流读取都正常），直接用上面的第 3 步，避免多余步骤。
 - worker 启动后会先 `register_inventory_worker` 心跳，再 `claim_inventory_run`：**先领取队列里最早的 queued/manual 任务**，没有到期自动计划时打印 `worker_idle: no_due_run` 并等待。
 - **不要把 worker 挂在会随工具/会话退出的进程树里**：本次 10-29 停运的现场是“无优雅停止日志 + pid 直接消失 + 数据库未中断”，**推测**是常驻进程随启动它的会话/沙箱服务一起被终止（无 OS 级证据，见任务包 §2.2/§2.3）。日常应在独立终端窗口启动；如需长期托管，用 Windows 服务/计划任务另行接入（见 §9，属后续工作）。
 
@@ -75,6 +81,8 @@ node scripts/shipment/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
 node scripts/inventory/stop-worker.mjs --run-id run-20261026T211500Z-11a22b33
 # 只停物流读取
 node scripts/shipment/stop-worker.mjs --run-id run-20261026T211500Z-11a22b33
+# 只停飞书商品来源读取
+node scripts/catalog/feishu-source/stop-worker.mjs --run-id run-20261026T211500Z-11a22b33
 # 停 Web / 数据库
 node scripts/catalog/stop-local-preview.mjs --run-id run-20261026T211500Z-11a22b33
 node scripts/catalog/stop-catalog-postgres.mjs --run-id run-20261026T211500Z-11a22b33
@@ -90,11 +98,14 @@ Windows 上 `process.kill(pid,'SIGTERM')` 不保证 Python 的 signal handler �
 ## 5. 状态查看与判读
 
 ```powershell
-# 实例总状态（含库存 worker、物流读取、数据库与页面）
+# 实例总状态（含库存 worker、物流读取、商品来源读取、数据库与页面）
 node scripts/inventory/status.mjs --run-id run-20261026T211500Z-11a22b33
 
 # 物流读取专用状态
 node scripts/shipment/status.mjs --run-id run-20261026T211500Z-11a22b33
+
+# 商品来源读取专用状态（进程归属、最近读取、失败原因与下次计划）
+node scripts/catalog/feishu-source/status.mjs --run-id run-20261026T211500Z-11a22b33
 ```
 
 判读要点：
@@ -146,6 +157,7 @@ JOIN catalog.inventory_warehouse ON id=warehouse_id ORDER BY external_name;
 | 任务 `outcome_unknown`（后台发布结果未确认） | 由**本实例后台 worker 的恢复路径**核对（`tools/inventory-sync/worker.py` 的 `_recover_outcome_unknown`）：任务保留原租约但不释放，租约过期后下一次 `claim_inventory_run` 重新领取（attempt+1），按已登记/已发布批次核对——全部参与仓已发布则结为 `success`，有缺口则结为 `partial`，**不会重复发布**。处理：按 §3 保持或拉起本实例 worker，在 worker 日志查看 `outcome_unknown_recovery_check`，随后是 `run_finished`（`recovered=true`，全部已发布）或 `outcome_unknown_reconciled`（有缺口），以任务最终状态为准。**不是**页面的「原请求核对」——该入口只处理页面操作结果未知（服务端 `catalog.inventory_pending_action`）。 |
 | 页面「后台在线」但长时间无新批次 | 先看 `last_seen_at` 是否新鲜（`state` 字段不可靠），再按 §5 核对；进程不在就用 §3 第 3 步拉起 |
 | `scripts/inventory/status.mjs` 里物流读取显示 `ok:false / no output` | 该子步骤用管道收集输出，在受限沙箱里会失败；直接跑 `scripts/shipment/status.mjs` 看真实结果 |
+| 商品来源读取进程不在、最近读取失败或长时间不推进 | 跑 `scripts/catalog/feishu-source/status.mjs` 看进程归属、`reader-status.json` 的最近结果/失败原因与下次计划；进程不在按 §3 第 5 步拉起，读取失败只保留旧快照与已应用批次，不自动写商品库。 |
 
 失败只写失败快照/状态，不覆盖已发布批次；计划保持启用，到点重试。
 
@@ -159,7 +171,23 @@ JOIN catalog.inventory_warehouse ON id=warehouse_id ORDER BY external_name;
 - **备份**：现役库最近一次本地备份见 `.local/shipment-v1-closeout-20261107/backup/BACKUP.md`（自定义格式 dump + SHA-256 + `pg_restore --list` 与临时库恢复验证）。备份、实例配置、原表与证据都在 `.local/`，不入 Git。
 - **恢复**：恢复整实例前先按 §4 停 Web 与两个 worker；恢复到临时库验证后再决定是否覆盖；现役库不做无备份覆盖。
 
-## 9. 明确不做 / 已知限制
+## 9. 权限设置（角色 / 账号 / 成员按范围查看，2026-11-17 起）
+
+管理员入口：`/dashboard/permissions`（角色管理）与 `/dashboard/permissions/accounts`（账号管理）。完整记录见 [permissions-v1-20261117.md](permissions-v1-20261117.md)。
+
+- **角色**：预置「负责人」（库存查看 + 金额）、「运营」（仅库存查看）。每个账号一个角色；管理员账号只读、不受角色影响。
+- **账号**：姓名/邮箱/角色/市场与仓库范围/启用停用/初始密码/重置密码；仓库范围只列现役参与仓（弃用仓 `48787` 不出现）。
+- **成员范围**：只读海外库存；`catalog.require_inventory_read()` 放行「启用中的管理员」或「启用中且被授予库存查看的成员」，其余一律 `CATALOG_FORBIDDEN`；数据库读函数按被授予的仓库收窄，直接指定未授权仓库会被拒。
+- **金额**：无「库存金额查看」时服务端不读成本、不下发「估算货值」列，响应里也没有货值字段；有权限时页面只收当前结果行的货值，不收单位成本表。
+- **成员导航**：登录后只有「商品库存」；访问 `/dashboard` 会跳到 `/dashboard/inventory`，访问其它管理页显示「没有访问权限」。
+- **迁移**：`node scripts/catalog/apply-043.mjs --rollback` 先验证，现役提交加 `--commit --allow-live-commit`；随后同样的方式应用 `apply-044.mjs`（首轮补修）。标准准备链已按 043 → 044 顺序接入，新实例/重跑准备都会安装。
+- **后台与成员的范围来源（2026-11-18 修正）**：`inventory_scope_payload()` 只在存在登录成员身份（`access_profile_id()` 非空且非管理员）时与成员授权取交集；库存后台领取任务没有登录身份，继续按同步配置的参与仓执行。若再出现 `SCOPE_EMPTY`，先核对 044 是否在位，而不是删失败记录。
+- **金额**：含「库存金额查看」的成员由 `catalog.read_member_item_amounts()` 按授权仓商品返回采用成本，服务端用 `estimateValueScaled` 按「实物数量 × 成本」算好行货值后再排序、切页；页面只收 `estimatedValueText`，不接收成本表。无权限时函数拒绝、页面不显示金额列。成本缺失显示「—」，不写 0。
+- **详情/快照**：成员商品详情不返回绑定/候选资料；快照书签指向已收回仓时提示重新选仓，不自动改选；搜索/清空 SKU 时继续保留失效仓上下文，直到用户主动选择有效仓；首次打开才默认一个授权仓。
+- **密码重置**：只允许普通成员；管理员账号由服务端按 `isSystemAdmin` 拒绝。每次成功重置写 `inventory_audit`（`access_account_password_reset`，操作者/目标/时间，不含密码或哈希）。
+- **凭据**：测试账号与密码只在本机 `.local/catalog/permissions-v1-20261117/test-accounts.md`（不入 Git）。
+
+## 10. 明确不做 / 已知限制
 
 - **不做**：调度/监控平台、告警、自动扩容、多实例部署、长期多日稳定性验收。本交接只覆盖本机当前实例。
 - **worker 无服务守护**：机器重启、进程崩溃或启动会话结束时不会自动拉起，需要按 §3 手动启动（或用计划任务/服务方式自行托管，属后续工作）。

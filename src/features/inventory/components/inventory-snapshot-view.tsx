@@ -43,6 +43,7 @@ export function InventorySnapshotView({
   query,
   warehouses,
   warehouseId,
+  warehouseSelectionLost = false,
   batches,
   batchTotal,
   batchPage,
@@ -55,6 +56,8 @@ export function InventorySnapshotView({
   query: InventoryQueryState;
   warehouses: InventoryWarehouseDto[];
   warehouseId: string;
+  /** 书签指定的仓已不在当前账号授权范围：明确提示重新选仓，不默认改选其他仓。 */
+  warehouseSelectionLost?: boolean;
   batches: InventorySnapshotBatchDto[];
   batchTotal: number;
   batchPage: number;
@@ -96,14 +99,23 @@ export function InventorySnapshotView({
   const selectedBatchId = batch?.batchId ?? query.snapBatch;
   // 页面当前实际查看的批次：默认最新时 URL 没有 snapBatch，翻列表/明细分页必须沿用它。
   const viewedBatchId = snapshotViewedBatchId(batch?.batchId, query.snapBatch);
+  // 失效书签：warehouseId 为空，但 URL 仍带原仓。搜索/清空/翻页必须保留这个“待重选”上下文，
+  // 否则导航会去掉 snapWarehouse，服务端会按“首次打开”自动改选第一个授权仓。
+  // 只有用户通过选仓控件主动选择有效仓（next.snapWarehouse）时才替换。
+  const retainedWarehouseId = warehouseSelectionLost ? (query.snapWarehouse ?? '') : warehouseId;
 
   function navigate(
     next: Partial<Pick<InventoryQueryState, 'snapWarehouse' | 'snapBatch' | 'snapQ' | 'snapPage' | 'snapBPage'>>,
     transition = startFilter,
   ) {
     const href = buildInventorySnapshotHref(
-      { ...query, snapWarehouse: warehouseId },
-      { snapBatch: viewedBatchId, snapPage: 1, ...next },
+      { ...query, snapWarehouse: retainedWarehouseId },
+      {
+        // 失效仓下没有任何可查看的批次：搜索/清空时不要把旧批次编号带进下一次导航。
+        snapBatch: warehouseSelectionLost ? '' : viewedBatchId,
+        snapPage: 1,
+        ...next,
+      },
     );
     transition(() => router.replace(href, { scroll: false }));
   }
@@ -124,7 +136,7 @@ export function InventorySnapshotView({
   /** 选批：留在当前批次列表页，只换批次与明细页。 */
   function batchHref(batchId: string): string {
     return buildInventorySnapshotHref(
-      { ...query, snapWarehouse: warehouseId },
+      { ...query, snapWarehouse: retainedWarehouseId },
       { snapBatch: batchId, snapQ: query.snapQ, snapPage: 1, snapBPage: batchRange.page },
     );
   }
@@ -132,14 +144,14 @@ export function InventorySnapshotView({
   /** 批次列表翻页：保留当前实际查看的批次与 SKU 搜索，只改左栏页码。 */
   function batchPageHref(page: number): string {
     return buildInventorySnapshotHref(
-      { ...query, snapWarehouse: warehouseId },
+      { ...query, snapWarehouse: retainedWarehouseId },
       { snapBatch: viewedBatchId, snapQ: query.snapQ, snapPage: query.snapPage, snapBPage: page },
     );
   }
 
   function pageHref(page: number): string {
     return buildInventorySnapshotHref(
-      { ...query, snapWarehouse: warehouseId },
+      { ...query, snapWarehouse: retainedWarehouseId },
       { snapBatch: viewedBatchId, snapQ: query.snapQ, snapPage: page, snapBPage: batchRange.page },
     );
   }
@@ -230,6 +242,13 @@ export function InventorySnapshotView({
         </p>
       ) : null}
 
+      {warehouseSelectionLost ? (
+        <p className={styles.inlineError} data-testid="inventory-snapshot-warehouse-lost">
+          这个书签指向的仓库已不在当前账号的授权范围。请从上方重新选择仓库；页面不会自动改选其他仓库，
+          也不会显示其他仓的批次或数量。
+        </p>
+      ) : null}
+
       <div className={styles.snapshotLayout}>
         <section className={`${styles.panel} ${styles.snapshotBatchPanel}`} data-testid="inventory-snapshot-batch-panel">
           <div className={styles.panelBar}>
@@ -239,6 +258,13 @@ export function InventorySnapshotView({
           {confirmedWarehouses.length === 0 ? (
             <div className={styles.snapshotEmpty}>
               <EmptyState title="当前账号没有参与仓" hint="先在数据同步页确认参与仓库。" />
+            </div>
+          ) : warehouseSelectionLost ? (
+            <div className={styles.snapshotEmpty}>
+              <EmptyState
+                title="请重新选择仓库"
+                hint="书签中的仓库已不在当前账号的授权范围；重新选仓后才能查看该仓的已发布批次。"
+              />
             </div>
           ) : batches.length === 0 ? (
             <div className={styles.snapshotEmpty}>
@@ -447,7 +473,7 @@ export function InventorySnapshotView({
                 hint={`${detailError}；没有显示数量，也不会用其他批次代替。可刷新或从左侧重新选择批次。`}
               />
             </div>
-          ) : batchNotice ? (
+          ) : batchNotice && !warehouseSelectionLost ? (
             <div className={styles.snapshotEmpty} data-testid="inventory-snapshot-unavailable">
               {batchNotice.kind === 'warehouse_mismatch' ? (
                 <>
@@ -485,6 +511,13 @@ export function InventorySnapshotView({
                   hint="直接链接的批次编号在该账号的已发布批次里没有找到；不会用最新批次代替。请从左侧重新选择批次。"
                 />
               )}
+            </div>
+          ) : warehouseSelectionLost ? (
+            <div className={styles.snapshotEmpty} data-testid="inventory-snapshot-rechoose-warehouse">
+              <EmptyState
+                title="请重新选择仓库"
+                hint="书签中的仓库已不在当前账号的授权范围；页面没有自动改选，也没有显示其他仓的数量。"
+              />
             </div>
           ) : (
             <div className={styles.snapshotEmpty} data-testid="inventory-snapshot-unavailable">

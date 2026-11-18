@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { getCurrentActiveUser } from '@/lib/auth';
 import { ReadFailurePanel } from '@/features/inventory/components/display';
 import { classifyReadFailure } from '@/features/inventory/model';
 import { BusinessOverviewPage } from '@/features/overview/components/business-overview-page';
@@ -22,6 +24,10 @@ export default async function DashboardHomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // 权限设置 v1：成员没有全站总览权限，登录后直接进自己能用的商品库存，不显示空的总览。
+  const actor = await getCurrentActiveUser();
+  if (actor && actor.roleName !== 'admin') redirect('/dashboard/inventory');
+
   const sp = await searchParams;
   const query = parseHomeSearchParams(sp);
 

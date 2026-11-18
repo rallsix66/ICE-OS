@@ -4,6 +4,7 @@ import path from 'node:path';
 import {
   CATALOG_ISSUES_HREF,
   ICE_V4_ACTIVE_NAV_HREFS,
+  ICE_V4_ADMIN_NAV_HREFS,
   ICE_V4_RETAINED_ENTRY_HREFS,
   LEGACY_PRODUCTS_LIST_HREF,
   LEGACY_ROUTE_DISPOSITION,
@@ -48,6 +49,19 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
     expect(shellSrc).not.toContain('其它处理入口');
     expect(shellSrc).not.toContain('旧入口未启用');
     expect(shellSrc).toContain('data-nav-primary="true"');
+  });
+
+  it('权限设置是仅管理员可见的入口，成员导航只保留商品库存', () => {
+    expect(ICE_V4_ADMIN_NAV_HREFS).toEqual(['/dashboard/permissions']);
+    for (const href of ICE_V4_ADMIN_NAV_HREFS) {
+      expect(navBlock).toContain(`href: '${href}'`);
+      expect(ICE_V4_ACTIVE_NAV_HREFS).not.toContain(href);
+    }
+    // nav 项带 requires 标注：权限设置与其它管理页只有管理员看得到，商品库存按库存查看权限出现。
+    expect(navBlock).toMatch(/href: '\/dashboard\/permissions',[\s\S]*?requires: 'admin'/);
+    expect(navBlock).toMatch(/href: '\/dashboard\/inventory',[\s\S]*?requires: 'inventory'/);
+    expect(shellSrc).toContain("requires === 'admin'");
+    expect(shellSrc).toContain("requires === 'inventory'");
   });
 
   it('账户区不再出现数据维护等内部入口', () => {

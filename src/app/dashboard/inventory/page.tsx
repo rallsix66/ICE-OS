@@ -10,6 +10,7 @@ import {
   INVENTORY_SNAPSHOT_PAGE_SIZE,
   parseInventorySearchParams,
   pendingBlocksWrites,
+  type InventoryQueryState,
 } from '@/features/inventory/model';
 import {
   getInventoryItem,
@@ -18,8 +19,9 @@ import {
   getInventorySnapshotRows,
   getInventorySyncOverview,
   getInventoryWarehouseRows,
+  getMemberItemAmounts,
   getSourceBinding,
-  requireInventoryAdmin,
+  requireInventoryReader,
 } from '@/features/inventory/server/reads';
 import { getInventoryDomesticSnapshot } from '@/features/inventory/server/domestic-reads';
 import { requireCatalogAdmin } from '@/features/catalog/authorization';
@@ -32,6 +34,7 @@ import type {
   InventoryProductSummaryDto,
   InventorySnapshotBatchesDto,
   InventorySnapshotRowsDto,
+  InventoryWarehouseDto,
   InventoryWarehouseRowDto,
   InventoryWarehouseRowsDto,
   SourceBindingDto,
@@ -76,28 +79,42 @@ export default async function InventoryPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const query = parseInventorySearchParams(toUrlSearchParams(sp));
 
-  let identity;
+  let reader;
   try {
-    identity = await requireInventoryAdmin();
+    reader = await requireInventoryReader();
   } catch (error) {
     return <ReadFailurePanel kind={classifyReadFailure(error)} backHref="/dashboard/catalog" backLabel="返回 ICE 商品库" />;
   }
+  const identity = reader.identity;
+  const isAdmin = reader.isAdmin;
+  const parsed = parseInventorySearchParams(toUrlSearchParams(sp));
+  // 国内冻结快照本包仍只给管理员看：成员的来源范围固定为「仅海外」（不显示国内，也不请求国内数据）。
+  const query: InventoryQueryState = isAdmin
+    ? parsed
+    : { ...parsed, source: parsed.source === 'overseas' ? parsed.source : 'overseas' };
 
-  // 估算货值：单独走 amount:read 权限；无权限不读成本、不显示该列。
-  // 成本读取失败时保留列但全部按缺成本显示“—”，不把缺失写成 0。
+  // 估算货值：管理员沿用 catalog 的 amount:read；成员只用角色里的「库存金额查看」，
+  // 由数据库按授权仓商品返回采用成本（不再借用管理员专用的全商品成本查询）。
+  // 成本只在服务端参与排序与当前页行货值计算；页面不接收单位成本表。
+  // 无金额权限时不读成本、不传该列（merge 不收到 costMap，行上也不出现货值字段）。
   let amountAllowed = false;
-  try {
-    await requireCatalogAdmin('amount:read');
-    amountAllowed = true;
-  } catch {
-    amountAllowed = false;
+  if (isAdmin) {
+    try {
+      await requireCatalogAdmin('amount:read');
+      amountAllowed = true;
+    } catch {
+      amountAllowed = false;
+    }
+  } else {
+    amountAllowed = reader.canViewAmount;
   }
   const inventoryCostMap: Record<string, string> = {};
   if (amountAllowed && !query.snapshot) {
     try {
-      const batch = await catalogRepository.baselineAmountsMap(identity);
+      const batch = isAdmin
+        ? await catalogRepository.baselineAmountsMap(identity)
+        : await getMemberItemAmounts(identity);
       for (const [itemId, financial] of batch) {
         const cost = adoptedUnitCostFromFinancial(financial);
         if (cost.state === 'priced') inventoryCostMap[itemId] = cost.amountCny;
@@ -127,8 +144,9 @@ export default async function InventoryPage({
       })
       : Promise.resolve(null),
     // 历史快照只读已发布批次，不合并国内冻结快照，也不影响当前库存视图。
-    query.snapshot ? Promise.resolve(null) : getInventoryDomesticSnapshot(identity),
-    getInventorySyncOverview(identity),
+    // 国内快照只对管理员读取；成员页面不请求、不显示国内数据。
+    query.snapshot || !isAdmin ? Promise.resolve(null) : getInventoryDomesticSnapshot(identity),
+    isAdmin ? getInventorySyncOverview(identity) : Promise.resolve(null),
   ]);
 
   const viewFailure = query.view === 'warehouse' ? warehouseSettled : summarySettled;
@@ -153,13 +171,29 @@ export default async function InventoryPage({
 
   const overview: InventoryOverviewDto | null = overviewSettled.status === 'fulfilled' ? overviewSettled.value : null;
 
+  // 可见仓库：管理员取同步范围里的参与仓；成员取账号被授予的仓（服务端已按授权范围返回）。
+  const warehouses: InventoryWarehouseDto[] = isAdmin
+    ? (overview?.warehouses ?? [])
+    : reader.access.warehouses.map((warehouse) => ({
+      id: warehouse.id,
+      externalId: warehouse.externalId,
+      name: warehouse.name,
+      status: 'confirmed',
+      market: warehouse.market,
+    }));
+  const scopeEmpty = isAdmin ? overview?.scope.empty === true : reader.access.scopeEmpty;
+
   // 历史快照：只读选定海外仓的已发布批次；默认该仓最新批次。
   // 明确 snapBatch 时独立读取这一批并核对所属仓，不依赖它是否落在当前批次列表页；
   // 不存在/仓库不一致时不返回其他批次的数量，由页面给出明确提示。
   // 该视图不读当前库存列表/国内冻结快照，也不会改写它们的筛选。
-  const snapshotWarehouses = (overview?.warehouses ?? []).filter((warehouse) => warehouse.status === 'confirmed');
+  const snapshotWarehouses = warehouses.filter((warehouse) => warehouse.status === 'confirmed');
+  // 书签里的仓已被收回授权：不要静默改选第一个授权仓，明确提示重新选仓。
+  // 只有首次打开（URL 未指定仓库）才默认选中一个授权仓。
+  const explicitSnapshotWarehouse = Boolean(query.snapWarehouse);
   const requestedSnapshotWarehouse = snapshotWarehouses.find((warehouse) => warehouse.id === query.snapWarehouse) ?? null;
   let snapshotWarehouseId = requestedSnapshotWarehouse?.id ?? '';
+  let snapshotWarehouseSelectionLost = false;
   let snapshotBatches: InventorySnapshotBatchesDto | null = null;
   let snapshotDetailResult: InventorySnapshotRowsDto | null = null;
   let snapshotBatchPage = query.snapBPage > 0 ? query.snapBPage : 1;
@@ -172,8 +206,12 @@ export default async function InventoryPage({
     observationAt: string;
   } | null = null;
   if (query.snapshot) {
-    if (!overview) {
+    const overviewFailed = isAdmin && overviewSettled.status === 'rejected';
+    if (overviewFailed) {
       snapshotBatchesError = '仓库清单读取失败';
+    } else if (warehouses.length === 0) {
+      // 成员没有授权仓时不是“读取失败”，明确说明没有可用仓库。
+      snapshotBatchesError = isAdmin ? '参与仓库为空' : '暂无授权的仓库';
     } else {
       if (query.snapBatch) {
         try {
@@ -201,7 +239,13 @@ export default async function InventoryPage({
           snapshotDetailError = shortFailure(error) ?? '明细读取失败';
         }
       }
-      if (!snapshotWarehouseId) snapshotWarehouseId = snapshotWarehouses[0]?.id ?? '';
+      if (!snapshotWarehouseId) {
+        if (explicitSnapshotWarehouse) {
+          snapshotWarehouseSelectionLost = true;
+        } else {
+          snapshotWarehouseId = snapshotWarehouses[0]?.id ?? '';
+        }
+      }
       if (snapshotWarehouseId) {
         // 直链批次不在第一批次页时，列表翻到它所在页：页面选择与直链看到的是同一批。
         const rankPage = snapshotDetailResult?.batchRank
@@ -259,14 +303,15 @@ export default async function InventoryPage({
 
   // 「待处理」入口不再在此同步读清单或计数：徽标数量由客户端挂载后异步读取，
   // 完整清单由弹窗打开时懒加载。这样切换「仓库明细 / 商品汇总」时先看到视图和数据，
-  // 不会为 5 页队列读取（约 1s）等待。
-  const pendingEntry = (
+  // 不会为 5 页队列读取（约 1s）等待。绑定/待处理都是管理员维护动作，成员不渲染入口。
+  const viewer = isAdmin ? { actorId: identity.profileUserId, accountId: overview?.account.accountId ?? '' } : null;
+  const pendingEntry = isAdmin ? (
     <InventoryPendingEntry
       viewer={{ actorId: identity.profileUserId, accountId: overview?.account.accountId ?? '' }}
       pendingLocked={pendingBlocksWrites(overview?.pendingAction ?? null)}
       autoOpen={query.pending === 'open'}
     />
-  );
+  ) : null;
 
   const domestic: InventoryDomesticSnapshotDto | null = domesticSettled.status === 'fulfilled' ? domesticSettled.value : null;
   const overseasRows: InventoryWarehouseRowsDto | null = warehouseSettled.status === 'fulfilled' ? warehouseSettled.value : null;
@@ -277,7 +322,7 @@ export default async function InventoryPage({
       query: { ...query, warehouse: warehouseFilter, market: marketFilter },
       overseas: overseasRows,
       domestic,
-      costMap: inventoryCostMap,
+      costMap: amountAllowed ? inventoryCostMap : undefined,
     })
     : null;
   const mergedSummary = query.view === 'product' && productSummary
@@ -285,7 +330,7 @@ export default async function InventoryPage({
       query: { ...query, warehouse: warehouseFilter, market: marketFilter },
       summary: productSummary,
       domestic,
-      costMap: inventoryCostMap,
+      costMap: amountAllowed ? inventoryCostMap : undefined,
     })
     : null;
 
@@ -326,7 +371,8 @@ export default async function InventoryPage({
 
   // 仓库行详情：读取固定来源（仓 + 原 SKU）的当前绑定，供详情内直接绑定/更换商品。
   // 国内行只读冻结快照，不提供 BigSeller 绑定；读取失败显示“可重试”，不当作“未绑定”。
-  const bindingTarget = detailRow && detailRow.source === 'bigseller' && detailRow.warehouseId ? detailRow : null;
+  const bindingTarget = isAdmin && detailRow && detailRow.source === 'bigseller' && detailRow.warehouseId
+    ? detailRow : null;
   let sourceBinding: SourceBindingDto | null = null;
   let sourceBindingError: string | null = null;
   if (bindingTarget?.warehouseId) {
@@ -344,13 +390,14 @@ export default async function InventoryPage({
   }
 
   // 恢复入口只在有未完成原请求/本地未知记录时出现；身份用于判断本地记录是否属于当前管理员。
-  const viewer = { actorId: identity.profileUserId, accountId: overview?.account.accountId ?? '' };
-
+  // 成员不渲染恢复/绑定/待处理入口（这些是管理员维护动作），viewer 因此为 null。
   return (
     <InventoryView
       query={query}
       effectiveFilters={{ warehouse: warehouseFilter, market: marketFilter }}
-      overview={overview}
+      warehouses={warehouses}
+      scopeEmpty={scopeEmpty}
+      allowDomestic={isAdmin}
       warehouseRows={warehouseRows}
       productSummary={mergedSummary}
       warehouseStates={warehouseStates}
@@ -365,10 +412,10 @@ export default async function InventoryPage({
       sourceBinding={sourceBinding}
       sourceBindingError={sourceBindingError}
       bindingReady={Boolean(bindingTarget)}
-      costMap={amountAllowed ? inventoryCostMap : undefined}
       showValue={amountAllowed}
       snapshot={{
         warehouseId: snapshotWarehouseId,
+        warehouseSelectionLost: snapshotWarehouseSelectionLost,
         batches: snapshotBatches?.batches ?? [],
         batchTotal: snapshotBatches?.batchTotal ?? 0,
         batchPage: snapshotBatchPage,
