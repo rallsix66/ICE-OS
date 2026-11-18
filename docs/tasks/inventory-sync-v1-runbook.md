@@ -27,10 +27,11 @@
 |---|---|
 | 库存 worker | Python 常驻进程 `inv-worker-59345`；配置 `…\instance\inventory-worker.json`；marker `…\instance\inventory-worker.pid.json` |
 | 冻结构建 | worker 实际运行 `…\instance\inventory-worker-src\worker.py`（prepare 时冻结，哈希 `1db4017a…`，与仓库 `tools/inventory-sync/*.py` 归一化换行后一致） |
-| 日志 | `…\inventory-work\logs\worker-YYYYMMDD.jsonl`（事件：`worker_started` / `worker_heartbeat` / `run_claimed` / `export_registered` / `run_finished` / `worker_idle` / `worker_shutdown_requested` / `worker_stopped`）；stdout `worker.stdout.log` |
+| 日志 | `…\inventory-work\logs\worker-YYYYMMDD.jsonl`（事件：`worker_started` / `worker_heartbeat` / `run_claimed` / `export_registered` / `run_finished` / `worker_idle` / `worker_shutdown_requested` / `worker_stopped`）；stdout `worker.stdout.log`（注意：文件名为**本地日期**，启动脚本打印的是按 UTC 推算的名字，以实际文件为准） |
 | 导出文件 | `…\inventory-work\exports\库存清单YYYYMMDDhhmmssSSS.xlsx`（每次真实导出）；文件指纹登记在 `catalog.inventory_export_file` |
 | 浏览器会话 | Chrome 持久化 profile `tools\bigseller-scraper\runtime\profile`；会话状态 `…\.local\inventory-sync-20261025\session\session-status.json`；锁 `browser.lock` |
 | 物流读取（并列，不受本交接控制） | `scripts/shipment/worker.mjs`，10 分钟；配置 `…\instance\shipment-auto-reader.json` |
+| 飞书商品来源读取（并列，只读） | `scripts/catalog/feishu-source/worker.mjs`，60 分钟；配置 `…\instance\product-source-reader.json`；只写 `…\source-snapshots\`（快照 + `reader-status.json`），不连数据库、不写飞书原表、不自动采用 |
 
 ## 2. 依赖
 
@@ -61,10 +62,15 @@ node scripts/inventory/start-web.mjs --run-id run-20261026T211500Z-11a22b33
 node scripts/inventory/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
 # 4) 物流在途读取进程（与本包无关，保持原来的 10 分钟计划）
 node scripts/shipment/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
+# 5) 飞书商品来源只读读取进程（60 分钟，只生成待应用快照；等第一轮读取最多 60s）
+node scripts/catalog/feishu-source/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
 ```
 
+- 第 1 步的整实例命令已按 `postgres -> web -> worker -> shipment-auto-reader -> product-source-reader -> status` 的顺序包含上面 5 步，正常只用一条命令即可。
+- 注意：在受限沙箱（Low 完整性）会话里直接跑这些命令会因 `…\.local` 目录没有 Low 标签而 `EPERM`。请在普通终端窗口或完全权限会话里启动；三个后台进程起来后与发起它的会话无关，可继续常驻。
+
 - `start-worker.mjs` 只在 marker 指向的进程已不存在时启动；进程活着且归属校验通过时直接提示已在运行。
-- `start-instance.mjs` 会依次检查并启动四步，已在运行的组件不会启动第二份；如果只想把停掉的库存 worker 拉起来（DB/Web/物流读取都正常），直接用上面的第 3 步，避免多余步骤。
+- `start-instance.mjs` 会依次检查并启动五步，已在运行的组件不会启动第二份；如果只想把停掉的库存 worker 拉起来（DB/Web/物流读取都正常），直接用上面的第 3 步，避免多余步骤。
 - worker 启动后会先 `register_inventory_worker` 心跳，再 `claim_inventory_run`：**先领取队列里最早的 queued/manual 任务**，没有到期自动计划时打印 `worker_idle: no_due_run` 并等待。
 - **不要把 worker 挂在会随工具/会话退出的进程树里**：本次 10-29 停运的现场是“无优雅停止日志 + pid 直接消失 + 数据库未中断”，**推测**是常驻进程随启动它的会话/沙箱服务一起被终止（无 OS 级证据，见任务包 §2.2/§2.3）。日常应在独立终端窗口启动；如需长期托管，用 Windows 服务/计划任务另行接入（见 §9，属后续工作）。
 
@@ -75,6 +81,8 @@ node scripts/shipment/start-worker.mjs --run-id run-20261026T211500Z-11a22b33
 node scripts/inventory/stop-worker.mjs --run-id run-20261026T211500Z-11a22b33
 # 只停物流读取
 node scripts/shipment/stop-worker.mjs --run-id run-20261026T211500Z-11a22b33
+# 只停飞书商品来源读取
+node scripts/catalog/feishu-source/stop-worker.mjs --run-id run-20261026T211500Z-11a22b33
 # 停 Web / 数据库
 node scripts/catalog/stop-local-preview.mjs --run-id run-20261026T211500Z-11a22b33
 node scripts/catalog/stop-catalog-postgres.mjs --run-id run-20261026T211500Z-11a22b33
@@ -90,11 +98,14 @@ Windows 上 `process.kill(pid,'SIGTERM')` 不保证 Python 的 signal handler �
 ## 5. 状态查看与判读
 
 ```powershell
-# 实例总状态（含库存 worker、物流读取、数据库与页面）
+# 实例总状态（含库存 worker、物流读取、商品来源读取、数据库与页面）
 node scripts/inventory/status.mjs --run-id run-20261026T211500Z-11a22b33
 
 # 物流读取专用状态
 node scripts/shipment/status.mjs --run-id run-20261026T211500Z-11a22b33
+
+# 商品来源读取专用状态（进程归属、最近读取、失败原因与下次计划）
+node scripts/catalog/feishu-source/status.mjs --run-id run-20261026T211500Z-11a22b33
 ```
 
 判读要点：
@@ -146,6 +157,7 @@ JOIN catalog.inventory_warehouse ON id=warehouse_id ORDER BY external_name;
 | 任务 `outcome_unknown`（后台发布结果未确认） | 由**本实例后台 worker 的恢复路径**核对（`tools/inventory-sync/worker.py` 的 `_recover_outcome_unknown`）：任务保留原租约但不释放，租约过期后下一次 `claim_inventory_run` 重新领取（attempt+1），按已登记/已发布批次核对——全部参与仓已发布则结为 `success`，有缺口则结为 `partial`，**不会重复发布**。处理：按 §3 保持或拉起本实例 worker，在 worker 日志查看 `outcome_unknown_recovery_check`，随后是 `run_finished`（`recovered=true`，全部已发布）或 `outcome_unknown_reconciled`（有缺口），以任务最终状态为准。**不是**页面的「原请求核对」——该入口只处理页面操作结果未知（服务端 `catalog.inventory_pending_action`）。 |
 | 页面「后台在线」但长时间无新批次 | 先看 `last_seen_at` 是否新鲜（`state` 字段不可靠），再按 §5 核对；进程不在就用 §3 第 3 步拉起 |
 | `scripts/inventory/status.mjs` 里物流读取显示 `ok:false / no output` | 该子步骤用管道收集输出，在受限沙箱里会失败；直接跑 `scripts/shipment/status.mjs` 看真实结果 |
+| 商品来源读取进程不在、最近读取失败或长时间不推进 | 跑 `scripts/catalog/feishu-source/status.mjs` 看进程归属、`reader-status.json` 的最近结果/失败原因与下次计划；进程不在按 §3 第 5 步拉起，读取失败只保留旧快照与已应用批次，不自动写商品库。 |
 
 失败只写失败快照/状态，不覆盖已发布批次；计划保持启用，到点重试。
 

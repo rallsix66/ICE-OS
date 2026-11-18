@@ -301,5 +301,5 @@ node scripts/catalog/apply-044.mjs --commit --allow-live-commit --run-id run-202
 - 分支：`codex/permissions-v1`（从 `codex/operations-log-v1` 的 `55f7356` 创建；仅本地，未推送）。
 - 包提交：**`6b4c34b`** `feat(permissions): 权限设置 v1 与两轮补修`，共 37 个文件：043/044 迁移与 apply 脚本、权限页面与 access 服务端、库存成员/金额/详情/快照改动、导航、定向测试、准备链和本包交付文档。
 - 共用文档只提交本包段落：`AGENTS.md`、`docs/current-state.md`、`docs/tasks/current-task.md`、`docs/tasks/inventory-sync-v1-runbook.md`（§9 权限设置）。
-- 保留在工作区、未纳入包提交：Mac 部署准备（`scripts/catalog/start-catalog-postgres.mjs`、`stop-catalog-postgres.mjs`、`scripts/inventory/login-bigseller.mjs`、`start-worker.mjs`、`scripts/shipment/start-worker.mjs`、`tools/inventory-sync/bigseller_session.py`，以及 README/部署文档、`docs/deploy/`、`scripts/deploy/`、`scripts/runtime/check-runtime.mjs`、pnpm 文件、`.gitignore` 的部署准备忽略项）；上一包 `docs/tasks/live-data-resume-20261117.md` 及其共用文档段落；本机 `.local` 凭据与证据。
+- Mac 部署准备（`scripts/catalog/start-catalog-postgres.mjs`、`stop-catalog-postgres.mjs`、`scripts/inventory/login-bigseller.mjs`、`start-worker.mjs`、`scripts/shipment/start-worker.mjs`、`tools/inventory-sync/bigseller_session.py`，以及 README/部署文档、`docs/deploy/`、`scripts/deploy/`、`scripts/runtime/check-runtime.mjs`、pnpm 文件、`.gitignore` 的部署准备忽略项）与本机 `.local` 凭据/证据保留在工作区；上一包 `docs/tasks/live-data-resume-20261117.md` 及其共用文档段落已由后续本地文档提交纳入。
 - 本提交只做本地版本收尾；未推送、未部署，3011 运行构建与三个后台未重启，沿用 §12 的 PASS 结论。
