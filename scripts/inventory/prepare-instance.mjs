@@ -156,6 +156,12 @@ async function ensureSchema(owner, evidence) {
   // 权限设置 v1 首轮补修（044，幂等；必须晚于 043）：后台范围读取、成员详情裁剪、
   // 成员金额读取与密码重置留痕。重复准备只替换函数/补策略，不动已有角色与仓库授权。
   const permissionsV1FixesFile = 'db/catalog/044_permissions_v1_fixes.sql';
+  // 成员按授权物流市场查看物流在途（045，幂等；必须晚于 016-044）：物流市场范围表、
+  // 成员物流读取守卫与货票读取按市场收窄；重复准备只替换函数/补策略，不动已有授权。
+  const memberLogisticsMarketsFile = 'db/catalog/045_member_logistics_markets.sql';
+  // 成员物流在途 v1 补修（046，幂等；必须晚于 045）：恢复 045 漏掉的数量冲突/原数量字段，
+  // 修正账号保存审计 before.isActive 取值；保留成员市场过滤。
+  const memberLogisticsFixesFile = 'db/catalog/046_member_logistics_markets_fixes.sql';
   const applied = [];
   let sqlState;
   const version = Number(before.row?.version ?? 0);
@@ -215,6 +221,8 @@ async function ensureSchema(owner, evidence) {
   // 幂等且不覆盖已有角色/仓库授权；已安装 042 的库重跑不会被旧管理员守卫覆盖。
   applied.push(await applySql(owner, permissionsV1File));
   applied.push(await applySql(owner, permissionsV1FixesFile));
+  applied.push(await applySql(owner, memberLogisticsMarketsFile));
+  applied.push(await applySql(owner, memberLogisticsFixesFile));
   const structureSha = hashFile(v6File);
   const functionsSha = hashFile(functionsFile);
   await owner.query(

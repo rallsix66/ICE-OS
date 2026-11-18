@@ -22,7 +22,7 @@ vi.mock('./auth-accounts', () => ({
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-import { resetAccessPasswordAction } from './actions';
+import { resetAccessPasswordAction, updateAccessAccountAction } from './actions';
 
 const PROFILE = '11111111-1111-4111-8111-111111111104';
 const ADMIN_PROFILE = '11111111-1111-4111-8111-111111111101';
@@ -35,6 +35,39 @@ beforeEach(() => {
   withAppDbMock.mockReset();
   callAppRpcMock.mockReset();
   setAuthAccountPasswordMock.mockReset();
+});
+
+describe('updateAccessAccountAction（物流市场授权）', () => {
+  it('仓库范围与物流市场分别提交：市场去空白/去重，未知值交给数据库入口校验', async () => {
+    callAppRpcMock.mockResolvedValue({ ok: true });
+    const result = await updateAccessAccountAction({
+      profileId: PROFILE,
+      displayName: '验收成员V1',
+      roleId: '22222222-2222-4222-8222-222222222222',
+      isActive: true,
+      warehouseIds: ['33333333-3333-4333-8333-333333333333'],
+      marketKeys: ['越南', ' 越南 ', '', '泰国', 123 as unknown as string],
+    });
+    expect(result).toEqual({ success: true });
+    const [identity, spec, params] = callAppRpcMock.mock.calls[0];
+    expect(identity).toEqual({ profileUserId: 'admin-profile' });
+    expect(spec).toBe('catalog.update_access_account');
+    expect(params[4]).toEqual(['33333333-3333-4333-8333-333333333333']);
+    expect(params[5]).toEqual(['越南', '泰国']);
+  });
+
+  it('不传市场时提交空数组（不授予任何物流市场）', async () => {
+    callAppRpcMock.mockResolvedValue({ ok: true });
+    await updateAccessAccountAction({
+      profileId: PROFILE,
+      displayName: '验收成员V1',
+      roleId: '22222222-2222-4222-8222-222222222222',
+      isActive: true,
+      warehouseIds: [],
+      marketKeys: [],
+    });
+    expect(callAppRpcMock.mock.calls[0][2][5]).toEqual([]);
+  });
 });
 
 describe('resetAccessPasswordAction', () => {

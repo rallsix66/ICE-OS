@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { requireActiveAdmin } from '@/lib/auth';
+import { requireActiveAdmin, requireActiveAuth } from '@/lib/auth';
 import { catalogRepository } from '@/features/catalog/repository';
 import { withReadOnlyAppDb, type DbIdentity } from '@/lib/database/app-db';
 import type {
@@ -95,6 +95,15 @@ export async function requireShipmentAdmin(): Promise<DbIdentity> {
   return { profileUserId: actor.id };
 }
 
+/**
+ * 物流读取鉴权（045）：管理员，或启用中且至少获授一个物流市场的成员。
+ * 是否有市场、能看哪些市场都由数据库按 request.jwt.claim.sub 判断，页面不传市场范围。
+ */
+export async function requireShipmentReader(): Promise<DbIdentity> {
+  const actor = await requireActiveAuth();
+  return { profileUserId: actor.id };
+}
+
 async function callReadRpc<T>(identity: DbIdentity, functionSpec: string, params: unknown[]): Promise<T> {
   const placeholders = params.map((_, index) => `$${index + 1}`).join(', ');
   const sql = params.length > 0
@@ -160,8 +169,11 @@ export async function getShipmentSourceStatus(): Promise<ShipmentSourceStatusDto
   return { ...status, autoReader: await readAutoReaderStatus(identity) };
 }
 
-export async function getShipmentList(query: ShipmentListQuery): Promise<ShipmentListDto> {
-  const identity = await requireShipmentAdmin();
+export async function getShipmentList(
+  query: ShipmentListQuery,
+  options: { includeAdminMeta?: boolean } = {},
+): Promise<ShipmentListDto> {
+  const identity = await requireShipmentReader();
   const limit = Math.max(1, Math.min(Math.trunc(query.limit) || 20, 100));
   const offset = Math.max(0, Math.trunc(query.offset) || 0);
   const [raw, manualIndex] = await Promise.all([
@@ -177,8 +189,8 @@ export async function getShipmentList(query: ShipmentListQuery): Promise<Shipmen
     readManualIndex(identity),
   ]);
   const list = normalizeList(raw);
-  // 状态条同时显示后台自动读取状态（与列表同一签名/session，多一次只读查询）。
-  const autoReader = await readAutoReaderStatus(identity);
+  // 状态条同时显示后台自动读取状态（管理员）；成员只读不需要这次管理员读取。
+  const autoReader = options.includeAdminMeta === false ? null : await readAutoReaderStatus(identity);
   return {
     ...list,
     rows: mergeManualListRows(list.rows, manualIndex),
@@ -235,18 +247,30 @@ async function attachProductCards(identity: DbIdentity, detail: ShipmentDetailDt
   };
 }
 
-/** 单票详情；票不存在（例如 URL 里的 ticket 已失效）返回 null，由页面按空态处理。 */
-export async function getShipmentDetail(shipmentId: string): Promise<ShipmentDetailDto | null> {
-  const identity = await requireShipmentAdmin();
+/**
+ * 单票详情；票不存在（例如 URL 里的 ticket 已失效）返回 null，由页面按空态处理。
+ *
+ * member=true（成员只读）：不读商品成本卡片、不读人工修正历史、不算本票货值；
+ * 有效状态与剩余数量仍取同一份人工修正索引（与列表/管理员同口径）。
+ * 未授权市场的票由数据库按「不存在」返回 NULL，服务端拿不到任何票面。
+ */
+export async function getShipmentDetail(
+  shipmentId: string,
+  options: { member?: boolean } = {},
+): Promise<ShipmentDetailDto | null> {
+  const identity = await requireShipmentReader();
+  const member = options.member === true;
   // 026 详情主数据与 029 的人工索引/历史并行读；人工两路失败只降级人工字段。
   const [raw, manualIndex, manualHistory] = await Promise.all([
     callReadRpc<unknown>(identity, 'catalog.read_shipment_detail', [shipmentId]),
     readManualIndex(identity),
-    readManualHistory(identity, shipmentId),
+    member ? Promise.resolve([]) : readManualHistory(identity, shipmentId),
   ]);
   const detail = normalizeDetail(raw);
   if (!detail) return null;
-  const withCards = await attachProductCards(identity, mergeManualDetail(detail, manualIndex, manualHistory));
+  const merged = mergeManualDetail(detail, manualIndex, manualHistory);
+  if (member) return merged;
+  const withCards = await attachProductCards(identity, merged);
   return { ...withCards, ticketValue: buildShipmentTicketValue(withCards.items) };
 }
 

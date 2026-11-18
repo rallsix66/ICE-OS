@@ -75,6 +75,41 @@ const DEPENDENT_SQL = [
       'catalog.read_inventory_item(uuid,text,text,boolean)',
     ],
   },
+  {
+    // 成员按授权物流市场查看物流在途（045）：必须晚于 043/044 与 026 的货票读取函数；
+    // 目录预览还没有物流表时跳过，由 prepare-instance 在 026-044 之后按顺序安装。
+    path: 'db/catalog/045_member_logistics_markets.sql',
+    requires: [
+      'catalog.access_role', 'catalog.account_access', 'catalog.account_access_warehouse',
+      'catalog.shipment', 'catalog.shipment_item', 'catalog.shipment_source_snapshot',
+      'public.profiles',
+    ],
+    requiresFunctions: [
+      'catalog.require_admin()',
+      'catalog.is_admin()',
+      'catalog.read_shipment_list(text,text,text,uuid,boolean,integer,integer)',
+      'catalog.read_shipment_detail(uuid)',
+      'catalog.read_shipment_manual_index()',
+      'catalog.read_shipment_manual_history(uuid)',
+      'catalog.read_shipment_source_status()',
+      'catalog.read_my_inventory_access()',
+      'catalog.access_account_rows(text,uuid,text,integer,integer)',
+      'catalog.read_access_account(uuid)',
+    ],
+  },
+  {
+    // 成员物流在途 v1 补修（046）：必须晚于 045/030；恢复冲突字段并修正账号审计取值。
+    path: 'db/catalog/046_member_logistics_markets_fixes.sql',
+    requires: ['catalog.access_role', 'catalog.account_access', 'catalog.account_access_market', 'catalog.shipment', 'catalog.shipment_item'],
+    requiresFunctions: [
+      'catalog.require_shipment_read()',
+      'catalog.access_member_markets()',
+      'catalog.shipment_manual_quantity_conflict(uuid)',
+      'catalog.shipment_effective_status_class(uuid)',
+      'catalog.read_shipment_manual_index()',
+      'catalog.update_access_account(uuid,text,uuid,boolean,uuid[],text[])',
+    ],
+  },
 ];
 
 async function applyCatalogSql(run) {

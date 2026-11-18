@@ -59,6 +59,7 @@ export function ShipmentDetailDrawer({
   detailError,
   loading,
   focusItemId = '',
+  readOnly = false,
   onClose,
 }: {
   detail: ShipmentDetailDto | null;
@@ -67,6 +68,8 @@ export function ShipmentDetailDrawer({
   loading: boolean;
   /** 从汇总带过来的明细 id：高亮并滚动到该行。 */
   focusItemId?: string;
+  /** 成员只读（045）：无货值、无单位成本、无改票/绑定/修正入口，也不显示变更记录页签。 */
+  readOnly?: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -128,7 +131,7 @@ export function ShipmentDetailDrawer({
   const effectiveClass = shipment ? shipment.effectiveStatusClass : null;
   const statusToShow = effectiveClass ?? shipment?.statusClass ?? null;
   // 本票在途货值（第十三轮）：逐条当前有效剩余 × 商品库采用进货价；一条都算不出写「暂无法计算」。
-  const ticketValue = detail?.ticketValue ?? null;
+  const ticketValue = readOnly ? null : detail?.ticketValue ?? null;
   const ticketValueText = ticketValue === null
     ? ''
     : ticketValue.pricedItemCount === 0
@@ -206,8 +209,10 @@ export function ShipmentDetailDrawer({
         </header>
 
         <DetailTabs
-          tabs={[{ key: 'detail', label: '货票详情' }, { key: 'changes', label: '变更记录' }] as const}
-          active={tab}
+          tabs={readOnly
+            ? [{ key: 'detail', label: '货票详情' }]
+            : [{ key: 'detail', label: '货票详情' }, { key: 'changes', label: '变更记录' }]}
+          active={readOnly ? 'detail' : tab}
           onSelect={(key) => setTab(key === 'changes' ? 'changes' : 'detail')}
           ariaLabel="货票详情分区"
           idPrefix="shipment-detail-tab"
@@ -216,7 +221,7 @@ export function ShipmentDetailDrawer({
         />
 
         <div ref={bodyRef} className={`${demoStyles.detailBody} ${styles.detailBody}`}>
-          {tab === 'detail' ? (
+          {readOnly || tab === 'detail' ? (
             <div role="tabpanel" id="shipment-detail-panel-detail" aria-labelledby="shipment-detail-tab-detail" data-testid="shipment-detail-panel">
           {loading ? (
             <p className={styles.detailEmpty} data-testid="shipment-detail-loading">正在读取货票…</p>
@@ -307,19 +312,19 @@ export function ShipmentDetailDrawer({
                       <th scope="col">来源商品</th>
                       <th scope="col">来源 SKU</th>
                       <th scope="col">关联 ICE 商品</th>
-                      <th scope="col">规格 / 单位</th>
-                      <th scope="col">单位成本</th>
+                      {readOnly ? null : <th scope="col">规格 / 单位</th>}
+                      {readOnly ? null : <th scope="col">单位成本</th>}
                       <th scope="col">发货量</th>
                       <th scope="col">累计到货</th>
                       <th scope="col">剩余在途</th>
                       <th scope="col">来源备注</th>
-                      <th scope="col">操作</th>
+                      {readOnly ? null : <th scope="col">操作</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {items.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className={styles.itemProductSub}>本次来源没有当前明细</td>
+                        <td colSpan={readOnly ? 7 : 10} className={styles.itemProductSub}>本次来源没有当前明细</td>
                       </tr>
                     ) : items.map((item) => {
                       const received = receivedDisplay(item);
@@ -350,37 +355,41 @@ export function ShipmentDetailDrawer({
                               <span className={styles.itemProductSub}>未关联</span>
                             )}
                           </td>
-                          <td data-testid="shipment-item-spec-unit">
-                            {item.product ? (
-                              <>
-                                <span className={styles.itemProductSub} data-testid="shipment-item-specification">
-                                  {item.product.specificationText ? `规格 ${item.product.specificationText}` : '规格待补'}
-                                </span>
-                                <span className={styles.itemProductSub} data-testid="shipment-item-unit">
-                                  {item.product.unitText ? `单位 ${item.product.unitText}` : '单位 待确认'}
-                                </span>
-                              </>
-                            ) : (
-                              <span className={styles.itemProductSub}>—</span>
-                            )}
-                          </td>
-                          <td data-testid="shipment-item-unit-cost">
-                            {item.product ? (
-                              <>
-                                <span
-                                  className={item.product.unitCost.state === 'priced' ? styles.unitCostPriced : styles.unitCostMissing}
-                                  data-testid="shipment-item-unit-cost-label"
-                                >
-                                  {item.product.unitCost.label}
-                                </span>
-                                {item.product.unitCost.state === 'missing' && item.product.unitCost.reason ? (
-                                  <span className={styles.unitCostReason}>{item.product.unitCost.reason}</span>
-                                ) : null}
-                              </>
-                            ) : (
-                              <span className={styles.itemProductSub}>—</span>
-                            )}
-                          </td>
+                          {readOnly ? null : (
+                            <td data-testid="shipment-item-spec-unit">
+                              {item.product ? (
+                                <>
+                                  <span className={styles.itemProductSub} data-testid="shipment-item-specification">
+                                    {item.product.specificationText ? `规格 ${item.product.specificationText}` : '规格待补'}
+                                  </span>
+                                  <span className={styles.itemProductSub} data-testid="shipment-item-unit">
+                                    {item.product.unitText ? `单位 ${item.product.unitText}` : '单位 待确认'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className={styles.itemProductSub}>—</span>
+                              )}
+                            </td>
+                          )}
+                          {readOnly ? null : (
+                            <td data-testid="shipment-item-unit-cost">
+                              {item.product ? (
+                                <>
+                                  <span
+                                    className={item.product.unitCost.state === 'priced' ? styles.unitCostPriced : styles.unitCostMissing}
+                                    data-testid="shipment-item-unit-cost-label"
+                                  >
+                                    {item.product.unitCost.label}
+                                  </span>
+                                  {item.product.unitCost.state === 'missing' && item.product.unitCost.reason ? (
+                                    <span className={styles.unitCostReason}>{item.product.unitCost.reason}</span>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <span className={styles.itemProductSub}>—</span>
+                              )}
+                            </td>
+                          )}
                           <td className={styles.numCell} data-testid="shipment-item-shipped">
                             {formatQuantityOr(item.shippedQuantity)}
                           </td>
@@ -414,6 +423,7 @@ export function ShipmentDetailDrawer({
                             {remaining.pending ? <span className={styles.pendingChip}>待核</span> : null}
                           </td>
                           <td className={styles.itemProductSub}>{noteText(item.sourceNote)}</td>
+                          {readOnly ? null : (
                           <td>
                             <span className={styles.itemActions}>
                               <button
@@ -466,6 +476,7 @@ export function ShipmentDetailDrawer({
                               )}
                             </span>
                           </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -481,7 +492,7 @@ export function ShipmentDetailDrawer({
                 <p className={styles.manualSaved} role="status" data-testid="shipment-assoc-saved-notice">{assocNotice}</p>
               ) : null}
 
-              {editingItem ? (
+              {!readOnly && editingItem ? (
                 <ShipmentAssociationEditor
                   key={editingItem.itemId}
                   item={{
@@ -597,7 +608,7 @@ export function ShipmentDetailDrawer({
           )}
         </div>
 
-        {correctingItem ? (
+        {!readOnly && correctingItem ? (
           <ShipmentManualCorrectionDialog
             item={correctingItem}
             onClose={() => setCorrectingItemId('')}

@@ -13,6 +13,7 @@ import {
   getShipmentList,
   getShipmentValuePage,
 } from '@/features/shipment/server/reads';
+import { getMyInventoryAccess } from '@/features/access/server/reads';
 import type {
   ShipmentDetailDto,
   ShipmentListDto,
@@ -37,10 +38,11 @@ function toUrlSearchParams(sp: Record<string, string | string[] | undefined>): U
 /**
  * 物流在途（货票）页：飞书物流情况表的只读投影。
  *
- * - 两个主视图「货票列表｜货值汇总」共用市场筛选；默认货票列表，切换视图保留市场；
- * - 列表/详情/货值/复核各自读取：任一失败只降级对应区域，不伪造 0 或空数据；
- * - 读取状态统一在「数据同步」页；本页读取失败且仍在展示旧数据时只留一行提示与入口；
- * - 详情抽屉由客户端壳按 URL 打开，关闭后回到原筛选与页码。
+ * - 管理员：两个主视图「货票列表｜货值汇总」共用市场筛选，可做拆合票复核；
+ * - 成员（045）：只读「货票列表」，范围由服务端按账号获授的物流市场收窄；
+ *   页面不传市场范围，也不显示货值、改票、商品绑定等管理员能力；
+ * - 列表/详情各自读取：任一失败只降级对应区域，不伪造 0 或空数据；
+ * - 详情抽屉由客户端壳按 URL 打开，关闭后回到原筛选与页码（成员同一套行为）。
  */
 export default async function InTransitPage({
   searchParams,
@@ -49,7 +51,20 @@ export default async function InTransitPage({
 }) {
   const sp = await searchParams;
   const query = parseShipmentSearchParams(toUrlSearchParams(sp));
-  const valueView = query.view === 'value';
+  const access = await getMyInventoryAccess().catch(() => null);
+  const isAdmin = access?.isAdmin === true;
+  const member = !isAdmin;
+  if (!isAdmin && access?.canViewShipment !== true) {
+    return (
+      <ShipmentReadFailurePanel
+        kind="forbidden"
+        backHref="/dashboard/inventory"
+        backLabel="返回商品库存"
+        extra={<p>当前账号还没有任何物流市场授权，请联系管理员在「权限设置 → 账号管理」勾选可查看的物流市场。</p>}
+      />
+    );
+  }
+  const valueView = isAdmin && query.view === 'value';
 
   let list: ShipmentListDto;
   try {
@@ -61,14 +76,14 @@ export default async function InTransitPage({
       includeAbsent: query.includeAbsent,
       limit: query.limit,
       offset: shipmentOffset(query.page, query.limit),
-    });
+    }, { includeAdminMeta: isAdmin });
   } catch (error) {
     const kind = classifyShipmentReadFailure(error);
     return (
       <ShipmentReadFailurePanel
         kind={kind}
-        backHref="/dashboard/catalog"
-        backLabel="返回 ICE 商品库"
+        backHref={member ? '/dashboard/inventory' : '/dashboard/catalog'}
+        backLabel={member ? '返回商品库存' : '返回 ICE 商品库'}
         extra={kind === 'read_failed' ? (
           <p>飞书来源读取失败时不会清空已保存的货票；可稍后重新打开本页或到「数据同步」重试。</p>
         ) : null}
@@ -76,23 +91,31 @@ export default async function InTransitPage({
     );
   }
 
-  // 详情 / 货值 / 复核互不依赖：并行读取；各自失败只降级对应区域。
-  // 货值汇总（第十七轮）：一次 028 读取同时产出全部市场汇总、各市场展开数据、
-  // 选中市场的完整汇总与未关联明细的商品建议；点市场不再跳转/整页刷新。
-  const [detailOutcome, valueOutcome, reviewsOutcome] = await Promise.all([
-    query.ticket
-      ? getShipmentDetail(query.ticket)
-        .then((value) => ({ ok: true as const, value }))
-        .catch((error: unknown) => ({ ok: false as const, error: shortShipmentFailure(error) }))
-      : Promise.resolve({ ok: true as const, value: null as ShipmentDetailDto | null }),
-    valueView
-      ? getShipmentValuePage(query.market)
-        .then((value) => ({ ok: true as const, value }))
-        .catch((error: unknown) => ({ ok: false as const, error: shortShipmentFailure(error) }))
-      : Promise.resolve({ ok: true as const, value: null as ShipmentValuePageDto | null }),
-    getShipmentGroupingReviews()
+  // 管理员的货值/复核与详情互不依赖：并行读取；各自失败只降级对应区域。
+  // 成员只读列表与授权票详情：不读货值、不读拆合票复核、不算货值。
+  const detailOutcomePromise = query.ticket
+    ? getShipmentDetail(query.ticket, { member })
       .then((value) => ({ ok: true as const, value }))
-      .catch((error: unknown) => ({ ok: false as const, error: shortShipmentFailure(error) })),
+      .catch((error: unknown) => ({ ok: false as const, error: shortShipmentFailure(error) }))
+    : Promise.resolve({ ok: true as const, value: null as ShipmentDetailDto | null });
+  const adminOutcomePromise = isAdmin
+    ? Promise.all([
+      valueView
+        ? getShipmentValuePage(query.market)
+          .then((value) => ({ ok: true as const, value }))
+          .catch((error: unknown) => ({ ok: false as const, error: shortShipmentFailure(error) }))
+        : Promise.resolve({ ok: true as const, value: null as ShipmentValuePageDto | null }),
+      getShipmentGroupingReviews()
+        .then((value) => ({ ok: true as const, value }))
+        .catch((error: unknown) => ({ ok: false as const, error: shortShipmentFailure(error) })),
+    ])
+    : Promise.resolve([
+      { ok: true as const, value: null as ShipmentValuePageDto | null },
+      { ok: true as const, value: null },
+    ] as const);
+  const [detailOutcome, [valueOutcome, reviewsOutcome]] = await Promise.all([
+    detailOutcomePromise,
+    adminOutcomePromise,
   ]);
   const valuePage = valueOutcome.ok ? valueOutcome.value : null;
 
@@ -100,6 +123,7 @@ export default async function InTransitPage({
     <InTransitView
       query={query}
       list={list}
+      isAdmin={isAdmin}
       detail={detailOutcome.ok ? detailOutcome.value : null}
       detailError={detailOutcome.ok ? null : detailOutcome.error}
       marketSummary={valuePage?.selected ?? null}

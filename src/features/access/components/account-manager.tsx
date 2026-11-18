@@ -15,6 +15,7 @@ import { marketLabel } from '../types';
 import type {
   AccessAccountDetailDto,
   AccessAccountDto,
+  AccessMarketOptionDto,
   AccessRoleDto,
   AccessWarehouseOptionDto,
 } from '../types';
@@ -49,6 +50,7 @@ export function AccountManager({
   total,
   roles,
   warehouses,
+  markets,
   filters,
   rolesHref,
 }: {
@@ -56,6 +58,7 @@ export function AccountManager({
   total: number;
   roles: AccessRoleDto[];
   warehouses: AccessWarehouseOptionDto[];
+  markets: AccessMarketOptionDto[];
   filters: { q: string; role: string; status: string };
   rolesHref: string;
 }) {
@@ -169,6 +172,7 @@ export function AccountManager({
                 <th>角色</th>
                 <th>金额</th>
                 <th>数据范围</th>
+                <th>物流市场</th>
                 <th>状态</th>
                 <th>操作</th>
               </tr>
@@ -176,7 +180,7 @@ export function AccountManager({
             <tbody>
               {accounts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className={styles.muted}>没有符合条件的账号。</td>
+                  <td colSpan={8} className={styles.muted}>没有符合条件的账号。</td>
                 </tr>
               ) : null}
               {accounts.map((account) => (
@@ -191,6 +195,13 @@ export function AccountManager({
                       : account.warehouseCount === 0
                         ? '未分配'
                         : `${account.markets.map((market) => marketLabel(market)).join('、')} · ${account.warehouseCount} 个仓`}
+                  </td>
+                  <td data-testid="account-logistics-markets">
+                    {account.isSystemAdmin
+                      ? '全部市场'
+                      : account.logisticsMarkets.length === 0
+                        ? '未授权'
+                        : `${account.logisticsMarkets.map((market) => marketLabel(market)).join('、')}物流`}
                   </td>
                   <td>
                     <span
@@ -235,6 +246,7 @@ export function AccountManager({
           dialog={dialog}
           roles={roles}
           groups={groups}
+          markets={markets}
           defaultRoleId={defaultRoleId}
           onClose={() => setDialog(null)}
           onSaved={(text) => { setDialog(null); refreshWithNotice(text); }}
@@ -248,6 +260,7 @@ function AccountDialog({
   dialog,
   roles,
   groups,
+  markets,
   defaultRoleId,
   onClose,
   onSaved,
@@ -255,6 +268,7 @@ function AccountDialog({
   dialog: Exclude<DialogState, null>;
   roles: AccessRoleDto[];
   groups: Array<[string, AccessWarehouseOptionDto[]]>;
+  markets: AccessMarketOptionDto[];
   defaultRoleId: string;
   onClose: () => void;
   onSaved: (text: string) => void;
@@ -266,6 +280,7 @@ function AccountDialog({
   const [roleId, setRoleId] = useState(editing?.roleId ?? defaultRoleId);
   const [isActive, setIsActive] = useState(editing?.isActive ?? true);
   const [selected, setSelected] = useState<string[]>(editing?.warehouses.map((row) => row.warehouseId) ?? []);
+  const [selectedMarkets, setSelectedMarkets] = useState<string[]>(editing?.logisticsMarkets ?? []);
   const [resetPassword, setResetPassword] = useState('');
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -289,6 +304,12 @@ function AccountDialog({
       : [...new Set([...current, ...ids])]));
   }
 
+  function toggleLogisticsMarket(market: string) {
+    setSelectedMarkets((current) => (current.includes(market)
+      ? current.filter((entry) => entry !== market)
+      : [...current, market].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'))));
+  }
+
   function save() {
     setNotice(null);
     startTransition(async () => {
@@ -299,6 +320,7 @@ function AccountDialog({
           roleId,
           isActive,
           warehouseIds: selected,
+          marketKeys: selectedMarkets,
         })
         : await createAccessAccountAction({
           displayName,
@@ -306,6 +328,7 @@ function AccountDialog({
           password,
           roleId,
           warehouseIds: selected,
+          marketKeys: selectedMarkets,
           isActive,
         });
       if (!result.success) {
@@ -436,6 +459,31 @@ function AccountDialog({
             </div>
             <p className={styles.muted}>
               已选 {selected.length} 个仓；不选任何仓时该账号登录后显示「暂无授权库存」。
+            </p>
+          </div>
+
+          <div>
+            <p className={styles.label}>物流市场：成员可在「物流在途」查看哪些市场的货票</p>
+            <div className={styles.marketChoices} data-testid="account-logistics-scope">
+              {markets.length === 0 ? (
+                <span className={styles.muted}>物流来源里暂时没有可授权的市场。</span>
+              ) : markets.map((option) => (
+                <label key={option.market} className={styles.choice}>
+                  <input
+                    type="checkbox"
+                    checked={selectedMarkets.includes(option.market)}
+                    onChange={() => toggleLogisticsMarket(option.market)}
+                    data-testid="account-logistics-market"
+                    data-market={option.market}
+                  />
+                  <span>{marketLabel(option.market)}物流</span>
+                </label>
+              ))}
+            </div>
+            <p className={styles.muted} data-testid="account-logistics-hint">
+              {selectedMarkets.length === 0
+                ? '未勾选：该账号看不到任何物流货票。'
+                : `已选 ${selectedMarkets.map((market) => marketLabel(market)).join('、')}；仓库范围与物流市场分别授权，互不代替。`}
             </p>
           </div>
 

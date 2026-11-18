@@ -29,8 +29,17 @@ export interface AccessAccountDto {
   roleName: string | null;
   canViewInventory: boolean;
   canViewAmount: boolean;
+  /** 库存仓库范围所属市场（由仓库范围推导，保持原语义）。 */
   markets: string[];
+  /** 物流市场授权（与仓库范围独立；空数组=没有物流在途权限）。 */
+  logisticsMarkets: string[];
   warehouseCount: number;
+}
+
+/** 账号可勾选的物流市场：来自飞书物流表里真实出现过的市场。 */
+export interface AccessMarketOptionDto {
+  market: string;
+  ticketCount: number;
 }
 
 export interface AccessAccountScopeWarehouseDto {
@@ -61,6 +70,10 @@ export interface MyInventoryAccessDto {
   warehouseCount: number;
   scopeEmpty: boolean;
   warehouses: Array<{ id: string; externalId: string; name: string; market: string | null }>;
+  /** 物流在途读取权限：管理员或至少获授一个物流市场。 */
+  canViewShipment: boolean;
+  /** 获授的物流市场（飞书来源国家原值，如「越南」）。 */
+  shipmentMarkets: string[];
 }
 
 /** 市场中文名：与页面其它位置一致；未知市场（market IS NULL）单列。 */

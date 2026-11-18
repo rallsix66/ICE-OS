@@ -62,6 +62,7 @@ export function ShipmentTable({
   columns,
   controls,
   footer,
+  readOnly = false,
   onOpen,
 }: {
   query: ShipmentQueryState;
@@ -70,11 +71,14 @@ export function ShipmentTable({
   controls: TableControls;
   /** 分页底栏（固定在面板底部，不随表格滚动）。 */
   footer?: React.ReactNode;
+  /** 成员只读：空态不提示「刷新来源」（那是管理员入口）。 */
+  readOnly?: boolean;
   onOpen: (shipmentId: string, trigger: HTMLElement | null) => void;
 }) {
   const rows = sortRows(page.rows, controls.sort, SORT_ACCESSORS);
   const hasAnyTicket = page.counts.total > 0;
-  const hasAbsentHistory = page.absentTickets > 0 && !query.includeAbsent;
+  // 成员只读：不提供「本次来源未见」入口，空态也不引导历史筛选。
+  const hasAbsentHistory = !readOnly && page.absentTickets > 0 && !query.includeAbsent;
   const emptyTitle = hasAbsentHistory
     ? '当前来源没有货票'
     : hasAnyTicket ? '没有符合条件的货票' : '还没有读取到货票';
@@ -82,7 +86,9 @@ export function ShipmentTable({
     ? `本次来源未见 ${page.absentTickets} 票 / ${page.absentItems} 明细（已退出当前列表，历史保留）`
     : hasAnyTicket
       ? (query.product ? '该商品没有关联到这些筛选下的货票' : '切换市场/状态或清空搜索')
-      : '点上方「刷新来源」从飞书物流情况表读取';
+      : readOnly
+        ? '当前授权市场还没有读取到货票'
+        : '点上方「刷新来源」从飞书物流情况表读取';
   const clearHref = buildShipmentListHref({
     ...query,
     market: 'all',

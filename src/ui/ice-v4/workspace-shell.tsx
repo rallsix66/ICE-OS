@@ -21,8 +21,9 @@ type NavItem = {
   label: string;
   icon: typeof Package;
   match?: (pathname: string) => boolean;
-  /** admin：只有管理员看得到；inventory：有库存查看权限（管理员或成员）即可。 */
-  requires?: 'admin' | 'inventory';
+  /** admin：只有管理员看得到；inventory：有库存查看权限（管理员或成员）即可；
+   *  shipment：有物流在途权限（管理员或至少获授一个物流市场）即可。 */
+  requires?: 'admin' | 'inventory' | 'shipment';
 };
 
 /**
@@ -58,7 +59,7 @@ const NAV: NavItem[] = [
     href: '/dashboard/in-transit',
     label: '物流在途',
     icon: Truck,
-    requires: 'admin',
+    requires: 'shipment',
   },
   {
     href: '/dashboard/operations',
@@ -121,18 +122,21 @@ export function IceV4WorkspaceShell({
   roleName,
   isAdmin,
   canViewInventory,
+  canViewShipment,
   children,
 }: {
   displayName: string;
   roleName: string;
   isAdmin: boolean;
   canViewInventory: boolean;
+  canViewShipment: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const items = NAV.filter((item) => {
     if (item.requires === 'admin') return isAdmin;
     if (item.requires === 'inventory') return isAdmin || canViewInventory;
+    if (item.requires === 'shipment') return isAdmin || canViewShipment;
     return true;
   });
   const currentRole = roleLabel(roleName);

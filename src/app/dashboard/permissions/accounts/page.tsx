@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 import { AccountManager } from '@/features/access/components/account-manager';
 import { AccessDeniedPanel } from '@/features/access/components/denied';
-import { getAccessAccounts, getAccessRoles, getAccessWarehouseOptions } from '@/features/access/server/reads';
+import { getAccessAccounts, getAccessMarketOptions, getAccessRoles, getAccessWarehouseOptions } from '@/features/access/server/reads';
 import { PageHeading } from '@/ui/ice-v4/data-surface';
 import styles from '@/features/access/components/access.module.css';
 
@@ -40,11 +40,13 @@ export default async function PermissionsAccountsPage({
 
   let roles;
   let warehouses;
+  let markets;
   let page;
   try {
-    [roles, warehouses, page] = await Promise.all([
+    [roles, warehouses, markets, page] = await Promise.all([
       getAccessRoles(),
       getAccessWarehouseOptions(),
+      getAccessMarketOptions(),
       getAccessAccounts({
         search: filters.q,
         roleId: filters.role || null,
@@ -72,6 +74,7 @@ export default async function PermissionsAccountsPage({
         total={page.total}
         roles={roles}
         warehouses={warehouses}
+        markets={markets}
         filters={filters}
         rolesHref="/dashboard/permissions"
       />

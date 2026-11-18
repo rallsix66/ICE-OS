@@ -33,6 +33,7 @@ export default async function DashboardLayout({
   const access = await getMyInventoryAccess().catch(() => null);
   const isAdmin = access?.isAdmin ?? activeUser.roleName === 'admin';
   const canViewInventory = isAdmin || access?.canViewInventory === true;
+  const canViewShipment = isAdmin || access?.canViewShipment === true;
   const displayRole = access?.isAdmin === false && access.roleName
     ? access.roleName
     : activeUser.roleName;
@@ -43,6 +44,7 @@ export default async function DashboardLayout({
       roleName={displayRole}
       isAdmin={isAdmin}
       canViewInventory={canViewInventory}
+      canViewShipment={canViewShipment}
     >
       <PageTransition>{children}</PageTransition>
     </IceV4WorkspaceShell>

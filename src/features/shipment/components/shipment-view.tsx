@@ -43,6 +43,7 @@ import { SHIPMENT_TABLE_STORAGE_KEY, ShipmentTable, shipmentTableColumns } from 
 export function InTransitView({
   query,
   list,
+  isAdmin,
   detail,
   detailError,
   marketSummary,
@@ -55,6 +56,8 @@ export function InTransitView({
 }: {
   query: ShipmentQueryState;
   list: ShipmentListDto;
+  /** 管理员：完整视图；成员：只读列表 + 授权票详情（045）。 */
+  isAdmin: boolean;
   detail: ShipmentDetailDto | null;
   detailError: string | null;
   /** 选中单个市场时的完整汇总（含逐商品明细）；全部市场时为 null。 */
@@ -160,7 +163,7 @@ export function InTransitView({
   const drawerOpen = Boolean(query.ticket) || Boolean(pendingTicket);
   const loading = Boolean(pendingTicket) && !query.ticket;
   const detailForTicket = detail && query.ticket ? detail : null;
-  const valueView = query.view === 'value';
+  const valueView = isAdmin && query.view === 'value';
   // 货值汇总与列表共用市场筛选；汇总的票数/明细数/市场下拉全部取自同一市场范围，
   // 不再沿用列表关键词过滤后的「共 1 票」（第十三轮）。
   const valueScope = valueView
@@ -188,12 +191,12 @@ export function InTransitView({
     <div className={styles.page} data-testid="in-transit-page">
       <div className={styles.pageHeadRow}>
         <PageHeading title="物流在途" />
-        <ViewTabs view={valueView ? 'value' : 'list'} hrefFor={viewHref} />
+        {isAdmin ? <ViewTabs view={valueView ? 'value' : 'list'} hrefFor={viewHref} /> : null}
       </div>
 
-      <ShipmentLiveRefresh stamp={shipmentLiveStamp(list.sourceStatus)} />
+      {isAdmin ? <ShipmentLiveRefresh stamp={shipmentLiveStamp(list.sourceStatus)} /> : null}
 
-      <ShipmentReadFailureNotice sourceStatus={list.sourceStatus} />
+      <ShipmentReadFailureNotice sourceStatus={list.sourceStatus} showSyncLink={isAdmin} />
 
       <ShipmentFilterBar
         query={query}
@@ -205,7 +208,9 @@ export function InTransitView({
         controls={controls}
         compact={valueView}
         compactCountText={compactCountText}
-        reviewEntry={(
+        allowAbsent={isAdmin}
+        allowColumns={isAdmin}
+        reviewEntry={isAdmin ? (
           <ShipmentGroupingReviewEntry
             reviews={groupingReviews}
             error={groupingReviewsError}
@@ -219,7 +224,7 @@ export function InTransitView({
               />
             )}
           />
-        )}
+        ) : undefined}
       />
 
       {valueView ? (
@@ -242,6 +247,7 @@ export function InTransitView({
             page={list}
             columns={columns}
             controls={controls}
+            readOnly={!isAdmin}
             onOpen={openTicket}
             footer={<ShipmentPagination query={query} total={list.total} limit={list.limit} page={query.page} />}
           />
@@ -254,6 +260,7 @@ export function InTransitView({
           detailError={detailError}
           loading={loading}
           focusItemId={query.item}
+          readOnly={!isAdmin}
           onClose={closeTicket}
         />
       ) : null}
@@ -333,14 +340,20 @@ function ViewTabs({
   );
 }
 
-/** 读取失败但仍展示旧数据：只留一行原因 + 当前数据时间 + 查看同步（成功不显示横栏）。 */
-function ShipmentReadFailureNotice({ sourceStatus }: { sourceStatus: ShipmentListDto['sourceStatus'] }) {
+/** 读取失败但仍展示旧数据：只留一行原因 + 当前数据时间（管理员另给「查看同步」入口）。 */
+function ShipmentReadFailureNotice({
+  sourceStatus,
+  showSyncLink,
+}: {
+  sourceStatus: ShipmentListDto['sourceStatus'];
+  showSyncLink: boolean;
+}) {
   const text = shipmentReadFailureText(sourceStatus);
   if (!text) return null;
   return (
     <p className={styles.readFailureLine} role="status" data-testid="shipment-read-failure-line">
       <span>{text}</span>
-      <Link href="/dashboard/sync#feishu-shipment" className={styles.inlineLink}>查看同步</Link>
+      {showSyncLink ? <Link href="/dashboard/sync#feishu-shipment" className={styles.inlineLink}>查看同步</Link> : null}
     </p>
   );
 }

@@ -60,8 +60,11 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
     // nav 项带 requires 标注：权限设置与其它管理页只有管理员看得到，商品库存按库存查看权限出现。
     expect(navBlock).toMatch(/href: '\/dashboard\/permissions',[\s\S]*?requires: 'admin'/);
     expect(navBlock).toMatch(/href: '\/dashboard\/inventory',[\s\S]*?requires: 'inventory'/);
+    // 物流在途按「物流市场授权」出现（管理员或至少一个市场），与库存仓库范围分开。
+    expect(navBlock).toMatch(/href: '\/dashboard\/in-transit',[\s\S]*?requires: 'shipment'/);
     expect(shellSrc).toContain("requires === 'admin'");
     expect(shellSrc).toContain("requires === 'inventory'");
+    expect(shellSrc).toContain("requires === 'shipment'");
   });
 
   it('账户区不再出现数据维护等内部入口', () => {
