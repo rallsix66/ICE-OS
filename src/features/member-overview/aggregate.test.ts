@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { InventoryWarehouseRowDto, InventoryWarehouseRowsDto } from '@/features/inventory/types';
+import type {
+  InventoryProductSummaryDto,
+  InventoryProductSummaryRowDto,
+  InventoryWarehouseRowDto,
+  InventoryWarehouseRowsDto,
+} from '@/features/inventory/types';
 import type { ShipmentMarketSummarySource } from '@/features/shipment/summary';
 import { summarizeMemberInventory, summarizeMemberShipment } from './aggregate';
 
@@ -35,6 +40,29 @@ function row(overrides: Partial<InventoryWarehouseRowDto>): InventoryWarehouseRo
   };
 }
 
+function warehouseState(overrides: Partial<InventoryWarehouseRowsDto['warehouses'][number]>) {
+  return {
+    warehouseId: 'wh-vn',
+    externalId: '50455',
+    name: '越南青林湾仓库',
+    market: 'VN',
+    warehouseStatus: 'confirmed',
+    lastSuccessAt: '2026-11-18T16:22:18+08:00',
+    lastBatchId: 'batch-vn',
+    batchRows: 3,
+    adoptedRows: 2,
+    unmappedRows: 1,
+    observationAt: '2026-11-18T16:22:18+08:00',
+    publishedAt: null,
+    failed: false,
+    stale: false,
+    lastErrorCode: null,
+    latestRunStatus: 'success',
+    pendingMappingRows: 1,
+    ...overrides,
+  };
+}
+
 function inventoryRows(rows: InventoryWarehouseRowDto[]): InventoryWarehouseRowsDto {
   return {
     total: rows.length,
@@ -44,51 +72,75 @@ function inventoryRows(rows: InventoryWarehouseRowDto[]): InventoryWarehouseRows
     scope: { warehouseCount: 2, lastAllSuccessAt: '2026-11-18T16:22:18+08:00' },
     marketOptions: [],
     warehouses: [
-      {
-        warehouseId: 'wh-vn',
-        externalId: '50455',
-        name: '越南青林湾仓库',
-        market: 'VN',
-        warehouseStatus: 'confirmed',
-        lastSuccessAt: '2026-11-18T16:22:18+08:00',
-        lastBatchId: 'batch-vn',
-        batchRows: 3,
-        adoptedRows: 2,
-        unmappedRows: 1,
-        observationAt: '2026-11-18T16:22:18+08:00',
-        publishedAt: null,
-        failed: false,
-        stale: false,
-        lastErrorCode: null,
-        latestRunStatus: 'success',
-        pendingMappingRows: 1,
-      },
-      {
+      warehouseState({}),
+      warehouseState({
         warehouseId: 'wh-th',
         externalId: '56673',
         name: 'DEE-龙仔厝（ICE专属）',
         market: null,
-        warehouseStatus: 'confirmed',
-        lastSuccessAt: '2026-11-18T16:22:18+08:00',
         lastBatchId: 'batch-th',
         batchRows: 1,
         adoptedRows: 1,
         unmappedRows: 0,
-        observationAt: '2026-11-18T16:22:18+08:00',
-        publishedAt: null,
-        failed: false,
-        stale: false,
-        lastErrorCode: null,
-        latestRunStatus: 'success',
         pendingMappingRows: 0,
-      },
+      }),
     ],
     counts: { adopted: 3, unmapped: 1, pendingAdoption: 0, inactive: 0 },
   };
 }
 
+function summaryRow(overrides: Partial<InventoryProductSummaryRowDto>): InventoryProductSummaryRowDto {
+  return {
+    itemId: 'item-a',
+    iceCode: 'A',
+    nameCn: '商品 A',
+    gtin: null,
+    market: 'VN',
+    knownSubtotal: 10,
+    unitConflict: false,
+    unitGroups: [],
+    coveredWarehouseCount: 1,
+    scopeWarehouseCount: 1,
+    hasCurrentData: true,
+    notMappedWarehouses: [],
+    unseenWarehouses: [],
+    failedWarehouses: [],
+    lastObservedAt: '2026-11-18T16:22:18+08:00',
+    mapped: true,
+    hasPendingTotal: false,
+    knownSubtotalComplete: true,
+    pendingTotalWarehouses: [],
+    marketCells: [{ market: 'VN', onHand: 10, skuCount: 1, warehouseCount: 1, hasPendingTotal: false }],
+    overseasOnHand: 10,
+    overseasSkuCount: 1,
+    domestic: null,
+    ...overrides,
+  } as InventoryProductSummaryRowDto;
+}
+
+function productSummary(warehouseId: string, rows: InventoryProductSummaryRowDto[]): InventoryProductSummaryDto {
+  return {
+    total: rows.length,
+    offset: 0,
+    limit: 200,
+    rows,
+    scope: { warehouseCount: 1, lastAllSuccessAt: '2026-11-18T16:22:18+08:00', warehouseFilter: warehouseId },
+    marketOptions: [],
+    warehouses: [warehouseState({ warehouseId })],
+    unmappedOverseasRows: 0,
+    unmappedDomesticRows: 0,
+    domesticAvailable: false,
+    domesticReason: null,
+  };
+}
+
+const warehouses = [
+  { id: 'wh-vn', externalId: '50455', name: '越南青林湾仓库', market: 'VN' },
+  { id: 'wh-th', externalId: '56673', name: 'DEE-龙仔厝（ICE专属）', market: null },
+];
+
 describe('成员经营总览 · 库存汇总', () => {
-  it('只计已采用行，实物/可售分别求和，缺价只计数不计金额', () => {
+  it('只计商品汇总可明确计入的已采用行，实物/可售分别求和，缺价只计数不计金额', () => {
     const result = summarizeMemberInventory({
       rows: inventoryRows([
         row({ rowKey: 'vn-a', itemId: 'item-a', onHand: 10, warehouseAvailable: 8 }),
@@ -105,9 +157,29 @@ describe('成员经营总览 · 库存汇总', () => {
           warehouseAvailable: 90,
         }),
       ]),
-      warehouses: [
-        { id: 'wh-vn', externalId: '50455', name: '越南青林湾仓库', market: 'VN' },
-        { id: 'wh-th', externalId: '56673', name: 'DEE-龙仔厝（ICE专属）', market: null },
+      warehouses,
+      productSummaries: [
+        {
+          warehouseId: 'wh-vn',
+          summary: productSummary('wh-vn', [
+            summaryRow({ itemId: 'item-a' }),
+            summaryRow({ itemId: 'item-b', iceCode: 'B', nameCn: '商品 B', knownSubtotal: 5, overseasOnHand: 5 }),
+          ]),
+        },
+        {
+          warehouseId: 'wh-th',
+          summary: productSummary('wh-th', [
+            summaryRow({
+              itemId: 'item-c',
+              iceCode: 'C',
+              nameCn: '商品 C',
+              market: null,
+              knownSubtotal: 100,
+              overseasOnHand: 100,
+              marketCells: [{ market: null, onHand: 100, skuCount: 1, warehouseCount: 1, hasPendingTotal: false }],
+            }),
+          ]),
+        },
       ],
       costMap: { 'item-a': '2.5', 'item-c': '0.1' },
       canViewAmount: true,
@@ -120,7 +192,8 @@ describe('成员经营总览 · 库存汇总', () => {
     expect(result.unmappedRows).toBe(1);
     expect(result.estimatedValueCny).toBe('¥35.00');
     expect(result.missingCostProducts).toBe(1);
-    expect(result.dataTime).toBe('2026-11-18T16:22:18+08:00');
+    expect(result.pendingProductCount).toBe(0);
+    expect(result.contributingWarehouseCount).toBe(2);
     const vn = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-vn');
     expect(vn?.onHand).toBe(15);
     expect(vn?.available).toBe(8);
@@ -132,10 +205,112 @@ describe('成员经营总览 · 库存汇总', () => {
     expect(th?.missingCostProducts).toBe(0);
   });
 
+  it('同仓多来源 SKU/单位冲突排除待核，同款商品其他仓的明确数量仍保留', () => {
+    const result = summarizeMemberInventory({
+      rows: inventoryRows([
+        // 越南仓：同款商品两个来源 SKU，商品汇总判待核
+        row({ rowKey: 'vn-p1', itemId: 'item-p', externalSku: 'SKU-P1', onHand: 10, warehouseAvailable: 4 }),
+        row({ rowKey: 'vn-p2', itemId: 'item-p', externalSku: 'SKU-P2', onHand: 5, warehouseAvailable: 3 }),
+        // 泰国仓：同款商品单 SKU，可明确计入
+        row({
+          rowKey: 'th-p1',
+          warehouseId: 'wh-th',
+          warehouseExternalId: '56673',
+          warehouseName: 'DEE-龙仔厝（ICE专属）',
+          market: null,
+          itemId: 'item-p',
+          externalSku: 'SKU-P3',
+          onHand: 7,
+          warehouseAvailable: 6,
+        }),
+        // 越南仓：单位冲突
+        row({ rowKey: 'vn-q1', itemId: 'item-q', externalSku: 'SKU-Q1', unit: '个', onHand: 9, warehouseAvailable: 9 }),
+        row({ rowKey: 'vn-q2', itemId: 'item-q', externalSku: 'SKU-Q2', unit: '箱', onHand: 2, warehouseAvailable: 2 }),
+      ]),
+      warehouses,
+      productSummaries: [
+        {
+          warehouseId: 'wh-vn',
+          summary: productSummary('wh-vn', [
+            summaryRow({
+              itemId: 'item-p',
+              iceCode: 'WM0026',
+              nameCn: '待核商品 P',
+              knownSubtotal: null,
+              knownSubtotalComplete: false,
+              hasPendingTotal: true,
+              overseasOnHand: null,
+              pendingTotalWarehouses: [{
+                warehouseId: 'wh-vn',
+                externalId: '50455',
+                name: '越南青林湾仓库',
+                unit: '个',
+                rowCount: 2,
+                rows: [],
+              }],
+            }),
+            summaryRow({
+              itemId: 'item-q',
+              iceCode: 'WM0030',
+              nameCn: '单位冲突商品 Q',
+              knownSubtotal: null,
+              knownSubtotalComplete: false,
+              unitConflict: true,
+              overseasOnHand: null,
+            }),
+          ]),
+        },
+        {
+          warehouseId: 'wh-th',
+          summary: productSummary('wh-th', [
+            summaryRow({
+              itemId: 'item-p',
+              iceCode: 'WM0026',
+              nameCn: '待核商品 P',
+              market: null,
+              knownSubtotal: 7,
+              overseasOnHand: 7,
+              marketCells: [{ market: null, onHand: 7, skuCount: 1, warehouseCount: 1, hasPendingTotal: false }],
+            }),
+          ]),
+        },
+      ],
+      costMap: { 'item-p': '2' },
+      canViewAmount: true,
+      amountError: null,
+    });
+
+    // 越南待核 15 件/7 可售 + 单位冲突 9+2 全部排除；泰国 7 件/6 可售保留。
+    expect(result.onHand).toBe(7);
+    expect(result.available).toBe(6);
+    expect(result.estimatedValueCny).toBe('¥14.00');
+    expect(result.pendingProductCount).toBe(2);
+    expect(result.pendingOnHand).toBe(26);
+    expect(result.pendingAvailable).toBe(18);
+    expect(result.contributingWarehouseCount).toBe(1);
+    expect(result.dataTime).toBe('2026-11-18T16:22:18+08:00');
+    expect(result.pendingProducts.map((product) => product.iceCode)).toEqual(['WM0026', 'WM0030']);
+    expect(result.pendingProducts.find((product) => product.iceCode === 'WM0026')?.warehouseNames).toEqual(['越南青林湾仓库']);
+    expect(result.pendingProducts.find((product) => product.iceCode === 'WM0026')?.reasons).toContain('同仓多来源 SKU');
+    expect(result.pendingProducts.find((product) => product.iceCode === 'WM0030')?.reasons).toContain('单位冲突');
+    const vn = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-vn');
+    expect(vn?.onHand).toBeNull();
+    expect(vn?.available).toBeNull();
+    expect(vn?.pendingProductCount).toBe(2);
+    expect(vn?.pendingOnHand).toBe(26);
+    const th = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-th');
+    expect(th?.onHand).toBe(7);
+    expect(th?.available).toBe(6);
+  });
+
   it('无金额权限时不计算货值，也不把缺价写成 0', () => {
     const result = summarizeMemberInventory({
       rows: inventoryRows([row({})]),
-      warehouses: [{ id: 'wh-vn', externalId: '50455', name: '越南青林湾仓库', market: 'VN' }],
+      warehouses: [warehouses[0]],
+      productSummaries: [{
+        warehouseId: 'wh-vn',
+        summary: productSummary('wh-vn', [summaryRow({})]),
+      }],
       costMap: null,
       canViewAmount: false,
       amountError: null,
@@ -208,13 +383,13 @@ describe('成员经营总览 · 物流汇总', () => {
     expect(result.knownRemaining).toBe(17);
     expect(result.pendingItemCount).toBe(2);
     expect(result.latestReadAt).toBe('2026-11-18T17:08:20+08:00');
-    const vn = result.markets.find((row) => row.market === '越南');
+    const vn = result.markets.find((market) => market.market === '越南');
     expect(vn).toMatchObject({ ticketCount: 2, itemCount: 3, knownRemaining: 10, pendingItemCount: 2 });
-    const th = result.markets.find((row) => row.market === '泰国');
+    const th = result.markets.find((market) => market.market === '泰国');
     expect(th).toMatchObject({ ticketCount: 1, itemCount: 1, knownRemaining: 7, pendingItemCount: 0 });
-    const my = result.markets.find((row) => row.market === '马来西亚');
+    const my = result.markets.find((market) => market.market === '马来西亚');
     expect(my).toMatchObject({ ticketCount: 0, itemCount: 0, knownRemaining: 0, pendingItemCount: 0 });
-    expect(result.markets.some((row) => row.market === '菲律宾')).toBe(false);
+    expect(result.markets.some((market) => market.market === '菲律宾')).toBe(false);
   });
 
   it('有票但全部数量未知时已知剩余为 null，不写 0', () => {

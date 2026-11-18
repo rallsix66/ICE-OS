@@ -49,9 +49,8 @@ function InventorySection({
               <span>实物数量</span>
               <strong data-testid="member-inventory-onhand">{quantity(summary.onHand)}</strong>
               <small>
-                {summary.onHandUnknownRows > 0
-                  ? `${summary.warehouses.length} 个授权仓 · ${summary.onHandUnknownRows} 条未知未计入`
-                  : `${summary.warehouses.length} 个授权仓 · 已对应商品行合计`}
+                {summary.contributingWarehouseCount} 个参与汇总的授权仓
+                {summary.pendingProductCount > 0 ? ` · 已排除 ${summary.pendingProductCount} 款待核` : ''}
               </small>
             </div>
             <div className={styles.metric}>
@@ -61,6 +60,7 @@ function InventorySection({
                 {summary.availableUnknownRows > 0
                   ? `${summary.availableUnknownRows} 条可售缺失未计入`
                   : '来源可售字段合计'}
+                {summary.pendingProductCount > 0 ? ` · 已排除 ${summary.pendingProductCount} 款待核` : ''}
               </small>
             </div>
             <div className={styles.metric}>
@@ -68,7 +68,7 @@ function InventorySection({
               <strong className={styles.timeValue} data-testid="member-inventory-time">
                 {time(summary.dataTime)}
               </strong>
-              <small>各授权仓最近成功批次</small>
+              <small>实际参与汇总的 {summary.contributingWarehouseCount} 个授权仓</small>
             </div>
             {summary.canViewAmount ? (
               <div className={styles.metric}>
@@ -81,7 +81,10 @@ function InventorySection({
                     ? summary.amountError
                     : summary.missingCostProducts > 0
                       ? `${summary.missingCostProducts} 款缺价未计入`
-                      : '采用进货价 × 实物数量'}
+                      : '采用进货价 × 可明确计入数量'}
+                  {!summary.amountError && summary.pendingProductCount > 0
+                    ? ` · 已排除 ${summary.pendingProductCount} 款待核`
+                    : ''}
                 </small>
               </div>
             ) : null}
@@ -118,11 +121,17 @@ function InventorySection({
                       <td>{row.market ? marketLabel(row.market) : <span className={styles.muted}>市场待确认</span>}</td>
                       <td className={styles.num} data-field="onHand">
                         {quantity(row.onHand)}
-                        {row.onHandUnknownRows > 0 ? <small className={styles.cellSub}>{row.onHandUnknownRows} 条未知</small> : null}
+                        {row.pendingProductCount > 0
+                          ? <small className={styles.cellSub}>已排除 {row.pendingProductCount} 款待核</small>
+                          : null}
                       </td>
                       <td className={styles.num} data-field="available">
                         {quantity(row.available)}
-                        {row.availableUnknownRows > 0 ? <small className={styles.cellSub}>{row.availableUnknownRows} 条缺失</small> : null}
+                        {row.pendingProductCount > 0
+                          ? <small className={styles.cellSub}>待核可售 {formatHomeQuantity(row.pendingAvailable)}</small>
+                          : row.availableUnknownRows > 0
+                            ? <small className={styles.cellSub}>{row.availableUnknownRows} 条缺失</small>
+                            : null}
                       </td>
                       <td data-field="dataTime">{time(row.dataTime)}</td>
                       {summary.canViewAmount ? (
@@ -146,8 +155,48 @@ function InventorySection({
             </div>
           )}
 
+          {summary.pendingProductCount > 0 ? (
+            <section className={styles.pendingBox} data-testid="member-inventory-pending">
+              <header className={styles.pendingHead}>
+                <strong>待核商品 {summary.pendingProductCount} 款（未计入首页合计）</strong>
+                <span>
+                  原始待核：实物 {formatHomeQuantity(summary.pendingOnHand)}
+                  {' · '}可售 {formatHomeQuantity(summary.pendingAvailable)}
+                </span>
+              </header>
+              <div className={styles.tableWrap}>
+                <table className={styles.table} data-testid="member-inventory-pending-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">商品</th>
+                      <th scope="col">授权仓</th>
+                      <th scope="col">待核原因</th>
+                      <th scope="col" className={styles.num}>待核实</th>
+                      <th scope="col" className={styles.num}>待核可售</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.pendingProducts.map((product) => (
+                      <tr key={product.itemId} data-testid="member-pending-product" data-item-id={product.itemId}>
+                        <td>
+                          <span className={styles.rowLink}>{product.iceCode ?? '缺货号'}</span>
+                          <small className={styles.cellSub}>{product.nameCn ?? '未命名商品'}</small>
+                        </td>
+                        <td>{product.warehouseNames.join('、')}</td>
+                        <td>{product.reasons.join(' · ')}</td>
+                        <td className={styles.num}>{formatHomeQuantity(product.pendingOnHand)}</td>
+                        <td className={styles.num}>{formatHomeQuantity(product.pendingAvailable)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
           <p className={styles.footNote}>
-            只统计已对应并计入的海外库存行；未对应 {summary.unmappedRows} 条不进入数量。
+            只统计商品汇总可明确计入的已采用行；待核部分已从实物、可售和货值中排除，
+            同款商品在其他仓可明确计入的数量仍然保留。未对应 {summary.unmappedRows} 条不进入数量。
             {summary.canViewAmount
               ? summary.missingCostProducts > 0
                 ? ` 缺价 ${summary.missingCostProducts} 款只计数量、不计金额。`
