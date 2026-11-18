@@ -41,6 +41,10 @@ export function computeOpt6FileFingerprint(rawUtf8) {
   return { sha256, normalizedLfSha256, crlfCount, loneLfCount };
 }
 
+export function normalizeLineEndings(text) {
+  return text.replace(/\r\n/g, '\n');
+}
+
 export function loadApprovedOpt6Baseline(baselinePath = APPROVED_BASELINE_PATH) {
   const doc = JSON.parse(fs.readFileSync(baselinePath, 'utf8').replace(/^\uFEFF/, ''));
   if (!Array.isArray(doc.files) || doc.files.length === 0) {
@@ -68,10 +72,19 @@ export function verifyOpt6ApprovedFileFingerprints({
     }
     const raw = fs.readFileSync(abs, 'utf8');
     const actual = computeOpt6FileFingerprint(raw);
-    for (const key of ['sha256', 'normalizedLfSha256', 'crlfCount', 'loneLfCount']) {
-      if (actual[key] !== expected[key]) {
-        mismatches.push({ rel: expected.rel, field: key, expected: expected[key], actual: actual[key] });
-      }
+    // Line endings are a checkout detail (core.autocrlf), not file content.
+    // Compare the LF-normalized digest so Windows CRLF and Linux LF agree, while
+    // keeping the raw SHA / counts for diagnostics only.
+    if (typeof expected.normalizedLfSha256 !== 'string' || actual.normalizedLfSha256 !== expected.normalizedLfSha256) {
+      mismatches.push({
+        rel: expected.rel,
+        field: 'normalizedLfSha256',
+        expected: expected.normalizedLfSha256 ?? null,
+        actual: actual.normalizedLfSha256,
+        rawSha256: actual.sha256,
+        crlfCount: actual.crlfCount,
+        loneLfCount: actual.loneLfCount,
+      });
     }
   }
   if (mismatches.length > 0) {

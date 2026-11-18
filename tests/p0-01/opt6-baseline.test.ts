@@ -64,6 +64,18 @@ describe('opt6 baseline detector', () => {
     expect(verifyOpt6ApprovedFileFingerprints().ok).toBe(true);
   });
 
+  it('LF 与 CRLF 指纹等价（原始 SHA 与换行计数仅作诊断）', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'opt6-fp-eol-'));
+    const baseline = loadApprovedOpt6Baseline();
+    for (const file of baseline.files) {
+      const dest = path.join(tmpRoot, file.rel);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      const lf = fs.readFileSync(path.join(process.cwd(), file.rel), 'utf8').replace(/\r\n/g, '\n');
+      fs.writeFileSync(dest, lf.replace(/\n/g, '\r\n'));
+    }
+    expect(verifyOpt6ApprovedFileFingerprints({ repoRoot: tmpRoot }).ok).toBe(true);
+  });
+
   it('仅保留 CREATE POLICY 的篡改 migration 指纹不匹配', () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'opt6-fp-'));
     const baseline = loadApprovedOpt6Baseline();

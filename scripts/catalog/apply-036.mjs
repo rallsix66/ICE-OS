@@ -64,7 +64,6 @@ const FUNCTION_SPECS = [
   { key: 'assign_product_source_code|uuid,text,uuid,integer,text,text,text', secdef: true, app: true, sync: false, public: false },
   { key: 'read_product_source_overview|text', secdef: true, app: true, sync: false, public: false },
 ];
-const APP_FUNCTION_KEYS = FUNCTION_SPECS.filter((spec) => spec.app).map((spec) => spec.key);
 const NEW_TABLES = [
   { schema: 'catalog', table: 'product_source_field_decision' },
   { schema: 'catalog', table: 'product_source_duplicate_decision' },
@@ -306,7 +305,6 @@ async function main() {
   }
 
   const appUrl = isLive ? env.appDbUrl : withDatabase(env.appDbUrl, targetDatabase);
-  const syncUrl = isLive ? env.syncDbUrl : withDatabase(env.syncDbUrl, targetDatabase);
   const sqlText = fs.readFileSync(path.join(REPO_ROOT, SQL_FILE), 'utf8');
   const sqlSha256 = sha256Text(sqlText);
 

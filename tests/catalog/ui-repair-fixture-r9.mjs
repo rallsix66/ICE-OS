@@ -10,7 +10,7 @@
  *   node .../ui-repair-fixture-r9.mjs --run-id <preview-run> --port 3012 --lane preview
  */
 import {
-  baseUrl, createRecorder, launch, login, newLoggedInPage, ownerClient, resolveRun,
+  baseUrl, createRecorder, launch, newLoggedInPage, ownerClient, resolveRun,
 } from './ui-repair-fixture-lib.mjs';
 
 function arg(flag, fallback) { const index = process.argv.indexOf(flag); return index < 0 ? fallback : process.argv[index + 1]; }

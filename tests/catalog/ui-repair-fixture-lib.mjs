@@ -48,7 +48,6 @@ export async function ownerClient(run) {
 
 export async function appDb(run, identity, sql, values = []) {
   const { default: pg } = await import(pathToFileURL(path.join(REPO_ROOT, 'node_modules/pg/lib/index.js')).href);
-  const instance = run.instance;
   const env = run.env;
   const client = new pg.Client({ connectionString: env.P0_02_APP_DATABASE_URL });
   await client.connect();
