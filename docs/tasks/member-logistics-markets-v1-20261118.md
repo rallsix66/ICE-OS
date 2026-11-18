@@ -1,7 +1,7 @@
 # 成员按授权物流市场查看物流在途 v1（2026-11-18）
 
 适用实例：**`run-20261026T211500Z-11a22b33`**（Web `3011` / PostgreSQL `59345`）。
-交付状态：**本机现役独立复核 PASS，阻断 0**（验收提交 `7a4dd12`；功能 `76b851d`，四项补修见 [补修记录](member-logistics-markets-v1-fixes-20261118.md)）。
+交付状态：**本机现役独立复核 PASS，阻断 0**（验收提交 `7a4dd12`；功能 `76b851d`，四项补修见 [补修记录](member-logistics-markets-v1-fixes-20261118.md)）。Git 收尾：PR **[#22](https://github.com/rallsix66/ICE-OS/pull/22)**，未部署。
 运行构建：**BUILD `-lyX4Pxg5aGgaM_7bUUNS`**（源码快照 `c2720425…`，3011 login 200；含 2026-11-18 补修 046 与账号文案调整，补修记录见 [member-logistics-markets-v1-fixes-20261118.md](member-logistics-markets-v1-fixes-20261118.md)）。
 
 - 前置任务：[permissions-v1-20261117.md](permissions-v1-20261117.md)（角色/账号/仓库范围；物流在途仍是管理员功能）
