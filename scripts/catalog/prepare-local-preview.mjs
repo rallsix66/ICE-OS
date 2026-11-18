@@ -97,6 +97,19 @@ const DEPENDENT_SQL = [
       'catalog.read_access_account(uuid)',
     ],
   },
+  {
+    // 成员物流在途 v1 补修（046）：必须晚于 045/030；恢复冲突字段并修正账号审计取值。
+    path: 'db/catalog/046_member_logistics_markets_fixes.sql',
+    requires: ['catalog.access_role', 'catalog.account_access', 'catalog.account_access_market', 'catalog.shipment', 'catalog.shipment_item'],
+    requiresFunctions: [
+      'catalog.require_shipment_read()',
+      'catalog.access_member_markets()',
+      'catalog.shipment_manual_quantity_conflict(uuid)',
+      'catalog.shipment_effective_status_class(uuid)',
+      'catalog.read_shipment_manual_index()',
+      'catalog.update_access_account(uuid,text,uuid,boolean,uuid[],text[])',
+    ],
+  },
 ];
 
 async function applyCatalogSql(run) {

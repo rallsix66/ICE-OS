@@ -477,7 +477,6 @@ function AccountDialog({
                     data-market={option.market}
                   />
                   <span>{marketLabel(option.market)}物流</span>
-                  <span className={styles.muted}>当前 {option.ticketCount} 票</span>
                 </label>
               ))}
             </div>

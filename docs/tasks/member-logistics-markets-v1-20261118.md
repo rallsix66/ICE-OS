@@ -2,7 +2,7 @@
 
 适用实例：**`run-20261026T211500Z-11a22b33`**（Web `3011` / PostgreSQL `59345`）。
 交付状态：**本机实现与实跑验收完成（执行方自验）**；本地提交在分支 `feat/member-logistics-market-v1`，**未推送/部署**，最终独立复核由复核方给出。
-运行构建：**BUILD `qVS5s3VseWDEWDk7NmvkU`**（源码快照 `dee5a54b1762a7e2…`，3011 pid 53220，login 200，`BUILD_ID` 与 ready 记录一致）。
+运行构建：**BUILD `-lyX4Pxg5aGgaM_7bUUNS`**（源码快照 `c2720425…`，3011 login 200；含 2026-11-18 补修 046 与账号文案调整，补修记录见 [member-logistics-markets-v1-fixes-20261118.md](member-logistics-markets-v1-fixes-20261118.md)）。
 
 - 前置任务：[permissions-v1-20261117.md](permissions-v1-20261117.md)（角色/账号/仓库范围；物流在途仍是管理员功能）
 - 运行交接：[inventory-sync-v1-runbook.md](inventory-sync-v1-runbook.md)、[shipment-in-transit-v1-runbook.md](shipment-in-transit-v1-runbook.md)
@@ -117,7 +117,9 @@ $env:CATALOG_PREVIEW_PORT="3011"; node scripts/catalog/start-local-preview.mjs -
 
 ## 7. 验证与已知边界
 
-- 全量标准测试 `npm test` **970/971**；唯一失败为既有慢测试 `get-catalog-list-page.test.ts` 首次超时，单独重跑 **5/5**（不是 opt6 换行基线）。
+> 2026-11-18 补修：新增 [046](member-logistics-markets-v1-fixes-20261118.md)，恢复 045 漏掉的冲突/原数量字段并修正账号启停审计；成员市场过滤未回退。全量标准测试 **971/971 PASS**。
+
+- 全量标准测试 `npm test` **971/971 PASS**。
 - 成员列表/详情只读；货值、改票、商品绑定仍由服务端管理员守卫拒绝（apply-045 已探针验证）。
 - 物流市场值来自 `catalog.shipment.market` 原值；若飞书把同一市场写成不同字符串，会按不同市场授权（当前现役 4 个市场值稳定）。
 - 本次没有把物流市场并入库存仓库授权，也没有做成员货值、导出或跨市场汇总。
