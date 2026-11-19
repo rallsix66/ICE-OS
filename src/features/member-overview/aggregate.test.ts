@@ -280,27 +280,196 @@ describe('成员经营总览 · 库存汇总', () => {
       amountError: null,
     });
 
-    // 越南待核 15 件/7 可售 + 单位冲突 9+2 全部排除；泰国 7 件/6 可售保留。
+    // 越南待核 15 件/7 可售；单位冲突 9 个 + 2 箱按单位拆分，不再合成 11。
     expect(result.onHand).toBe(7);
     expect(result.available).toBe(6);
     expect(result.estimatedValueCny).toBe('¥14.00');
     expect(result.pendingProductCount).toBe(2);
-    expect(result.pendingOnHand).toBe(26);
-    expect(result.pendingAvailable).toBe(18);
+    expect(result.pendingUnitConflictProductCount).toBe(1);
+    expect(result.pendingOnHand).toBe(15);
+    expect(result.pendingAvailable).toBe(7);
     expect(result.contributingWarehouseCount).toBe(1);
     expect(result.dataTime).toBe('2026-11-18T16:22:18+08:00');
     expect(result.pendingProducts.map((product) => product.iceCode)).toEqual(['WM0026', 'WM0030']);
     expect(result.pendingProducts.find((product) => product.iceCode === 'WM0026')?.warehouseNames).toEqual(['越南青林湾仓库']);
     expect(result.pendingProducts.find((product) => product.iceCode === 'WM0026')?.reasons).toContain('同仓多来源 SKU');
-    expect(result.pendingProducts.find((product) => product.iceCode === 'WM0030')?.reasons).toContain('单位冲突');
+    const unitConflictProduct = result.pendingProducts.find((product) => product.iceCode === 'WM0030');
+    expect(unitConflictProduct?.unitConflict).toBe(true);
+    expect(unitConflictProduct?.reasons).toContain('多单位，不合计');
+    expect(unitConflictProduct?.pendingOnHand).toBeNull();
+    expect(unitConflictProduct?.pendingAvailable).toBeNull();
+    expect(unitConflictProduct?.unitGroups).toEqual([
+      { unit: '个', warehouseNames: ['越南青林湾仓库'], pendingOnHand: 9, pendingAvailable: 9 },
+      { unit: '箱', warehouseNames: ['越南青林湾仓库'], pendingOnHand: 2, pendingAvailable: 2 },
+    ]);
     const vn = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-vn');
     expect(vn?.onHand).toBeNull();
     expect(vn?.available).toBeNull();
     expect(vn?.pendingProductCount).toBe(2);
-    expect(vn?.pendingOnHand).toBe(26);
+    expect(vn?.pendingUnitConflictCount).toBe(1);
+    expect(vn?.pendingOnHand).toBeNull();
+    expect(vn?.pendingAvailable).toBeNull();
     const th = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-th');
     expect(th?.onHand).toBe(7);
     expect(th?.available).toBe(6);
+  });
+
+  it('跨授权仓同款商品单位不同：A 仓 10 个 / B 仓 2 箱整款不合计，各仓原始单位保留', () => {
+    const vnMultiSummary = summaryRow({
+      itemId: 'item-multi',
+      iceCode: 'WM0100',
+      nameCn: '跨仓多单位商品',
+      knownSubtotal: 10,
+      overseasOnHand: 10,
+      unitGroups: [{ unit: '个', knownSubtotal: 10, rowCount: 1 }],
+      marketCells: [{ market: 'VN', onHand: 10, skuCount: 1, warehouseCount: 1, hasPendingTotal: false }],
+    });
+    const thMultiSummary = summaryRow({
+      itemId: 'item-multi',
+      iceCode: 'WM0100',
+      nameCn: '跨仓多单位商品',
+      market: null,
+      knownSubtotal: 2,
+      overseasOnHand: 2,
+      unitGroups: [{ unit: '箱', knownSubtotal: 2, rowCount: 1 }],
+      marketCells: [{ market: null, onHand: 2, skuCount: 1, warehouseCount: 1, hasPendingTotal: false }],
+    });
+    const vnSameSummary = summaryRow({
+      itemId: 'item-same',
+      iceCode: 'WM0101',
+      nameCn: '同单位正常商品',
+      knownSubtotal: 5,
+      overseasOnHand: 5,
+      unitGroups: [{ unit: '个', knownSubtotal: 5, rowCount: 1 }],
+      marketCells: [{ market: 'VN', onHand: 5, skuCount: 1, warehouseCount: 1, hasPendingTotal: false }],
+    });
+    const thSameSummary = summaryRow({
+      itemId: 'item-same',
+      iceCode: 'WM0101',
+      nameCn: '同单位正常商品',
+      market: null,
+      knownSubtotal: 3,
+      overseasOnHand: 3,
+      unitGroups: [{ unit: '个', knownSubtotal: 3, rowCount: 1 }],
+      marketCells: [{ market: null, onHand: 3, skuCount: 1, warehouseCount: 1, hasPendingTotal: false }],
+    });
+    // 正式商品汇总在完整授权范围内的单位集合：{个, 箱}，unitCount=2。
+    expect(new Set([
+      ...vnMultiSummary.unitGroups.map((group) => group.unit),
+      ...thMultiSummary.unitGroups.map((group) => group.unit),
+    ])).toEqual(new Set(['个', '箱']));
+
+    const multiRows = [
+      row({
+        rowKey: 'vn-multi',
+        itemId: 'item-multi',
+        externalSku: 'SKU-M-UNIT',
+        unit: '个',
+        onHand: 10,
+        warehouseAvailable: 8,
+      }),
+      row({
+        rowKey: 'th-multi',
+        warehouseId: 'wh-th',
+        warehouseExternalId: '56673',
+        warehouseName: 'DEE-龙仔厝（ICE专属）',
+        market: null,
+        itemId: 'item-multi',
+        externalSku: 'SKU-M-BOX',
+        unit: '箱',
+        onHand: 2,
+        warehouseAvailable: 2,
+      }),
+    ];
+    const multiSummaries = [
+      { warehouseId: 'wh-vn', summary: productSummary('wh-vn', [vnMultiSummary]) },
+      { warehouseId: 'wh-th', summary: productSummary('wh-th', [thMultiSummary]) },
+    ];
+
+    // 只看 A 10 个 + B 2 箱：旧逻辑会得到 12 / ¥24.00，补修后首页没有已知合计。
+    const onlyMulti = summarizeMemberInventory({
+      rows: inventoryRows(multiRows),
+      warehouses,
+      productSummaries: multiSummaries,
+      costMap: { 'item-multi': '2' },
+      canViewAmount: true,
+      amountError: null,
+    });
+    expect(onlyMulti.onHand).toBeNull();
+    expect(onlyMulti.onHand).not.toBe(12);
+    expect(onlyMulti.available).toBeNull();
+    expect(onlyMulti.estimatedValueCny).toBeNull();
+    expect(onlyMulti.estimatedValueCny).not.toBe('¥24.00');
+    expect(onlyMulti.pendingProductCount).toBe(1);
+    expect(onlyMulti.pendingUnitConflictProductCount).toBe(1);
+
+    const result = summarizeMemberInventory({
+      rows: inventoryRows([
+        ...multiRows,
+        row({ rowKey: 'vn-same', itemId: 'item-same', externalSku: 'SKU-S-VN', unit: '个', onHand: 5, warehouseAvailable: 5 }),
+        row({
+          rowKey: 'th-same',
+          warehouseId: 'wh-th',
+          warehouseExternalId: '56673',
+          warehouseName: 'DEE-龙仔厝（ICE专属）',
+          market: null,
+          itemId: 'item-same',
+          externalSku: 'SKU-S-TH',
+          unit: '个',
+          onHand: 3,
+          warehouseAvailable: 3,
+        }),
+      ]),
+      warehouses,
+      productSummaries: [
+        { warehouseId: 'wh-vn', summary: productSummary('wh-vn', [vnMultiSummary, vnSameSummary]) },
+        { warehouseId: 'wh-th', summary: productSummary('wh-th', [thMultiSummary, thSameSummary]) },
+      ],
+      costMap: { 'item-multi': '2', 'item-same': '2' },
+      canViewAmount: true,
+      amountError: null,
+    });
+
+    // 首页合计只保留同单位正常商品 5+3；多单位商品的 10 个/2 箱不再得到 12 / ¥24.00。
+    expect(result.onHand).toBe(8);
+    expect(result.onHand).not.toBe(12);
+    expect(result.available).toBe(8);
+    expect(result.estimatedValueCny).toBe('¥16.00');
+    expect(result.estimatedValueCny).not.toBe('¥24.00');
+    expect(result.contributingWarehouseCount).toBe(2);
+    expect(result.pendingProductCount).toBe(1);
+    expect(result.pendingUnitConflictProductCount).toBe(1);
+    expect(result.pendingOnHand).toBe(0);
+    expect(result.pendingAvailable).toBe(0);
+
+    const product = result.pendingProducts[0];
+    expect(product?.unitConflict).toBe(true);
+    expect(product?.pendingOnHand).toBeNull();
+    expect(product?.pendingAvailable).toBeNull();
+    expect(product?.reasons).toContain('多单位，不合计');
+    expect(product?.warehouseNames).toEqual(['DEE-龙仔厝（ICE专属）', '越南青林湾仓库']);
+    expect(product?.unitGroups).toHaveLength(2);
+    expect(product?.unitGroups).toEqual(expect.arrayContaining([
+      { unit: '个', warehouseNames: ['越南青林湾仓库'], pendingOnHand: 10, pendingAvailable: 8 },
+      { unit: '箱', warehouseNames: ['DEE-龙仔厝（ICE专属）'], pendingOnHand: 2, pendingAvailable: 2 },
+    ]));
+
+    // 各仓保留本仓可核对数量：A 仓 = 多单位 10 + 正常 5，B 仓 = 多单位 2 + 正常 3；
+    // 但它们不进入首页 8 / 8 / ¥16.00。
+    const vn = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-vn');
+    expect(vn?.onHand).toBe(15);
+    expect(vn?.available).toBe(13);
+    expect(vn?.estimatedValueCny).toBe('¥30.00');
+    expect(vn?.pendingUnitConflictCount).toBe(1);
+    expect(vn?.pendingOnHand).toBeNull();
+    expect(vn?.pendingAvailable).toBeNull();
+    const th = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-th');
+    expect(th?.onHand).toBe(5);
+    expect(th?.available).toBe(5);
+    expect(th?.estimatedValueCny).toBe('¥10.00');
+    expect(th?.pendingUnitConflictCount).toBe(1);
+    expect(th?.pendingOnHand).toBeNull();
+    expect(th?.pendingAvailable).toBeNull();
   });
 
   it('无金额权限时不计算货值，也不把缺价写成 0', () => {

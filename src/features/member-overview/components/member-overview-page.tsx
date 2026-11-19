@@ -6,6 +6,7 @@ import { formatTimestamp } from '@/features/inventory/model';
 import { marketLabel } from '@/features/access/types';
 import type {
   MemberInventorySummaryDto,
+  MemberPendingProductDto,
   MemberShipmentSummaryDto,
 } from '../types';
 import type { MemberOverviewSection } from '../server/reads';
@@ -17,6 +18,34 @@ function quantity(value: number | null): string {
 
 function time(value: string | null): string {
   return formatTimestamp(value) || '尚无成功数据';
+}
+
+function pendingNote(summary: MemberInventorySummaryDto): string {
+  if (summary.pendingProductCount === 0) return '';
+  const multiUnit = summary.pendingUnitConflictProductCount > 0
+    ? `（其中 ${summary.pendingUnitConflictProductCount} 款多单位不合计）`
+    : '';
+  return ` · 已排除 ${summary.pendingProductCount} 款待核${multiUnit}`;
+}
+
+function pendingUnitBreakdown(
+  product: MemberPendingProductDto,
+  field: 'onHand' | 'available',
+): string {
+  const showWarehouse = product.unitGroups.length > 1;
+  return product.unitGroups
+    .map((group) => {
+      const value = field === 'onHand' ? group.pendingOnHand : group.pendingAvailable;
+      const warehouse = showWarehouse ? `（${group.warehouseNames.join('、')}）` : '';
+      return `${group.unit ?? '未标单位'} ${quantity(value)}${warehouse}`;
+    })
+    .join(' · ');
+}
+
+function pendingUnitLabel(product: MemberPendingProductDto): string {
+  return product.unitGroups.length === 1 && product.unitGroups[0]?.unit
+    ? ` ${product.unitGroups[0].unit}`
+    : '';
 }
 
 function InventorySection({
@@ -50,7 +79,7 @@ function InventorySection({
               <strong data-testid="member-inventory-onhand">{quantity(summary.onHand)}</strong>
               <small>
                 {summary.contributingWarehouseCount} 个参与汇总的授权仓
-                {summary.pendingProductCount > 0 ? ` · 已排除 ${summary.pendingProductCount} 款待核` : ''}
+                {pendingNote(summary)}
               </small>
             </div>
             <div className={styles.metric}>
@@ -60,7 +89,7 @@ function InventorySection({
                 {summary.availableUnknownRows > 0
                   ? `${summary.availableUnknownRows} 条可售缺失未计入`
                   : '来源可售字段合计'}
-                {summary.pendingProductCount > 0 ? ` · 已排除 ${summary.pendingProductCount} 款待核` : ''}
+                {pendingNote(summary)}
               </small>
             </div>
             <div className={styles.metric}>
@@ -82,9 +111,7 @@ function InventorySection({
                     : summary.missingCostProducts > 0
                       ? `${summary.missingCostProducts} 款缺价未计入`
                       : '采用进货价 × 可明确计入数量'}
-                  {!summary.amountError && summary.pendingProductCount > 0
-                    ? ` · 已排除 ${summary.pendingProductCount} 款待核`
-                    : ''}
+                  {!summary.amountError ? pendingNote(summary) : ''}
                 </small>
               </div>
             ) : null}
@@ -122,13 +149,27 @@ function InventorySection({
                       <td className={styles.num} data-field="onHand">
                         {quantity(row.onHand)}
                         {row.pendingProductCount > 0
-                          ? <small className={styles.cellSub}>已排除 {row.pendingProductCount} 款待核</small>
+                          ? (
+                            <small className={styles.cellSub}>
+                              {row.pendingUnitConflictCount > 0
+                                ? `含 ${row.pendingUnitConflictCount} 款多单位，未计首页`
+                                : `已排除 ${row.pendingProductCount} 款待核`}
+                            </small>
+                          )
                           : null}
                       </td>
                       <td className={styles.num} data-field="available">
                         {quantity(row.available)}
                         {row.pendingProductCount > 0
-                          ? <small className={styles.cellSub}>待核可售 {formatHomeQuantity(row.pendingAvailable)}</small>
+                          ? (
+                            <small className={styles.cellSub}>
+                              {row.pendingUnitConflictCount > 0
+                                ? `含 ${row.pendingUnitConflictCount} 款多单位，未计首页`
+                                : row.pendingAvailable === null
+                                  ? `待核 ${row.pendingProductCount} 款（数量缺失）`
+                                  : `待核可售 ${formatHomeQuantity(row.pendingAvailable)}`}
+                            </small>
+                          )
                           : row.availableUnknownRows > 0
                             ? <small className={styles.cellSub}>{row.availableUnknownRows} 条缺失</small>
                             : null}
@@ -137,7 +178,11 @@ function InventorySection({
                       {summary.canViewAmount ? (
                         <td className={styles.num} data-field="value">
                           {row.estimatedValueCny ?? '—'}
-                          {row.missingCostProducts > 0 ? <small className={styles.cellSub}>{row.missingCostProducts} 款缺价</small> : null}
+                          {row.pendingUnitConflictCount > 0
+                            ? <small className={styles.cellSub}>含多单位，未计首页</small>
+                            : row.missingCostProducts > 0
+                              ? <small className={styles.cellSub}>{row.missingCostProducts} 款缺价</small>
+                              : null}
                         </td>
                       ) : null}
                       <td>
@@ -160,8 +205,19 @@ function InventorySection({
               <header className={styles.pendingHead}>
                 <strong>待核商品 {summary.pendingProductCount} 款（未计入首页合计）</strong>
                 <span>
-                  原始待核：实物 {formatHomeQuantity(summary.pendingOnHand)}
-                  {' · '}可售 {formatHomeQuantity(summary.pendingAvailable)}
+                  {summary.pendingUnitConflictProductCount > 0 ? (
+                    <>
+                      {summary.pendingProductCount > summary.pendingUnitConflictProductCount
+                        ? `单单位待核实物 ${formatHomeQuantity(summary.pendingOnHand)} · 可售 ${formatHomeQuantity(summary.pendingAvailable)}；`
+                        : ''}
+                      {summary.pendingUnitConflictProductCount} 款多单位不合计
+                    </>
+                  ) : (
+                    <>
+                      原始待核：实物 {formatHomeQuantity(summary.pendingOnHand)}
+                      {' · '}可售 {formatHomeQuantity(summary.pendingAvailable)}
+                    </>
+                  )}
                 </span>
               </header>
               <div className={styles.tableWrap}>
@@ -177,15 +233,48 @@ function InventorySection({
                   </thead>
                   <tbody>
                     {summary.pendingProducts.map((product) => (
-                      <tr key={product.itemId} data-testid="member-pending-product" data-item-id={product.itemId}>
+                      <tr
+                        key={product.itemId}
+                        data-testid="member-pending-product"
+                        data-item-id={product.itemId}
+                        data-unit-conflict={product.unitConflict ? 'true' : 'false'}
+                      >
                         <td>
                           <span className={styles.rowLink}>{product.iceCode ?? '缺货号'}</span>
                           <small className={styles.cellSub}>{product.nameCn ?? '未命名商品'}</small>
                         </td>
                         <td>{product.warehouseNames.join('、')}</td>
                         <td>{product.reasons.join(' · ')}</td>
-                        <td className={styles.num}>{formatHomeQuantity(product.pendingOnHand)}</td>
-                        <td className={styles.num}>{formatHomeQuantity(product.pendingAvailable)}</td>
+                        <td className={styles.num}>
+                          {product.unitConflict ? (
+                            <>
+                              <span className={styles.pendingText}>多单位，不合计</span>
+                              <small className={styles.cellSub}>
+                                {pendingUnitBreakdown(product, 'onHand')}
+                              </small>
+                            </>
+                          ) : (
+                            <>
+                              {formatHomeQuantity(product.pendingOnHand)}
+                              {pendingUnitLabel(product)}
+                            </>
+                          )}
+                        </td>
+                        <td className={styles.num}>
+                          {product.unitConflict ? (
+                            <>
+                              <span className={styles.pendingText}>多单位，不合计</span>
+                              <small className={styles.cellSub}>
+                                {pendingUnitBreakdown(product, 'available')}
+                              </small>
+                            </>
+                          ) : (
+                            <>
+                              {formatHomeQuantity(product.pendingAvailable)}
+                              {pendingUnitLabel(product)}
+                            </>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -196,7 +285,8 @@ function InventorySection({
 
           <p className={styles.footNote}>
             只统计商品汇总可明确计入的已采用行；待核部分已从实物、可售和货值中排除，
-            同款商品在其他仓可明确计入的数量仍然保留。未对应 {summary.unmappedRows} 条不进入数量。
+            同款商品在其他仓可明确计入的数量仍然保留；同一商品跨授权仓出现多个单位时，
+            各仓保留本仓数量与单位，但整款不进入首页合计。未对应 {summary.unmappedRows} 条不进入数量。
             {summary.canViewAmount
               ? summary.missingCostProducts > 0
                 ? ` 缺价 ${summary.missingCostProducts} 款只计数量、不计金额。`

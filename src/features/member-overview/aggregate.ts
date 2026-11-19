@@ -21,6 +21,7 @@ import type {
   MemberInventorySummaryDto,
   MemberInventoryWarehouseDto,
   MemberPendingProductDto,
+  MemberPendingUnitGroupDto,
   MemberShipmentMarketDto,
   MemberShipmentSummaryDto,
 } from './types';
@@ -53,35 +54,119 @@ function costAmountOf(costMap: Record<string, string> | null, itemId: string | n
   return typeof amount === 'string' && amount.trim() !== '' ? amount : null;
 }
 
+interface PendingUnitAccumulator {
+  unit: string | null;
+  warehouseNames: Set<string>;
+  onHand: number;
+  onHandKnown: number;
+  onHandMissing: boolean;
+  available: number;
+  availableKnown: number;
+  availableMissing: boolean;
+}
+
 interface PendingAccumulator {
   itemId: string;
   iceCode: string | null;
   nameCn: string | null;
   warehouseNames: Set<string>;
   reasons: Set<string>;
-  pendingOnHand: number;
-  pendingAvailable: number;
+  units: Map<string, PendingUnitAccumulator>;
+}
+
+type WarehouseItemRows = InventoryWarehouseRowsDto['rows'];
+type ProductSummaryRow = InventoryProductSummaryDto['rows'][number];
+
+function warehouseItemPending(summaryRow: ProductSummaryRow | null, itemRows: WarehouseItemRows): boolean {
+  return !summaryRow
+    || summaryRow.knownSubtotal === null
+    || summaryRow.knownSubtotalComplete !== true
+    || summaryRow.hasPendingTotal === true
+    || summaryRow.unitConflict === true
+    || itemRows.some((row) => row.onHand === null);
+}
+
+function distinctUnits(itemRows: WarehouseItemRows): Set<string> {
+  return new Set(itemRows
+    .map((row) => row.unit)
+    .filter((unit): unit is string => typeof unit === 'string' && unit !== ''));
 }
 
 function pendingReasons(
-  summaryRow: InventoryProductSummaryDto['rows'][number] | null,
-  itemRows: InventoryWarehouseRowsDto['rows'],
+  summaryRow: ProductSummaryRow | null,
+  itemRows: WarehouseItemRows,
+  crossWarehouseUnitConflict: boolean,
 ): string[] {
-  const reasons: string[] = [];
+  const reasons = new Set<string>();
+  if (crossWarehouseUnitConflict) reasons.add('多单位，不合计');
   if (!summaryRow) {
-    reasons.push('商品汇总缺失');
+    reasons.add('商品汇总缺失');
   } else {
-    if (summaryRow.hasPendingTotal) reasons.push('同仓多来源 SKU');
-    if (summaryRow.unitConflict) reasons.push('单位冲突');
-    if (summaryRow.knownSubtotal === null && !summaryRow.hasPendingTotal) reasons.push('已知小计不可用');
-    if (summaryRow.knownSubtotalComplete === false
+    if (summaryRow.hasPendingTotal) reasons.add('同仓多来源 SKU');
+    if (summaryRow.unitConflict) reasons.add('多单位，不合计');
+    if (summaryRow.knownSubtotal === null
       && !summaryRow.hasPendingTotal
       && !summaryRow.unitConflict) {
-      reasons.push('已知小计待核对');
+      reasons.add('已知小计不可用');
+    }
+    if (summaryRow.knownSubtotalComplete === false
+      && !summaryRow.hasPendingTotal
+      && !summaryRow.unitConflict
+      && !crossWarehouseUnitConflict) {
+      reasons.add('已知小计待核对');
     }
   }
-  if (itemRows.some((row) => row.onHand === null)) reasons.push('数量缺失');
-  return reasons.length > 0 ? reasons : ['待核对'];
+  if (itemRows.some((row) => row.onHand === null)) reasons.add('数量缺失');
+  return reasons.size > 0 ? [...reasons] : ['待核对'];
+}
+
+function addPendingRows(
+  accumulator: PendingAccumulator,
+  warehouseName: string,
+  itemRows: WarehouseItemRows,
+): void {
+  accumulator.warehouseNames.add(warehouseName);
+  for (const row of itemRows) {
+    const key = row.unit ?? '\u0000';
+    let unit = accumulator.units.get(key);
+    if (!unit) {
+      unit = {
+        unit: row.unit,
+        warehouseNames: new Set<string>(),
+        onHand: 0,
+        onHandKnown: 0,
+        onHandMissing: false,
+        available: 0,
+        availableKnown: 0,
+        availableMissing: false,
+      };
+      accumulator.units.set(key, unit);
+    }
+    unit.warehouseNames.add(warehouseName);
+    if (row.onHand === null) {
+      unit.onHandMissing = true;
+    } else {
+      unit.onHand += row.onHand;
+      unit.onHandKnown += 1;
+    }
+    if (row.warehouseAvailable === null) {
+      unit.availableMissing = true;
+    } else {
+      unit.available += row.warehouseAvailable;
+      unit.availableKnown += 1;
+    }
+  }
+}
+
+function pendingUnitGroups(units: Map<string, PendingUnitAccumulator>): MemberPendingUnitGroupDto[] {
+  return [...units.values()]
+    .map((unit) => ({
+      unit: unit.unit,
+      warehouseNames: [...unit.warehouseNames].sort(),
+      pendingOnHand: unit.onHandMissing || unit.onHandKnown === 0 ? null : unit.onHand,
+      pendingAvailable: unit.availableMissing || unit.availableKnown === 0 ? null : unit.available,
+    }))
+    .sort((left, right) => (left.unit ?? '').localeCompare(right.unit ?? '', 'zh-Hans-CN'));
 }
 
 export function summarizeMemberInventory(input: {
@@ -102,6 +187,47 @@ export function summarizeMemberInventory(input: {
     );
   }
   const adopted = rows.rows.filter((row) => row.status === 'adopted');
+  const buckets = warehouses.map((warehouse) => {
+    const own = adopted.filter((row) => row.warehouseId === warehouse.id);
+    const byItem = new Map<string, WarehouseItemRows>();
+    for (const row of own) {
+      if (!row.itemId) continue;
+      const bucket = byItem.get(row.itemId) ?? [];
+      bucket.push(row);
+      byItem.set(row.itemId, bucket);
+    }
+    return {
+      warehouse,
+      own,
+      byItem,
+      summaries: summaryByWarehouse.get(warehouse.id) ?? new Map<string, ProductSummaryRow>(),
+    };
+  });
+
+  // 完整授权范围的单位判定：只从各仓「可明确计入」的商品汇总取单位。
+  // 同款商品 A 仓 10 个、B 仓 2 箱时，单位集合为 {个, 箱}，整款不合计；
+  // 各仓的原始数量与单位保留在待核明细里，不换算、不相加。
+  const unitsByItem = new Map<string, Set<string>>();
+  for (const { byItem, summaries } of buckets) {
+    for (const [itemId, itemRows] of byItem) {
+      const summaryRow = summaries.get(itemId) ?? null;
+      if (warehouseItemPending(summaryRow, itemRows)) continue;
+      const units = (summaryRow?.unitGroups ?? [])
+        .map((group) => group.unit)
+        .filter((unit): unit is string => typeof unit === 'string' && unit !== '');
+      if (units.length === 0) units.push(...distinctUnits(itemRows));
+      for (const unit of units) {
+        const known = unitsByItem.get(itemId) ?? new Set<string>();
+        known.add(unit);
+        unitsByItem.set(itemId, known);
+      }
+    }
+  }
+  const crossWarehouseUnitConflict = new Set<string>();
+  for (const [itemId, units] of unitsByItem) {
+    if (units.size > 1) crossWarehouseUnitConflict.add(itemId);
+  }
+
   const pendingProducts = new Map<string, PendingAccumulator>();
   const missingCostProducts = new Set<string>();
   let totalOnHand = 0;
@@ -109,42 +235,49 @@ export function summarizeMemberInventory(input: {
   let totalAvailable = 0;
   let totalAvailableKnown = 0;
   let totalValue: bigint | null = null;
+  let homeContributingCount = 0;
+  let homeDataTime: string | null = null;
 
-  const warehouseRows: MemberInventoryWarehouseDto[] = warehouses.map((warehouse) => {
-    const own = adopted.filter((row) => row.warehouseId === warehouse.id);
-    const byItem = new Map<string, InventoryWarehouseRowsDto['rows']>();
-    for (const row of own) {
-      if (!row.itemId) continue;
-      const bucket = byItem.get(row.itemId) ?? [];
-      bucket.push(row);
-      byItem.set(row.itemId, bucket);
-    }
-    const summaries = summaryByWarehouse.get(warehouse.id) ?? new Map();
-
+  const warehouseRows: MemberInventoryWarehouseDto[] = buckets.map(({ warehouse, own, byItem, summaries }) => {
     let onHand = 0;
     let onHandKnown = 0;
     let available = 0;
     let availableKnown = 0;
     let availableUnknownRows = 0;
     let value: bigint | null = null;
+    // 逐仓本地已知合计（保留跨仓多单位商品的本地数量）；
+    // 首页合计只累计非多单位商品，两者分开记，避免 10 个 + 2 箱 = 12。
+    let homeOnHand = 0;
+    let homeOnHandKnown = 0;
+    let homeAvailable = 0;
+    let homeAvailableKnown = 0;
+    let homeValue: bigint | null = null;
     const missing = new Set<string>();
+    const homeMissing = new Set<string>();
     const pendingItems = new Set<string>();
     let pendingOnHand = 0;
     let pendingAvailable = 0;
+    let pendingUnitConflictCount = 0;
+    let pendingHasUnitConflict = false;
 
     for (const [itemId, itemRows] of byItem) {
       const summaryRow = summaries.get(itemId) ?? null;
-      const pending = !summaryRow
-        || summaryRow.knownSubtotal === null
-        || summaryRow.knownSubtotalComplete !== true
-        || summaryRow.hasPendingTotal === true
-        || summaryRow.unitConflict === true
-        || itemRows.some((row) => row.onHand === null);
+      const crossUnitConflict = crossWarehouseUnitConflict.has(itemId);
+      const localPending = warehouseItemPending(summaryRow, itemRows);
+      const pending = crossUnitConflict || localPending;
       if (pending) {
         pendingItems.add(itemId);
-        pendingOnHand += itemRows.reduce((sum, row) => sum + (row.onHand ?? 0), 0);
-        pendingAvailable += itemRows.reduce((sum, row) => sum + (row.warehouseAvailable ?? 0), 0);
-        const reasons = pendingReasons(summaryRow, itemRows);
+        const itemHasUnitConflict = crossUnitConflict
+          || summaryRow?.unitConflict === true
+          || distinctUnits(itemRows).size > 1;
+        if (itemHasUnitConflict) {
+          pendingHasUnitConflict = true;
+          pendingUnitConflictCount += 1;
+        } else {
+          pendingOnHand += itemRows.reduce((sum, row) => sum + (row.onHand ?? 0), 0);
+          pendingAvailable += itemRows.reduce((sum, row) => sum + (row.warehouseAvailable ?? 0), 0);
+        }
+        const reasons = pendingReasons(summaryRow, itemRows, crossUnitConflict);
         const existing = pendingProducts.get(itemId);
         const accumulator: PendingAccumulator = existing ?? {
           itemId,
@@ -152,17 +285,16 @@ export function summarizeMemberInventory(input: {
           nameCn: summaryRow?.nameCn ?? itemRows[0]?.itemName ?? null,
           warehouseNames: new Set<string>(),
           reasons: new Set<string>(),
-          pendingOnHand: 0,
-          pendingAvailable: 0,
+          units: new Map<string, PendingUnitAccumulator>(),
         };
-        accumulator.warehouseNames.add(warehouse.name);
         for (const reason of reasons) accumulator.reasons.add(reason);
-        accumulator.pendingOnHand += itemRows.reduce((sum, row) => sum + (row.onHand ?? 0), 0);
-        accumulator.pendingAvailable += itemRows.reduce((sum, row) => sum + (row.warehouseAvailable ?? 0), 0);
+        addPendingRows(accumulator, warehouse.name, itemRows);
         pendingProducts.set(itemId, accumulator);
-        continue;
+        if (localPending) continue;
       }
 
+      // pending=false（或跨仓多单位）已保证商品汇总存在且已知小计可计入；这里只做类型收窄。
+      if (!summaryRow || summaryRow.knownSubtotal === null) continue;
       const knownOnHand = summaryRow.knownSubtotal;
       onHand += knownOnHand;
       onHandKnown += 1;
@@ -171,32 +303,53 @@ export function summarizeMemberInventory(input: {
         .map((row) => row.warehouseAvailable)
         .filter((value): value is number => value !== null);
       availableUnknownRows += itemRows.length - availableValues.length;
-      if (availableValues.length > 0) {
-        available += availableValues.reduce((sum, value) => sum + value, 0);
+      const knownAvailable = availableValues.length > 0
+        ? availableValues.reduce((sum, value) => sum + value, 0)
+        : null;
+      if (knownAvailable !== null) {
+        available += knownAvailable;
         availableKnown += 1;
       }
 
       const amount = costAmountOf(costMap, itemId);
+      let estimated: bigint | null = null;
       if (amount !== null) {
-        const estimated = estimateValueScaled(knownOnHand, amount);
+        estimated = estimateValueScaled(knownOnHand, amount);
         if (estimated !== null) value = (value ?? BigInt(0)) + estimated;
       } else if (costMap !== null && knownOnHand > 0) {
         missing.add(itemId);
       }
+
+      // 跨仓多单位商品的本地数量保留在仓行；首页合计不累计它。
+      if (!crossUnitConflict) {
+        homeOnHand += knownOnHand;
+        homeOnHandKnown += 1;
+        if (knownAvailable !== null) {
+          homeAvailable += knownAvailable;
+          homeAvailableKnown += 1;
+        }
+        if (estimated !== null) homeValue = (homeValue ?? BigInt(0)) + estimated;
+        else if (costMap !== null && knownOnHand > 0) homeMissing.add(itemId);
+      }
     }
 
-    for (const itemId of missing) missingCostProducts.add(itemId);
-    if (value !== null) totalValue = (totalValue ?? BigInt(0)) + value;
-    totalOnHand += onHand;
-    totalOnHandKnown += onHandKnown;
-    totalAvailable += available;
-    totalAvailableKnown += availableKnown;
+    for (const itemId of homeMissing) missingCostProducts.add(itemId);
+    if (homeValue !== null) totalValue = (totalValue ?? BigInt(0)) + homeValue;
+    totalOnHand += homeOnHand;
+    totalOnHandKnown += homeOnHandKnown;
+    totalAvailable += homeAvailable;
+    totalAvailableKnown += homeAvailableKnown;
 
     const state = statesById.get(warehouse.id);
     const rowTime = own.reduce<string | null>(
       (latest, row) => latestIso(latest, row.observationAt),
       null,
     );
+    const dataTime = state?.observationAt ?? state?.lastSuccessAt ?? rowTime;
+    if (homeOnHandKnown > 0) {
+      homeContributingCount += 1;
+      homeDataTime = latestIso(homeDataTime, dataTime);
+    }
     return {
       warehouseId: warehouse.id,
       externalId: warehouse.externalId,
@@ -208,25 +361,32 @@ export function summarizeMemberInventory(input: {
       availableUnknownRows,
       unmappedRows: rows.rows.filter((row) => row.warehouseId === warehouse.id && row.status === 'unmapped').length,
       pendingProductCount: pendingItems.size,
-      pendingOnHand,
-      pendingAvailable,
+      pendingUnitConflictCount,
+      pendingOnHand: pendingHasUnitConflict ? null : pendingOnHand,
+      pendingAvailable: pendingHasUnitConflict ? null : pendingAvailable,
       estimatedValueCny: scaledText(value),
       missingCostProducts: missing.size,
-      dataTime: state?.observationAt ?? state?.lastSuccessAt ?? rowTime,
+      dataTime,
     };
   });
 
-  const contributing = warehouseRows.filter((row) => row.onHand !== null);
   const pendingList: MemberPendingProductDto[] = [...pendingProducts.values()]
-    .map((row) => ({
-      itemId: row.itemId,
-      iceCode: row.iceCode,
-      nameCn: row.nameCn,
-      warehouseNames: [...row.warehouseNames].sort(),
-      reasons: [...row.reasons],
-      pendingOnHand: row.pendingOnHand,
-      pendingAvailable: row.pendingAvailable,
-    }))
+    .map((row) => {
+      const unitGroups = pendingUnitGroups(row.units);
+      const unitConflict = unitGroups.length > 1;
+      const singleUnit = unitGroups.length === 1 ? unitGroups[0] : null;
+      return {
+        itemId: row.itemId,
+        iceCode: row.iceCode,
+        nameCn: row.nameCn,
+        warehouseNames: [...row.warehouseNames].sort(),
+        reasons: [...row.reasons],
+        unitConflict,
+        pendingOnHand: unitConflict ? null : (singleUnit?.pendingOnHand ?? null),
+        pendingAvailable: unitConflict ? null : (singleUnit?.pendingAvailable ?? null),
+        unitGroups,
+      };
+    })
     .sort((left, right) => (left.iceCode ?? '').localeCompare(right.iceCode ?? '', 'zh-Hans-CN'));
 
   return {
@@ -240,17 +400,13 @@ export function summarizeMemberInventory(input: {
     unmappedRows: rows.rows.filter((row) => row.status === 'unmapped').length,
     pendingProducts: pendingList,
     pendingProductCount: pendingList.length,
-    pendingOnHand: pendingList.reduce((sum, row) => sum + row.pendingOnHand, 0),
-    pendingAvailable: pendingList.reduce((sum, row) => sum + row.pendingAvailable, 0),
+    pendingUnitConflictProductCount: pendingList.filter((row) => row.unitConflict).length,
+    pendingOnHand: pendingList.reduce((sum, row) => sum + (row.pendingOnHand ?? 0), 0),
+    pendingAvailable: pendingList.reduce((sum, row) => sum + (row.pendingAvailable ?? 0), 0),
     estimatedValueCny: scaledText(totalValue),
     missingCostProducts: missingCostProducts.size,
-    contributingWarehouseCount: contributing.length,
-    dataTime: contributing.length === 0
-      ? null
-      : contributing.reduce<string | null>(
-        (latest, row) => latestIso(latest, row.dataTime),
-        null,
-      ),
+    contributingWarehouseCount: homeContributingCount,
+    dataTime: homeDataTime,
   };
 }
 
