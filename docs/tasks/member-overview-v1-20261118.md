@@ -2,8 +2,9 @@
 
 适用实例：**`run-20261026T211500Z-11a22b33`**（Web `3011` / PostgreSQL `59345`）。
 基线：`origin/master` **`ea4a2a7`**（含 PR #22）；原起点 `7864f93` 因删除任务记录明文密码，已本地改写为 `187bf1e`。
-交付状态：**本机实跑完成（执行方自验，未宣布 PASS）**；未推送/部署。
+交付状态：**本机现役独立复核 PASS，阻断 0（2026-11-19）**；验收提交 `62dd7e6`，待推送/PR，未部署。
 运行构建：**BUILD `zCyIXb6JydiVoQ0JdpSOn`**（3011 pid 19372，login 200；上一 BUILD `uGVhWZ7LhYN1gBv4ckLmu`）。
+复核报告：`.local/catalog/member-overview-v1-20261118/independent-review-62dd7e6.md`。
 
 ## 1. 目标与边界
 
@@ -165,6 +166,13 @@ A 仓 9 个 + 2 箱，B 仓 3 个；A 仓正式汇总 `unitConflict=true`，B �
 
 截图：`10-original-member-fixed.png`、`11-philippines-pending.png`、`12-restored-member.png`；上一轮主流程截图 `01`–`06` 保留。
 
+### 4.6 独立复核
+
+- 结论：**本机现役独立复核 PASS，阻断 0**（报告 `independent-review-62dd7e6.md`）。
+- 复核范围：正式 `inventory_item_summary_core` 完整授权范围对照、两组页内渲染、3011 登录/BUILD、成员 09:22 批次只读回算、包内提交无新增测试账号密码与文件范围。
+- 复核确认：样例 1 首页/仓库行为空且两仓原数可查；样例 2 首页 8 / 8 / ¥16.00、仓库 5 / 3、待核 10 个和 2 箱；同仓同单位双 SKU 对照仍保留其他仓 3 个；3011 现役 111 款、187 条已采用行、待核 0 与页面一致。
+- 复核未改代码、未切换授权、未写样例；PR/CI/合并/部署不在其结论内。
+
 ## 5. 验证
 
 - `apply-047`：rollback **10/10**、commit **10/10**。
@@ -175,6 +183,7 @@ A 仓 9 个 + 2 箱，B 仓 3 个；A 仓正式汇总 `unitConflict=true`，B �
 - 全量标准测试 `npm test`：**978/978 PASS**（原 971 + 本包 7 个聚合单测）。
 - `tsc --noEmit`：仅既有 BEST 5 条基线错误；改动文件及 `src/tests/scripts` eslint **0**。
 - `git diff --check` 0。
+- 独立复核：**PASS，阻断 0**；报告 `.local/catalog/member-overview-v1-20261118/independent-review-62dd7e6.md`。
 
 ## 6. 入口
 
