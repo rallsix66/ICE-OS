@@ -1,10 +1,10 @@
 /** 成员经营总览 v1 的页面 DTO：只包含当前账号获授范围，不携带金额权限以外的成本。 */
 
-/** 待核商品按来源单位拆分的原始数量；不同单位绝不合成一个数。 */
+/** 待核商品的一行原始数量：按仓库 × 单位拆分，不同单位绝不合成一个数。 */
 export interface MemberPendingUnitGroupDto {
+  warehouseId: string;
+  warehouseName: string;
   unit: string | null;
-  /** 该单位数量来自哪些授权仓（各仓保留各自可核对的数量和单位）。 */
-  warehouseNames: string[];
   pendingOnHand: number | null;
   pendingAvailable: number | null;
 }
@@ -17,12 +17,12 @@ export interface MemberPendingProductDto {
   warehouseNames: string[];
   /** 待核原因：同仓多来源 SKU / 多单位，不合计 / 已知小计不可用。 */
   reasons: string[];
-  /** 跨授权仓存在多个单位：整款不合计，实物/可售/货值均不进入首页已知合计。 */
+  /** 整款不能进入首页合计：跨仓多单位，或任一授权仓已识别 unitConflict。 */
   unitConflict: boolean;
   /** 单一单位时是被排除的原始数量；多单位时为 null（不能把箱和个相加）。 */
   pendingOnHand: number | null;
   pendingAvailable: number | null;
-  /** 按单位分组的原始数量，多单位时逐组展示。 */
+  /** 按仓库 × 单位拆分的原始数量；冲突商品逐行展示。 */
   unitGroups: MemberPendingUnitGroupDto[];
 }
 
@@ -31,9 +31,9 @@ export interface MemberInventoryWarehouseDto {
   externalId: string;
   name: string;
   market: string | null;
-  /** 已对应且可明确计入的来源行实物合计；没有可计入行时为 null。 */
+  /** 本仓实际贡献给首页的实物小计；没有可计入行时为 null。 */
   onHand: number | null;
-  /** 已对应且可明确计入的来源行可售合计；没有可计入行时为 null。 */
+  /** 本仓实际贡献给首页的可售小计；没有可计入行时为 null。 */
   available: number | null;
   /** 有已采用行但实物/可售缺失的条数（原样保留，不写 0）。 */
   onHandUnknownRows: number;

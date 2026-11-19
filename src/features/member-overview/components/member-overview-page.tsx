@@ -28,18 +28,31 @@ function pendingNote(summary: MemberInventorySummaryDto): string {
   return ` · 已排除 ${summary.pendingProductCount} 款待核${multiUnit}`;
 }
 
-function pendingUnitBreakdown(
-  product: MemberPendingProductDto,
-  field: 'onHand' | 'available',
-): string {
-  const showWarehouse = product.unitGroups.length > 1;
-  return product.unitGroups
-    .map((group) => {
-      const value = field === 'onHand' ? group.pendingOnHand : group.pendingAvailable;
-      const warehouse = showWarehouse ? `（${group.warehouseNames.join('、')}）` : '';
-      return `${group.unit ?? '未标单位'} ${quantity(value)}${warehouse}`;
-    })
-    .join(' · ');
+function PendingUnitBreakdown({
+  product,
+  field,
+}: {
+  product: MemberPendingProductDto;
+  field: 'onHand' | 'available';
+}) {
+  return (
+    <span className={styles.unitBreakdown}>
+      {product.unitGroups.map((group) => {
+        const value = field === 'onHand' ? group.pendingOnHand : group.pendingAvailable;
+        return (
+          <span
+            key={`${group.warehouseId}-${group.unit ?? ''}`}
+            className={styles.unitLine}
+            data-testid="member-pending-unit"
+            data-warehouse-id={group.warehouseId}
+            data-unit={group.unit ?? ''}
+          >
+            {group.warehouseName} · {group.unit ?? '未标单位'} {quantity(value)}
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 function pendingUnitLabel(product: MemberPendingProductDto): string {
@@ -152,7 +165,7 @@ function InventorySection({
                           ? (
                             <small className={styles.cellSub}>
                               {row.pendingUnitConflictCount > 0
-                                ? `含 ${row.pendingUnitConflictCount} 款多单位，未计首页`
+                                ? `已排除 ${row.pendingUnitConflictCount} 款多单位`
                                 : `已排除 ${row.pendingProductCount} 款待核`}
                             </small>
                           )
@@ -164,7 +177,7 @@ function InventorySection({
                           ? (
                             <small className={styles.cellSub}>
                               {row.pendingUnitConflictCount > 0
-                                ? `含 ${row.pendingUnitConflictCount} 款多单位，未计首页`
+                                ? `已排除 ${row.pendingUnitConflictCount} 款多单位`
                                 : row.pendingAvailable === null
                                   ? `待核 ${row.pendingProductCount} 款（数量缺失）`
                                   : `待核可售 ${formatHomeQuantity(row.pendingAvailable)}`}
@@ -179,7 +192,7 @@ function InventorySection({
                         <td className={styles.num} data-field="value">
                           {row.estimatedValueCny ?? '—'}
                           {row.pendingUnitConflictCount > 0
-                            ? <small className={styles.cellSub}>含多单位，未计首页</small>
+                            ? <small className={styles.cellSub}>已排除多单位</small>
                             : row.missingCostProducts > 0
                               ? <small className={styles.cellSub}>{row.missingCostProducts} 款缺价</small>
                               : null}
@@ -249,9 +262,7 @@ function InventorySection({
                           {product.unitConflict ? (
                             <>
                               <span className={styles.pendingText}>多单位，不合计</span>
-                              <small className={styles.cellSub}>
-                                {pendingUnitBreakdown(product, 'onHand')}
-                              </small>
+                              <PendingUnitBreakdown product={product} field="onHand" />
                             </>
                           ) : (
                             <>
@@ -264,9 +275,7 @@ function InventorySection({
                           {product.unitConflict ? (
                             <>
                               <span className={styles.pendingText}>多单位，不合计</span>
-                              <small className={styles.cellSub}>
-                                {pendingUnitBreakdown(product, 'available')}
-                              </small>
+                              <PendingUnitBreakdown product={product} field="available" />
                             </>
                           ) : (
                             <>
@@ -284,9 +293,9 @@ function InventorySection({
           ) : null}
 
           <p className={styles.footNote}>
-            只统计商品汇总可明确计入的已采用行；待核部分已从实物、可售和货值中排除，
-            同款商品在其他仓可明确计入的数量仍然保留；同一商品跨授权仓出现多个单位时，
-            各仓保留本仓数量与单位，但整款不进入首页合计。未对应 {summary.unmappedRows} 条不进入数量。
+            仓库行只含本仓实际贡献给首页的已知小计，仓库行相加等于首页合计；
+            待核部分已从实物、可售和货值中排除，冲突商品的原数在待核区按仓库和单位列出。
+            同款商品在其他仓可明确计入的数量仍然保留。未对应 {summary.unmappedRows} 条不进入数量。
             {summary.canViewAmount
               ? summary.missingCostProducts > 0
                 ? ` 缺价 ${summary.missingCostProducts} 款只计数量、不计金额。`

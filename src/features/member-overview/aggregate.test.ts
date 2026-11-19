@@ -299,8 +299,8 @@ describe('成员经营总览 · 库存汇总', () => {
     expect(unitConflictProduct?.pendingOnHand).toBeNull();
     expect(unitConflictProduct?.pendingAvailable).toBeNull();
     expect(unitConflictProduct?.unitGroups).toEqual([
-      { unit: '个', warehouseNames: ['越南青林湾仓库'], pendingOnHand: 9, pendingAvailable: 9 },
-      { unit: '箱', warehouseNames: ['越南青林湾仓库'], pendingOnHand: 2, pendingAvailable: 2 },
+      { warehouseId: 'wh-vn', warehouseName: '越南青林湾仓库', unit: '个', pendingOnHand: 9, pendingAvailable: 9 },
+      { warehouseId: 'wh-vn', warehouseName: '越南青林湾仓库', unit: '箱', pendingOnHand: 2, pendingAvailable: 2 },
     ]);
     const vn = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-vn');
     expect(vn?.onHand).toBeNull();
@@ -314,7 +314,7 @@ describe('成员经营总览 · 库存汇总', () => {
     expect(th?.available).toBe(6);
   });
 
-  it('跨授权仓同款商品单位不同：A 仓 10 个 / B 仓 2 箱整款不合计，各仓原始单位保留', () => {
+  it('跨授权仓同款商品单位不同：A 仓 10 个 / B 仓 2 箱整款不合计，仓库行只计贡献', () => {
     const vnMultiSummary = summaryRow({
       itemId: 'item-multi',
       iceCode: 'WM0100',
@@ -450,26 +450,101 @@ describe('成员经营总览 · 库存汇总', () => {
     expect(product?.warehouseNames).toEqual(['DEE-龙仔厝（ICE专属）', '越南青林湾仓库']);
     expect(product?.unitGroups).toHaveLength(2);
     expect(product?.unitGroups).toEqual(expect.arrayContaining([
-      { unit: '个', warehouseNames: ['越南青林湾仓库'], pendingOnHand: 10, pendingAvailable: 8 },
-      { unit: '箱', warehouseNames: ['DEE-龙仔厝（ICE专属）'], pendingOnHand: 2, pendingAvailable: 2 },
+      { warehouseId: 'wh-vn', warehouseName: '越南青林湾仓库', unit: '个', pendingOnHand: 10, pendingAvailable: 8 },
+      { warehouseId: 'wh-th', warehouseName: 'DEE-龙仔厝（ICE专属）', unit: '箱', pendingOnHand: 2, pendingAvailable: 2 },
     ]));
 
-    // 各仓保留本仓可核对数量：A 仓 = 多单位 10 + 正常 5，B 仓 = 多单位 2 + 正常 3；
-    // 但它们不进入首页 8 / 8 / ¥16.00。
+    // 仓库表只含实际贡献首页的同单位正常商品：A 仓 5、B 仓 3，仓库行相加等于首页 8。
     const vn = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-vn');
-    expect(vn?.onHand).toBe(15);
-    expect(vn?.available).toBe(13);
-    expect(vn?.estimatedValueCny).toBe('¥30.00');
+    expect(vn?.onHand).toBe(5);
+    expect(vn?.available).toBe(5);
+    expect(vn?.estimatedValueCny).toBe('¥10.00');
     expect(vn?.pendingUnitConflictCount).toBe(1);
     expect(vn?.pendingOnHand).toBeNull();
     expect(vn?.pendingAvailable).toBeNull();
     const th = result.warehouses.find((warehouse) => warehouse.warehouseId === 'wh-th');
-    expect(th?.onHand).toBe(5);
-    expect(th?.available).toBe(5);
-    expect(th?.estimatedValueCny).toBe('¥10.00');
+    expect(th?.onHand).toBe(3);
+    expect(th?.available).toBe(3);
+    expect(th?.estimatedValueCny).toBe('¥6.00');
     expect(th?.pendingUnitConflictCount).toBe(1);
     expect(th?.pendingOnHand).toBeNull();
     expect(th?.pendingAvailable).toBeNull();
+    expect((vn?.onHand ?? 0) + (th?.onHand ?? 0)).toBe(result.onHand);
+  });
+
+  it('单仓 unitConflict 也整款待核：A 仓 9 个 + 2 箱、B 仓 3 个均不进入首页', () => {
+    const vnConflictSummary = summaryRow({
+      itemId: 'item-local-conflict',
+      iceCode: 'WM0102',
+      nameCn: '单仓多单位商品',
+      knownSubtotal: null,
+      knownSubtotalComplete: false,
+      unitConflict: true,
+      overseasOnHand: null,
+      unitGroups: [
+        { unit: '个', knownSubtotal: 9, rowCount: 1 },
+        { unit: '箱', knownSubtotal: 2, rowCount: 1 },
+      ],
+    });
+    const thConflictSummary = summaryRow({
+      itemId: 'item-local-conflict',
+      iceCode: 'WM0102',
+      nameCn: '单仓多单位商品',
+      market: null,
+      knownSubtotal: 3,
+      overseasOnHand: 3,
+      unitGroups: [{ unit: '个', knownSubtotal: 3, rowCount: 1 }],
+      marketCells: [{ market: null, onHand: 3, skuCount: 1, warehouseCount: 1, hasPendingTotal: false }],
+    });
+
+    const result = summarizeMemberInventory({
+      rows: inventoryRows([
+        row({ rowKey: 'vn-c1', itemId: 'item-local-conflict', externalSku: 'SKU-C1', unit: '个', onHand: 9, warehouseAvailable: 9 }),
+        row({ rowKey: 'vn-c2', itemId: 'item-local-conflict', externalSku: 'SKU-C2', unit: '箱', onHand: 2, warehouseAvailable: 2 }),
+        row({
+          rowKey: 'th-c1',
+          warehouseId: 'wh-th',
+          warehouseExternalId: '56673',
+          warehouseName: 'DEE-龙仔厝（ICE专属）',
+          market: null,
+          itemId: 'item-local-conflict',
+          externalSku: 'SKU-C3',
+          unit: '个',
+          onHand: 3,
+          warehouseAvailable: 3,
+        }),
+      ]),
+      warehouses,
+      productSummaries: [
+        { warehouseId: 'wh-vn', summary: productSummary('wh-vn', [vnConflictSummary]) },
+        { warehouseId: 'wh-th', summary: productSummary('wh-th', [thConflictSummary]) },
+      ],
+      costMap: { 'item-local-conflict': '2' },
+      canViewAmount: true,
+      amountError: null,
+    });
+
+    expect(result.onHand).toBeNull();
+    expect(result.available).toBeNull();
+    expect(result.estimatedValueCny).toBeNull();
+    expect(result.contributingWarehouseCount).toBe(0);
+    expect(result.pendingProductCount).toBe(1);
+    expect(result.pendingUnitConflictProductCount).toBe(1);
+
+    const product = result.pendingProducts[0];
+    expect(product?.unitConflict).toBe(true);
+    expect(product?.pendingOnHand).toBeNull();
+    expect(product?.pendingAvailable).toBeNull();
+    expect(product?.unitGroups).toEqual(expect.arrayContaining([
+      { warehouseId: 'wh-vn', warehouseName: '越南青林湾仓库', unit: '个', pendingOnHand: 9, pendingAvailable: 9 },
+      { warehouseId: 'wh-vn', warehouseName: '越南青林湾仓库', unit: '箱', pendingOnHand: 2, pendingAvailable: 2 },
+      { warehouseId: 'wh-th', warehouseName: 'DEE-龙仔厝（ICE专属）', unit: '个', pendingOnHand: 3, pendingAvailable: 3 },
+    ]));
+    expect(product?.unitGroups).toHaveLength(3);
+    for (const warehouse of result.warehouses) {
+      expect(warehouse.onHand).toBeNull();
+      expect(warehouse.available).toBeNull();
+    }
   });
 
   it('无金额权限时不计算货值，也不把缺价写成 0', () => {
