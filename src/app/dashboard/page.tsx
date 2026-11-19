@@ -7,6 +7,8 @@ import { classifyReadFailure } from '@/features/inventory/model';
 import { BusinessOverviewPage } from '@/features/overview/components/business-overview-page';
 import { parseHomeSearchParams } from '@/features/overview/model';
 import { getBusinessOverviewData } from '@/features/overview/server/reads';
+import { MemberOverviewPage } from '@/features/member-overview/components/member-overview-page';
+import { getMemberOverviewSections } from '@/features/member-overview/server/reads';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,24 +17,55 @@ export const metadata: Metadata = { title: '经营总览' };
 /**
  * /dashboard 经营总览（登录后的默认首页）。
  *
- * - 数据在服务端按完整范围汇总后再做搜索/分页，不在页面累加来源行；
- * - 商品汇总是首页数量主来源：读不到时整页明确失败，不显示 0 或假总额；
- *   国内快照、在途来源、成本各自失败只降级对应阶段/金额，并在页面说明。
- * - 三阶段来源时点不同：不提供跨阶段总资产，未知与真实零分开。
+ * - 管理员：沿用原经营总览（三阶段、货值、待处理、商品概览），口径不变；
+ * - 成员：只渲染「成员经营总览 v1」——海外库存按获授仓库汇总、物流按获授市场汇总，
+ *   两块分别读取、分别失败；只获授一类时只显示可用板块，两类都无授权显示空态；
+ * - 成员不再被重定向到商品库存/物流页，登录后就在 /dashboard 看自己负责的货。
  */
 export default async function DashboardHomePage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // 权限设置 v1：成员没有全站总览权限，登录后直接进自己能用的页面：
-  // 有库存范围去商品库存；只有物流市场授权去物流在途；两者都没有仍回库存看空态提示。
   const actor = await getCurrentActiveUser();
-  if (actor && actor.roleName !== 'admin') {
-    const access = await getMyInventoryAccess().catch(() => null);
-    redirect(access && !access.canViewInventory && access.canViewShipment
-      ? '/dashboard/in-transit'
-      : '/dashboard/inventory');
+  if (!actor) redirect('/auth/login');
+
+  const access = await getMyInventoryAccess().catch(() => null);
+  const isAdmin = actor.roleName === 'admin' || access?.isAdmin === true;
+
+  if (!isAdmin) {
+    if (!access) {
+      return (
+        <MemberOverviewPage
+          canViewInventory={false}
+          canViewShipment={false}
+          inventory={{ data: null, error: null }}
+          shipment={{ data: null, error: null }}
+          accessError="权限读取失败，暂时无法确认可查看的库存与物流范围；请刷新重试。"
+        />
+      );
+    }
+    const canViewInventory = access.canViewInventory && access.warehouses.length > 0;
+    const canViewShipment = access.canViewShipment && access.shipmentMarkets.length > 0;
+    if (!canViewInventory && !canViewShipment) {
+      return (
+        <MemberOverviewPage
+          canViewInventory={false}
+          canViewShipment={false}
+          inventory={{ data: null, error: null }}
+          shipment={{ data: null, error: null }}
+        />
+      );
+    }
+    const sections = await getMemberOverviewSections({ ...access, canViewInventory, canViewShipment });
+    return (
+      <MemberOverviewPage
+        canViewInventory={canViewInventory}
+        canViewShipment={canViewShipment}
+        inventory={sections.inventory}
+        shipment={sections.shipment}
+      />
+    );
   }
 
   const sp = await searchParams;

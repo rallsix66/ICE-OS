@@ -51,13 +51,17 @@ describe('ICE v4 导航合同（U7 / R9）', () => {
     expect(shellSrc).toContain('data-nav-primary="true"');
   });
 
-  it('权限设置是仅管理员可见的入口，成员导航只保留商品库存', () => {
+  it('权限设置是仅管理员可见的入口，成员可见经营总览与自身业务入口', () => {
     expect(ICE_V4_ADMIN_NAV_HREFS).toEqual(['/dashboard/permissions']);
     for (const href of ICE_V4_ADMIN_NAV_HREFS) {
       expect(navBlock).toContain(`href: '${href}'`);
       expect(ICE_V4_ACTIVE_NAV_HREFS).not.toContain(href);
     }
-    // nav 项带 requires 标注：权限设置与其它管理页只有管理员看得到，商品库存按库存查看权限出现。
+    // 成员经营总览 v1：/dashboard 对全部启用账号可见，由页面自身按授权渲染；
+    // 权限设置与其它管理页只有管理员看得到，商品库存/物流在途按各自授权出现。
+    const dashboardItem = navBlock.match(/\{\s*href: '\/dashboard',[\s\S]*?\n  \},/)?.[0] ?? '';
+    expect(dashboardItem).toContain("label: '经营总览'");
+    expect(dashboardItem).not.toContain("requires: 'admin'");
     expect(navBlock).toMatch(/href: '\/dashboard\/permissions',[\s\S]*?requires: 'admin'/);
     expect(navBlock).toMatch(/href: '\/dashboard\/inventory',[\s\S]*?requires: 'inventory'/);
     // 物流在途按「物流市场授权」出现（管理员或至少一个市场），与库存仓库范围分开。

@@ -1,0 +1,212 @@
+# 成员经营总览 v1（2026-11-18）
+
+适用实例：**`run-20261026T211500Z-11a22b33`**（Web `3011` / PostgreSQL `59345`）。
+基线：`origin/master` **`ea4a2a7`**（含 PR #22）；原起点 `7864f93` 因删除任务记录明文密码，已本地改写为 `187bf1e`。
+交付状态：**本机现役独立复核 PASS，阻断 0（2026-11-19）**；验收提交 `62dd7e6`，待推送/PR，未部署。
+运行构建：**BUILD `zCyIXb6JydiVoQ0JdpSOn`**（3011 pid 19372，login 200；上一 BUILD `uGVhWZ7LhYN1gBv4ckLmu`）。
+复核报告：`.local/catalog/member-overview-v1-20261118/independent-review-62dd7e6.md`。
+
+## 1. 目标与边界
+
+成员登录后进入 `/dashboard`，一页看清自己负责的海外库存与在途货物，并能点进现有明细核对：
+
+- 库存按账号实际获授的仓库汇总，展示实物、可售与数据时间；有库存金额权限时沿用商品库存页的估算货值与缺价口径；
+- 物流按账号独立获授的物流市场展示当前票数、已知剩余在途、待核明细与最近成功读取时间；成员只读、不显示货值；
+- 两块分别列数、分别失败，不跨来源相加；只获授一类时显示可用板块，两类都没有时显示空态；
+- 管理员继续使用原经营总览（三阶段、货值、待处理、商品概览），本包不改其口径。
+
+## 2. 数据与权限
+
+| 板块 | 读取入口 | 口径 |
+|---|---|---|
+| 海外库存 | `catalog.read_inventory_warehouse_rows`（043 已按授权仓收窄） | 只统计 `status=adopted`；实物 `onHand`、可售 `warehouseAvailable` 分别求和；未对应/待采用/停用行不计数量 |
+| 库存货值 | `catalog.read_member_item_amounts`（仅 `canViewAmount`） | 实物 × 采用单位成本；缺价商品只计数、不计金额；读取失败不写 0 |
+| 物流 | `catalog.read_shipment_market_summary`（047 改为成员守卫） | 最近一次成功快照的当前明细；按 `access_member_markets()` 收窄；票数按 `shipmentId` 去重 |
+| 物流待核 | 同上 | `remainingState=pending` 或 `manualConflict=true` 的明细；不计入已知剩余 |
+| 数据时间 | 库存 `inventory_scope_payload.lastAllSuccessAt` / 逐仓观测时间；物流 028 `latestReadAt` | 时间原样格式化，不补造 |
+
+库存仓库授权与物流市场授权互不代表：测试成员保留原「越南青林湾仓库 + DEE-龙仔厝（ICE专属）」两个仓，物流只授予「越南」；交叉配置时只把物流改为「泰国」，库存数字不变。
+
+## 3. 实现
+
+### 3.1 数据库 `db/catalog/047_member_overview.sql`
+
+只改一个函数，不改表、不写业务行：
+
+- `catalog.read_shipment_market_summary(text)` 守卫由 `require_admin()` 换成 `require_shipment_read()`；
+- 非管理员追加 `s.market = ANY(catalog.access_member_markets())`；
+- 管理员仍返回全部市场，024/028/030 的明细、剩余、冲突口径不变；
+- 幂等：函数已含 `v_markets text[]` 时跳过。
+
+`apply-047.mjs` 现役 **rollback 10/10、commit 10/10**：安装两次、管理员前后口径一致、成员只得到授权市场、无授权 `CATALOG_FORBIDDEN`、换泰国只返回泰国、探针授权复原、业务行数不变。
+
+### 3.2 应用
+
+- `src/features/member-overview/aggregate.ts`：库存/物流纯聚合；库存按商品汇总逐仓判 `knownSubtotal` / `knownSubtotalComplete` / `hasPendingTotal` / `unitConflict`，待核商品从实物、可售、货值中排除；物流待核只计未知或人工冲突；
+- `src/features/member-overview/server/reads.ts`：两个板块分别读取、分别失败；库存同时读逐仓商品汇总，金额只在 `canViewAmount` 时读；
+- `src/features/shipment/server/reads.ts`：新增 `getMemberShipmentMarketSource()`，复用 028 的成员范围，不读商品卡片/成本；
+- `src/features/member-overview/components/member-overview-page.tsx`：海外库存、物流在途两块；授权仓逐仓、授权市场逐市场列表与下钻链接；待核商品单列清单；
+- `src/app/dashboard/page.tsx`：管理员走原 `BusinessOverviewPage`；成员按实际仓库/市场授权渲染新页；两类都没有直接空态，不再重定向；
+- `src/ui/ice-v4/workspace-shell.tsx`：经营总览对全部启用账号可见；
+- 迁移接入 `prepare-instance.mjs` 与 `prepare-local-preview.mjs`，新实例按 045 → 046 → 047 安装。
+
+### 3.3 库存合计补修（2026-11-18 傍晚）
+
+原实现直接累加 `read_inventory_warehouse_rows` 的已采用行，会把「同仓同商品多个来源 SKU」的整组数量、以及单位冲突行都算进已知合计。补修后：
+
+- 按授权仓逐个读取 `read_inventory_product_summary(q=null, warehouse=仓)`，用现有商品汇总判断：
+  - `knownSubtotal`：单单位、无待核时的已知小计；
+  - `knownSubtotalComplete=false` / `hasPendingTotal=true`：同仓多来源 SKU 待核对；
+  - `unitConflict=true`：单位冲突；
+- 被判待核的「商品 × 授权仓」整组不计入实物、可售、货值；同款商品在另一个仓可明确计入的数量仍保留；
+- 首页单独列出待核商品、授权仓、原因、待核实/可售原始数量；待核原始数量只用于说明差额，不进入已知合计；
+- 数据时间只取实际有可计入商品的授权仓；只有待核商品、没有可计入商品的仓不参与总时间。
+
+### 3.4 跨授权仓单位判定补修（2026-11-19）
+
+上一版按「商品 × 授权仓」分别判单位，A 仓 10 个、B 仓 2 箱会被各仓当作可计入，首页再加总成 12 / ¥24.00。补修后：
+
+- 先按同一商品合并所有授权仓正式商品汇总返回的有效 `unitGroups`，并保留任一仓已识别的 `unitConflict`；
+- 合并后单位集合大于 1，或任一仓 `unitConflict=true`，整款标为「多单位，不合计」，所有仓的这款都不进入首页实物、可售、货值；
+- 正式汇总已排除的同仓同单位双 SKU 不贡献单位；其他仓可明确计入的数量照常保留；
+- 仓库表只含本仓实际贡献给首页的已知小计，仓库行相加等于首页合计；
+- 冲突商品的原始数量进入已有待核区，`unitGroups` 改为按「仓库 × 单位」逐行列清；冲突商品 `pendingOnHand` / `pendingAvailable` 为 `null`，不换算、不相加；
+- 同单位正常商品、同仓多来源 SKU（菲律宾三款）和「同款商品在其他仓可明确计入」口径不变。
+
+## 4. 本机验收
+
+证据目录 `.local/catalog/member-overview-v1-20261118/e2e/`：
+
+- `verify-member-overview-fix.mjs`（本轮库存补修）**11/11 PASS**，console/pageerror **0**；
+- `verify-member-overview.mjs`（上一轮总览主流程）**21/21 PASS**，沿用其两仓/物流/单板块/空态/管理员结论。
+
+### 4.1 原验收成员两仓（2026-11-18 17:22）
+
+| 项 | 首页 | 下钻 |
+|---|---|---|
+| 海外实物 | **1,548,101** | 越南青林湾 390,682（89 条来源行） + DEE-龙仔厝 1,157,419（144 条） |
+| 可售 | **1,544,416** | 389,682 + 1,154,734 |
+| 数据时间 | **2026-11-18 17:22** | 两仓均为 17:22 成功批次；实际参与汇总 2 个仓 |
+| 已知估算货值 | **¥4,102,807.19** | ¥1,299,923.23 + ¥2,802,883.96；缺价 0 款、待核 0 款 |
+| 越南物流 | **7 票 / 42 明细 / 已知剩余 466,684 / 待核 11** | 同市场货票列表「共 7 票」；打开 `POKNZX027976` 明细可见、无金额入口 |
+| 最近成功读取 | **2026-11-18 17:28** | 与 028 当前快照 `latestReadAt` 一致 |
+
+> 2026-11-19 09:53 只读冒烟为 09:22 批次：首页 **1,546,262 / 1,532,756 / ¥4,097,090.76**，待核 0；上表 17:22 数字保留为补修验收基线。
+
+### 4.2 菲律宾仓库存合计补修（同一 17:22 批次）
+
+只把库存授权临时改为「菲律宾-新创启辰自建仓」（id `72845387-…`），物流不动：
+
+| 口径 | 实物 | 可售 | 已知货值 |
+|---|---|---|---|
+| 原始已采用行直接相加（补修前） | 1,095,984 | 1,085,557 | — |
+| 商品汇总可明确计入（补修后首页） | **1,070,924** | **1,061,256** | **¥3,113,036.47** |
+| 待核（已排除） | **25,060** | **24,301** | 不计 |
+
+待核商品与原因：
+
+| 商品 | 授权仓 | 待核实 | 待核可售 | 原因 |
+|---|---|---|---|---|
+| WM0026 ICE LERSKIN双色泥膜 | 菲律宾-新创启辰自建仓 | 7,023 | 7,021 | 同仓多来源 SKU（`757577983013` + `ICEWM0026`） |
+| WM0030 ICE LERSKIN护发精油-桂花 | 菲律宾-新创启辰自建仓 | 6,998 | 6,924 | 同仓多来源 SKU（`757577983020` + `ICEWM0030`） |
+| WM0049 ICE LERSKIN 多效提亮防晒喷雾 | 菲律宾-新创启辰自建仓 | 11,039 | 10,356 | 同仓多来源 SKU（`757577407113` + `WM0049`） |
+
+首页待核清单显示「待核商品 3 款（未计入首页合计） · 原始待核：实物 25,060 · 可售 24,301」；三款商品均不计入 1,070,924 / 1,061,256 / ¥3,113,036.47。恢复原两仓后首页回到 1,548,101 / 1,544,416 / ¥4,102,807.19，正常商品仍计入。
+
+### 4.3 交叉授权
+
+只把物流授权改为「泰国」，库存授权不动：
+
+- 首页库存仍为 **1,548,101 / 1,544,416 / ¥4,102,807.19**，不随物流改变；
+- 物流只剩 **泰国 19 票 / 51 明细 / 已知剩余 603,909 / 待核 0**；
+- 首页物流表只有泰国行，不出现越南。
+
+### 4.4 单板块 / 空态 / 管理员
+
+- 撤掉物流授权：库存板块保留，物流显示「当前账号未获授物流市场」，不是整页空态；
+- 再撤掉库存仓库：显示「暂无业务授权」空态，不显示任何数量或 0；
+- 恢复原授权后两块与数字回到基线；
+- 管理员 `/dashboard` 仍是原经营总览，不出现成员总览。
+
+### 4.5 两组单位隔离样例（2026-11-19）
+
+不切换现役成员授权，用现有 `MemberOverviewPage` + `summarizeMemberInventory` 渲染隔离数据（Vite SSR + Playwright，不连数据库、不写授权）：
+
+**样例 1：单仓 unitConflict 传导整款**
+
+A 仓 9 个 + 2 箱，B 仓 3 个；A 仓正式汇总 `unitConflict=true`，B 仓为 3 个单单位。
+
+| 页面位置 | 实物 | 可售 | 货值 |
+|---|---:|---:|---:|
+| 首页 | **—** | **—** | **—** |
+| 仓库表 A / B | — / — | — / — | — / — |
+| 待核区 | A 仓 个 9、A 仓 箱 2、B 仓 个 3 | 同上 | 不计 |
+
+- 首页已知实物、可售、货值均为空，不把 B 仓 3 个留在首页；
+- 待核商品 1 款、`unitConflict=true`、`pendingOnHand=null`；
+- 待核区逐行显示两仓原数，成员能查到 A 仓 9 个 / 2 箱、B 仓 3 个。
+
+**样例 2：跨仓多单位 + 同单位正常商品**
+
+冲突款 A 仓 10 个、B 仓 2 箱；正常款 A 仓 5 个、B 仓 3 个。
+
+| 页面位置 | 实物 | 可售 | 货值 |
+|---|---:|---:|---:|
+| 首页 | **8** | **8** | **¥16.00** |
+| 仓库表 A / B | **5 / 3** | **5 / 3** | ¥10.00 / ¥6.00 |
+| 待核区 | A 仓 个 10、B 仓 箱 2 | 8 / 2 | 不计 |
+| 旧逻辑直接相加 | 12 | — | ¥24.00 |
+
+- 仓库行相加等于首页 8，成员不会再看到 12 / ¥24.00；
+- 冲突款不在仓库小计中，原数在待核区保留 10 个和 2 箱。
+
+页面断言 **2/2 PASS**，证据 [verify-unit-samples-page.json](.local/catalog/member-overview-v1-20261118/e2e/verify-unit-samples-page.json)；截图 `20-sample-a9b2.png`、`21-sample-a10b2.png`。
+
+同时校正原单测：越南仓「9 个 + 2 箱」不再合成 11 —— 商品 `WM0030` 的 `pendingOnHand` 为 `null`，单位分组为 `个 9` / `箱 2`；首页待核合计只累计单单位的 `WM0026`（15 / 7），不再断言 26 / 18。
+
+截图：`10-original-member-fixed.png`、`11-philippines-pending.png`、`12-restored-member.png`；上一轮主流程截图 `01`–`06` 保留。
+
+### 4.6 独立复核
+
+- 结论：**本机现役独立复核 PASS，阻断 0**（报告 `independent-review-62dd7e6.md`）。
+- 复核范围：正式 `inventory_item_summary_core` 完整授权范围对照、两组页内渲染、3011 登录/BUILD、成员 09:22 批次只读回算、包内提交无新增测试账号密码与文件范围。
+- 复核确认：样例 1 首页/仓库行为空且两仓原数可查；样例 2 首页 8 / 8 / ¥16.00、仓库 5 / 3、待核 10 个和 2 箱；同仓同单位双 SKU 对照仍保留其他仓 3 个；3011 现役 111 款、187 条已采用行、待核 0 与页面一致。
+- 复核未改代码、未切换授权、未写样例；PR/CI/合并/部署不在其结论内。
+
+## 5. 验证
+
+- `apply-047`：rollback **10/10**、commit **10/10**。
+- 上一轮库存补修页面验收 **11/11 PASS**、主流程 **21/21 PASS** 沿用（本轮未改现役成员授权，未重跑）。
+- 本轮单位口径：`src/features/member-overview/aggregate.test.ts` **7/7 PASS**；两组样例分别断言首页空态和 8 / 8 / ¥16.00，仓库行 5 / 3，待核按仓/单位列出 9 / 2 / 3 与 10 / 2。
+- 两组页面渲染断言 **2/2 PASS**，console/pageerror 0；证据 `verify-unit-samples-page.json`、`20-sample-a9b2.png`、`21-sample-a10b2.png`。
+- 运行 BUILD 只读冒烟：成员 `/dashboard` 正常渲染，四项指标有值，console/pageerror **0**；数据已刷新到 09:22（1,546,262 / 1,532,756 / ¥4,097,090.76），待核 0。
+- 全量标准测试 `npm test`：**978/978 PASS**（原 971 + 本包 7 个聚合单测）。
+- `tsc --noEmit`：仅既有 BEST 5 条基线错误；改动文件及 `src/tests/scripts` eslint **0**。
+- `git diff --check` 0。
+- 独立复核：**PASS，阻断 0**；报告 `.local/catalog/member-overview-v1-20261118/independent-review-62dd7e6.md`。
+
+## 6. 入口
+
+- 成员经营总览：<http://127.0.0.1:3011/dashboard>
+- 成员库存下钻：<http://127.0.0.1:3011/dashboard/inventory?source=overseas>
+- 成员物流下钻：<http://127.0.0.1:3011/dashboard/in-transit>
+- 管理员授权：<http://127.0.0.1:3011/dashboard/permissions/accounts> → 「验收成员V1」→ 编辑 → 物流市场
+- 成员：`member.v1@catalog.test`（密码见本机 `.local/catalog/permissions-v1-20261117/test-accounts.md`）；管理员：`admin@catalog.test`（密码见实例 `login.local-preview.txt`）。
+
+## 7. 构建与运行
+
+```powershell
+node scripts/catalog/apply-047.mjs --commit --allow-live-commit --run-id run-20261026T211500Z-11a22b33
+node scripts/catalog/build-preview-workspace.mjs --run-id run-20261026T211500Z-11a22b33
+node scripts/catalog/promote-preview-build.mjs --run-id run-20261026T211500Z-11a22b33
+$env:CATALOG_PREVIEW_PORT="3011"; node scripts/catalog/start-local-preview.mjs --run-id run-20261026T211500Z-11a22b33
+```
+
+## 8. 已知边界
+
+- 首页数字是**验收时点**（库存 17:22、物流 17:28）；后台按计划继续更新后，刷新会显示新批次。
+- 测试成员实际有两个库存仓（含市场待确认的 DEE-龙仔厝），首页按实际授权全部列出；不是只显示越南一个仓。
+- 验收中的物流授权切换/撤销为直接改测试成员授权，结束后已恢复原「越南」；这些切换不写账号审计。
+- 物流板块只读、无金额；成员库存金额沿用角色「库存金额查看」。
+- 未做多日稳定性、真实撤权压测与 200% 缩放验收；未部署。
+- 待推历史已删除任务记录中的明文密码，改为引用本机凭据文件；原起点 `7864f93` 因此本地改写为 `187bf1e`。Mac 部署准备改动继续留在工作区，不进入本包提交。

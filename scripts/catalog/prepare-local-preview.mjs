@@ -110,6 +110,17 @@ const DEPENDENT_SQL = [
       'catalog.update_access_account(uuid,text,uuid,boolean,uuid[],text[])',
     ],
   },
+  {
+    // 成员经营总览 v1（047）：必须晚于 028/030/045/046；物流市场汇总允许成员读取，
+    // 非管理员只返回授权市场。
+    path: 'db/catalog/047_member_overview.sql',
+    requires: ['catalog.account_access_market', 'catalog.shipment', 'catalog.shipment_item'],
+    requiresFunctions: [
+      'catalog.require_shipment_read()',
+      'catalog.access_member_markets()',
+      'catalog.read_shipment_market_summary(text)',
+    ],
+  },
 ];
 
 async function applyCatalogSql(run) {
